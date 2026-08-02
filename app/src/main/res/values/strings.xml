@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">مصروف</string>
-    <string name="app_title">مصروف</string>
-    <string name="app_subtitle">التطبيق يعمل بنجاح</string>
+
+    <!-- SMS reader screen -->
+    <string name="sms_screen_title">الرسائل</string>
+    <string name="action_refresh">تحديث</string>
+
+    <!-- Pre-permission explanation (shown before the system prompt) -->
+    <string name="permission_explain_title">الوصول إلى الرسائل</string>
+    <string name="permission_explain_body">يحتاج التطبيق إلى إذنك لقراءة الرسائل الواردة على هذا الجهاز وعرضها داخل التطبيق. لن يتم تعديل الرسائل أو حذفها.</string>
+    <string name="permission_grant">السماح</string>
+
+    <!-- Shown after the user has denied the permission -->
+    <string name="permission_denied_title">الإذن مرفوض</string>
+    <string name="permission_denied_body">لم تسمح للتطبيق بقراءة الرسائل. يمكنك المحاولة مرة أخرى للسماح بالوصول إلى الرسائل وعرضها.</string>
+    <string name="permission_retry">إعادة المحاولة</string>
+
+    <!-- List states -->
+    <string name="empty_messages">لا توجد رسائل لعرضها.</string>
+    <string name="empty_body">(لا يوجد نص للرسالة)</string>
+    <string name="unknown_sender">مرسل غير معروف</string>
 </resources>

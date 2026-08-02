@@ -1,0 +1,77 @@
+package com.baraa.masroof.sms
+
+import android.content.ContentResolver
+import android.content.Context
+import android.database.Cursor
+import android.net.Uri
+import android.provider.Telephony
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Reads SMS rows from the system SMS provider.
+ *
+ * The repository is read-only: it never writes, deletes, or modifies messages.
+ * All I/O runs on [Dispatchers.IO] so callers may invoke it from the main thread.
+ */
+class SmsRepository(private val context: Context) {
+
+    private val tag = "SmsRepository"
+
+    /**
+     * Load the most recent inbox messages (newest first), capped at [limit].
+     *
+     * @return list of messages, empty if the provider is unavailable or no rows match
+     */
+    suspend fun loadInbox(limit: Int = DEFAULT_LIMIT): List<SmsMessage> =
+        withContext(Dispatchers.IO) {
+            val resolver: ContentResolver = context.contentResolver
+            val uri: Uri = Telephony.Sms.Inbox.CONTENT_URI
+
+            val projection = arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+            )
+            val sortOrder = "${Telephony.Sms.DATE} DESC LIMIT $limit"
+
+            val result = ArrayList<SmsMessage>()
+            var cursor: Cursor? = null
+            try {
+                cursor = resolver.query(uri, projection, null, null, sortOrder)
+                if (cursor == null) {
+                    Log.w(tag, "ContentResolver returned null cursor")
+                    return@withContext emptyList()
+                }
+                val idIdx = cursor.getColumnIndex(Telephony.Sms._ID)
+                val addrIdx = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+                val bodyIdx = cursor.getColumnIndex(Telephony.Sms.BODY)
+                val dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE)
+
+                while (cursor.moveToNext()) {
+                    val id = if (idIdx >= 0 && !cursor.isNull(idIdx)) cursor.getLong(idIdx) else 0L
+                    val sender = if (addrIdx >= 0 && !cursor.isNull(addrIdx)) cursor.getString(addrIdx) else null
+                    val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
+                    val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
+                    result.add(SmsMessage(id = id, sender = sender, body = body, timestamp = date))
+                }
+                Log.d(tag, "Loaded ${result.size} messages (limit=$limit)")
+            } catch (security: SecurityException) {
+                // Permission revoked between check and query — return empty so UI can recover.
+                Log.e(tag, "READ_SMS permission missing while reading inbox", security)
+                return@withContext emptyList()
+            } catch (t: Throwable) {
+                Log.e(tag, "Failed to read SMS inbox", t)
+                return@withContext emptyList()
+            } finally {
+                runCatching { cursor?.close() }
+            }
+            result
+        }
+
+    companion object {
+        const val DEFAULT_LIMIT: Int = 100
+    }
+}
