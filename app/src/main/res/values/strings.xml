@@ -18,6 +18,36 @@
 
     <!-- List states -->
     <string name="empty_messages">لا توجد رسائل لعرضها.</string>
+    <string name="empty_no_bank_messages">لا توجد رسائل بنكية مطابقة ضمن الرسائل المحملة.</string>
     <string name="empty_body">(لا يوجد نص للرسالة)</string>
     <string name="unknown_sender">مرسل غير معروف</string>
+
+    <!-- Bank filter controls -->
+    <string name="filter_banks_only">رسائل البنوك فقط</string>
+    <string name="filter_all">جميع الرسائل</string>
+
+    <!-- Per-message match reason labels (shown as a small pill) -->
+    <string name="match_known_sender">مرسل معروف</string>
+    <string name="match_keywords">كلمات مالية</string>
+    <string name="match_both">كلاهما</string>
+
+    <!-- Message count (Arabic plural rules) -->
+    <plurals name="count_messages">
+        <item quantity="zero">لا توجد رسائل</item>
+        <item quantity="one">رسالة واحدة</item>
+        <item quantity="two">رسالتان</item>
+        <item quantity="few">%1$d رسائل</item>
+        <item quantity="many">%1$d رسالة</item>
+        <item quantity="other">%1$d رسالة</item>
+    </plurals>
+
+    <!-- "X of Y" count when bank filter is hiding messages -->
+    <plurals name="count_messages_of_total">
+        <item quantity="zero">لا توجد رسائل من %2$d</item>
+        <item quantity="one">رسالة واحدة من %2$d</item>
+        <item quantity="two">رسالتان من %2$d</item>
+        <item quantity="few">%1$d رسائل من %2$d</item>
+        <item quantity="many">%1$d رسالة من %2$d</item>
+        <item quantity="other">%1$d رسالة من %2$d</item>
+    </plurals>
 </resources>

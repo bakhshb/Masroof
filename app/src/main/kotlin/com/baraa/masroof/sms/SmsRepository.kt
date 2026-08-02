@@ -10,7 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Reads SMS rows from the system SMS provider.
+ * Reads SMS rows from the system SMS provider and annotates each one with a
+ * [MatchReason] via [BankSmsFilter].
  *
  * The repository is read-only: it never writes, deletes, or modifies messages.
  * All I/O runs on [Dispatchers.IO] so callers may invoke it from the main thread.
@@ -21,6 +22,8 @@ class SmsRepository(private val context: Context) {
 
     /**
      * Load the most recent inbox messages (newest first), capped at [limit].
+     * Each row is annotated with the bank-filter result; UI layers can decide
+     * whether to show or hide non-financial messages.
      *
      * @return list of messages, empty if the provider is unavailable or no rows match
      */
@@ -55,7 +58,16 @@ class SmsRepository(private val context: Context) {
                     val sender = if (addrIdx >= 0 && !cursor.isNull(addrIdx)) cursor.getString(addrIdx) else null
                     val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
                     val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
-                    result.add(SmsMessage(id = id, sender = sender, body = body, timestamp = date))
+                    val match = BankSmsFilter.classifyMessage(sender, body)
+                    result.add(
+                        SmsMessage(
+                            id = id,
+                            sender = sender,
+                            body = body,
+                            timestamp = date,
+                            matchReason = match.reason,
+                        )
+                    )
                 }
                 Log.d(tag, "Loaded ${result.size} messages (limit=$limit)")
             } catch (security: SecurityException) {

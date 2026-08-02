@@ -26,12 +26,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,8 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.CompositionLocalProvider
 import com.baraa.masroof.R
+import com.baraa.masroof.sms.MatchReason
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.ui.theme.MasroofTheme
 import java.text.SimpleDateFormat
@@ -70,7 +74,7 @@ fun SmsScreen(viewModel: SmsViewModel = viewModel()) {
 
     // On first composition, check the current permission state. If not granted,
     // surface the explanation screen — do NOT auto-launch the system prompt so the
-    // user sees the rationale first (per the "show explanation before requesting" rule).
+    // user sees the rationale first.
     val initiallyGranted = remember {
         ContextCompat.checkSelfPermission(
             context,
@@ -116,19 +120,100 @@ fun SmsScreen(viewModel: SmsViewModel = viewModel()) {
                     .padding(innerPadding),
             )
 
-            state.messages.isEmpty() -> EmptyState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                onRefresh = { viewModel.refresh() },
-            )
-
-            else -> MessageList(
-                messages = state.messages,
+            else -> LoadedContent(
+                state = state,
                 contentPadding = innerPadding,
+                onFilterChange = viewModel::setFilterMode,
+                onRefresh = viewModel::refresh,
             )
         }
     }
+}
+
+@Composable
+private fun LoadedContent(
+    state: SmsUiState,
+    contentPadding: PaddingValues,
+    onFilterChange: (FilterMode) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    val displayed = state.displayedMessages
+    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        FilterBar(
+            current = state.filterMode,
+            onFilterChange = onFilterChange,
+        )
+        CountLine(
+            displayedCount = displayed.size,
+            totalCount = state.messages.size,
+            filterMode = state.filterMode,
+        )
+        when {
+            displayed.isEmpty() -> EmptyState(
+                modifier = Modifier.fillMaxSize(),
+                onRefresh = onRefresh,
+                filterMode = state.filterMode,
+                totalCount = state.messages.size,
+            )
+
+            else -> MessageList(messages = displayed)
+        }
+    }
+}
+
+@Composable
+private fun FilterBar(
+    current: FilterMode,
+    onFilterChange: (FilterMode) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = current == FilterMode.BANKS_ONLY,
+            onClick = { onFilterChange(FilterMode.BANKS_ONLY) },
+            label = { Text(text = stringResource(id = R.string.filter_banks_only)) },
+        )
+        FilterChip(
+            selected = current == FilterMode.ALL,
+            onClick = { onFilterChange(FilterMode.ALL) },
+            label = { Text(text = stringResource(id = R.string.filter_all)) },
+        )
+    }
+}
+
+@Composable
+private fun CountLine(
+    displayedCount: Int,
+    totalCount: Int,
+    filterMode: FilterMode,
+) {
+    val text = if (filterMode == FilterMode.BANKS_ONLY && totalCount > displayedCount) {
+        // Show "X of Y" so the user knows there are other messages hidden by the filter.
+        pluralStringResource(
+            id = R.plurals.count_messages_of_total,
+            count = displayedCount,
+            displayedCount,
+            totalCount,
+        )
+    } else {
+        pluralStringResource(
+            id = R.plurals.count_messages,
+            count = displayedCount,
+            displayedCount,
+        )
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -181,14 +266,23 @@ private fun LoadingState(modifier: Modifier) {
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier, onRefresh: () -> Unit) {
+private fun EmptyState(
+    modifier: Modifier,
+    onRefresh: () -> Unit,
+    filterMode: FilterMode,
+    totalCount: Int,
+) {
+    val isFilteredEmpty = filterMode == FilterMode.BANKS_ONLY && totalCount > 0
     Column(
         modifier = modifier.padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = stringResource(id = R.string.empty_messages),
+            text = stringResource(
+                id = if (isFilteredEmpty) R.string.empty_no_bank_messages
+                else R.string.empty_messages,
+            ),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
@@ -201,19 +295,11 @@ private fun EmptyState(modifier: Modifier, onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun MessageList(
-    messages: List<SmsMessage>,
-    contentPadding: PaddingValues,
-) {
+private fun MessageList(messages: List<SmsMessage>) {
     val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 12.dp + contentPadding.calculateStartPadding(LayoutDirection.Rtl),
-            end = 12.dp + contentPadding.calculateEndPadding(LayoutDirection.Rtl),
-            top = 8.dp + contentPadding.calculateTopPadding(),
-            bottom = 8.dp + contentPadding.calculateBottomPadding(),
-        ),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(items = messages, key = { it.id }) { message ->
@@ -245,7 +331,9 @@ private fun SmsRow(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                 Text(
                     text = formatDate(message.timestamp, dateFormat),
                     style = MaterialTheme.typography.labelSmall,
@@ -259,7 +347,34 @@ private fun SmsRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            if (message.matchReason != MatchReason.NONE) {
+                Spacer(modifier = Modifier.height(8.dp))
+                MatchReasonPill(reason = message.matchReason)
+            }
         }
+    }
+}
+
+@Composable
+private fun MatchReasonPill(reason: MatchReason) {
+    val label = stringResource(
+        id = when (reason) {
+            MatchReason.KNOWN_SENDER -> R.string.match_known_sender
+            MatchReason.KEYWORDS -> R.string.match_keywords
+            MatchReason.BOTH -> R.string.match_both
+            MatchReason.NONE -> return // hidden by parent
+        },
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

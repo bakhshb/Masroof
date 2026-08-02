@@ -12,13 +12,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Which subset of messages the UI is currently displaying. */
+enum class FilterMode {
+    /** Show only messages classified as financial. Default. */
+    BANKS_ONLY,
+
+    /** Show every loaded message regardless of classification. */
+    ALL,
+}
+
 /** UI state for the SMS reader screen. */
 data class SmsUiState(
     val hasPermission: Boolean = false,
     val isLoading: Boolean = false,
     val messages: List<SmsMessage> = emptyList(),
+    val filterMode: FilterMode = FilterMode.BANKS_ONLY,
     val error: String? = null,
-)
+) {
+    /** Messages after applying the current [filterMode]. */
+    val displayedMessages: List<SmsMessage>
+        get() = when (filterMode) {
+            FilterMode.BANKS_ONLY -> messages.filter { it.matchReason != com.baraa.masroof.sms.MatchReason.NONE }
+            FilterMode.ALL -> messages
+        }
+}
 
 /**
  * Owns SMS screen state. Uses [AndroidViewModel] to access [Application] for the
@@ -38,6 +55,13 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         if (granted) {
             refresh()
         }
+    }
+
+    /** Switch between bank-only and all-messages display. */
+    fun setFilterMode(mode: FilterMode) {
+        if (_uiState.value.filterMode == mode) return
+        _uiState.update { it.copy(filterMode = mode) }
+        Log.d(tag, "filter mode -> $mode")
     }
 
     /** Re-read messages; safe to call from UI events (refresh button, retry). */
