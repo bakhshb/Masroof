@@ -1,0 +1,22 @@
+# Built with Android Studio
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Kotlin
+*.hprof
+
+# Keystore files
+*.jks
+*.keystore
+
+# Orchestration runtime state
+.orch/
