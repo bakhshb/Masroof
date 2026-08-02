@@ -23,14 +23,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * State of the two-phase import flow. The [PreviewReady] variant carries the
- * full [TransactionImportService.PreviewResult] (counts + prepared entities)
- * so the confirm call has everything it needs.
+ * State of the two-phase import flow. The [ReviewingDuplicates] variant is
+ * shown when the preview contains at least one POSSIBLE_DUPLICATE item and
+ * the user has not yet finalized the per-item decisions.
  */
 sealed interface ImportState {
     data object Idle : ImportState
     data object Scanning : ImportState
     data class PreviewReady(val result: TransactionImportService.PreviewResult) : ImportState
+    data class ReviewingDuplicates(val result: TransactionImportService.PreviewResult) : ImportState
     data object Importing : ImportState
     data class Done(val summary: ImportSummary) : ImportState
     data class Error(val message: String) : ImportState
@@ -89,7 +90,56 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 val summary = withContext(Dispatchers.IO) {
                     importService.commit(preview)
                 }
-                Log.d(tag, "import complete inserted=${summary.inserted} dup=${summary.duplicatesSkipped}")
+                Log.d(
+                    tag,
+                    "import complete inserted=${summary.inserted} " +
+                        "exact_dups=${summary.exactDuplicatesSkipped} " +
+                        "possible_dups_skipped=${summary.possibleDuplicatesSkipped} " +
+                        "possible_dups_kept=${summary.possibleDuplicatesInserted}",
+                )
+                _importState.value = ImportState.Done(summary)
+            } catch (t: Throwable) {
+                Log.e(tag, "import commit failed", t)
+                _importState.value = ImportState.Error(t.message ?: "unknown error")
+            }
+        }
+    }
+
+    /** Move from preview to the duplicate-review dialog (no DB write). */
+    fun openDuplicateReview() {
+        val state = _importState.value
+        if (state is ImportState.PreviewReady) {
+            _importState.value = ImportState.ReviewingDuplicates(state.result)
+        }
+    }
+
+    /**
+     * Apply the per-item user decisions and commit. The [decisions] map is
+     * keyed by [com.baraa.masroof.data.repository.ImportPreviewItem.smsIndex].
+     */
+    fun applyDecisionsAndCommit(
+        preview: TransactionImportService.PreviewResult,
+        decisions: Map<Int, com.baraa.masroof.data.repository.DuplicateDecision>,
+    ) {
+        // Apply decisions to the in-memory items, then commit.
+        val updatedItems = preview.items.map { item ->
+            val dec = decisions[item.smsIndex] ?: item.decision
+            item.copy(decision = dec)
+        }
+        val updatedPreview = preview.copy(items = updatedItems)
+        _importState.value = ImportState.Importing
+        viewModelScope.launch {
+            try {
+                val summary = withContext(Dispatchers.IO) {
+                    importService.commit(updatedPreview)
+                }
+                Log.d(
+                    tag,
+                    "import (after review) complete inserted=${summary.inserted} " +
+                        "exact_dups=${summary.exactDuplicatesSkipped} " +
+                        "possible_dups_skipped=${summary.possibleDuplicatesSkipped} " +
+                        "possible_dups_kept=${summary.possibleDuplicatesInserted}",
+                )
                 _importState.value = ImportState.Done(summary)
             } catch (t: Throwable) {
                 Log.e(tag, "import commit failed", t)

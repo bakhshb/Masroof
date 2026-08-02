@@ -66,15 +66,29 @@
     <string name="import_preview_parsed">تم تحليلها بنجاح: %1$d</string>
     <string name="import_preview_unparseable">تعذر تحليلها: %1$d</string>
     <string name="import_preview_new">عمليات جديدة: %1$d</string>
-    <string name="import_preview_duplicates">مكررات سيتم تجاهلها: %1$d</string>
+    <string name="import_preview_exact_dups">مكررات مطابقة سيتم تجاهلها: %1$d</string>
+    <string name="import_preview_possible_dups">قد تكون مكررة بانتظار المراجعة: %1$d</string>
     <string name="import_preview_confirm_body">هل تريد حفظ %1$d عملية جديدة في قاعدة البيانات المحلية؟</string>
     <string name="import_preview_no_new">لا توجد عمليات جديدة لحفظها.</string>
+    <string name="import_preview_review_duplicates">مراجعة المكررات المحتملة</string>
 
     <!-- Import summary dialog -->
     <string name="import_summary_title">نتيجة الاستيراد</string>
     <string name="import_summary_inserted">تمت إضافة %1$d عملية</string>
     <string name="import_summary_duplicates">تم تجاهل %1$d عمليات مكررة</string>
     <string name="import_summary_unparseable">تعذر تحليل %1$d رسائل</string>
+
+    <!-- Two-level duplicate detection -->
+    <string name="import_exact_dup">مكررة مطابقة</string>
+    <string name="import_possible_dup">قد تكون مكررة</string>
+    <string name="import_new">عملية جديدة</string>
+    <string name="duplicate_review_title">مراجعة المكررات المحتملة</string>
+    <string name="duplicate_review_body">تم العثور على %1$d رسالة قد تكون مكررة. اختر العملية التي تريد تنفيذها لكل عنصر.</string>
+    <string name="duplicate_decision_insert">إضافة على أي حال</string>
+    <string name="duplicate_decision_skip">تجاهل العملية</string>
+    <string name="duplicate_review_existing_sender">الرسالة الحالية: %1$s</string>
+    <string name="duplicate_review_existing_amount">بمبلغ: %1$s</string>
+    <string name="duplicate_review_existing_date">بتاريخ: %1$s</string>
 
     <!-- Edit dialog -->
     <string name="edit_dialog_title">تعديل العملية</string>
@@ -118,6 +132,7 @@
     <string name="status_declined">مرفوض</string>
     <string name="status_reversed">معكوس</string>
     <string name="status_unknown">غير معروف</string>
+    <string name="status_needs_review">يحتاج مراجعة</string>
 
     <!-- Currency labels -->
     <string name="currency_sar">ر.س</string>

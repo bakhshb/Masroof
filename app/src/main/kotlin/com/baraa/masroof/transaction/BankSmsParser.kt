@@ -4,10 +4,27 @@ package com.baraa.masroof.transaction
  * Contract for a bank SMS parser. Each concrete parser decides whether it can
  * handle a given [sender] / [body] pair, and produces a [ParsedTransaction].
  *
- * To add support for a new bank format, implement this interface and register
- * the new parser in [BankSmsParserRegistry] ahead of [GenericBankSmsParser].
+ * To add support for a new bank format, implement this interface (most likely
+ * by extending [AbstractBankSmsParser]) and register the new parser in
+ * [BankParserRegistry] ahead of [GenericBankSmsParser].
+ *
+ * Parsers are sorted by [priority] in the registry: higher-priority parsers
+ * are tried first, and the first one whose [canParse] returns true handles
+ * the message. The fallback parser is the generic one.
  */
 interface BankSmsParser {
+
+    /** Human-readable parser name, surfaced in the [ParsedTransaction.parserName]. */
+    val name: String
+
+    /** Parser version. Bumped when extraction logic changes meaningfully. */
+    val version: String
+
+    /**
+     * Higher = tried first. Dedicated bank parsers should use `100`, the
+     * generic fallback uses `0` so it always loses to a specific parser.
+     */
+    val priority: Int
 
     /**
      * Return true if this parser wants to handle the message. The registry

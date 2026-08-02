@@ -43,6 +43,12 @@ android {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
 
+    // Export Room schemas to a version-controlled directory so future migrations
+    // can be tested and reviewed. See `app/schemas/`.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

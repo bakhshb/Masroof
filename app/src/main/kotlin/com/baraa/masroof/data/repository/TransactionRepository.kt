@@ -23,6 +23,7 @@ interface TransactionRepository {
     suspend fun deleteAll()
     suspend fun count(): Int
     suspend fun existsByFingerprint(fingerprint: String): Boolean
+    suspend fun findBySimilarityKey(key: String): List<TransactionEntity>
 }
 
 /** Room-backed implementation. */
@@ -40,6 +41,9 @@ class RoomTransactionRepository(private val dao: TransactionDao) : TransactionRe
     override suspend fun count(): Int = dao.count()
     override suspend fun existsByFingerprint(fingerprint: String): Boolean =
         dao.existsByFingerprint(fingerprint)
+
+    override suspend fun findBySimilarityKey(key: String): List<TransactionEntity> =
+        dao.findBySimilarityKey(key)
 }
 
 /**
@@ -109,6 +113,10 @@ class FakeTransactionRepository : TransactionRepository {
 
     override suspend fun existsByFingerprint(fingerprint: String): Boolean =
         rows.any { it.uniqueFingerprint == fingerprint }
+
+    override suspend fun findBySimilarityKey(key: String): List<TransactionEntity> =
+        rows.filter { it.transactionSimilarityKey == key }
+            .sortedByDescending { it.smsTimestamp }
 
     private fun nextId(): Long = (rows.maxOfOrNull { it.id } ?: 0L) + 1L
 }

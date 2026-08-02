@@ -6,14 +6,14 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
-import com.baraa.masroof.transaction.BankSmsParserRegistry
+import com.baraa.masroof.transaction.BankParserRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Reads SMS rows from the system SMS provider, classifies them with
  * [BankSmsFilter], and parses any likely financial message into a
- * structured transaction via [BankSmsParserRegistry].
+ * structured transaction via [BankParserRegistry].
  *
  * The repository is read-only: it never writes, deletes, or modifies messages.
  * All I/O runs on [Dispatchers.IO] so callers may invoke it from the main thread.
@@ -63,7 +63,7 @@ class SmsRepository(private val context: Context) {
                     val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
                     val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
                     val match = BankSmsFilter.classifyMessage(sender, body)
-                    val parsed = BankSmsParserRegistry.parse(sender, body, date.takeIf { it > 0L })
+                    val parsed = BankParserRegistry.parse(sender, body, date.takeIf { it > 0L })
                     result.add(
                         SmsMessage(
                             id = id,

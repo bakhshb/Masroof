@@ -10,8 +10,10 @@ import java.time.format.DateTimeParseException
 import java.util.Locale
 
 /**
- * Fallback parser that handles any bank SMS using a small set of Arabic and
- * English keyword patterns + a balanced amount-extraction scoring algorithm.
+ * Base class for bank SMS parsers. Concrete subclasses override [name],
+ * [priority], and [senderAliases] to claim specific senders; the shared
+ * extraction logic (currency, type, amount, last-four, merchant, date, status,
+ * confidence) lives here so each bank parser does not have to re-implement it.
  *
  * Amount extraction (the hard part):
  *  1. Find all numeric candidates in the normalized body.
@@ -24,11 +26,36 @@ import java.util.Locale
  *     that "عملية شراء بمبلغ 250 ريال / الرصيد المتاح 4,500 ريال" extracts
  *     250 — not 4,500.
  *
- * This parser is pure JVM: no Android imports, no logging, no I/O.
+ * This class is pure JVM: no Android imports, no logging, no I/O.
+ *
+ * **Real Saudi bank SMS samples are still required** to add bank-specific
+ * patterns on top of this base. The current concrete bank parsers simply
+ * declare their sender aliases and inherit the shared extraction logic.
  */
-class GenericBankSmsParser : BankSmsParser {
+open class GenericBankSmsParser : BankSmsParser {
 
-    override fun canParse(sender: String?, body: String?): Boolean = true
+    override val name: String = "Generic"
+    override val version: String = "1.0.0"
+    override val priority: Int = 0
+
+    /**
+     * Sender identifiers (already normalized: lowercased, whitespace
+     * collapsed) that this parser is willing to handle. An empty list means
+     * "match anything" — the convention used by the fallback generic parser.
+     */
+    open val senderAliases: List<String> = emptyList()
+
+    /**
+     * True if this parser claims the message. The [BankParserRegistry] calls
+     * this on the highest-priority parser first; the first to return true
+     * handles the message.
+     */
+    override fun canParse(sender: String?, body: String?): Boolean {
+        if (senderAliases.isEmpty()) return true
+        if (sender.isNullOrBlank()) return false
+        val normalized = BankTextNormalizer.normalizeForParsing(sender)
+        return senderAliases.any { it == normalized }
+    }
 
     override fun parse(
         sender: String?,
@@ -36,19 +63,24 @@ class GenericBankSmsParser : BankSmsParser {
         smsTimestampMillis: Long?,
     ): ParsedTransaction {
         val notes = mutableListOf<String>()
+        val matchedRules = mutableListOf<String>()
         val normalized = BankTextNormalizer.normalizeForParsing(body)
 
         if (normalized.isEmpty()) {
             notes.add("empty body")
-            return emptyResult(sender, body, notes)
+            return emptyResult(sender, body, notes, matchedRules)
         }
 
-        val currency = detectCurrency(normalized, notes)
-        val type = detectType(normalized, notes)
+        if (senderAliases.isNotEmpty() && !sender.isNullOrBlank()) {
+            matchedRules.add("sender_alias_match:${sender.trim()}")
+        }
+
+        val currency = detectCurrency(normalized, notes, matchedRules)
+        val type = detectType(normalized, notes, matchedRules)
         val status = detectStatus(normalized, type)
-        val amount = extractAmount(normalized, type, notes)
-        val cardOrAccount = extractLastFourDigits(normalized, notes)
-        val merchant = extractMerchant(body, notes)
+        val amount = extractAmount(normalized, type, notes, matchedRules)
+        val cardOrAccount = extractLastFourDigits(normalized, notes, matchedRules)
+        val merchant = extractMerchant(body, notes, matchedRules)
         val (date, time) = extractDateTime(normalized, smsTimestampMillis, notes)
         val confidence = computeConfidence(
             amount = amount,
@@ -60,6 +92,24 @@ class GenericBankSmsParser : BankSmsParser {
             dateFromBody = notes.any { it.startsWith("date from message body") },
         )
 
+        val missingFields = buildList {
+            if (amount == null) add("amount")
+            if (currency == Currency.UNKNOWN) add("currency")
+            if (type == TransactionType.UNKNOWN) add("transactionType")
+            if (merchant.isNullOrBlank()) add("merchant")
+            if (cardOrAccount.isNullOrBlank()) add("accountOrCardLastFourDigits")
+            if (date == null) add("transactionDate")
+        }
+
+        // Below the confidence floor -> mark as NEEDS_REVIEW so the UI can
+        // surface it. The threshold matches the existing import service
+        // `PARSE_CONFIDENCE_THRESHOLD`.
+        val finalStatus = if (confidence < NEEDS_REVIEW_CONFIDENCE_FLOOR) {
+            if (status == TransactionStatus.COMPLETED) TransactionStatus.NEEDS_REVIEW else status
+        } else {
+            status
+        }
+
         return ParsedTransaction(
             originalSender = sender,
             originalMessage = body,
@@ -70,23 +120,40 @@ class GenericBankSmsParser : BankSmsParser {
             accountOrCardLastFourDigits = cardOrAccount,
             transactionDate = date,
             transactionTime = time,
-            status = status,
+            status = finalStatus,
             confidence = confidence,
             parsingNotes = notes,
+            parserName = name,
+            parserVersion = version,
+            matchedRules = matchedRules.toList(),
+            missingFields = missingFields,
         )
     }
 
     // -- Currency -------------------------------------------------------------
 
-    private fun detectCurrency(normalized: String, notes: MutableList<String>): Currency {
+    private fun detectCurrency(
+        normalized: String,
+        notes: MutableList<String>,
+        matchedRules: MutableList<String>,
+    ): Currency {
         val lower = normalized.lowercase(Locale.ROOT)
         val hasSar = "sar" in lower || "ريال" in normalized || "ر.س" in normalized || "ر س" in normalized
         val hasUsd = "usd" in lower || "$" in normalized
         val hasEur = "eur" in lower || "€" in normalized
         return when {
-            hasSar -> Currency.SAR
-            hasUsd -> Currency.USD
-            hasEur -> Currency.EUR
+            hasSar -> {
+                matchedRules.add("currency:sar")
+                Currency.SAR
+            }
+            hasUsd -> {
+                matchedRules.add("currency:usd")
+                Currency.USD
+            }
+            hasEur -> {
+                matchedRules.add("currency:eur")
+                Currency.EUR
+            }
             else -> {
                 notes.add("currency not found in message; defaulted to UNKNOWN")
                 Currency.UNKNOWN
@@ -99,30 +166,64 @@ class GenericBankSmsParser : BankSmsParser {
     // Order matters: most-specific patterns are checked first. SALARY is
     // checked before DEPOSIT because "تم إيداع راتب" should be SALARY.
 
-    private fun detectType(normalized: String, notes: MutableList<String>): TransactionType {
+    private fun detectType(
+        normalized: String,
+        notes: MutableList<String>,
+        matchedRules: MutableList<String>,
+    ): TransactionType {
         val n = normalized
 
         // -- DECLINED first, because a declined message often still mentions
         //    "purchase" / "transfer" etc. and we want the negative status to win.
-        if (containsAny(n, DECLINED_KEYWORDS)) return TransactionType.DECLINED
+        if (containsAny(n, DECLINED_KEYWORDS)) {
+            matchedRules.add("type:declined")
+            return TransactionType.DECLINED
+        }
 
         // -- SALARY before DEPOSIT (Arabic "راتب" is a substring of nothing
         //    else dangerous, but "إيداع راتب" should be SALARY).
-        if (containsAny(n, SALARY_KEYWORDS)) return TransactionType.SALARY
+        if (containsAny(n, SALARY_KEYWORDS)) {
+            matchedRules.add("type:salary")
+            return TransactionType.SALARY
+        }
 
         // -- ONLINE_PURCHASE before PURCHASE (more specific).
-        if (containsAny(n, ONLINE_PURCHASE_KEYWORDS)) return TransactionType.ONLINE_PURCHASE
-        if (containsAny(n, PURCHASE_KEYWORDS)) return TransactionType.PURCHASE
+        if (containsAny(n, ONLINE_PURCHASE_KEYWORDS)) {
+            matchedRules.add("type:online_purchase")
+            return TransactionType.ONLINE_PURCHASE
+        }
+        if (containsAny(n, PURCHASE_KEYWORDS)) {
+            matchedRules.add("type:purchase")
+            return TransactionType.PURCHASE
+        }
 
-        if (containsAny(n, CASH_WITHDRAWAL_KEYWORDS)) return TransactionType.CASH_WITHDRAWAL
-        if (containsAny(n, TRANSFER_IN_KEYWORDS)) return TransactionType.TRANSFER_IN
-        if (containsAny(n, TRANSFER_OUT_KEYWORDS)) return TransactionType.TRANSFER_OUT
-        if (containsAny(n, CARD_PAYMENT_KEYWORDS)) return TransactionType.CARD_PAYMENT
-        if (containsAny(n, REFUND_KEYWORDS)) return TransactionType.REFUND
-        if (containsAny(n, BANK_FEE_KEYWORDS)) return TransactionType.BANK_FEE
-        if (containsAny(n, DEPOSIT_KEYWORDS)) return TransactionType.DEPOSIT
-        if (containsAny(n, INTERNAL_TRANSFER_KEYWORDS)) return TransactionType.INTERNAL_TRANSFER
-        if (containsAny(n, INVESTMENT_TRANSFER_KEYWORDS)) return TransactionType.INVESTMENT_TRANSFER
+        if (containsAny(n, CASH_WITHDRAWAL_KEYWORDS)) {
+            matchedRules.add("type:cash_withdrawal"); return TransactionType.CASH_WITHDRAWAL
+        }
+        if (containsAny(n, TRANSFER_IN_KEYWORDS)) {
+            matchedRules.add("type:transfer_in"); return TransactionType.TRANSFER_IN
+        }
+        if (containsAny(n, TRANSFER_OUT_KEYWORDS)) {
+            matchedRules.add("type:transfer_out"); return TransactionType.TRANSFER_OUT
+        }
+        if (containsAny(n, CARD_PAYMENT_KEYWORDS)) {
+            matchedRules.add("type:card_payment"); return TransactionType.CARD_PAYMENT
+        }
+        if (containsAny(n, REFUND_KEYWORDS)) {
+            matchedRules.add("type:refund"); return TransactionType.REFUND
+        }
+        if (containsAny(n, BANK_FEE_KEYWORDS)) {
+            matchedRules.add("type:bank_fee"); return TransactionType.BANK_FEE
+        }
+        if (containsAny(n, DEPOSIT_KEYWORDS)) {
+            matchedRules.add("type:deposit"); return TransactionType.DEPOSIT
+        }
+        if (containsAny(n, INTERNAL_TRANSFER_KEYWORDS)) {
+            matchedRules.add("type:internal_transfer"); return TransactionType.INTERNAL_TRANSFER
+        }
+        if (containsAny(n, INVESTMENT_TRANSFER_KEYWORDS)) {
+            matchedRules.add("type:investment_transfer"); return TransactionType.INVESTMENT_TRANSFER
+        }
 
         notes.add("could not determine transaction type")
         return TransactionType.UNKNOWN
@@ -153,6 +254,7 @@ class GenericBankSmsParser : BankSmsParser {
         normalized: String,
         type: TransactionType,
         notes: MutableList<String>,
+        matchedRules: MutableList<String>,
     ): BigDecimal? {
         val candidates = NUMBER_REGEX.findAll(normalized).toList()
         if (candidates.isEmpty()) {
@@ -206,6 +308,7 @@ class GenericBankSmsParser : BankSmsParser {
             notes.add("amount candidate '$raw' could not be parsed as BigDecimal")
             return null
         }
+        matchedRules.add("amount_pattern")
         notes.add("amount picked from candidates=$raw at pos=${bestMatch.range.first}")
         return amount
     }
@@ -215,11 +318,13 @@ class GenericBankSmsParser : BankSmsParser {
     private fun extractLastFourDigits(
         normalized: String,
         notes: MutableList<String>,
+        matchedRules: MutableList<String>,
     ): String? {
         val match = LAST_FOUR_REGEX.find(normalized) ?: return null
         val digits = match.groupValues[1]
         // Reject obviously-not-card values (e.g., "0000") only if the user
         // chose strict mode — for now, accept whatever the regex matched.
+        matchedRules.add("card_or_account_digits")
         notes.add("last 4 digits found: $digits")
         return digits
     }
@@ -229,12 +334,14 @@ class GenericBankSmsParser : BankSmsParser {
     private fun extractMerchant(
         originalBody: String?,
         notes: MutableList<String>,
+        matchedRules: MutableList<String>,
     ): String? {
         if (originalBody.isNullOrBlank()) return null
         for (pattern in MERCHANT_PATTERNS) {
             val match = pattern.find(originalBody) ?: continue
             val candidate = match.groupValues[1].trim().trim('.', ' ', ',')
             if (candidate.isNotEmpty() && candidate.length <= MAX_MERCHANT_LEN) {
+                matchedRules.add("merchant_pattern")
                 notes.add("merchant matched pattern")
                 return candidate
             }
@@ -335,23 +442,35 @@ class GenericBankSmsParser : BankSmsParser {
     private fun containsAny(text: String, keywords: List<String>): Boolean =
         keywords.any { it in text }
 
-    private fun emptyResult(sender: String?, body: String?, notes: List<String>) =
-        ParsedTransaction(
-            originalSender = sender,
-            originalMessage = body,
-            transactionType = TransactionType.UNKNOWN,
-            amount = null,
-            currency = Currency.UNKNOWN,
-            merchant = null,
-            accountOrCardLastFourDigits = null,
-            transactionDate = null,
-            transactionTime = null,
-            status = TransactionStatus.UNKNOWN,
-            confidence = 0,
-            parsingNotes = notes,
-        )
+    private fun emptyResult(
+        sender: String?,
+        body: String?,
+        notes: List<String>,
+        matchedRules: List<String>,
+    ) = ParsedTransaction(
+        originalSender = sender,
+        originalMessage = body,
+        transactionType = TransactionType.UNKNOWN,
+        amount = null,
+        currency = Currency.UNKNOWN,
+        merchant = null,
+        accountOrCardLastFourDigits = null,
+        transactionDate = null,
+        transactionTime = null,
+        status = TransactionStatus.NEEDS_REVIEW,
+        confidence = 0,
+        parsingNotes = notes,
+        parserName = name,
+        parserVersion = version,
+        matchedRules = matchedRules,
+        missingFields = listOf("amount", "currency", "transactionType", "merchant", "accountOrCardLastFourDigits", "transactionDate"),
+    )
 
     companion object {
+        // Below this confidence we mark the result as [TransactionStatus.NEEDS_REVIEW]
+        // so the UI can surface it for the user to verify / edit.
+        const val NEEDS_REVIEW_CONFIDENCE_FLOOR: Int = 30
+
         private const val CONTEXT_WINDOW = 30
         // Smaller window for balance markers — they must be IMMEDIATELY
         // adjacent to the amount (within ~15 chars), otherwise the next

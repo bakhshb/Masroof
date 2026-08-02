@@ -275,6 +275,7 @@ private fun statusLabel(s: TransactionStatus): String = stringResource(
         TransactionStatus.DECLINED -> R.string.status_declined
         TransactionStatus.REVERSED -> R.string.status_reversed
         TransactionStatus.UNKNOWN -> R.string.status_unknown
+        TransactionStatus.NEEDS_REVIEW -> R.string.status_needs_review
     }
 )
 

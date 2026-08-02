@@ -25,6 +25,11 @@ enum class TransactionStatus {
     DECLINED,
     REVERSED,
     UNKNOWN,
+    /**
+     * The parser did not produce a high-confidence result. The transaction
+     * is persisted but the UI should surface it for user review / edit.
+     */
+    NEEDS_REVIEW,
 }
 
 /** Currency of the transaction amount. */

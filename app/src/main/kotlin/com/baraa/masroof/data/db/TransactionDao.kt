@@ -61,4 +61,14 @@ interface TransactionDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE uniqueFingerprint = :fingerprint LIMIT 1)")
     suspend fun existsByFingerprint(fingerprint: String): Boolean
+
+    /**
+     * Find transactions whose computed similarity key matches [key]. Used by
+     * the import service to detect near-duplicate transactions that arrived
+     * in separate SMS messages. Sorted by `smsTimestamp DESC` so the most
+     * recent candidate is at index 0 — the duplicate-window check then
+     * compares against the incoming message's timestamp.
+     */
+    @Query("SELECT * FROM transactions WHERE transactionSimilarityKey = :key ORDER BY smsTimestamp DESC")
+    suspend fun findBySimilarityKey(key: String): List<TransactionEntity>
 }

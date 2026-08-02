@@ -171,6 +171,19 @@ fun TransactionListScreen(
                 preview = state.result.preview,
                 onConfirm = { viewModel.confirmImport(state.result) },
                 onCancel = { viewModel.cancelImport() },
+                onReviewDuplicates = { viewModel.openDuplicateReview() },
+            )
+        }
+        is ImportState.ReviewingDuplicates -> {
+            val possibleItems = state.result.items.filter {
+                it.status == com.baraa.masroof.data.repository.ImportItemStatus.POSSIBLE_DUPLICATE
+            }
+            DuplicateReviewDialog(
+                items = possibleItems,
+                onDecisions = { decisions ->
+                    viewModel.applyDecisionsAndCommit(state.result, decisions)
+                },
+                onCancel = { viewModel.cancelImport() },
             )
         }
         ImportState.Scanning -> {
@@ -461,6 +474,7 @@ private fun statusLabel(s: TransactionStatus): String = stringResource(
         TransactionStatus.DECLINED -> R.string.status_declined
         TransactionStatus.REVERSED -> R.string.status_reversed
         TransactionStatus.UNKNOWN -> R.string.status_unknown
+        TransactionStatus.NEEDS_REVIEW -> R.string.status_needs_review
     },
 )
 

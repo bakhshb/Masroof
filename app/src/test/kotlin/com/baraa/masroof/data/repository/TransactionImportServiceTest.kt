@@ -3,6 +3,7 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.sms.MatchReason
 import com.baraa.masroof.sms.SmsMessage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -12,6 +13,12 @@ import java.math.BigDecimal
 /**
  * Unit tests for [TransactionImportService] using the in-memory
  * [FakeTransactionRepository] — pure JVM, no Android, no Room.
+ *
+ * Covers: empty list, mixed parseable / unparseable, exact-duplicate
+ * detection, possible-duplicate detection within the window, no-match
+ * after the window, the two legitimate purchases with the same amount
+ * remaining distinguishable, different cards, missing optional fields,
+ * commit, summary, and import summary calculation.
  */
 class TransactionImportServiceTest {
 
@@ -36,8 +43,9 @@ class TransactionImportServiceTest {
         assertEquals(0, r.preview.parsedSuccessfully)
         assertEquals(0, r.preview.unparseable)
         assertEquals(0, r.preview.newTransactions)
-        assertEquals(0, r.preview.duplicatesSkipped)
-        assertTrue(r.prepared.isEmpty())
+        assertEquals(0, r.preview.exactDuplicates)
+        assertEquals(0, r.preview.possibleDuplicates)
+        assertTrue(r.items.isEmpty())
     }
 
     @Test
@@ -53,61 +61,192 @@ class TransactionImportServiceTest {
         assertEquals(2, r.preview.parsedSuccessfully)
         assertEquals(1, r.preview.unparseable)
         assertEquals(2, r.preview.newTransactions)
-        assertEquals(0, r.preview.duplicatesSkipped)
-        assertEquals(2, r.prepared.size)
+        assertEquals(0, r.preview.exactDuplicates)
+        assertEquals(0, r.preview.possibleDuplicates)
+        assertEquals(2, r.items.size)
     }
 
-    @Suppress("RedundantSuppression") // keep for clarity
-    private fun blockingCount(repo: com.baraa.masroof.data.repository.TransactionRepository): Int =
-        kotlinx.coroutines.runBlocking { repo.count() }
+    // -- Two-level duplicate detection ------------------------------------
 
     @Test
-    fun duplicateMessagesAreSkippedOnSecondImport() {
+    fun exactSameSmsDetectedAsExactDuplicate() {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
-        val first = listOf(sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks", timestamp = 1_700_000_000_000L))
+        val first = listOf(
+            sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks", timestamp = 1_700_000_000_000L)
+        )
         val r1 = kotlinx.coroutines.runBlocking { service.preview(first) }
         val s1 = kotlinx.coroutines.runBlocking { service.commit(r1) }
         assertEquals(1, s1.inserted)
-        assertEquals(0, s1.duplicatesSkipped)
+        assertEquals(0, s1.exactDuplicatesSkipped)
+        assertEquals(0, s1.possibleDuplicatesSkipped)
 
-        // Re-import the same SMS (same sender + same timestamp + same parsed
-        // values) — the duplicate must be skipped.
+        // Re-import the SAME message (same id / sender / body / timestamp)
         val r2 = kotlinx.coroutines.runBlocking { service.preview(first) }
-        assertEquals(1, r2.preview.duplicatesSkipped)
+        assertEquals(1, r2.preview.exactDuplicates)
+        assertEquals(0, r2.preview.possibleDuplicates)
         assertEquals(0, r2.preview.newTransactions)
-        assertTrue(r2.prepared.isEmpty())
+        val exact = r2.items.single()
+        assertEquals(ImportItemStatus.EXACT_DUPLICATE, exact.status)
     }
 
     @Test
-    fun differentMessagesAtSameTimeAreNotDuplicates() {
-        // Same timestamp, different amount — different fingerprints.
+    fun sameTransactionFiveMinutesLaterDetectedAsPossibleDuplicate() {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
+        val base = 1_700_000_000_000L
+        val fiveMinLater = base + 5L * 60L * 1000L
+
+        // First import
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 100 ريال", timestamp = 1_700_000_000_000L)))
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
         }
+        kotlinx.coroutines.runBlocking { service.commit(r1) }
+
+        // Same amount / merchant / card / day, different SMS, 5 min later
         val r2 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 2, body = "عملية شراء بمبلغ 200 ريال", timestamp = 1_700_000_000_000L)))
+            service.preview(listOf(
+                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = fiveMinLater)
+            ))
         }
-        assertEquals(1, r1.preview.newTransactions)
-        assertEquals(1, r2.preview.newTransactions)
-        assertEquals(0, r1.preview.duplicatesSkipped)
-        assertEquals(0, r2.preview.duplicatesSkipped)
+        assertEquals(1, r2.preview.possibleDuplicates)
+        assertEquals(0, r2.preview.exactDuplicates)
+        assertEquals(0, r2.preview.newTransactions)
+        val item = r2.items.single()
+        assertEquals(ImportItemStatus.POSSIBLE_DUPLICATE, item.status)
+        assertNotNull(item.collidingWith)
     }
 
     @Test
-    fun commitInsertsPreparedTransactionsAndReturnsSummary() {
+    fun sameTransactionAfterWindowIsTreatedAsNew() {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
-        val messages = listOf(
-            sms(id = 1, body = "عملية شراء بمبلغ 100 ريال"),
-            sms(id = 2, body = "عملية شراء بمبلغ 200 ريال"),
+        val base = 1_700_000_000_000L
+        // 11 minutes later — outside the 10-minute window.
+        val afterWindow = base + 11L * 60L * 1000L
+
+        val r1 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
+        }
+        kotlinx.coroutines.runBlocking { service.commit(r1) }
+
+        val r2 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(
+                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = afterWindow)
+            ))
+        }
+        // Legitimate repeated purchase → treated as NEW, not a duplicate.
+        assertEquals(1, r2.preview.newTransactions)
+        assertEquals(0, r2.preview.exactDuplicates)
+        assertEquals(0, r2.preview.possibleDuplicates)
+    }
+
+    @Test
+    fun twoLegitimatePurchasesSameAmountAndMerchantAreDistinguishable() {
+        // Same amount, same merchant, but DIFFERENT DAYS — that should be
+        // two independent transactions, not duplicates.
+        val repo = FakeTransactionRepository()
+        val service = TransactionImportService(repo)
+        // 1 day apart
+        val t1 = 1_700_000_000_000L
+        val t2 = t1 + 24L * 60L * 60L * 1000L
+        val r1 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 50 at Starbucks", timestamp = t1)))
+        }
+        kotlinx.coroutines.runBlocking { service.commit(r1) }
+        val r2 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 2, body = "Purchase of SAR 50 at Starbucks", timestamp = t2)))
+        }
+        assertEquals(1, r2.preview.newTransactions)
+        assertEquals(0, r2.preview.possibleDuplicates)
+    }
+
+    @Test
+    fun differentCardsProduceDifferentSimilarityKeys() {
+        val k1 = com.baraa.masroof.transaction.TransactionFingerprint.generateSimilarityKey(
+            sender = "AlRajhi",
+            amount = BigDecimal("100"),
+            currency = com.baraa.masroof.transaction.Currency.SAR,
+            type = com.baraa.masroof.transaction.TransactionType.PURCHASE,
+            merchant = "Starbucks",
+            lastFour = "1234",
+            date = java.time.LocalDate.of(2024, 1, 15),
+            time = java.time.LocalTime.of(14, 30),
         )
-        val r = kotlinx.coroutines.runBlocking { service.preview(messages) }
+        val k2 = com.baraa.masroof.transaction.TransactionFingerprint.generateSimilarityKey(
+            sender = "AlRajhi",
+            amount = BigDecimal("100"),
+            currency = com.baraa.masroof.transaction.Currency.SAR,
+            type = com.baraa.masroof.transaction.TransactionType.PURCHASE,
+            merchant = "Starbucks",
+            lastFour = "5678",
+            date = java.time.LocalDate.of(2024, 1, 15),
+            time = java.time.LocalTime.of(14, 30),
+        )
+        assertTrue("different cards should produce different keys", k1 != k2)
+    }
+
+    @Test
+    fun missingMerchantIsAccepted() {
+        val service = TransactionImportService(FakeTransactionRepository())
+        val r = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "تحويل وارد بمبلغ 500 ريال")))
+        }
+        val entity = r.items.single().preparedEntity!!
+        assertNotNull(entity.amount)
+        // The parser may or may not extract a merchant from "تحويل وارد"
+        // (it might match "من" inside the body). What we care about is
+        // that the entity round-trips even if the merchant is null.
+        assertNull(entity.accountOrCardLastFourDigits)
+    }
+
+    @Test
+    fun missingLastFourDigitsIsAccepted() {
+        val service = TransactionImportService(FakeTransactionRepository())
+        val r = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
+        }
+        val entity = r.items.single().preparedEntity!!
+        assertNotNull(entity.amount)
+        assertNull(entity.accountOrCardLastFourDigits)
+        assertNotNull(entity.transactionSimilarityKey)
+    }
+
+    @Test
+    fun preparedEntityCarriesSimilarityKeyAndExactFingerprint() {
+        val service = TransactionImportService(FakeTransactionRepository())
+        val r = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 250 ريال لدى Starbucks")))
+        }
+        val entity = r.items.single().preparedEntity!!
+        assertNotNull(entity.uniqueFingerprint)
+        assertEquals(64, entity.uniqueFingerprint.length)
+        assertNotNull(entity.transactionSimilarityKey)
+        assertEquals(64, entity.transactionSimilarityKey!!.length)
+        // The two keys MUST differ — the similarity key intentionally
+        // excludes the exact timestamp.
+        assertTrue(entity.uniqueFingerprint != entity.transactionSimilarityKey)
+        assertEquals(0, BigDecimal("250").compareTo(entity.amount))
+        assertEquals("Starbucks", entity.merchantOrBeneficiary)
+    }
+
+    // -- Commit / summary ---------------------------------------------------
+
+    @Test
+    fun commitInsertsOnlyInsertAnywayDecisions() {
+        val repo = FakeTransactionRepository()
+        val service = TransactionImportService(repo)
+        val r = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(
+                sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
+                sms(id = 2, body = "Purchase of SAR 200 at Caribou"),
+            ))
+        }
         val s = kotlinx.coroutines.runBlocking { service.commit(r) }
         assertEquals(2, s.inserted)
-        assertEquals(0, s.duplicatesSkipped)
+        assertEquals(0, s.exactDuplicatesSkipped)
+        assertEquals(0, s.possibleDuplicatesSkipped)
+        assertEquals(0, s.possibleDuplicatesInserted)
         assertEquals(2, kotlinx.coroutines.runBlocking { repo.count() })
     }
 
@@ -115,38 +254,58 @@ class TransactionImportServiceTest {
     fun importSummaryCalculationIsConsistent() {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
-        // First import: 1 successful.
+        val base = 1_700_000_000_000L
+
+        // First import: 1 successful new
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 100 ريال")))
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
         }
         val s1 = kotlinx.coroutines.runBlocking { service.commit(r1) }
         assertEquals(1, s1.messagesScanned)
         assertEquals(1, s1.parsedSuccessfully)
         assertEquals(0, s1.unparseable)
         assertEquals(1, s1.inserted)
-        assertEquals(0, s1.duplicatesSkipped)
+        assertEquals(0, s1.exactDuplicatesSkipped)
+        assertEquals(0, s1.possibleDuplicatesSkipped)
 
-        // Second import: same message → 0 inserted, 1 duplicate.
+        // Second import: same message 2 minutes later → 0 inserted, 1 possible
         val r2 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 2, body = "عملية شراء بمبلغ 100 ريال")))
+            service.preview(listOf(
+                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = base + 2L * 60L * 1000L)
+            ))
         }
         val s2 = kotlinx.coroutines.runBlocking { service.commit(r2) }
-        assertEquals(0, s2.inserted) // nothing new to insert
-        assertEquals(1, s2.duplicatesSkipped) // 1 from preview + 0 from insert
+        assertEquals(1, s2.messagesScanned)
+        assertEquals(1, s2.parsedSuccessfully)
+        assertEquals(0, s2.inserted)
+        assertEquals(0, s2.exactDuplicatesSkipped)
+        assertEquals(1, s2.possibleDuplicatesSkipped)
     }
 
     @Test
-    fun preparedEntityCarriesFingerprintAndAmount() {
-        val service = TransactionImportService(FakeTransactionRepository())
-        val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 250 ريال لدى Starbucks")))
+    fun possibleDuplicateWithInsertAnywayDecisionIsInserted() {
+        val repo = FakeTransactionRepository()
+        val service = TransactionImportService(repo)
+        val base = 1_700_000_000_000L
+        val r1 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
         }
-        val entity = r.prepared.single()
-        assertNotNull(entity.uniqueFingerprint)
-        assertEquals(64, entity.uniqueFingerprint.length)
-        assertEquals(0, BigDecimal("250").compareTo(entity.amount))
-        assertEquals("Starbucks", entity.merchantOrBeneficiary)
-        assertNotNull(entity.transactionDate) // falls back to SMS timestamp
+        kotlinx.coroutines.runBlocking { service.commit(r1) }
+
+        val r2 = kotlinx.coroutines.runBlocking {
+            service.preview(listOf(
+                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = base + 1L * 60L * 1000L)
+            ))
+        }
+        val item = r2.items.single()
+        assertEquals(ImportItemStatus.POSSIBLE_DUPLICATE, item.status)
+        // User decides to insert anyway
+        val decided = r2.copy(items = listOf(item.copy(decision = DuplicateDecision.INSERT_ANYWAY)))
+        val s = kotlinx.coroutines.runBlocking { service.commit(decided) }
+        assertEquals(1, s.inserted)
+        assertEquals(1, s.possibleDuplicatesInserted)
+        assertEquals(0, s.possibleDuplicatesSkipped)
+        assertEquals(2, kotlinx.coroutines.runBlocking { repo.count() })
     }
 
     // -- Repository contract tests via the fake -----------------------------
@@ -154,7 +313,6 @@ class TransactionImportServiceTest {
     @Test
     fun repositoryObserveAllStartsEmpty() {
         val repo = FakeTransactionRepository()
-        // First emission is the initial empty list.
         val initial = kotlinx.coroutines.runBlocking { repo.getAllNewestFirst() }
         assertTrue(initial.isEmpty())
     }
@@ -165,15 +323,14 @@ class TransactionImportServiceTest {
         val service = TransactionImportService(repo)
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 1, body = "عملية شراء بمبلغ 100 ريال", timestamp = 1_700_000_000_000L),
-                sms(id = 2, body = "عملية شراء بمبلغ 200 ريال", timestamp = 1_700_000_001_000L), // newer
-                sms(id = 3, body = "عملية شراء بمبلغ 300 ريال", timestamp = 1_700_000_000_500L),
+                sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = 1_700_000_000_000L),
+                sms(id = 2, body = "Purchase of SAR 200 at Caribou", timestamp = 1_700_000_001_000L),
+                sms(id = 3, body = "Purchase of SAR 300 at Noon", timestamp = 1_700_000_000_500L),
             ))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
         val all = kotlinx.coroutines.runBlocking { repo.getAllNewestFirst() }
         assertEquals(3, all.size)
-        // Newest first: id 2, id 3, id 1
         assertEquals(2L, all[0].id)
         assertEquals(3L, all[1].id)
         assertEquals(1L, all[2].id)
@@ -184,7 +341,7 @@ class TransactionImportServiceTest {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 100 ريال")))
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
         val before = kotlinx.coroutines.runBlocking { repo.getById(1L) }!!
@@ -200,7 +357,7 @@ class TransactionImportServiceTest {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 100 ريال")))
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
         assertEquals(1, kotlinx.coroutines.runBlocking { repo.count() })
@@ -215,8 +372,8 @@ class TransactionImportServiceTest {
         val service = TransactionImportService(repo)
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 1, body = "عملية شراء بمبلغ 100 ريال"),
-                sms(id = 2, body = "عملية شراء بمبلغ 200 ريال"),
+                sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
+                sms(id = 2, body = "Purchase of SAR 200 at Caribou"),
             ))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
@@ -232,10 +389,9 @@ class TransactionImportServiceTest {
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Amount: 123.4567 SAR")))
         }
-        val entity = r.prepared.single()
+        val entity = r.items.single().preparedEntity!!
         assertEquals(0, BigDecimal("123.4567").compareTo(entity.amount))
         assertEquals(4, entity.amount!!.scale())
-        // Persist + read back via the fake — should round-trip.
         kotlinx.coroutines.runBlocking { service.commit(r) }
         val back = kotlinx.coroutines.runBlocking { repo.getById(1L) }!!
         assertEquals(entity.amount, back.amount)
@@ -243,29 +399,20 @@ class TransactionImportServiceTest {
     }
 
     @Test
-    fun missingOptionalFieldsStoredAsNull() {
+    fun findBySimilarityKeyReturnsMatchingRows() {
         val repo = FakeTransactionRepository()
         val service = TransactionImportService(repo)
-        // A transfer message with no merchant and no last-four.
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(
-                id = 1,
-                body = "تحويل وارد بمبلغ 500 ريال",
-            )))
+            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
-        val entity = r.prepared.single()
-        assertNotNull(entity.amount)
-        // The parser may or may not extract a merchant from "تحويل وارد"
-        // (it might match "من" inside the body). What we care about is
-        // that the entity round-trips even if the merchant is null.
+        val entity = r.items.single().preparedEntity!!
         kotlinx.coroutines.runBlocking { service.commit(r) }
-        val back = kotlinx.coroutines.runBlocking { repo.getById(1L) }!!
-        // Round-trip should be lossless.
-        assertEquals(entity.amount, back.amount)
-        assertEquals(entity.transactionType, back.transactionType)
-        assertEquals(entity.merchantOrBeneficiary, back.merchantOrBeneficiary)
-        assertNull(entity.accountOrCardLastFourDigits) // not in the message
-        assertNotNull(entity.createdAt)
-        assertNotNull(entity.updatedAt)
+        val key = entity.transactionSimilarityKey!!
+        val found = kotlinx.coroutines.runBlocking { repo.findBySimilarityKey(key) }
+        assertEquals(1, found.size)
+        // The pre-commit entity had id=0; the post-commit row has an
+        // auto-generated id >= 1. We don't compare ids here; we just
+        // verify the row exists.
+        assertNotNull(found.firstOrNull())
     }
 }

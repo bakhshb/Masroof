@@ -61,4 +61,14 @@ data class TransactionEntity(
     val dateSource: DateSource,
     val createdAt: Long,
     val updatedAt: Long,
+    /**
+     * Coarse fingerprint used to detect near-duplicate transactions that
+     * arrive in separate SMS messages (e.g. a push + a digest). Computed
+     * by [com.baraa.masroof.transaction.TransactionFingerprint.generateSimilarityKey]
+     * — it deliberately excludes the exact SMS-received timestamp so two
+     * SMS for the same purchase sent minutes apart still collide. The
+     * importing service then compares against the [com.baraa.masroof.data.repository.TransactionImportService.DUPLICATE_WINDOW_MILLIS]
+     * window before flagging as POSSIBLE_DUPLICATE.
+     */
+    val transactionSimilarityKey: String? = null,
 )

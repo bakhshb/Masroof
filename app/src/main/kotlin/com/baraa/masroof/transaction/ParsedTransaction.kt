@@ -40,4 +40,25 @@ data class ParsedTransaction(
     val status: TransactionStatus,
     val confidence: Int,
     val parsingNotes: List<String>,
+    /**
+     * Name of the [BankSmsParser] that produced this result (e.g. "AlRajhi",
+     * "Generic"). Always present.
+     */
+    val parserName: String = "Unknown",
+    /**
+     * Parser version string. Bumped when a parser's extraction logic changes
+     * in a way that could re-parse old messages differently.
+     */
+    val parserVersion: String = "0.0.0",
+    /**
+     * Diagnostic list of rules the parser fired while extracting the message
+     * (e.g. "sender_alias_match", "amount_pattern", "currency_sar"). Never
+     * includes sensitive data.
+     */
+    val matchedRules: List<String> = emptyList(),
+    /**
+     * Diagnostic list of fields the parser could not extract. Used to surface
+     * a "needs review" hint in the UI and to inform future parser work.
+     */
+    val missingFields: List<String> = emptyList(),
 )
