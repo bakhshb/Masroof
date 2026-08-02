@@ -58,6 +58,8 @@
     <string name="action_confirm">تأكيد</string>
     <string name="action_continue">متابعة</string>
     <string name="action_back">رجوع</string>
+    <string name="action_settings">الإعدادات</string>
+    <string name="action_accounts">الحسابات</string>
     <string name="loading">جاري التحميل…</string>
 
     <!-- Import preview dialog -->
@@ -159,6 +161,33 @@
         <item quantity="many">%1$d رسالة من %2$d</item>
         <item quantity="other">%1$d رسالة من %2$d</item>
     </plurals>
+
+    <!-- Transaction review actions -->
+    <string name="review_action_confirm">تأكيد</string>
+    <string name="review_action_change_category">تعديل التصنيف</string>
+    <string name="review_action_change_treatment">تغيير نوع المعالجة</string>
+    <string name="review_action_mark_internal">اعتبارها تحويلًا داخليًا</string>
+    <string name="review_action_mark_investment">اعتبارها استثمارًا</string>
+    <string name="review_action_ignore">تجاهل العملية</string>
+    <string name="review_apply_to_one">تطبيق على هذه العملية فقط</string>
+    <string name="review_apply_and_remember">تذكر هذا التصنيف لهذا التاجر مستقبلًا</string>
+    <string name="review_treatment_changed">تم تغيير نوع المعالجة</string>
+
+    <!-- Account management -->
+    <string name="accounts_title">الحسابات</string>
+    <string name="accounts_empty">لا توجد حسابات محفوظة</string>
+    <string name="accounts_empty_hint">أضف حساباتك (بطاقات، محافظ، حسابات بنكية) ليتمكن التطبيق من اكتشاف التحويلات الداخلية بشكل صحيح.</string>
+    <string name="account_add_title">إضافة حساب</string>
+    <string name="account_edit_title">تعديل الحساب</string>
+    <string name="account_field_display_name">اسم الحساب</string>
+    <string name="account_field_institution">المؤسسة (اختياري)</string>
+    <string name="account_field_type">نوع الحساب</string>
+    <string name="account_field_last_four">آخر 4 أرقام</string>
+    <string name="account_field_last_four_hint">نحفظ آخر 4 أرقام فقط، لا نطلب أو نخزن أرقامًا كاملة</string>
+    <string name="account_field_aliases">أسماء المرسل (مفصولة بفواصل)</string>
+    <string name="account_field_aliases_hint">مثال: alrajhi, الراجحي, rajhi</string>
+    <string name="account_delete_title">حذف الحساب</string>
+    <string name="account_delete_body">هل تريد حذف هذا الحساب؟ العمليات السابقة المرتبطة به ستبقى محفوظة.</string>
 
     <!-- Saved transactions count (Arabic plural rules) -->
     <plurals name="count_transactions">

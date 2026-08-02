@@ -1,7 +1,10 @@
 package com.baraa.masroof.data.db
 
 import androidx.room.TypeConverter
+import com.baraa.masroof.transaction.AccountType
+import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
+import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionStatus
 import com.baraa.masroof.transaction.TransactionType
 import java.math.BigDecimal
@@ -72,4 +75,22 @@ class Converters {
 
     @TypeConverter
     fun toDateSource(value: String): DateSource = DateSource.valueOf(value)
+
+    @TypeConverter
+    fun fromFinancialTreatment(value: FinancialTreatment): String = value.name
+
+    @TypeConverter
+    fun toFinancialTreatment(value: String): FinancialTreatment = FinancialTreatment.valueOf(value)
+
+    @TypeConverter
+    fun fromCategorySource(value: CategorySource): String = value.name
+
+    @TypeConverter
+    fun toCategorySource(value: String): CategorySource = CategorySource.valueOf(value)
+
+    @TypeConverter
+    fun fromAccountType(value: AccountType): String = value.name
+
+    @TypeConverter
+    fun toAccountType(value: String): AccountType = AccountType.valueOf(value)
 }

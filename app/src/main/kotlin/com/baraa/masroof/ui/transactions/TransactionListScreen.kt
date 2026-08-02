@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
@@ -74,6 +75,7 @@ fun TransactionListScreen(
 
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var showDeleteAll by remember { mutableStateOf(false) }
+    var showAccounts by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -105,6 +107,12 @@ fun TransactionListScreen(
                         Icon(
                             imageVector = Icons.Filled.Add,
                             contentDescription = stringResource(id = R.string.action_import),
+                        )
+                    }
+                    IconButton(onClick = { showAccounts = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.AccountBox,
+                            contentDescription = stringResource(id = R.string.accounts_title),
                         )
                     }
                     if (count > 0) {
@@ -153,6 +161,11 @@ fun TransactionListScreen(
                 editing = null
             },
         )
+    }
+
+    if (showAccounts) {
+        com.baraa.masroof.ui.accounts.AccountListScreen(onClose = { showAccounts = false })
+        return
     }
 
     if (showDeleteAll) {

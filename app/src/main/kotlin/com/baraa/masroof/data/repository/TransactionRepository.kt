@@ -3,6 +3,7 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.data.db.TransactionDao
 import com.baraa.masroof.data.db.TransactionEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Repository contract for the local `transactions` table.
@@ -119,4 +120,146 @@ class FakeTransactionRepository : TransactionRepository {
             .sortedByDescending { it.smsTimestamp }
 
     private fun nextId(): Long = (rows.maxOfOrNull { it.id } ?: 0L) + 1L
+}
+
+/** In-memory [CategoryRepository] for unit tests. */
+class FakeCategoryRepository : CategoryRepository {
+    private val rows = mutableListOf<com.baraa.masroof.data.db.Category>()
+    private val flows = mutableListOf<MutableList<com.baraa.masroof.data.db.Category>>()
+    private var nextId = 1L
+
+    override fun observeAll(): Flow<List<com.baraa.masroof.data.db.Category>> =
+        kotlinx.coroutines.flow.MutableStateFlow(rows.toList())
+
+    override suspend fun getAll(): List<com.baraa.masroof.data.db.Category> = rows.toList()
+    override suspend fun getById(id: Long): com.baraa.masroof.data.db.Category? = rows.firstOrNull { it.id == id }
+    override suspend fun count(): Int = rows.size
+    override suspend fun any(): Boolean = rows.isNotEmpty()
+    override suspend fun seedIfEmpty() { /* no-op for tests */ }
+    override suspend fun add(nameAr: String, parentId: Long?, nameEn: String?, sortOrder: Int): Long {
+        val id = nextId++
+        rows.add(
+            com.baraa.masroof.data.db.Category(
+                id = id,
+                parentId = parentId,
+                nameAr = nameAr,
+                nameEn = nameEn,
+                sortOrder = sortOrder,
+                enabled = true,
+                isSystem = false,
+            )
+        )
+        return id
+    }
+    override suspend fun rename(id: Long, newNameAr: String, newNameEn: String?) {
+        val idx = rows.indexOfFirst { it.id == id }
+        if (idx >= 0) rows[idx] = rows[idx].copy(nameAr = newNameAr, nameEn = newNameEn)
+    }
+    override suspend fun setEnabled(id: Long, enabled: Boolean) {
+        val idx = rows.indexOfFirst { it.id == id }
+        if (idx >= 0) rows[idx] = rows[idx].copy(enabled = enabled)
+    }
+    override suspend fun setSortOrder(id: Long, sortOrder: Int) {
+        val idx = rows.indexOfFirst { it.id == id }
+        if (idx >= 0) rows[idx] = rows[idx].copy(sortOrder = sortOrder)
+    }
+    override suspend fun deleteIfNotSystem(id: Long): Boolean {
+        return rows.removeAll { it.id == id && !it.isSystem }
+    }
+    override fun resolveByName(name: String): suspend () -> com.baraa.masroof.data.db.Category? =
+        { rows.firstOrNull { it.nameAr == name || it.nameEn == name } }
+}
+
+/** In-memory [MerchantMemoryRepository] for unit tests. */
+class FakeMerchantMemoryRepository : MerchantMemoryRepository {
+    private val rows = mutableListOf<com.baraa.masroof.data.db.MerchantMemory>()
+
+    override fun observeAll(): Flow<List<com.baraa.masroof.data.db.MerchantMemory>> =
+        kotlinx.coroutines.flow.MutableStateFlow(rows.toList())
+
+    override suspend fun getAll(): List<com.baraa.masroof.data.db.MerchantMemory> = rows.toList()
+    override suspend fun getByKey(key: String): com.baraa.masroof.data.db.MerchantMemory? =
+        rows.firstOrNull { it.normalizedKey == key }
+    override suspend fun remember(
+        rawMerchant: String?,
+        displayName: String,
+        categoryId: Long?,
+        treatment: com.baraa.masroof.transaction.FinancialTreatment?,
+    ) {
+        val key = com.baraa.masroof.transaction.MerchantNormalizer.normalize(rawMerchant)
+        if (key.isBlank()) return
+        val existing = rows.firstOrNull { it.normalizedKey == key }
+        if (existing == null) {
+            rows.add(
+                com.baraa.masroof.data.db.MerchantMemory(
+                    normalizedKey = key,
+                    displayName = displayName,
+                    preferredCategoryId = categoryId,
+                    preferredFinancialTreatment = treatment,
+                    confirmationCount = 1,
+                    lastConfirmedAt = 1_700_000_000_000L,
+                )
+            )
+        } else {
+            val idx = rows.indexOf(existing)
+            rows[idx] = existing.copy(
+                preferredCategoryId = categoryId,
+                preferredFinancialTreatment = treatment,
+                confirmationCount = existing.confirmationCount + 1,
+            )
+        }
+    }
+    override suspend fun delete(key: String) {
+        rows.removeAll { it.normalizedKey == key }
+    }
+}
+
+/** In-memory [FinancialAccountRepository] for unit tests. */
+class FakeFinancialAccountRepository : FinancialAccountRepository {
+    private val rows = mutableListOf<com.baraa.masroof.data.db.FinancialAccount>()
+    private var nextId = 1L
+
+    override fun observeAll(): Flow<List<com.baraa.masroof.data.db.FinancialAccount>> =
+        kotlinx.coroutines.flow.MutableStateFlow(rows.toList())
+
+    override suspend fun getActive(): List<com.baraa.masroof.data.db.FinancialAccount> =
+        rows.filter { it.isActive }
+
+    override suspend fun getOwnedActive(): List<com.baraa.masroof.data.db.FinancialAccount> =
+        rows.filter { it.isOwnedByUser && it.isActive }
+
+    override suspend fun getById(id: Long): com.baraa.masroof.data.db.FinancialAccount? =
+        rows.firstOrNull { it.id == id }
+
+    override suspend fun add(
+        displayName: String,
+        accountType: com.baraa.masroof.transaction.AccountType,
+        institutionName: String?,
+        lastFourDigits: String?,
+        senderAliases: List<String>,
+    ): Long {
+        val id = nextId++
+        rows.add(
+            com.baraa.masroof.data.db.FinancialAccount(
+                id = id,
+                displayName = displayName,
+                institutionName = institutionName,
+                accountType = accountType,
+                lastFourDigits = lastFourDigits,
+                senderAliases = senderAliases,
+                isOwnedByUser = true,
+                isActive = true,
+            )
+        )
+        return id
+    }
+
+    override suspend fun update(account: com.baraa.masroof.data.db.FinancialAccount) {
+        val idx = rows.indexOfFirst { it.id == account.id }
+        if (idx >= 0) rows[idx] = account
+    }
+
+    override suspend fun delete(account: com.baraa.masroof.data.db.FinancialAccount) {
+        rows.removeAll { it.id == account.id }
+    }
 }

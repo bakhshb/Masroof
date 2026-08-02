@@ -37,7 +37,12 @@ class TransactionImportServiceTest {
 
     @Test
     fun emptyListProducesEmptyPreview() {
-        val service = TransactionImportService(FakeTransactionRepository())
+        val service = TransactionImportService(
+            transactionRepository = FakeTransactionRepository(),
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking { service.preview(emptyList()) }
         assertEquals(0, r.preview.messagesScanned)
         assertEquals(0, r.preview.parsedSuccessfully)
@@ -50,7 +55,12 @@ class TransactionImportServiceTest {
 
     @Test
     fun parsesValidBankMessagesAndCountsCorrectly() {
-        val service = TransactionImportService(FakeTransactionRepository())
+        val service = TransactionImportService(
+            transactionRepository = FakeTransactionRepository(),
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val messages = listOf(
             sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks"),
             sms(id = 2, body = "Purchase of SAR 50.00 at Starbucks"),
@@ -71,7 +81,12 @@ class TransactionImportServiceTest {
     @Test
     fun exactSameSmsDetectedAsExactDuplicate() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val first = listOf(
             sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks", timestamp = 1_700_000_000_000L)
         )
@@ -93,7 +108,12 @@ class TransactionImportServiceTest {
     @Test
     fun sameTransactionFiveMinutesLaterDetectedAsPossibleDuplicate() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val base = 1_700_000_000_000L
         val fiveMinLater = base + 5L * 60L * 1000L
 
@@ -120,7 +140,12 @@ class TransactionImportServiceTest {
     @Test
     fun sameTransactionAfterWindowIsTreatedAsNew() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val base = 1_700_000_000_000L
         // 11 minutes later — outside the 10-minute window.
         val afterWindow = base + 11L * 60L * 1000L
@@ -146,7 +171,12 @@ class TransactionImportServiceTest {
         // Same amount, same merchant, but DIFFERENT DAYS — that should be
         // two independent transactions, not duplicates.
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         // 1 day apart
         val t1 = 1_700_000_000_000L
         val t2 = t1 + 24L * 60L * 60L * 1000L
@@ -188,7 +218,12 @@ class TransactionImportServiceTest {
 
     @Test
     fun missingMerchantIsAccepted() {
-        val service = TransactionImportService(FakeTransactionRepository())
+        val service = TransactionImportService(
+            transactionRepository = FakeTransactionRepository(),
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "تحويل وارد بمبلغ 500 ريال")))
         }
@@ -202,7 +237,12 @@ class TransactionImportServiceTest {
 
     @Test
     fun missingLastFourDigitsIsAccepted() {
-        val service = TransactionImportService(FakeTransactionRepository())
+        val service = TransactionImportService(
+            transactionRepository = FakeTransactionRepository(),
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
@@ -214,7 +254,12 @@ class TransactionImportServiceTest {
 
     @Test
     fun preparedEntityCarriesSimilarityKeyAndExactFingerprint() {
-        val service = TransactionImportService(FakeTransactionRepository())
+        val service = TransactionImportService(
+            transactionRepository = FakeTransactionRepository(),
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 250 ريال لدى Starbucks")))
         }
@@ -235,7 +280,12 @@ class TransactionImportServiceTest {
     @Test
     fun commitInsertsOnlyInsertAnywayDecisions() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
                 sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
@@ -253,7 +303,12 @@ class TransactionImportServiceTest {
     @Test
     fun importSummaryCalculationIsConsistent() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val base = 1_700_000_000_000L
 
         // First import: 1 successful new
@@ -285,7 +340,12 @@ class TransactionImportServiceTest {
     @Test
     fun possibleDuplicateWithInsertAnywayDecisionIsInserted() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val base = 1_700_000_000_000L
         val r1 = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
@@ -320,7 +380,12 @@ class TransactionImportServiceTest {
     @Test
     fun repositoryGetAllNewestFirstSortsBySmsTimestampDesc() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
                 sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = 1_700_000_000_000L),
@@ -339,7 +404,12 @@ class TransactionImportServiceTest {
     @Test
     fun repositoryUpdateChangesFields() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
@@ -355,7 +425,12 @@ class TransactionImportServiceTest {
     @Test
     fun repositoryDeleteRemovesRow() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }
@@ -369,7 +444,12 @@ class TransactionImportServiceTest {
     @Test
     fun repositoryDeleteAllWipesEverything() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
                 sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
@@ -385,7 +465,12 @@ class TransactionImportServiceTest {
     @Test
     fun amountStoredPrecisely() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Amount: 123.4567 SAR")))
         }
@@ -401,7 +486,12 @@ class TransactionImportServiceTest {
     @Test
     fun findBySimilarityKeyReturnsMatchingRows() {
         val repo = FakeTransactionRepository()
-        val service = TransactionImportService(repo)
+        val service = TransactionImportService(
+            transactionRepository = repo,
+            categoryRepository = FakeCategoryRepository(),
+            merchantMemoryRepository = FakeMerchantMemoryRepository(),
+            financialAccountRepository = FakeFinancialAccountRepository(),
+        )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
         }

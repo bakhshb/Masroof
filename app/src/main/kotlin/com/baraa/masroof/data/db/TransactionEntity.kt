@@ -4,7 +4,9 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
+import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionStatus
 import com.baraa.masroof.transaction.TransactionType
 import java.math.BigDecimal
@@ -71,4 +73,19 @@ data class TransactionEntity(
      * window before flagging as POSSIBLE_DUPLICATE.
      */
     val transactionSimilarityKey: String? = null,
+    // -- v3 financial-treatment fields --------------------------------
+    /** How this transaction affects the user's finances. */
+    val financialTreatment: FinancialTreatment = FinancialTreatment.PENDING_REVIEW,
+    /** Assigned category id (FK to [CategoryEntity.id]). Null if unclassified. */
+    val categoryId: Long? = null,
+    /** How the category / treatment was assigned. */
+    val categorySource: CategorySource = CategorySource.UNCLASSIFIED,
+    /** Confidence in the category / treatment assignment (0..100). */
+    val categoryConfidence: Int = 0,
+    /** True if the user must confirm before this transaction is tallied. */
+    val needsReview: Boolean = true,
+    /** True if the user has explicitly confirmed the assignment. */
+    val userConfirmed: Boolean = false,
+    /** Diagnostic reason if the transaction is excluded from spending totals. */
+    val exclusionReason: String? = null,
 )

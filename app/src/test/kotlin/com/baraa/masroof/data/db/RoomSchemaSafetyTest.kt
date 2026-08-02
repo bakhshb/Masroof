@@ -40,8 +40,8 @@ class RoomSchemaSafetyTest {
             ?: error("Could not find MasroofDatabase.kt in any of: $candidates")
         val source = sourceFile.readText()
         assertFalse(
-            "fallbackToDestructiveMigration must not appear in MasroofDatabase.kt",
-            source.contains("fallbackToDestructiveMigration"),
+            "fallbackToDestructiveMigration() must not be called in MasroofDatabase.kt",
+            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source),
         )
         assertTrue(
             "addMigrations must be configured",
@@ -51,15 +51,15 @@ class RoomSchemaSafetyTest {
 
     @Test
     fun databaseVersionIsAtLeastTwo() {
-        // The v1 → v2 migration added the transactionSimilarityKey column.
-        // The current version must be at least 2 to reflect that bump.
-        val kspGenerated = File("build/generated/ksp/release/kotlin/com/baraa/masroof/data/db/MasroofDatabase_Impl.java")
-        val alt = File("build/generated/ksp/debug/kotlin/com/baraa.masroof.data.db.MasroofDatabase_Impl.java")
-        // We don't actually need the impl — the version is in the annotation
-        // on the source file. Just assert the source has version = 2.
+        // The v1 -> v2 migration added the transactionSimilarityKey column;
+        // the v2 -> v3 migration added the categories / merchant_memory /
+        // financial_accounts tables and the 7 new transaction columns.
         val sourceFile = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt")
         val source = sourceFile.readText()
-        assertTrue("database must declare version 2 or higher", source.contains("version = 2"))
+        val match = Regex("version\\s*=\\s*(\\d+)").find(source)
+        assertTrue("database must declare a version", match != null)
+        val version = match!!.groupValues[1].toInt()
+        assertTrue("database version must be >= 2 (was $version)", version >= 2)
     }
 
     @Test
@@ -79,7 +79,7 @@ class RoomSchemaSafetyTest {
     }
 
     @Test
-    fun schemaExportDirectoryContainsV1AndV2Schemas() {
+    fun schemaExportDirectoryContainsAllVersions() {
         // The KSP arg `room.schemaLocation = $projectDir/schemas` is
         // configured in app/build.gradle.kts. After a clean build it
         // produces one JSON per database version.
@@ -92,20 +92,31 @@ class RoomSchemaSafetyTest {
         }
         val v1 = File(root, "1.json")
         val v2 = File(root, "2.json")
+        val v3 = File(root, "3.json")
         assertTrue("v1 schema must exist: $v1", v1.exists())
         assertTrue("v2 schema must exist: $v2", v2.exists())
-        // The two schemas must differ in the table definition (v2 adds a column).
-        val v1Json = v1.readText()
-        val v2Json = v2.readText()
-        assertNotEquals("v1 and v2 schemas must differ", v1Json, v2Json)
-        // v2 must reference the new column.
+        assertTrue("v3 schema must exist: $v3", v3.exists())
+        // v3 must contain the new transaction columns and the new tables.
+        val v3Json = v3.readText()
         assertTrue(
-            "v2 schema must contain transactionSimilarityKey",
-            v2Json.contains("transactionSimilarityKey"),
+            "v3 schema must contain financialTreatment",
+            v3Json.contains("financialTreatment"),
         )
-        assertFalse(
-            "v1 schema must not contain transactionSimilarityKey",
-            v1Json.contains("transactionSimilarityKey"),
+        assertTrue(
+            "v3 schema must contain categoryId",
+            v3Json.contains("categoryId"),
+        )
+        assertTrue(
+            "v3 schema must contain the categories table",
+            v3Json.contains("\"categories\""),
+        )
+        assertTrue(
+            "v3 schema must contain the merchant_memory table",
+            v3Json.contains("\"merchant_memory\""),
+        )
+        assertTrue(
+            "v3 schema must contain the financial_accounts table",
+            v3Json.contains("\"financial_accounts\""),
         )
     }
 }

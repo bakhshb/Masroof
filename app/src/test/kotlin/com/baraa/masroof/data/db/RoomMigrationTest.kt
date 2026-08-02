@@ -3,6 +3,7 @@ package com.baraa.masroof.data.db
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Migration test for the Masroof Room database.
@@ -32,11 +33,55 @@ class RoomMigrationTest {
     }
 
     @Test
-    fun allMigrationsArrayContainsTheV1ToV2Migration() {
+    fun migration2to3_startAndEndVersionsAreCorrect() {
+        assertEquals(2, MasroofDatabase.MIGRATION_2_3.startVersion)
+        assertEquals(3, MasroofDatabase.MIGRATION_2_3.endVersion)
+    }
+
+    @Test
+    fun allMigrationsArrayContainsBothMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
         assertTrue(
             "ALL_MIGRATIONS must contain 1->2 (was: $versions)",
             versions.contains("1->2"),
+        )
+        assertTrue(
+            "ALL_MIGRATIONS must contain 2->3 (was: $versions)",
+            versions.contains("2->3"),
+        )
+    }
+
+    @Test
+    fun migration2to3AddsTheNewColumnsAndTables() {
+        // We can't actually run the migration on a real SQLite database
+        // here without a Robolectric / Android context. So we inspect the
+        // SQL the migration would execute by reading the source and looking
+        // for the expected statements.
+        val sourceFile = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt")
+        val source = sourceFile.readText()
+        assertTrue(
+            "v2 -> v3 migration must add the financialTreatment column",
+            source.contains("ADD COLUMN `financialTreatment`"),
+        )
+        assertTrue(
+            "v2 -> v3 migration must add the categoryId column",
+            source.contains("ADD COLUMN `categoryId`"),
+        )
+        assertTrue(
+            "v2 -> v3 migration must add the categorySource column",
+            source.contains("ADD COLUMN `categorySource`"),
+        )
+        assertTrue(
+            "v2 -> v3 migration must create the categories table",
+            source.contains("CREATE TABLE IF NOT EXISTS `categories`"),
+        )
+        assertTrue(
+            "v2 -> v3 migration must create the merchant_memory table",
+            source.contains("CREATE TABLE IF NOT EXISTS `merchant_memory`"),
+        )
+        assertTrue(
+            "v2 -> v3 migration must create the financial_accounts table",
+            source.contains("CREATE TABLE IF NOT EXISTS `financial_accounts`"),
         )
     }
 

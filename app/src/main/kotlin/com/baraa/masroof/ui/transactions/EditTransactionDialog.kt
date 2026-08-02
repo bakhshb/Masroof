@@ -155,6 +155,85 @@ fun EditTransactionDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                TextButton(
+                    onClick = {
+                        // Mark as confirmed by the user.
+                        onSave(
+                            entity.copy(
+                                transactionType = type,
+                                amount = parseAmount(amountText),
+                                currency = currency,
+                                merchantOrBeneficiary = merchant.ifBlank { null },
+                                transactionDate = parseDate(dateText),
+                                status = status,
+                                userConfirmed = true,
+                                needsReview = false,
+                            )
+                        )
+                    },
+                ) {
+                    Text(stringResource(id = R.string.review_action_confirm))
+                }
+                TextButton(
+                    onClick = {
+                        onSave(
+                            entity.copy(
+                                transactionType = type,
+                                amount = parseAmount(amountText),
+                                currency = currency,
+                                merchantOrBeneficiary = merchant.ifBlank { null },
+                                transactionDate = parseDate(dateText),
+                                status = status,
+                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.INTERNAL_TRANSFER,
+                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
+                                userConfirmed = true,
+                                needsReview = false,
+                            )
+                        )
+                    },
+                ) {
+                    Text(stringResource(id = R.string.review_action_mark_internal))
+                }
+                TextButton(
+                    onClick = {
+                        onSave(
+                            entity.copy(
+                                transactionType = type,
+                                amount = parseAmount(amountText),
+                                currency = currency,
+                                merchantOrBeneficiary = merchant.ifBlank { null },
+                                transactionDate = parseDate(dateText),
+                                status = status,
+                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.INVESTMENT,
+                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
+                                userConfirmed = true,
+                                needsReview = false,
+                            )
+                        )
+                    },
+                ) {
+                    Text(stringResource(id = R.string.review_action_mark_investment))
+                }
+                TextButton(
+                    onClick = {
+                        onSave(
+                            entity.copy(
+                                transactionType = type,
+                                amount = parseAmount(amountText),
+                                currency = currency,
+                                merchantOrBeneficiary = merchant.ifBlank { null },
+                                transactionDate = parseDate(dateText),
+                                status = status,
+                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.IGNORED,
+                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
+                                userConfirmed = true,
+                                needsReview = false,
+                            )
+                        )
+                    },
+                ) {
+                    Text(stringResource(id = R.string.review_action_ignore))
+                }
             }
         },
         confirmButton = {
@@ -178,6 +257,9 @@ fun EditTransactionDialog(
                             merchantOrBeneficiary = merchant.ifBlank { null },
                             transactionDate = parsedDate,
                             status = status,
+                            categorySource = com.baraa.masroof.transaction.CategorySource.USER,
+                            userConfirmed = true,
+                            needsReview = false,
                         )
                     )
                 },
