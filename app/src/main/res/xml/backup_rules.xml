@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Disable Android Auto Backup for the Masroof app. The local Room database
+    holds structured financial transaction data; we do not currently have an
+    encrypted backup strategy so the safe default is to keep the data on the
+    device only.
+-->
+<full-backup-content>
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="file" />
+    <exclude domain="external" />
+</full-backup-content>

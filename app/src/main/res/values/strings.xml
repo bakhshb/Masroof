@@ -33,7 +33,7 @@
     <string name="match_keywords">كلمات مالية</string>
     <string name="match_both">كلاهما</string>
 
-    <!-- Transaction card labels -->
+    <!-- Transaction card labels (used in SMS list transaction card) -->
     <string name="tx_type">نوع العملية</string>
     <string name="tx_amount">المبلغ</string>
     <string name="tx_currency">العملة</string>
@@ -44,6 +44,57 @@
     <string name="tx_confidence">نسبة الثقة</string>
     <string name="tx_missing">غير متوفر</string>
     <string name="tx_parse_failed">تعذر تحليل الرسالة</string>
+
+    <!-- Transaction list screen -->
+    <string name="transactions_title">العمليات</string>
+    <string name="transactions_empty">لا توجد عمليات محفوظة حتى الآن</string>
+    <string name="transactions_empty_hint">اضغط على استيراد العمليات لبدء قراءة رسائل البنوك المحفوظة على الجهاز.</string>
+    <string name="action_import">استيراد العمليات</string>
+    <string name="action_delete_all">حذف جميع العمليات</string>
+    <string name="action_edit">تعديل</string>
+    <string name="action_delete">حذف</string>
+    <string name="action_save">حفظ</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_confirm">تأكيد</string>
+    <string name="action_continue">متابعة</string>
+    <string name="action_back">رجوع</string>
+    <string name="loading">جاري التحميل…</string>
+
+    <!-- Import preview dialog -->
+    <string name="import_preview_title">معاينة الاستيراد</string>
+    <string name="import_preview_scanned">عدد الرسائل الممسوحة: %1$d</string>
+    <string name="import_preview_parsed">تم تحليلها بنجاح: %1$d</string>
+    <string name="import_preview_unparseable">تعذر تحليلها: %1$d</string>
+    <string name="import_preview_new">عمليات جديدة: %1$d</string>
+    <string name="import_preview_duplicates">مكررات سيتم تجاهلها: %1$d</string>
+    <string name="import_preview_confirm_body">هل تريد حفظ %1$d عملية جديدة في قاعدة البيانات المحلية؟</string>
+    <string name="import_preview_no_new">لا توجد عمليات جديدة لحفظها.</string>
+
+    <!-- Import summary dialog -->
+    <string name="import_summary_title">نتيجة الاستيراد</string>
+    <string name="import_summary_inserted">تمت إضافة %1$d عملية</string>
+    <string name="import_summary_duplicates">تم تجاهل %1$d عمليات مكررة</string>
+    <string name="import_summary_unparseable">تعذر تحليل %1$d رسائل</string>
+
+    <!-- Edit dialog -->
+    <string name="edit_dialog_title">تعديل العملية</string>
+    <string name="edit_dialog_merchant_label">التاجر أو المستفيد</string>
+    <string name="edit_dialog_amount_label">المبلغ</string>
+    <string name="edit_dialog_date_label">التاريخ (YYYY-MM-DD)</string>
+    <string name="edit_dialog_invalid_amount">قيمة المبلغ غير صحيحة</string>
+    <string name="edit_dialog_invalid_date">صيغة التاريخ غير صحيحة، استخدم YYYY-MM-DD</string>
+
+    <!-- Delete confirmations -->
+    <string name="delete_one_title">حذف العملية</string>
+    <string name="delete_one_body">هل تريد حذف هذه العملية؟ لا يمكن التراجع.</string>
+    <string name="delete_all_title">حذف جميع العمليات</string>
+    <string name="delete_all_body">سيتم حذف جميع العمليات المحفوظة محليًا. لا يمكن التراجع. لن يتم حذف أي رسالة من جهازك.</string>
+    <string name="delete_all_typed_prompt">للتأكيد، اكتب كلمة «حذف» في الحقل أدناه:</string>
+    <string name="delete_all_typed_hint">حذف</string>
+    <string name="delete_all_typed_mismatch">الكلمة المكتوبة غير مطابقة</string>
+
+    <!-- Error toast -->
+    <string name="error_load_sms">تعذر قراءة الرسائل</string>
 
     <!-- Transaction type labels (Arabic) -->
     <string name="type_purchase">شراء</string>
@@ -92,5 +143,15 @@
         <item quantity="few">%1$d رسائل من %2$d</item>
         <item quantity="many">%1$d رسالة من %2$d</item>
         <item quantity="other">%1$d رسالة من %2$d</item>
+    </plurals>
+
+    <!-- Saved transactions count (Arabic plural rules) -->
+    <plurals name="count_transactions">
+        <item quantity="zero">لا توجد عمليات محفوظة</item>
+        <item quantity="one">عملية واحدة محفوظة</item>
+        <item quantity="two">عمليتان محفوظتان</item>
+        <item quantity="few">%1$d عمليات محفوظة</item>
+        <item quantity="many">%1$d عملية محفوظة</item>
+        <item quantity="other">%1$d عملية محفوظة</item>
     </plurals>
 </resources>
