@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.sms.MatchReason
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.sms.SmsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,12 +28,19 @@ data class SmsUiState(
     val isLoading: Boolean = false,
     val messages: List<SmsMessage> = emptyList(),
     val filterMode: FilterMode = FilterMode.BANKS_ONLY,
+    /**
+     * Whether to hide the original SMS body text in the list (privacy: only
+     * the structured transaction card is shown). When the parser fails on a
+     * message, the body is shown regardless — the user needs to see the raw
+     * message if we couldn't extract structure from it.
+     */
+    val hideOriginalBody: Boolean = true,
     val error: String? = null,
 ) {
     /** Messages after applying the current [filterMode]. */
     val displayedMessages: List<SmsMessage>
         get() = when (filterMode) {
-            FilterMode.BANKS_ONLY -> messages.filter { it.matchReason != com.baraa.masroof.sms.MatchReason.NONE }
+            FilterMode.BANKS_ONLY -> messages.filter { it.matchReason != MatchReason.NONE }
             FilterMode.ALL -> messages
         }
 }
@@ -62,6 +70,13 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         if (_uiState.value.filterMode == mode) return
         _uiState.update { it.copy(filterMode = mode) }
         Log.d(tag, "filter mode -> $mode")
+    }
+
+    /** Toggle whether the original SMS body is hidden in the list. */
+    fun setHideOriginalBody(hide: Boolean) {
+        if (_uiState.value.hideOriginalBody == hide) return
+        _uiState.update { it.copy(hideOriginalBody = hide) }
+        Log.d(tag, "hide original body -> $hide")
     }
 
     /** Re-read messages; safe to call from UI events (refresh button, retry). */

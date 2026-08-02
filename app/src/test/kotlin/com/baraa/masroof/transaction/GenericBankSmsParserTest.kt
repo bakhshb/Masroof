@@ -1,0 +1,397 @@
+package com.baraa.masroof.transaction
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+
+/**
+ * Unit tests for [GenericBankSmsParser] covering the 23+ scenarios required
+ * by the spec. Each test is intentionally narrow: one assertion family per
+ * test, named so that failures are self-describing in the JUnit report.
+ */
+class GenericBankSmsParserTest {
+
+    private val parser = GenericBankSmsParser()
+    private val smsEpoch = 1_700_000_000_000L // 2023-11-14 ~22:13 UTC
+
+    // -- Transaction types ---------------------------------------------------
+
+    @Test
+    fun parsesArabicPurchaseMessage() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 250 ريال لدى Starbucks. الرصيد المتاح 4,500 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.PURCHASE, r.transactionType)
+        assertEquals(BigDecimal("250"), r.amount)
+        assertEquals(Currency.SAR, r.currency)
+        assertEquals("Starbucks", r.merchant)
+        assertEquals(TransactionStatus.COMPLETED, r.status)
+        assertTrue("confidence should be meaningful", r.confidence >= 50)
+    }
+
+    @Test
+    fun parsesEnglishPurchaseMessage() {
+        val r = parser.parse(
+            sender = "Visa",
+            body = "Purchase of SAR 50.00 at Starbucks. Available balance: 1000 SAR",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.PURCHASE, r.transactionType)
+        assertEquals(0, BigDecimal("50.00").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+        assertEquals("Starbucks", r.merchant)
+    }
+
+    @Test
+    fun parsesArabicOnlinePurchase() {
+        val r = parser.parse(
+            sender = "Alinma",
+            body = "تم تنفيذ شراء عبر الإنترنت بمبلغ 199.99 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.ONLINE_PURCHASE, r.transactionType)
+        assertEquals(0, BigDecimal("199.99").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesCashWithdrawal() {
+        val r = parser.parse(
+            sender = "SNB",
+            body = "سحب نقدي 500 ريال من الصراف الآلي. الرصيد 1,200 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.CASH_WITHDRAWAL, r.transactionType)
+        assertEquals(0, BigDecimal("500").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesOutgoingTransfer() {
+        val r = parser.parse(
+            sender = "RiyadBank",
+            body = "تم تحويل صادر بمبلغ 1,500 ريال إلى المستفيد أحمد",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.TRANSFER_OUT, r.transactionType)
+        assertEquals(0, BigDecimal("1500").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesIncomingTransfer() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "تحويل وارد بمبلغ 2,000 ريال من John Doe. رصيدك الآن 5,000 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.TRANSFER_IN, r.transactionType)
+        assertEquals(0, BigDecimal("2000").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesCardPayment() {
+        val r = parser.parse(
+            sender = "BankAlbilad",
+            body = "سداد بطاقة ائتمانية بمبلغ 1,250 ر.س",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.CARD_PAYMENT, r.transactionType)
+        assertEquals(0, BigDecimal("1250").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesRefund() {
+        val r = parser.parse(
+            sender = "Visa",
+            body = "A refund of SAR 75.00 has been issued to your card",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.REFUND, r.transactionType)
+        assertEquals(0, BigDecimal("75.00").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesSalaryDeposit() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "تم إيداع راتبك الشهري بمبلغ 12,000 ريال. الرصيد 15,000 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.SALARY, r.transactionType)
+        assertEquals(0, BigDecimal("12000").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesBankFee() {
+        val r = parser.parse(
+            sender = "SNB",
+            body = "تم خصم رسوم شهرية بمبلغ 25 ريال. الرصيد 1,200 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.BANK_FEE, r.transactionType)
+        assertEquals(0, BigDecimal("25").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesDeclinedTransaction() {
+        val r = parser.parse(
+            sender = "AlJazira",
+            body = "عملية شراء بمبلغ 300 ريال - عملية مرفوضة",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.DECLINED, r.transactionType)
+        assertEquals(TransactionStatus.DECLINED, r.status)
+        assertEquals(0, BigDecimal("300").compareTo(r.amount))
+    }
+
+    // -- Amount formatting variants -----------------------------------------
+
+    @Test
+    fun parsesArabicNumerals() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ ١٢٥٫٥٠ ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("125.50").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+        assertEquals(TransactionType.PURCHASE, r.transactionType)
+    }
+
+    @Test
+    fun parsesDecimalAmount() {
+        val r = parser.parse(
+            sender = "Visa",
+            body = "Amount: 89.00 SAR was charged",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("89.00").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun parsesAmountWithCommas() {
+        val r = parser.parse(
+            sender = "STCBank",
+            body = "مبلغ 2,350.75 ر.س",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("2350.75").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    // -- Missing fields ------------------------------------------------------
+
+    @Test
+    fun missingCurrency_defaultsToUnknown() {
+        val r = parser.parse(
+            sender = "Unknown",
+            body = "Purchase of 50 at TestMerchant",
+            smsTimestampMillis = null,
+        )
+        assertEquals(Currency.UNKNOWN, r.currency)
+    }
+
+    @Test
+    fun missingMerchant_isNull() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 100 ريال. الرصيد 1,000 ريال",
+            smsTimestampMillis = null,
+        )
+        assertNull(r.merchant)
+    }
+
+    @Test
+    fun missingCardDigits_isNull() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 100 ريال لدى Starbucks",
+            smsTimestampMillis = null,
+        )
+        assertNull(r.accountOrCardLastFourDigits)
+    }
+
+    // -- Rejection / edge cases ---------------------------------------------
+
+    @Test
+    fun malformedMessage_doesNotCrash() {
+        val r = parser.parse(
+            sender = "Bank",
+            body = "####@@@@\n\n$$$",
+            smsTimestampMillis = null,
+        )
+        assertNotNull(r)
+        assertTrue(r.confidence <= 20)
+    }
+
+    @Test
+    fun otpOnlyMessage_lowConfidence() {
+        val r = parser.parse(
+            sender = "Verify",
+            body = "Your OTP code is 123456. Do not share.",
+            smsTimestampMillis = null,
+        )
+        assertTrue("OTP should not parse to a transaction", r.confidence < PARSE_FAIL_THRESHOLD)
+        assertNull(r.amount)
+    }
+
+    @Test
+    fun advertisementMessage_lowConfidence() {
+        val r = parser.parse(
+            sender = "ShoesStore",
+            body = "50% off all shoes today only! Subscribe now for more deals.",
+            smsTimestampMillis = null,
+        )
+        assertTrue("ad should not parse to a transaction", r.confidence < PARSE_FAIL_THRESHOLD)
+        assertNull(r.amount)
+    }
+
+    // -- Mixed / duplicate amounts ------------------------------------------
+
+    @Test
+    fun mixedArabicAndEnglish_parsesCorrectly() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "Purchase at STORE_X: amount 50 SAR. تم خصم 50 ريال من حسابك. Balance: 1000 SAR",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.PURCHASE, r.transactionType)
+        assertEquals(0, BigDecimal("50").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun duplicateAmounts_picksTransactionAmountNotBalance() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 250 ريال. الرصيد المتاح 4,500 ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("250").compareTo(r.amount))
+    }
+
+    @Test
+    fun balanceNotMistakenForTransactionAmount() {
+        // The balance figure 4500 must NOT win over the transaction figure 250.
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 250 ريال. الرصيد المتاح 4,500 ريال",
+            smsTimestampMillis = null,
+        )
+        assertNotNull(r.amount)
+        assertFalse(
+            "balance figure should never be picked as the transaction amount",
+            r.amount == BigDecimal("4500") || r.amount == BigDecimal("4500.00"),
+        )
+    }
+
+    // -- Last four digits & dates (bonus coverage) ---------------------------
+
+    @Test
+    fun extractsLastFourDigits_afterCardKeyword() {
+        val r = parser.parse(
+            sender = "Visa",
+            body = "Card ending 1234 was used for SAR 50.00 at Starbucks. Balance 1000 SAR",
+            smsTimestampMillis = null,
+        )
+        assertEquals("1234", r.accountOrCardLastFourDigits)
+    }
+
+    @Test
+    fun extractsLastFourDigits_arabicKeyword() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 100 ريال على بطاقة تنتهي بـ 5678",
+            smsTimestampMillis = null,
+        )
+        assertEquals("5678", r.accountOrCardLastFourDigits)
+    }
+
+    @Test
+    fun dateFromMessageBody_usedWhenPresent() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 100 ريال بتاريخ 15/01/2024 الساعة 14:30",
+            smsTimestampMillis = null,
+        )
+        assertEquals(LocalDate.of(2024, 1, 15), r.transactionDate)
+        assertEquals(LocalTime.of(14, 30), r.transactionTime)
+        assertTrue(
+            "should note that date came from body",
+            r.parsingNotes.any { it.startsWith("date from message body") || it == "date and time from message body" },
+        )
+    }
+
+    @Test
+    fun dateFallsBackToSmsTimestampWhenMissing() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "عملية شراء بمبلغ 100 ريال",
+            smsTimestampMillis = smsEpoch,
+        )
+        assertNotNull(r.transactionDate)
+        assertNotNull(r.transactionTime)
+        // Convert epoch to local date and check it matches.
+        val expectedDate = java.time.Instant.ofEpochMilli(smsEpoch)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+        assertEquals(expectedDate, r.transactionDate)
+        assertTrue(
+            "should note that date came from SMS metadata",
+            r.parsingNotes.any { it.startsWith("date from SMS metadata") },
+        )
+    }
+
+    // -- Original sender / message preserved --------------------------------
+
+    @Test
+    fun preservesOriginalSenderAndMessage() {
+        val r = parser.parse(
+            sender = "AlRajhi Bank",
+            body = "عملية شراء بمبلغ 250 ريال لدى Starbucks",
+            smsTimestampMillis = null,
+        )
+        assertEquals("AlRajhi Bank", r.originalSender)
+        assertEquals("عملية شراء بمبلغ 250 ريال لدى Starbucks", r.originalMessage)
+    }
+
+    @Test
+    fun nullInputs_doNotCrash() {
+        val r = parser.parse(sender = null, body = null, smsTimestampMillis = null)
+        assertNotNull(r)
+        assertEquals(TransactionType.UNKNOWN, r.transactionType)
+        assertEquals(0, r.confidence)
+    }
+
+    // -- Normalizer (covered as part of the parser pipeline) ----------------
+
+    @Test
+    fun normalizerConvertsArabicDigitsAndDecimal() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "بمبلغ ١٢٣٫٤٥ ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("123.45").compareTo(r.amount))
+    }
+
+    companion object {
+        private const val PARSE_FAIL_THRESHOLD = 30
+    }
+}

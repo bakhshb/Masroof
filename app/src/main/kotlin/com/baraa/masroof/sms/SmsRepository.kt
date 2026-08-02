@@ -6,12 +6,14 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
+import com.baraa.masroof.transaction.BankSmsParserRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Reads SMS rows from the system SMS provider and annotates each one with a
- * [MatchReason] via [BankSmsFilter].
+ * Reads SMS rows from the system SMS provider, classifies them with
+ * [BankSmsFilter], and parses any likely financial message into a
+ * structured transaction via [BankSmsParserRegistry].
  *
  * The repository is read-only: it never writes, deletes, or modifies messages.
  * All I/O runs on [Dispatchers.IO] so callers may invoke it from the main thread.
@@ -22,8 +24,10 @@ class SmsRepository(private val context: Context) {
 
     /**
      * Load the most recent inbox messages (newest first), capped at [limit].
-     * Each row is annotated with the bank-filter result; UI layers can decide
-     * whether to show or hide non-financial messages.
+     * Each row is annotated with the bank-filter result AND a parsed
+     * transaction (when applicable). UI layers can decide whether to show
+     * or hide non-financial messages, and whether to render the structured
+     * card or the raw body.
      *
      * @return list of messages, empty if the provider is unavailable or no rows match
      */
@@ -59,6 +63,7 @@ class SmsRepository(private val context: Context) {
                     val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
                     val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
                     val match = BankSmsFilter.classifyMessage(sender, body)
+                    val parsed = BankSmsParserRegistry.parse(sender, body, date.takeIf { it > 0L })
                     result.add(
                         SmsMessage(
                             id = id,
@@ -66,6 +71,7 @@ class SmsRepository(private val context: Context) {
                             body = body,
                             timestamp = date,
                             matchReason = match.reason,
+                            parsed = parsed,
                         )
                     )
                 }

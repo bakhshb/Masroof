@@ -25,11 +25,54 @@
     <!-- Bank filter controls -->
     <string name="filter_banks_only">رسائل البنوك فقط</string>
     <string name="filter_all">جميع الرسائل</string>
+    <string name="filter_hide_body">إخفاء الرسالة الأصلية</string>
+    <string name="filter_show_body">عرض الرسالة الأصلية</string>
 
     <!-- Per-message match reason labels (shown as a small pill) -->
     <string name="match_known_sender">مرسل معروف</string>
     <string name="match_keywords">كلمات مالية</string>
     <string name="match_both">كلاهما</string>
+
+    <!-- Transaction card labels -->
+    <string name="tx_type">نوع العملية</string>
+    <string name="tx_amount">المبلغ</string>
+    <string name="tx_currency">العملة</string>
+    <string name="tx_merchant">التاجر أو المستفيد</string>
+    <string name="tx_account">البطاقة أو الحساب</string>
+    <string name="tx_date">التاريخ</string>
+    <string name="tx_status">الحالة</string>
+    <string name="tx_confidence">نسبة الثقة</string>
+    <string name="tx_missing">غير متوفر</string>
+    <string name="tx_parse_failed">تعذر تحليل الرسالة</string>
+
+    <!-- Transaction type labels (Arabic) -->
+    <string name="type_purchase">شراء</string>
+    <string name="type_online_purchase">شراء عبر الإنترنت</string>
+    <string name="type_cash_withdrawal">سحب نقدي</string>
+    <string name="type_transfer_out">تحويل صادر</string>
+    <string name="type_transfer_in">تحويل وارد</string>
+    <string name="type_card_payment">سداد بطاقة</string>
+    <string name="type_refund">استرداد</string>
+    <string name="type_salary">راتب</string>
+    <string name="type_deposit">إيداع</string>
+    <string name="type_bank_fee">رسوم بنكية</string>
+    <string name="type_internal_transfer">تحويل داخلي</string>
+    <string name="type_investment_transfer">تحويل استثماري</string>
+    <string name="type_declined">عملية مرفوضة</string>
+    <string name="type_unknown">غير معروف</string>
+
+    <!-- Transaction status labels (Arabic) -->
+    <string name="status_completed">مكتمل</string>
+    <string name="status_pending">قيد المعالجة</string>
+    <string name="status_declined">مرفوض</string>
+    <string name="status_reversed">معكوس</string>
+    <string name="status_unknown">غير معروف</string>
+
+    <!-- Currency labels -->
+    <string name="currency_sar">ر.س</string>
+    <string name="currency_usd">دولار أمريكي</string>
+    <string name="currency_eur">يورو</string>
+    <string name="currency_unknown">غير معروف</string>
 
     <!-- Message count (Arabic plural rules) -->
     <plurals name="count_messages">
