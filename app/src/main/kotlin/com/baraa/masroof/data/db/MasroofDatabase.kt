@@ -11,14 +11,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Local Room database for the Masroof app.
  *
- * **Schema version 4**. v4 adds an `enabled` column to `merchant_memory`
- * so the user can disable a remembered merchant rule from the UI.
+ * **Schema version 5**. v5 adds:
+ *  - `ai_cache` table — sanitized AI suggestion cache (no raw prompts,
+ *    no raw responses, no API key, no merchant names beyond the
+ *    normalized key, no exact amounts)
+ *  - `ai_settings` table — AI provider settings (the API key itself is
+ *    stored in Keystore-backed encrypted storage, never in Room)
  *
- * The DB is **device-local only**: the application manifest disables cloud
- * backup and data extraction, no networking code touches this DB, and there
- * is no sync layer. **No destructive migration is configured** — every
- * schema bump ships with an explicit [Migration] that preserves existing
- * rows.
+ * The DB is **device-local only**. No destructive migration is
+ * configured. Every schema bump ships with an explicit [Migration].
  */
 @Database(
     entities = [
@@ -26,8 +27,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CategoryEntity::class,
         MerchantMemoryEntity::class,
         FinancialAccountEntity::class,
+        AiCacheEntity::class,
+        AiSettingsEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -37,13 +40,12 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun merchantMemoryDao(): MerchantMemoryDao
     abstract fun financialAccountDao(): FinancialAccountDao
+    abstract fun aiCacheDao(): AiCacheDao
+    abstract fun aiSettingsDao(): AiSettingsDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
 
-        /**
-         * v1 → v2 migration: add the `transactionSimilarityKey` column.
-         */
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -53,15 +55,8 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v2 → v3 migration: add three new tables and seven new columns
-         * to `transactions`. All new columns are nullable or have a
-         * NOT NULL DEFAULT, so existing rows survive without any data
-         * backfill.
-         */
         val MIGRATION_2_3: Migration = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // -- 1. New columns on transactions --
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `financialTreatment` TEXT NOT NULL DEFAULT 'PENDING_REVIEW'")
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `categoryId` INTEGER")
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `categorySource` TEXT NOT NULL DEFAULT 'UNCLASSIFIED'")
@@ -70,7 +65,6 @@ abstract class MasroofDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `userConfirmed` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `exclusionReason` TEXT")
 
-                // -- 2. New tables --
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `categories` (
@@ -123,11 +117,6 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v3 → v4 migration: add the `enabled` column to `merchant_memory`.
-         * Existing rows default to enabled=1; the UI can flip it to 0 to
-         * disable a remembered rule.
-         */
         val MIGRATION_3_4: Migration = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -136,8 +125,62 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v4 → v5 migration: add `ai_cache` and `ai_settings` tables.
+         * No existing rows change. No API key is ever persisted in either
+         * of these tables — the key lives in Keystore-backed encrypted
+         * shared preferences.
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `ai_cache` (
+                        `normalizedMerchantKey` TEXT NOT NULL,
+                        `categoryId` INTEGER NOT NULL,
+                        `confidence` INTEGER NOT NULL,
+                        `providerName` TEXT NOT NULL,
+                        `modelName` TEXT NOT NULL,
+                        `promptVersion` TEXT NOT NULL,
+                        `resultVersion` TEXT NOT NULL,
+                        `explanation` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `lastUsedAt` INTEGER NOT NULL,
+                        `usageCount` INTEGER NOT NULL,
+                        `userAccepted` INTEGER NOT NULL DEFAULT 0,
+                        `userRejected` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`normalizedMerchantKey`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_cache_normalizedMerchantKey` ON `ai_cache`(`normalizedMerchantKey`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `ai_settings` (
+                        `id` INTEGER NOT NULL,
+                        `enabled` INTEGER NOT NULL,
+                        `providerLabel` TEXT NOT NULL,
+                        `baseUrl` TEXT NOT NULL,
+                        `modelName` TEXT NOT NULL,
+                        `shareExactAmount` INTEGER NOT NULL,
+                        `minimumConfidence` INTEGER NOT NULL,
+                        `requireHttps` INTEGER NOT NULL,
+                        `timeoutMillis` INTEGER NOT NULL,
+                        `hasApiKey` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
-        val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+        )
 
         fun build(context: Context): MasroofDatabase =
             Room.databaseBuilder(
@@ -146,9 +189,6 @@ abstract class MasroofDatabase : RoomDatabase() {
                 DATABASE_NAME,
             )
                 .addMigrations(*ALL_MIGRATIONS)
-                // No fallbackToDestructiveMigration. If a future version is
-                // published without a migration, Room will throw so tests
-                // / QA catch it instead of silently deleting rows.
                 .build()
     }
 }

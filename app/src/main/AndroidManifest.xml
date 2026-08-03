@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
+    <!--
+        INTERNET is used ONLY when the user explicitly enables a remote AI
+        provider in the AI settings screen. The rest of the application is
+        fully offline. The provider short-circuits when disabled, and we
+        never open a network connection without an enabled provider config.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Telephony hardware is required for the SMS permissions above. Declared
          as required="false" so the app is installable on devices without
          telephony (e.g. Chrome OS tablets), even though the SMS features will

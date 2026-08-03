@@ -39,7 +39,19 @@ class RoomMigrationTest {
     }
 
     @Test
-    fun allMigrationsArrayContainsBothMigrations() {
+    fun migration3to4_startAndEndVersionsAreCorrect() {
+        assertEquals(3, MasroofDatabase.MIGRATION_3_4.startVersion)
+        assertEquals(4, MasroofDatabase.MIGRATION_3_4.endVersion)
+    }
+
+    @Test
+    fun migration4to5_startAndEndVersionsAreCorrect() {
+        assertEquals(4, MasroofDatabase.MIGRATION_4_5.startVersion)
+        assertEquals(5, MasroofDatabase.MIGRATION_4_5.endVersion)
+    }
+
+    @Test
+    fun allMigrationsArrayContainsAllFourMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
         assertTrue(
             "ALL_MIGRATIONS must contain 1->2 (was: $versions)",
@@ -48,6 +60,14 @@ class RoomMigrationTest {
         assertTrue(
             "ALL_MIGRATIONS must contain 2->3 (was: $versions)",
             versions.contains("2->3"),
+        )
+        assertTrue(
+            "ALL_MIGRATIONS must contain 3->4 (was: $versions)",
+            versions.contains("3->4"),
+        )
+        assertTrue(
+            "ALL_MIGRATIONS must contain 4->5 (was: $versions)",
+            versions.contains("4->5"),
         )
     }
 

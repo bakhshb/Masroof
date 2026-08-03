@@ -231,4 +231,62 @@
         <item quantity="many">%1$d عملية محفوظة</item>
         <item quantity="other">%1$d عملية محفوظة</item>
     </plurals>
+
+    <!-- AI settings -->
+    <string name="ai_settings_title">التصنيف الذكي</string>
+    <string name="ai_settings_enabled">تفعيل التصنيف الذكي</string>
+    <string name="ai_settings_provider">مزود الخدمة</string>
+    <string name="ai_settings_base_url">رابط الخادم</string>
+    <string name="ai_settings_model">اسم النموذج</string>
+    <string name="ai_settings_api_key">مفتاح API</string>
+    <string name="ai_settings_api_key_saved">تم حفظ المفتاح (لن يُعرض مرة أخرى)</string>
+    <string name="ai_settings_api_key_clear">حذف المفتاح</string>
+    <string name="ai_settings_share_exact_amount">إرسال المبلغ الدقيق</string>
+    <string name="ai_settings_min_confidence">الحد الأدنى لقبول التصنيف</string>
+    <string name="ai_settings_require_https">استخدام HTTPS</string>
+    <string name="ai_settings_http_warning">تحذير: استخدام HTTP يعرّض البيانات للخطر. استخدم HTTPS قدر الإمكان.</string>
+    <string name="ai_settings_test_connection">اختبار الاتصال</string>
+    <string name="ai_settings_test_success">الاتصال ناجح</string>
+    <string name="ai_settings_test_failed">فشل الاتصال: %1$s</string>
+    <string name="ai_settings_clear_cache">حذف نتائج التصنيف الذكي المحفوظة</string>
+    <string name="ai_settings_clear_cache_done">تم حذف ذاكرة التصنيف الذكي</string>
+    <string name="ai_settings_privacy_notice">لن يتم إرسال نص الرسالة البنكية. سيُرسل فقط اسم التاجر بعد التنقية، ونوع العملية، ونطاق المبلغ، والتصنيفات المتاحة.</string>
+    <string name="ai_settings_status_disabled">التصنيف الذكي معطّل</string>
+    <string name="ai_settings_status_enabled">التصنيف الذكي مفعّل</string>
+    <string name="ai_settings_status_no_key">التصنيف الذكي مفعّل لكن لم يتم حفظ مفتاح API</string>
+
+    <!-- AI suggestion dialog -->
+    <string name="ai_suggestion_title">تصنيف مقترح</string>
+    <string name="ai_suggestion_confidence">نسبة الثقة: %1$d%%</string>
+    <string name="ai_suggestion_explanation">السبب: %1$s</string>
+    <string name="ai_suggestion_provider_model">المزود: %1$s — النموذج: %2$s</string>
+    <string name="ai_suggestion_accept">قبول</string>
+    <string name="ai_suggestion_modify">تعديل</string>
+    <string name="ai_suggestion_reject">رفض</string>
+    <string name="ai_suggestion_apply_one">تطبيق على هذه العملية فقط</string>
+    <string name="ai_suggestion_apply_and_remember">تذكر هذا التصنيف لهذا التاجر مستقبلاً</string>
+    <string name="ai_suggestion_provider_unavailable">تعذر استخدام التصنيف الذكي، ويمكنك تصنيف العملية يدويًا.</string>
+    <string name="ai_suggestion_low_confidence">نسبة الثقة منخفضة، يرجى المراجعة.</string>
+
+    <!-- AI batch action -->
+    <string name="ai_batch_action">تصنيف العمليات غير المصنفة</string>
+    <string name="ai_batch_dialog_title">تصنيف ذكي للعمليات غير المصنفة</string>
+    <string name="ai_batch_dialog_body">عدد العمليات المؤهلة: %1$d\nمن نتائج محفوظة: %2$d\nطلبات ستُرسل: %3$d\nالمزود: %4$s</string>
+    <string name="ai_batch_progress">جارٍ تصنيف %1$d من %2$d</string>
+    <string name="ai_batch_cancel">إلغاء</string>
+    <string name="ai_batch_done">اكتمل التصنيف: %1$d عمليات (%2$d فشل)</string>
+    <string name="ai_batch_no_eligible">لا توجد عمليات مؤهلة للتصنيف الذكي.</string>
+
+    <!-- AI diagnostics -->
+    <string name="ai_diagnostics_title">تشخيص التصنيف الذكي</string>
+    <string name="ai_diagnostics_provider">المزود: %1$s</string>
+    <string name="ai_diagnostics_model">النموذج: %1$s</string>
+    <string name="ai_diagnostics_duration">المدة: %1$d مللي ثانية</string>
+    <string name="ai_diagnostics_status">الحالة: %1$s</string>
+    <string name="ai_diagnostics_cache_hit">من الذاكرة المؤقتة: %1$s</string>
+    <string name="ai_diagnostics_response_valid">صلاحية الاستجابة: %1$s</string>
+    <string name="ai_diagnostics_status_success">نجاح</string>
+    <string name="ai_diagnostics_status_failed">فشل</string>
+    <string name="ai_diagnostics_yes">نعم</string>
+    <string name="ai_diagnostics_no">لا</string>
 </resources>

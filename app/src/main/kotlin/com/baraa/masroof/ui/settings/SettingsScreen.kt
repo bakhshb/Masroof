@@ -34,6 +34,7 @@ fun SettingsScreen(
     onCategories: () -> Unit,
     onMerchants: () -> Unit,
     onAccounts: () -> Unit,
+    onAi: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -63,6 +64,11 @@ fun SettingsScreen(
                 title = stringResource(id = R.string.settings_merchants),
                 icon = Icons.Filled.Add,
                 onClick = onMerchants,
+            )
+            SettingsRow(
+                title = stringResource(id = R.string.ai_settings_title),
+                icon = Icons.Filled.Settings,
+                onClick = onAi,
             )
             SettingsRow(
                 title = stringResource(id = R.string.settings_accounts_short),

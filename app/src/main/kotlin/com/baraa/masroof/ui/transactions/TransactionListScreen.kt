@@ -80,6 +80,7 @@ fun TransactionListScreen(
     var showCategories by remember { mutableStateOf(false) }
     var showMerchants by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showAi by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -198,7 +199,13 @@ fun TransactionListScreen(
             onCategories = { showCategories = true; showSettings = false },
             onMerchants = { showMerchants = true; showSettings = false },
             onAccounts = { showAccounts = true; showSettings = false },
+            onAi = { showAi = true; showSettings = false },
         )
+        return
+    }
+
+    if (showAi) {
+        com.baraa.masroof.ui.ai.AiSettingsScreen(onClose = { showAi = false })
         return
     }
 
