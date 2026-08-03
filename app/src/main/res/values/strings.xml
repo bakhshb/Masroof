@@ -350,4 +350,98 @@
     <string name="ai_suggestion_low_confidence_short">نسبة الثقة منخفضة، يرجى المراجعة.</string>
     <string name="ai_suggestion_remember_merchant">تذكر هذا التصنيف لهذا التاجر مستقبلاً</string>
     <string name="ai_suggestion_apply_only">تطبيق على هذه العملية فقط</string>
+
+    <!-- Diagnostics screen -->
+    <string name="diagnostics_title">تشخيص التطبيق</string>
+    <string name="diagnostics_version_name">إصدار التطبيق</string>
+    <string name="diagnostics_version_code">رقم الإصدار الداخلي</string>
+    <string name="diagnostics_db_version">إصدار قاعدة البيانات</string>
+    <string name="diagnostics_sms_permission">صلاحية قراءة الرسائل</string>
+    <string name="diagnostics_sms_scanned">عدد رسائل SMS التي تم فحصها</string>
+    <string name="diagnostics_sms_financial">عدد الرسائل المالية المكتشفة</string>
+    <string name="diagnostics_sms_parsed">عدد الرسائل التي تم تحليلها</string>
+    <string name="diagnostics_sms_parse_failure">عدد الرسائل التي تعذر تحليلها</string>
+    <string name="diagnostics_saved_tx">عدد العمليات المحفوظة</string>
+    <string name="diagnostics_exact_dups">عدد العمليات المكررة المطابقة</string>
+    <string name="diagnostics_possible_dups">عدد العمليات المحتمل تكرارها</string>
+    <string name="diagnostics_needs_review">عدد العمليات التي تحتاج مراجعة</string>
+    <string name="diagnostics_categories">عدد التصنيفات</string>
+    <string name="diagnostics_merchants">عدد التجار المحفوظين</string>
+    <string name="diagnostics_ai_status">حالة التصنيف الذكي</string>
+    <string name="diagnostics_ai_provider">اسم مزود AI</string>
+    <string name="diagnostics_ai_model">اسم النموذج</string>
+    <string name="diagnostics_last_ai_outcome">آخر نتيجة اتصال</string>
+    <string name="diagnostics_last_error">آخر خطأ منقح</string>
+    <string name="diagnostics_export">تصدير تقرير التشخيص</string>
+    <string name="diagnostics_export_done">تم إنشاء التقرير</string>
+    <string name="diagnostics_perm_granted">ممنوحة</string>
+    <string name="diagnostics_perm_denied">مرفوضة</string>
+    <string name="diagnostics_ai_enabled">مفعّل</string>
+    <string name="diagnostics_ai_disabled">معطّل</string>
+    <string name="diagnostics_no_errors">(لا توجد أخطاء مسجلة)</string>
+
+    <!-- Developer toggles -->
+    <string name="diagnostics_show_dev_details">إظهار تفاصيل التشخيص</string>
+    <string name="diagnostics_show_dev_details_desc">عرض اسم المحلل وإصداره والقواعد المتطابقة وحالة التكرار للعمليات</string>
+    <string name="diagnostics_test_data_mode">وضع البيانات التجريبية</string>
+    <string name="diagnostics_test_data_mode_desc">تحميل رسائل SMS تجريبية للاختبار دون لمس البيانات الحقيقية</string>
+
+    <!-- Parser failure reporting -->
+    <string name="parse_failure_title">تعذر تحليل هذه الرسالة</string>
+    <string name="parse_failure_ignore">تجاهل</string>
+    <string name="parse_failure_retry">إعادة المحاولة</string>
+    <string name="parse_failure_copy_sanitized">نسخ نموذج منقح</string>
+    <string name="parse_failure_preview_title">معاينة النص المنقح</string>
+    <string name="parse_failure_preview_confirm">نسخ</string>
+    <string name="parse_failure_preview_cancel">إلغاء</string>
+    <string name="parse_failure_copied">تم نسخ النص المنقح</string>
+
+    <!-- Developer details per transaction -->
+    <string name="dev_details_title">تفاصيل التشخيص</string>
+    <string name="dev_details_parser_name">اسم المحلل</string>
+    <string name="dev_details_parser_version">إصدار المحلل</string>
+    <string name="dev_details_confidence">نسبة الثقة</string>
+    <string name="dev_details_matched_rules">القواعد المتطابقة</string>
+    <string name="dev_details_missing_fields">الحقول الناقصة</string>
+    <string name="dev_details_date_source">مصدر التاريخ</string>
+    <string name="dev_details_duplicate_status">حالة التكرار</string>
+    <string name="dev_details_financial_rule">قاعدة التصنيف المالي</string>
+    <string name="dev_details_category_source">مصدر التصنيف</string>
+    <string name="dev_details_ai_eligibility">أهلية الذكاء الاصطناعي</string>
+
+    <!-- Permission flow -->
+    <string name="permission_explain_rationale_title">لماذا نطلب إذن الرسائل؟</string>
+    <string name="permission_explain_rationale_body">نقرأ الرسائل القصيرة الواردة من بنوكك المحلية فقط لتصنيفها كعمليات مالية. لا نرسل هذه الرسائل لأي خادم، ولا نخزنها. العمليات التي تحفظها تبقى محفوظة في جهازك فقط.</string>
+    <string name="permission_request">السماح بقراءة الرسائل</string>
+    <string name="permission_open_settings">فتح إعدادات التطبيق</string>
+    <string name="permission_denied_permanent_body">تم رفض الإذن بشكل دائم. يمكنك استخدام العمليات المحفوظة دون منح الصلاحية، أو فتح إعدادات التطبيق لمنحها يدويًا.</string>
+    <string name="permission_continue_without">يمكنك استخدام العمليات المحفوظة دون منح الصلاحية</string>
+
+    <!-- Test data mode -->
+    <string name="test_data_load">تحميل رسالة تجريبية</string>
+    <string name="test_data_label">رسائل تجريبية</string>
+    <string name="test_data_clear">حذف جميع البيانات التجريبية</string>
+    <string name="test_data_count">عدد الرسائل التجريبية المحفوظة: %1$d</string>
+    <string name="test_data_loaded">تم تحميل %1$d رسالة تجريبية</string>
+    <string name="test_data_cleared">تم حذف جميع البيانات التجريبية</string>
+    <string name="test_data_disabled">وضع البيانات التجريبية معطّل</string>
+
+    <!-- Release notes -->
+    <string name="release_notes_title">ملاحظات الإصدار</string>
+    <string name="release_notes_test_banner">هذه نسخة اختبارية</string>
+    <string name="release_notes_sms_permission">قراءة الرسائل تحتاج موافقة المستخدم</string>
+    <string name="release_notes_parser_coverage">لم يتم اختبار جميع صيغ رسائل البنوك</string>
+    <string name="release_notes_review">راجع العمليات قبل اعتمادها</string>
+    <string name="release_notes_ai_assist">التصنيف الذكي يقدم اقتراحات ولا يستبدل مراجعة المستخدم</string>
+    <string name="release_notes_no_sms_body">لا يتم إرسال نص الرسالة البنكية إلى مزود الذكاء الاصطناعي</string>
+
+    <!-- Import preview labels -->
+    <string name="import_label_scanned">الرسائل التي تم فحصها</string>
+    <string name="import_label_financial">الرسائل المالية</string>
+    <string name="import_label_parsed">تم تحليلها بنجاح</string>
+    <string name="import_label_unparsed">تعذر تحليلها</string>
+    <string name="import_label_new">عمليات جديدة</string>
+    <string name="import_label_exact_dups">مكررة مطابقة</string>
+    <string name="import_label_possible_dups">قد تكون مكررة</string>
+    <string name="import_label_needs_review">تحتاج مراجعة</string>
 </resources>

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -82,6 +83,9 @@ fun TransactionListScreen(
     var showAccounts by remember { mutableStateOf(false) }
     var showCategories by remember { mutableStateOf(false) }
     var showMerchants by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
+    var showTestData by remember { mutableStateOf(false) }
+    var showReleaseNotes by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAi by remember { mutableStateOf(false) }
     var showAiSuggestions by remember { mutableStateOf(false) }
@@ -151,6 +155,12 @@ fun TransactionListScreen(
                                 contentDescription = stringResource(id = R.string.action_delete_all),
                             )
                         }
+                    }
+                    IconButton(onClick = { showDiagnostics = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = stringResource(id = R.string.diagnostics_title),
+                        )
                     }
                 },
             )
@@ -238,6 +248,9 @@ fun TransactionListScreen(
             onAi = { showAi = true; showSettings = false },
             onAiSuggestions = { showAiSuggestions = true; showSettings = false },
             onAiBatch = { showAiBatch = true; showSettings = false },
+            onDiagnostics = { showDiagnostics = true; showSettings = false },
+            onTestData = { showTestData = true; showSettings = false },
+            onReleaseNotes = { showReleaseNotes = true; showSettings = false },
         )
         return
     }
@@ -287,6 +300,25 @@ fun TransactionListScreen(
             },
             onCancel = { showDeleteAll = false },
         )
+    }
+
+    if (showDiagnostics) {
+        com.baraa.masroof.ui.diagnostics.DiagnosticsScreen(onClose = { showDiagnostics = false })
+        return
+    }
+    if (showTestData) {
+        com.baraa.masroof.ui.diagnostics.TestDataModeScreen(onClose = { showTestData = false })
+        return
+    }
+    if (showReleaseNotes) {
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrDefault("?")
+        com.baraa.masroof.ui.diagnostics.ReleaseNotesScreen(
+            versionName = versionName,
+            onClose = { showReleaseNotes = false },
+        )
+        return
     }
 
     when (val state = importState) {

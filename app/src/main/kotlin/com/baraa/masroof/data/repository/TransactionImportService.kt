@@ -42,6 +42,17 @@ class TransactionImportService(
     private val merchantMemoryRepository: MerchantMemoryRepository,
     private val financialAccountRepository: FinancialAccountRepository,
     private val now: () -> Long = { System.currentTimeMillis() },
+    /**
+     * Optional callbacks so the diagnostics screen can show live counts.
+     * All callbacks are best-effort — the import must succeed even if
+     * no callback is wired in.
+     */
+    private val onScanned: (() -> Unit)? = null,
+    private val onFinancialDetected: (() -> Unit)? = null,
+    private val onParsed: (() -> Unit)? = null,
+    private val onParseFailure: (() -> Unit)? = null,
+    private val onExactDuplicate: (() -> Unit)? = null,
+    private val onPossibleDuplicate: (() -> Unit)? = null,
 ) {
 
     companion object {
@@ -63,16 +74,25 @@ class TransactionImportService(
         var scanned = 0
         var parsed = 0
         var unparseable = 0
+        var financialDetected = 0
+        var exactDuplicatesCount = 0
+        var possibleDuplicatesCount = 0
         val items = ArrayList<ImportPreviewItem>(messages.size)
 
         for ((index, sms) in messages.withIndex()) {
             scanned++
+            onScanned?.invoke()
             val parsedTxn = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp)
             if (!isUseful(parsedTxn)) {
                 unparseable++
+                onParseFailure?.invoke()
                 continue
             }
+            // We have a financially-relevant parse. Increment that counter.
+            financialDetected++
+            onFinancialDetected?.invoke()
             parsed++
+            onParsed?.invoke()
 
             val built = buildEntityAndClassify(sms, parsedTxn, engine, context)
             if (built == null) {
@@ -84,6 +104,8 @@ class TransactionImportService(
 
             // -- Level 1: exact fingerprint collision --
             if (transactionRepository.existsByFingerprint(entity.uniqueFingerprint)) {
+                exactDuplicatesCount++
+                onExactDuplicate?.invoke()
                 items.add(
                     ImportPreviewItem(
                         smsIndex = index,
@@ -107,6 +129,8 @@ class TransactionImportService(
                     Math.abs(existing.smsTimestamp - sms.timestamp) <= DUPLICATE_WINDOW_MILLIS
                 }
             if (candidate != null) {
+                possibleDuplicatesCount++
+                onPossibleDuplicate?.invoke()
                 items.add(
                     ImportPreviewItem(
                         smsIndex = index,

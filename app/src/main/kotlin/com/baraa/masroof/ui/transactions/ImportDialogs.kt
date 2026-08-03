@@ -100,14 +100,14 @@ fun ImportPreviewDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(stringResource(id = R.string.import_preview_scanned, preview.messagesScanned))
-                Text(stringResource(id = R.string.import_preview_parsed, preview.parsedSuccessfully))
-                Text(stringResource(id = R.string.import_preview_unparseable, preview.unparseable))
-                Text(stringResource(id = R.string.import_preview_new, preview.newTransactions))
-                Text(stringResource(id = R.string.import_preview_exact_dups, preview.exactDuplicates))
+                Text(stringResource(id = R.string.import_label_scanned, preview.messagesScanned))
+                Text(stringResource(id = R.string.import_label_parsed, preview.parsedSuccessfully))
+                Text(stringResource(id = R.string.import_label_unparsed, preview.unparseable))
+                Text(stringResource(id = R.string.import_label_new, preview.newTransactions))
+                Text(stringResource(id = R.string.import_label_exact_dups, preview.exactDuplicates))
                 Text(
                     stringResource(
-                        id = R.string.import_preview_possible_dups,
+                        id = R.string.import_label_possible_dups,
                         preview.possibleDuplicates,
                     ),
                 )
@@ -125,7 +125,7 @@ fun ImportPreviewDialog(
             Row {
                 if (preview.hasPossibleDuplicates) {
                     TextButton(onClick = onReviewDuplicates) {
-                        Text(stringResource(id = R.string.import_preview_review_duplicates))
+                        Text(stringResource(id = R.string.import_label_needs_review))
                     }
                 }
                 TextButton(onClick = onCancel) {

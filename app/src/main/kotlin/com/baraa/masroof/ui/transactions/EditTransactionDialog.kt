@@ -1,5 +1,6 @@
 package com.baraa.masroof.ui.transactions
 
+import com.baraa.masroof.MasroofApplication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -183,6 +184,11 @@ fun EditTransactionDialog(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                }
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val app = context.applicationContext as MasroofApplication
+                if (app.developerPreferences.showDevDetails) {
+                    com.baraa.masroof.ui.diagnostics.TransactionDevDetailsCard(entity = entity)
                 }
                 TextButton(onClick = { showDeleteConfirm = true }) {
                     Text(

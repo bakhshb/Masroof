@@ -51,6 +51,9 @@ object BankParserRegistry {
         GenericBankSmsParser(),
     ).sortedByDescending { it.priority }
 
+    /** Public read-only view of the registered parsers. */
+    val parsers: List<BankSmsParser> get() = PARSERS
+
     /**
      * Parse the message using the highest-priority parser that claims it.
      * The returned [ParsedTransaction.parserName] identifies the parser that

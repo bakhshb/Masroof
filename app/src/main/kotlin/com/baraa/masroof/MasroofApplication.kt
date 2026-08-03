@@ -13,6 +13,11 @@ import com.baraa.masroof.ai.DisabledAiCategorizationProvider
 import com.baraa.masroof.ai.EncryptedAiSettingsStore
 import com.baraa.masroof.ai.OpenAiCompatibleProvider
 import com.baraa.masroof.ai.RemoteAiHttpClient
+import com.baraa.masroof.diagnostics.DiagnosticCollector
+import com.baraa.masroof.diagnostics.DiagnosticErrorLog
+import com.baraa.masroof.diagnostics.FakeSmsSamples
+import com.baraa.masroof.diagnostics.DeveloperPreferences
+import com.baraa.masroof.diagnostics.SharedPreferencesDeveloperPreferences
 import com.baraa.masroof.data.db.MasroofDatabase
 import com.baraa.masroof.data.repository.RoomCategoryRepository
 import com.baraa.masroof.data.repository.RoomFinancialAccountRepository
@@ -66,6 +71,12 @@ class MasroofApplication : Application() {
             categoryRepository = categoryRepository,
             merchantMemoryRepository = merchantMemoryRepository,
             financialAccountRepository = financialAccountRepository,
+            onScanned = { diagnosticCollector.metrics.scannedCount++ },
+            onFinancialDetected = { diagnosticCollector.metrics.financialDetectedCount++ },
+            onParsed = { diagnosticCollector.metrics.parsedCount++ },
+            onParseFailure = { diagnosticCollector.metrics.parseFailureCount++ },
+            onExactDuplicate = { diagnosticCollector.metrics.exactDuplicatesCount++ },
+            onPossibleDuplicate = { diagnosticCollector.metrics.possibleDuplicatesCount++ },
         )
     }
 
@@ -145,6 +156,38 @@ class MasroofApplication : Application() {
             transactionDao = database.transactionDao(),
             categoryDao = database.categoryDao(),
         )
+    }
+
+    /**
+     * Global sanitized error log. Capped at 100 entries; cleared on
+     * process death. Records only error category + short Arabic message
+     * — no stack traces, no transaction data, no API keys.
+     */
+    val errorLog: DiagnosticErrorLog = DiagnosticErrorLog()
+
+    val diagnosticCollector: DiagnosticCollector by lazy {
+        DiagnosticCollector(
+            context = this,
+            database = database,
+            merchantMemoryRepository = merchantMemoryRepository,
+            categoryRepository = categoryRepository,
+            aiSettingsRepository = aiSettingsRepository,
+            errorLog = errorLog,
+        )
+    }
+
+    /**
+     * Test data mode toggle. Defaults to disabled. When enabled, the
+     * UI exposes the bundled fake SMS samples and runs them through the
+     * parser pipeline WITHOUT persisting to the real transactions table.
+     */
+    @Volatile
+    var testDataMode: Boolean = false
+
+    val fakeSmsSamples: List<FakeSmsSamples.Sample> = FakeSmsSamples.samples
+
+    val developerPreferences: DeveloperPreferences by lazy {
+        SharedPreferencesDeveloperPreferences(this)
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
