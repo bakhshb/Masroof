@@ -49,15 +49,24 @@ class RuleEngineTest {
         displayName: String,
         institutionName: String? = null,
         senderAliases: List<String> = emptyList(),
+        type: com.baraa.masroof.transaction.AccountType =
+            com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT,
     ) = FinancialAccount(
         id = id,
         displayName = displayName,
         institutionName = institutionName,
-        accountType = com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT,
+        accountType = type,
+        accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(type),
         lastFourDigits = null,
         senderAliases = senderAliases,
+        currency = Currency.SAR,
+        openingBalance = BigDecimal.ZERO,
+        openingBalanceDate = 0L,
+        includeInNetWorth = true,
+        includeInLiquidity = com.baraa.masroof.transaction.AccountLiquidityDefaults.defaultFor(type),
         isOwnedByUser = true,
         isActive = true,
+        notes = null,
     )
 
     private fun makeInput(
@@ -283,8 +292,7 @@ class RuleEngineTest {
             "Abyan",
             institutionName = "Abyan",
             senderAliases = listOf("abyan"),
-        ).copy(
-            accountType = com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT,
+            type = com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT,
         )
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(

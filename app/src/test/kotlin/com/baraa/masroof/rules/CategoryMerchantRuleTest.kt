@@ -81,10 +81,17 @@ class CategoryMerchantRuleTest {
         displayName = displayName,
         institutionName = null,
         accountType = type,
+        accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(type),
         lastFourDigits = lastFour,
         senderAliases = aliases,
+        currency = com.baraa.masroof.transaction.Currency.SAR,
+        openingBalance = java.math.BigDecimal.ZERO,
+        openingBalanceDate = 0L,
+        includeInNetWorth = true,
+        includeInLiquidity = com.baraa.masroof.transaction.AccountLiquidityDefaults.defaultFor(type),
         isOwnedByUser = true,
         isActive = true,
+        notes = null,
     )
 
     // -- merchant memory behavior ------------------------------------------

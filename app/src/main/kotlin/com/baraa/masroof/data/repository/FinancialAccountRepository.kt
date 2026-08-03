@@ -3,9 +3,13 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.FinancialAccountDao
 import com.baraa.masroof.data.db.FinancialAccountEntity
+import com.baraa.masroof.transaction.AccountLiquidityDefaults
+import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
+import com.baraa.masroof.transaction.Currency
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.math.BigDecimal
 
 interface FinancialAccountRepository {
     fun observeAll(): Flow<List<FinancialAccount>>
@@ -18,6 +22,13 @@ interface FinancialAccountRepository {
         institutionName: String? = null,
         lastFourDigits: String? = null,
         senderAliases: List<String> = emptyList(),
+        accountNature: AccountNature = AccountNature.defaultNatureFor(accountType),
+        currency: Currency = Currency.SAR,
+        openingBalance: BigDecimal = BigDecimal.ZERO,
+        openingBalanceDate: Long = 0L,
+        includeInNetWorth: Boolean = true,
+        includeInLiquidity: Boolean = AccountLiquidityDefaults.defaultFor(accountType),
+        notes: String? = null,
     ): Long
     suspend fun update(account: FinancialAccount)
     suspend fun delete(account: FinancialAccount)
@@ -45,16 +56,30 @@ class RoomFinancialAccountRepository(
         institutionName: String?,
         lastFourDigits: String?,
         senderAliases: List<String>,
+        accountNature: AccountNature,
+        currency: Currency,
+        openingBalance: BigDecimal,
+        openingBalanceDate: Long,
+        includeInNetWorth: Boolean,
+        includeInLiquidity: Boolean,
+        notes: String?,
     ): Long {
         val n = now()
         val entity = FinancialAccountEntity(
             displayName = displayName,
             institutionName = institutionName,
             accountType = accountType,
-            lastFourDigits = lastFourDigits?.takeIf { it.isNotBlank() },
+            accountNature = accountNature,
+            lastFourDigits = sanitizeLastFour(lastFourDigits),
             senderAliases = senderAliases.joinToString(","),
+            currency = currency,
+            openingBalance = openingBalance,
+            openingBalanceDate = openingBalanceDate,
+            includeInNetWorth = includeInNetWorth,
+            includeInLiquidity = includeInLiquidity,
             isOwnedByUser = true,
             isActive = true,
+            notes = notes?.takeIf { it.isNotBlank() },
             createdAt = n,
             updatedAt = n,
         )
@@ -69,11 +94,18 @@ class RoomFinancialAccountRepository(
                 displayName = account.displayName,
                 institutionName = account.institutionName,
                 accountType = account.accountType,
-                lastFourDigits = account.lastFourDigits,
+                accountNature = account.accountNature,
+                lastFourDigits = sanitizeLastFour(account.lastFourDigits),
                 senderAliases = account.senderAliases.joinToString(","),
+                currency = account.currency,
+                openingBalance = account.openingBalance,
+                openingBalanceDate = account.openingBalanceDate,
+                includeInNetWorth = account.includeInNetWorth,
+                includeInLiquidity = account.includeInLiquidity,
                 isOwnedByUser = account.isOwnedByUser,
                 isActive = account.isActive,
-                createdAt = n,
+                notes = account.notes,
+                createdAt = account.createdAt,
                 updatedAt = n,
             )
         )
@@ -86,25 +118,44 @@ class RoomFinancialAccountRepository(
                 displayName = account.displayName,
                 institutionName = account.institutionName,
                 accountType = account.accountType,
-                lastFourDigits = account.lastFourDigits,
+                accountNature = account.accountNature,
+                lastFourDigits = sanitizeLastFour(account.lastFourDigits),
                 senderAliases = account.senderAliases.joinToString(","),
+                currency = account.currency,
+                openingBalance = account.openingBalance,
+                openingBalanceDate = account.openingBalanceDate,
+                includeInNetWorth = account.includeInNetWorth,
+                includeInLiquidity = account.includeInLiquidity,
                 isOwnedByUser = account.isOwnedByUser,
                 isActive = account.isActive,
-                createdAt = 0L,
+                notes = account.notes,
+                createdAt = account.createdAt,
                 updatedAt = now(),
             )
         )
     }
 }
 
+private fun sanitizeLastFour(value: String?): String? =
+    value?.trim()?.takeIf { it.length == 4 && it.all(Char::isDigit) }
+
 internal fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
     id = id,
     displayName = displayName,
     institutionName = institutionName,
     accountType = accountType,
+    accountNature = accountNature,
     lastFourDigits = lastFourDigits,
     senderAliases = if (senderAliases.isBlank()) emptyList()
                     else senderAliases.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+    currency = currency,
+    openingBalance = openingBalance,
+    openingBalanceDate = openingBalanceDate,
+    includeInNetWorth = includeInNetWorth,
+    includeInLiquidity = includeInLiquidity,
     isOwnedByUser = isOwnedByUser,
     isActive = isActive,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
 )

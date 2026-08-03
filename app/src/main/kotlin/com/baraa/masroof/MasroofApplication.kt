@@ -190,6 +190,10 @@ class MasroofApplication : Application() {
         SharedPreferencesDeveloperPreferences(this)
     }
 
+    val financialSetupRepository: com.baraa.masroof.data.repository.FinancialSetupRepository by lazy {
+        com.baraa.masroof.data.repository.RoomFinancialSetupRepository(database.financialSetupDao())
+    }
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {

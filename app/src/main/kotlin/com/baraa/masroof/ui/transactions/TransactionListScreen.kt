@@ -94,14 +94,16 @@ fun TransactionListScreen(
     var showAiBatchPlan by remember { mutableStateOf<com.baraa.masroof.ai.BatchPlan?>(null) }
     var aiMinimumConfidence by remember { mutableStateOf(80) }
     var aiEnabled by remember { mutableStateOf(false) }
+    var showFinancialSetup by remember { mutableStateOf(false) }
 
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.runBlocking { app.aiSettingsRepository.load() }.let {
+        app.aiSettingsRepository.load().let {
             aiEnabled = it.enabled
             aiMinimumConfidence = it.minimumConfidence
         }
+        showFinancialSetup = !app.financialSetupRepository.load().setupCompleted
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -222,6 +224,14 @@ fun TransactionListScreen(
                 editing = null
             },
         )
+    }
+
+    if (showFinancialSetup) {
+        com.baraa.masroof.ui.accounts.SetupFlowScreen(
+            onClose = { showFinancialSetup = false },
+            onFinished = { showFinancialSetup = false },
+        )
+        return
     }
 
     if (showAccounts) {

@@ -301,18 +301,35 @@ class FakeFinancialAccountRepository : FinancialAccountRepository {
         institutionName: String?,
         lastFourDigits: String?,
         senderAliases: List<String>,
+        accountNature: com.baraa.masroof.transaction.AccountNature,
+        currency: com.baraa.masroof.transaction.Currency,
+        openingBalance: java.math.BigDecimal,
+        openingBalanceDate: Long,
+        includeInNetWorth: Boolean,
+        includeInLiquidity: Boolean,
+        notes: String?,
     ): Long {
         val id = nextId++
+        val now = System.currentTimeMillis()
         rows.add(
             com.baraa.masroof.data.db.FinancialAccount(
                 id = id,
                 displayName = displayName,
                 institutionName = institutionName,
                 accountType = accountType,
-                lastFourDigits = lastFourDigits,
+                accountNature = accountNature,
+                lastFourDigits = lastFourDigits?.trim()?.takeIf { it.length == 4 && it.all(Char::isDigit) },
                 senderAliases = senderAliases,
+                currency = currency,
+                openingBalance = openingBalance,
+                openingBalanceDate = openingBalanceDate,
+                includeInNetWorth = includeInNetWorth,
+                includeInLiquidity = includeInLiquidity,
                 isOwnedByUser = true,
                 isActive = true,
+                notes = notes,
+                createdAt = now,
+                updatedAt = now,
             )
         )
         return id

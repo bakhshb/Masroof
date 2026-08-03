@@ -11,15 +11,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Local Room database for the Masroof app.
  *
- * **Schema version 6**. v6 adds:
- *  - `ai_suggestions` table — per-transaction AI suggestion queue used
- *    by the review UI. Sanitized; foreign key to `transactions` with
- *    CASCADE delete so removing a transaction cleans up its
- *    suggestions.
+ * **Schema version 7**. v7 adds the financial-setup + opening-balance
+ * foundation:
+ *  - new columns on `financial_accounts` (accountNature, currency,
+ *    openingBalance, openingBalanceDate, includeInNetWorth /
+ *    includeInLiquidity, notes) — defaults are safe.
+ *  - new table `financial_setup` (single-row.
+ *    [FinancialSetupEntity.SINGLETON_ID]).
  *
- * v5 introduced `ai_cache` and `ai_settings`. The DB is **device-local
- * only**. No destructive migration is configured. Every schema bump
- * ships with an explicit [Migration].
+ * The migration is **purely additive** — existing rows are preserved
+ * and assigned conservative defaults. No
+ * `fallbackToDestructiveMigration` is configured.
  */
 @Database(
     entities = [
@@ -30,8 +32,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AiCacheEntity::class,
         AiSettingsEntity::class,
         AiSuggestionEntity::class,
+        FinancialSetupEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -44,6 +47,7 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun aiCacheDao(): AiCacheDao
     abstract fun aiSettingsDao(): AiSettingsDao
     abstract fun aiSuggestionDao(): AiSuggestionDao
+    abstract fun financialSetupDao(): FinancialSetupDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -170,10 +174,6 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v5 → v6: add the `ai_suggestions` table. Per-transaction
-         * suggestion queue. Existing tables untouched.
-         */
         val MIGRATION_5_6: Migration = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -205,6 +205,73 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7: open the financial-accounts / financial-setup
+         * foundation. Adds columns to `financial_accounts` and a new
+         * `financial_setup` singleton table.
+         *
+         * Existing accounts get:
+         *  - `accountNature` derived from the existing `accountType` via
+         *    [com.baraa.masroof.transaction.AccountNature.defaultNatureFor]
+         *  - `currency` = SAR (default currency)
+         *  - `openingBalance` = 0
+         *  - `openingBalanceDate` = 0 (the unsigned long sentinel — the
+         *    UI interprets 0 as "no date" and shows the user an empty
+         *    field)
+         *  - `includeInNetWorth` = 1 (true)
+         *  - `includeInLiquidity` = derived from the existing account
+         *    type via [AccountLiquidityDefaults]
+         *  - `notes` = NULL
+         */
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add columns with safe defaults; existing rows are
+                // backfilled automatically.
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `accountNature` TEXT NOT NULL DEFAULT 'ASSET'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `currency` TEXT NOT NULL DEFAULT 'SAR'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `openingBalance` TEXT NOT NULL DEFAULT '0'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `openingBalanceDate` INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `includeInNetWorth` INTEGER NOT NULL DEFAULT 1"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `includeInLiquidity` INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE `financial_accounts` ADD COLUMN `notes` TEXT"
+                )
+                // Backfill accountNature from the existing accountType.
+                // The defaults above set everything to ASSET / 0 / etc;
+                // we now map per-type to the correct nature.
+                db.execSQL("UPDATE `financial_accounts` SET `accountNature` = 'LIABILITY' WHERE `accountType` IN ('CREDIT_CARD', 'LOAN', 'OTHER_LIABILITY')")
+                db.execSQL("UPDATE `financial_accounts` SET `accountNature` = 'ASSET' WHERE `accountType` NOT IN ('CREDIT_CARD', 'LOAN', 'OTHER_LIABILITY')")
+                // Backfill includeInLiquidity from the existing accountType.
+                db.execSQL("UPDATE `financial_accounts` SET `includeInLiquidity` = 1 WHERE `accountType` IN ('BANK_ACCOUNT', 'DIGITAL_WALLET', 'WALLET', 'CASH')")
+                db.execSQL("UPDATE `financial_accounts` SET `includeInLiquidity` = 0 WHERE `accountType` NOT IN ('BANK_ACCOUNT', 'DIGITAL_WALLET', 'WALLET', 'CASH')")
+                // Create the new financial_setup singleton table.
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `financial_setup` (
+                        `id` INTEGER NOT NULL,
+                        `trackingStartDate` INTEGER NOT NULL,
+                        `setupCompleted` INTEGER NOT NULL,
+                        `setupCompletedAt` INTEGER NOT NULL,
+                        `defaultCurrency` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -212,6 +279,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_3_4,
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
         )
 
         fun build(context: Context): MasroofDatabase =
