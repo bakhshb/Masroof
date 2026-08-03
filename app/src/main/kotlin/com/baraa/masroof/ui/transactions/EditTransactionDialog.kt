@@ -164,6 +164,11 @@ fun EditTransactionDialog(
                     labelFor = { statusLabel(it) },
                     onSelect = { status = it },
                 )
+                com.baraa.masroof.ui.ai.AiPerTransactionSection(
+                    entity = entity,
+                    merchantMemories = emptyList(),
+                    onApplied = { /* state already persisted inside the section */ },
+                )
                 if (rememberAvailable && onConfirmAndRememberMerchant != null && merchant.isNotBlank()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

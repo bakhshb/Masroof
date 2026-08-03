@@ -14,6 +14,9 @@ enum class CategorySource {
     /** Reserved for a future AI-based classifier. Not used today. */
     FUTURE_AI,
 
+    /** An AI categorizer suggested this category (requires user confirmation). */
+    AI,
+
     /** No category assigned yet. */
     UNCLASSIFIED,
 }

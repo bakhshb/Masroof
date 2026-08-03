@@ -8,6 +8,7 @@ import com.baraa.masroof.ai.AiCategorizationService
 import com.baraa.masroof.ai.AiHttpClient
 import com.baraa.masroof.ai.AiProviderConfig
 import com.baraa.masroof.ai.AiSettingsRepository
+import com.baraa.masroof.ai.AiSuggestionRepository
 import com.baraa.masroof.ai.DisabledAiCategorizationProvider
 import com.baraa.masroof.ai.EncryptedAiSettingsStore
 import com.baraa.masroof.ai.OpenAiCompatibleProvider
@@ -134,6 +135,15 @@ class MasroofApplication : Application() {
             categoryRepository = categoryRepository,
             merchantMemoryRepository = merchantMemoryRepository,
             aiService = aiService,
+            suggestionRepository = aiSuggestionRepository,
+        )
+    }
+
+    val aiSuggestionRepository: AiSuggestionRepository by lazy {
+        AiSuggestionRepository(
+            dao = database.aiSuggestionDao(),
+            transactionDao = database.transactionDao(),
+            categoryDao = database.categoryDao(),
         )
     }
 

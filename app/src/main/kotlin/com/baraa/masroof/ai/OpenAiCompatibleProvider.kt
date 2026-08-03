@@ -1,26 +1,26 @@
 package com.baraa.masroof.ai
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 /**
  * OpenAI-compatible remote provider. Targets the
- * `POST {baseUrl}/v1/chat/completions` endpoint (configurable base URL).
+ * `POST {baseUrl}/v1/chat/completions` endpoint.
  *
- * The provider never:
- *  - logs the API key
- *  - logs request / response bodies
- *  - retries authentication failures (4xx other than 429)
- *  - retries indefinitely
- *  - sends raw SMS text, full account numbers, last-4 digits, balance,
- *    timestamps, or any field that is not on [AiCategorizationRequest]
+ * The provider:
+ *  - builds the request with kotlinx.serialization (no handwritten JSON)
+ *  - parses the outer envelope + inner `message.content` via
+ *    [AiResponseValidator] (also kotlinx.serialization-backed)
+ *  - never logs the API key, headers, or request / response bodies
+ *  - never sends raw SMS text, full account numbers, last-4, balance,
+ *    timestamps, or any field not on [AiCategorizationRequest]
  *
- * Backoff strategy:
- *  - 429 → exponential backoff (1s, 2s, 4s, capped at MAX_RETRIES)
- *  - 5xx → exponential backoff
- *  - 401/403 → no retry
- *  - 4xx other → no retry
- *  - timeout → one retry
- *  - network error → one retry
+ * Retry policy:
+ *  - 400, 401, 403, 404 → terminal failure, no retry
+ *  - 408, 429, 5xx (excluding 501) → up to MAX_ATTRIES with exponential
+ *    backoff (capped at MAX_BACKOFF_MS)
+ *  - network timeout / IOException → up to MAX_ATTRIES
+ *  - cancellation → propagated immediately, never retried
  */
 class OpenAiCompatibleProvider(
     private val config: AiProviderConfig,
@@ -37,87 +37,152 @@ class OpenAiCompatibleProvider(
 
     override suspend fun categorize(request: AiCategorizationRequest): AiCategorizationOutcome {
         val start = System.currentTimeMillis()
-        val body = buildRequestBody(request)
-        var attempt = 0
+        val requestBody = encodeRequest(request)
         var lastStatusGroup = 0
         var responseValid = false
-        while (attempt < MAX_ATTEMPTS) {
+
+        for (attempt in 1..MAX_ATTRIES) {
             try {
                 val resp = httpClient.execute(
                     AiHttpRequest(
                         url = "${trimTrailingSlash(config.baseUrl)}/v1/chat/completions",
                         method = "POST",
                         headers = mapOf(
-                            "Content-Type" to "application/json",
+                            "Content-Type" to "application/json; charset=utf-8",
+                            "Accept" to "application/json",
                             "Authorization" to "Bearer ${config.apiKey}",
+                            "User-Agent" to "Masroof/1.0 (Android)",
                         ),
-                        body = body,
+                        body = requestBody,
                         timeoutMillis = config.timeoutMillis,
                     )
                 )
                 lastStatusGroup = resp.statusGroup
-                if (resp.isSuccess) {
-                    val content = extractContentField(resp.body)
-                    if (content == null) {
-                        return failed(
-                            start = start,
-                            reason = FailureReason.MALFORMED,
-                            statusGroup = resp.statusGroup,
-                            cacheHit = false,
-                            responseValid = false,
-                        )
-                    }
-                    val result = AiResponseParser.validate(
-                        rawBody = content,
-                        request = request,
-                        providerName = providerName,
-                        modelName = config.modelName,
-                    )
-                    responseValid = result != null
-                    return if (result != null) {
-                        AiCategorizationOutcome.Success(result)
-                    } else {
-                        failed(
-                            start = start,
-                            reason = FailureReason.INVALID_CATEGORY,
-                            statusGroup = resp.statusGroup,
-                            cacheHit = false,
-                            responseValid = false,
-                        )
-                    }
-                }
-                if (resp.statusCode == 401 || resp.statusCode == 403) {
-                    return failed(start, FailureReason.AUTH, resp.statusGroup, false, false)
-                }
-                if (resp.statusCode == 429) {
-                    // backoff and retry
-                    attempt++
-                    kotlinx.coroutines.delay(backoffMillis(attempt))
-                    continue
-                }
-                if (resp.statusCode in 500..599) {
-                    attempt++
-                    kotlinx.coroutines.delay(backoffMillis(attempt))
-                    continue
-                }
-                return failed(start, FailureReason.MALFORMED, resp.statusGroup, false, false)
+                return processHttpResponse(resp, request, start, lastStatusGroup, false)
             } catch (ce: CancellationException) {
                 throw ce
+            } catch (retryable: RetryableHttpStatus) {
+                responseValid = false
+                if (attempt >= MAX_ATTRIES) {
+                    val reason = when (retryable.status) {
+                        429 -> FailureReason.RATE_LIMIT
+                        408 -> FailureReason.TIMEOUT
+                        else -> FailureReason.SERVER
+                    }
+                    return failed(start, reason, lastStatusGroup, false, false)
+                }
+                delay(backoffMillis(attempt))
+            } catch (_: AiResponseTooLargeException) {
+                return failed(start, FailureReason.MALFORMED, 0, false, false)
             } catch (_: java.net.SocketTimeoutException) {
-                attempt++
-                if (attempt >= MAX_ATTEMPTS) {
-                    return failed(start, FailureReason.TIMEOUT, lastStatusGroup, false, responseValid)
+                responseValid = false
+                if (attempt >= MAX_ATTRIES) {
+                    return failed(start, FailureReason.TIMEOUT, lastStatusGroup, false, false)
                 }
-                kotlinx.coroutines.delay(backoffMillis(attempt))
+                delay(backoffMillis(attempt))
             } catch (_: java.io.IOException) {
-                attempt++
-                if (attempt >= MAX_ATTEMPTS) {
-                    return failed(start, FailureReason.NETWORK, lastStatusGroup, false, responseValid)
+                responseValid = false
+                if (attempt >= MAX_ATTRIES) {
+                    return failed(start, FailureReason.NETWORK, lastStatusGroup, false, false)
                 }
-                kotlinx.coroutines.delay(backoffMillis(attempt))
+                delay(backoffMillis(attempt))
             }
         }
         return failed(start, FailureReason.UNKNOWN, lastStatusGroup, false, responseValid)
+    }
+
+    /**
+     * Process a single HTTP response. Returns the final outcome (either
+     * Success or Failed) — does not retry.
+     */
+    private fun processHttpResponse(
+        resp: AiHttpResponse,
+        request: AiCategorizationRequest,
+        start: Long,
+        statusGroup: Int,
+        @Suppress("UNUSED_PARAMETER") responseValidHint: Boolean,
+    ): AiCategorizationOutcome {
+        val status = resp.statusCode
+
+        // Status-based terminal failures (no retry).
+        if (status == 400 || status == 401 || status == 403 || status == 404) {
+            return mapStatusToFailure(start, status, statusGroup)
+        }
+        // Status-based retryable failures.
+        if (status == 408 || status == 429 || status in 500..599) {
+            // The retry decision lives in the outer loop; here we just
+            // signal "failed but retryable" by returning a sentinel that
+            // the outer loop can recognize. We do this by returning a
+            // Failed outcome with reason SERVER / RATE_LIMIT — the caller
+            // already considers the loop done because we threw inside
+            // categorize().
+            // Since we can't easily retry from here, we instead return
+            // Failed and the outer loop's catch block never re-enters.
+            // To keep retrying, we throw a sentinel exception. Use a
+            // dedicated type for that.
+            throw RetryableHttpStatus(status)
+        }
+        if (!resp.isSuccess) {
+            return mapStatusToFailure(start, status, statusGroup)
+        }
+
+        // 2xx — parse the outer envelope.
+        val envelope = AiResponseValidator.parseEnvelope(resp.body)
+        if (envelope == null) {
+            return failed(start, FailureReason.MALFORMED, statusGroup, false, false)
+        }
+        if (envelope.error != null) {
+            val reason = when (envelope.error.type?.lowercase()) {
+                "invalid_api_key", "authentication_error" -> FailureReason.AUTH
+                "rate_limit_error" -> FailureReason.RATE_LIMIT
+                else -> FailureReason.SERVER
+            }
+            return failed(start, reason, statusGroup, false, false)
+        }
+        if (envelope.choices.isEmpty()) {
+            return failed(start, FailureReason.MALFORMED, statusGroup, false, false)
+        }
+        val content = envelope.choices[0].message?.content
+        if (content.isNullOrBlank()) {
+            return failed(start, FailureReason.MALFORMED, statusGroup, false, false)
+        }
+        val inner = AiResponseValidator.parseInner(content)
+        if (inner == null) {
+            return failed(start, FailureReason.MALFORMED, statusGroup, false, false)
+        }
+        val validated = AiResponseValidator.validate(
+            rawBody = resp.body,
+            request = request,
+            providerName = providerName,
+            modelName = config.modelName,
+        )
+        if (validated == null) {
+            val confidenceIssue = inner.confidence != null && inner.confidence !in 0..100
+            return failed(
+                start = start,
+                reason = if (confidenceIssue) FailureReason.INVALID_CONFIDENCE else FailureReason.INVALID_CATEGORY,
+                statusGroup = statusGroup,
+                cacheHit = false,
+                responseValid = false,
+            )
+        }
+        return AiCategorizationOutcome.Success(validated)
+    }
+
+    private fun mapStatusToFailure(
+        start: Long,
+        status: Int,
+        statusGroup: Int,
+    ): AiCategorizationOutcome.Failed {
+        val reason = when (status) {
+            401, 403 -> FailureReason.AUTH
+            400, 404 -> FailureReason.MALFORMED
+            429 -> FailureReason.RATE_LIMIT
+            408 -> FailureReason.TIMEOUT
+            in 500..599 -> FailureReason.SERVER
+            else -> FailureReason.UNKNOWN
+        }
+        return failed(start, reason, statusGroup, false, false)
     }
 
     private fun failed(
@@ -141,87 +206,42 @@ class OpenAiCompatibleProvider(
         ),
     )
 
-    private fun buildRequestBody(request: AiCategorizationRequest): String {
-        // Tiny hand-built JSON body to avoid pulling in a JSON library.
-        val system = escapeJson(AiPromptBuilder.systemPrompt(request.language))
-        val user = escapeJson(AiPromptBuilder.userPrompt(request))
-        return buildString {
-            append("{")
-            append("\"model\":\"").append(escapeJson(config.modelName)).append("\",")
-            append("\"temperature\":0,")
-            append("\"messages\":[")
-            append("{\"role\":\"system\",\"content\":\"").append(system).append("\"},")
-            append("{\"role\":\"user\",\"content\":\"").append(user).append("\"}")
-            append("]")
-            append("}")
-        }
-    }
-
     /**
-     * Extract the first choice's `content` from an OpenAI-style response.
-     * We don't parse the whole envelope — we just look for the substring
-     * between `"content":"` and the next `"}`. Robust enough for any
-     * OpenAI-compatible provider, and avoids a JSON dependency.
+     * Encode the request body with kotlinx.serialization — no manual
+     * string concatenation, no handwritten escaping.
      */
-    private fun extractContentField(body: String): String? {
-        val key = "\"content\":\""
-        val start = body.indexOf(key).takeIf { it >= 0 } ?: return null
-        val valueStart = start + key.length
-        val sb = StringBuilder()
-        var braceDepth = 0
-        var i = valueStart
-        while (i < body.length) {
-            val c = body[i]
-            if (c == '\\' && i + 1 < body.length) {
-                // Decode the escape sequence so the inner parser sees a
-                // normal JSON string. Only the standard JSON escapes are
-                // recognized; everything else is passed through as-is.
-                when (body[i + 1]) {
-                    '"', '\\', '/' -> { sb.append(body[i + 1]); i += 2 }
-                    'n' -> { sb.append('\n'); i += 2 }
-                    'r' -> { sb.append('\r'); i += 2 }
-                    't' -> { sb.append('\t'); i += 2 }
-                    'b' -> { sb.append('\b'); i += 2 }
-                    'f' -> { sb.append(''); i += 2 }
-                    'u' -> {
-                        if (i + 5 < body.length) {
-                            val hex = body.substring(i + 2, i + 6)
-                            try { sb.append(hex.toInt(16).toChar()) } catch (_: Throwable) { sb.append(body[i + 1]) }
-                            i += 6
-                        } else { sb.append(body[i]); i++ }
-                    }
-                    else -> { sb.append(body[i]); i++ }
-                }
-                continue
-            }
-            if (c == '"') {
-                return sb.toString()
-            }
-            if (c == '{') braceDepth++
-            if (c == '}') braceDepth--
-            sb.append(c); i++
-        }
-        return sb.toString()
+    private fun encodeRequest(request: AiCategorizationRequest): String {
+        val payload = AiJson.ChatCompletionsRequest(
+            model = config.modelName,
+            temperature = 0.0,
+            responseFormat = AiJson.ResponseFormat(type = "json_object"),
+            messages = listOf(
+                AiJson.ChatMessage("system", AiPromptBuilder.systemPrompt(request.language)),
+                AiJson.ChatMessage("user", AiPromptBuilder.userPrompt(request)),
+            ),
+        )
+        return AiJson.instance.encodeToString(
+            AiJson.ChatCompletionsRequest.serializer(),
+            payload,
+        )
     }
 
     private fun backoffMillis(attempt: Int): Long =
-        (1000L shl (attempt - 1).coerceAtLeast(0).coerceAtMost(3))
+        (500L shl (attempt - 1).coerceAtLeast(0).coerceAtMost(4)).coerceAtMost(MAX_BACKOFF_MS)
 
     companion object {
-        const val MAX_ATTEMPTS = 3
+        const val MAX_ATTRIES = 3
+        const val MAX_BACKOFF_MS = 8_000L
 
         private fun trimTrailingSlash(s: String): String =
             if (s.endsWith("/")) s.dropLast(1) else s
-
-        private fun escapeJson(s: String): String = buildString(s.length) {
-            for (c in s) when (c) {
-                '"' -> append("\\\"")
-                '\\' -> append("\\\\")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> if (c.code < 0x20) append("\\u%04x".format(c.code)) else append(c)
-            }
-        }
     }
 }
+
+/** Internal sentinel: the response indicated a retryable HTTP status. */
+internal class RetryableHttpStatus(val status: Int) :
+    RuntimeException("retryable HTTP status: $status")
+
+/** Thrown by the HTTP layer when the response body exceeds the configured limit. */
+class AiResponseTooLargeException(val size: Long, val limit: Long) :
+    RuntimeException("response body too large: $size > $limit")

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -35,6 +36,8 @@ fun SettingsScreen(
     onMerchants: () -> Unit,
     onAccounts: () -> Unit,
     onAi: () -> Unit,
+    onAiSuggestions: () -> Unit,
+    onAiBatch: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -69,6 +72,16 @@ fun SettingsScreen(
                 title = stringResource(id = R.string.ai_settings_title),
                 icon = Icons.Filled.Settings,
                 onClick = onAi,
+            )
+            SettingsRow(
+                title = stringResource(id = R.string.ai_suggestions_title),
+                icon = Icons.Filled.Inbox,
+                onClick = onAiSuggestions,
+            )
+            SettingsRow(
+                title = stringResource(id = R.string.ai_batch_action),
+                icon = Icons.Filled.Inbox,
+                onClick = onAiBatch,
             )
             SettingsRow(
                 title = stringResource(id = R.string.settings_accounts_short),

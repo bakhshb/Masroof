@@ -289,4 +289,65 @@
     <string name="ai_diagnostics_status_failed">فشل</string>
     <string name="ai_diagnostics_yes">نعم</string>
     <string name="ai_diagnostics_no">لا</string>
+
+
+
+    <!-- AI settings validation messages -->
+    <string name="ai_settings_err_empty_base_url">عنوان الخادم مطلوب</string>
+    <string name="ai_settings_err_invalid_base_url">عنوان الخادم غير صالح</string>
+    <string name="ai_settings_err_http_not_allowed">يلزم استخدام HTTPS</string>
+    <string name="ai_settings_err_empty_model_name">اسم النموذج مطلوب</string>
+    <string name="ai_settings_err_missing_api_key">يلزم إدخال مفتاح API</string>
+    <string name="ai_settings_err_confidence_out_of_range">الحد الأدنى يجب أن يكون بين 0 و100</string>
+    <string name="ai_settings_test_success_ar">تم الاتصال بمزود التصنيف بنجاح</string>
+    <string name="ai_settings_test_failed_ar">تعذر الاتصال بمزود التصنيف</string>
+    <string name="ai_settings_test_invalid_key">مفتاح API غير صالح أو غير مصرح به</string>
+    <string name="ai_settings_test_invalid_url">عنوان الخادم غير صالح</string>
+    <string name="ai_settings_test_in_progress">جارٍ اختبار الاتصال…</string>
+    <string name="ai_batch_dialog_summary">عدد العمليات المؤهلة: %1$d
+من نتائج محفوظة: %2$d
+طلبات ستُرسل: %3$d
+المزود: %4$s
+النموذج: %5$s</string>
+    <string name="ai_batch_dialog_privacy">لن يتم إرسال نصوص الرسائل البنكية أو أرقام البطاقات والحسابات. سيُرسل فقط اسم التاجر بعد التنقية وبيانات التصنيف المسموح بها.</string>
+    <string name="ai_batch_dialog_start">بدء التصنيف</string>
+    <string name="ai_batch_dialog_cancel">إلغاء</string>
+    <string name="ai_batch_progress_label">جارٍ تصنيف %1$d من %2$d</string>
+    <string name="ai_batch_progress_cache_hits">من نتائج محفوظة: %1$d</string>
+    <string name="ai_batch_progress_succeeded">ناجحة: %1$d</string>
+    <string name="ai_batch_progress_failed">فشل: %1$d</string>
+    <string name="ai_batch_progress_skipped">متجاوزة: %1$d</string>
+    <string name="ai_batch_progress_canceled">تم الإيقاف</string>
+    <string name="ai_batch_progress_done">اكتمل التصنيف</string>
+    <string name="ai_batch_open_settings">افتح إعدادات التصنيف الذكي</string>
+    <string name="ai_batch_disabled_title">التصنيف الذكي معطّل</string>
+    <string name="ai_batch_disabled_body">يجب تفعيل التصنيف الذكي من الإعدادات قبل بدء التصنيف.</string>
+
+    <string name="ai_suggestions_title">اقتراحات التصنيف الذكي</string>
+    <string name="ai_suggestions_empty">لا توجد اقتراحات بانتظار المراجعة</string>
+    <!-- AI suggestion queue -->
+    <string name="ai_suggestions_filter_all">جميع الاقتراحات</string>
+    <string name="ai_suggestions_filter_high">ثقة مرتفعة</string>
+    <string name="ai_suggestions_filter_low">ثقة منخفضة</string>
+    <string name="ai_suggestions_filter_rejected">مرفوضة</string>
+    <string name="ai_suggestions_confidence_high">ثقة مرتفعة</string>
+    <string name="ai_suggestions_confidence_medium">ثقة متوسطة</string>
+    <string name="ai_suggestions_confidence_low">ثقة منخفضة</string>
+    <string name="ai_suggestions_provider_model">المزود: %1$s — النموذج: %2$s</string>
+    <string name="ai_suggestions_explanation">السبب: %1$s</string>
+    <string name="ai_suggestions_accept">قبول</string>
+    <string name="ai_suggestions_modify">تعديل</string>
+    <string name="ai_suggestions_reject">رفض</string>
+    <string name="ai_suggestions_rejected_toast">تم رفض الاقتراح، ويمكنك تصنيف العملية يدويًا.</string>
+    <string name="ai_suggestions_accepted_toast">تم تطبيق التصنيف</string>
+    <string name="ai_suggestions_modified_toast">تم تعديل التصنيف</string>
+    <string name="ai_suggestions_category_disabled">التصنيف معطّل أو محذوف</string>
+    <string name="ai_suggestions_select_category">اختر تصنيفًا بديلاً</string>
+
+    <!-- Per-transaction AI button -->
+    <string name="ai_request_suggestion">طلب اقتراح تصنيف</string>
+    <string name="ai_suggestion_section_title">التصنيف المقترح</string>
+    <string name="ai_suggestion_low_confidence_short">نسبة الثقة منخفضة، يرجى المراجعة.</string>
+    <string name="ai_suggestion_remember_merchant">تذكر هذا التصنيف لهذا التاجر مستقبلاً</string>
+    <string name="ai_suggestion_apply_only">تطبيق على هذه العملية فقط</string>
 </resources>

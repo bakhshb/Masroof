@@ -15,41 +15,44 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 
 /**
  * Drives the Arabic batch action: "تصنيف العمليات غير المصنفة".
  *
  * Behaviour:
  *  - Filters unclassified transactions (no categoryId set, not
- *    user-confirmed, not user-rejected) AND eligible (expense / bank
- *    fee; not declined/pending/refunded/transferred/etc.).
- *  - Checks the AI cache first.
- *  - Calls the provider for the rest, sequentially with very limited
- *    concurrency.
- *  - Updates each transaction in place with the AI suggestion; the
- *    user must still confirm via the edit dialog before
- *    `userConfirmed = true` and `needsReview = false`.
- *  - Cancels cleanly on [cancel].
- *  - A single failed request does NOT stop the batch.
+ *    user-confirmed) AND eligible (expense / bank fee; not declined/
+ *    pending/refunded/transferred/etc.).
+ *  - Skips transactions already covered by a user-confirmed memory.
+ *  - Checks the AI cache first; on hit the suggestion is reused without
+ *    a remote call.
+ *  - For uncached merchants, calls the provider sequentially.
+ *  - Records every suggestion in the [AiSuggestionRepository] so the
+ *    user can review it from "اقتراحات التصنيف الذكي".
+ *  - The transaction itself is NOT modified to `userConfirmed=true` by
+ *    the batch — it remains in `needsReview` until the user accepts
+ *    the suggestion.
+ *  - Cancellable mid-batch via [cancel]; already-completed items
+ *    remain available.
+ *  - A single failure does NOT stop the batch.
  */
 class AiBatchCategorizationService(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
     private val merchantMemoryRepository: MerchantMemoryRepository,
     private val aiService: AiCategorizationService,
+    private val suggestionRepository: AiSuggestionRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val mutex = Mutex()
     private var currentJob: Job? = null
 
     private val _state = MutableStateFlow<BatchState>(BatchState.Idle)
     val state: StateFlow<BatchState> = _state.asStateFlow()
 
-    /**
-     * Plan the batch — compute how many transactions are eligible, how
-     * many are cached, how many remote calls are needed.
-     */
+    /** True iff a batch is currently in progress. UI can use this to
+     *  disable the "start" button. */
+    fun isActive(): Boolean = currentJob?.isActive == true
+
     suspend fun plan(): BatchPlan {
         val txs = transactionRepository.getAllNewestFirst()
         val categories = categoryRepository.getAll()
@@ -70,14 +73,10 @@ class AiBatchCategorizationService(
             eligible = eligible.size,
             cached = cached,
             remote = remote,
-            providerName = aiService.let { "OpenAI-compatible" },
+            providerName = "OpenAI-compatible",
         )
     }
 
-    /**
-     * Start the batch. Updates [state] throughout. Returns the final
-     * summary via the StateFlow when [BatchState.Done] is reached.
-     */
     fun start() {
         if (currentJob?.isActive == true) return
         currentJob = scope.launch {
@@ -94,8 +93,12 @@ class AiBatchCategorizationService(
 
     fun cancel() {
         currentJob?.cancel()
-        currentJob = null
-        _state.value = BatchState.Idle
+        // Mark the current state as canceled (without resetting the
+        // progress counters if they were set by runBatch already).
+        _state.value = when (val s = _state.value) {
+            is BatchState.Running -> s.copy(canceled = true)
+            else -> BatchState.Running(processed = 0, total = 0, merchant = null, canceled = true)
+        }
     }
 
     private suspend fun runBatch() = coroutineScope {
@@ -104,19 +107,34 @@ class AiBatchCategorizationService(
         val memories = merchantMemoryRepository.getAll()
         val eligible = txs.filter { isEligible(it, memories) }
         if (eligible.isEmpty()) {
-            _state.value = BatchState.Done(BatchSummary(processed = 0, cached = 0, remote = 0, failed = 0, cancelled = false))
+            _state.value = BatchState.Done(BatchSummary())
             return@coroutineScope
         }
         var processed = 0
-        var cachedCount = 0
-        var remoteCount = 0
+        var cacheHits = 0
+        var remoteCalls = 0
+        var succeeded = 0
         var failed = 0
+        var skipped = 0
+        var canceled = false
         for (t in eligible) {
-            currentJob?.join()
             ensureActive()
-            _state.value = BatchState.Running(processed = processed, total = eligible.size, merchant = t.merchantOrBeneficiary)
+            _state.value = BatchState.Running(
+                processed = processed,
+                total = eligible.size,
+                merchant = t.merchantOrBeneficiary,
+                cacheHits = cacheHits,
+                succeeded = succeeded,
+                failed = failed,
+                skipped = skipped,
+                canceled = false,
+            )
             val merchant = t.merchantOrBeneficiary
-            if (merchant.isNullOrBlank()) { processed++; failed++; continue }
+            if (merchant.isNullOrBlank()) {
+                processed++
+                skipped++
+                continue
+            }
             val request = aiService.buildRequest(
                 merchant = merchant,
                 type = t.transactionType,
@@ -125,46 +143,61 @@ class AiBatchCategorizationService(
                 categories = categories,
                 includeExactAmount = false,
             )
-            val outcome = try {
-                aiService.categorize(merchant, request)
-            } catch (_: Throwable) {
-                AiCategorizationOutcome.Unclassified
+            // Check cache first.
+            val cached = aiService.lookupCache(merchant) { id -> categories.any { it.id == id && it.enabled } }
+            val outcome = if (cached != null) {
+                // Reuse cache → wrap in a synthetic Success.
+                AiCategorizationOutcome.Success(
+                    AiCategorizationResult(
+                        categoryId = cached.categoryId,
+                        categoryName = categories.firstOrNull { it.id == cached.categoryId }?.nameAr.orEmpty(),
+                        normalizedMerchantName = merchant,
+                        confidence = cached.confidence,
+                        explanation = cached.explanation,
+                        providerName = cached.providerName,
+                        modelName = cached.modelName,
+                        responseVersion = cached.resultVersion,
+                    )
+                )
+            } else {
+                try {
+                    aiService.categorize(merchant, request)
+                } catch (ce: kotlinx.coroutines.CancellationException) {
+                    throw ce
+                } catch (_: Throwable) {
+                    AiCategorizationOutcome.Unclassified
+                }
             }
             when (outcome) {
                 is AiCategorizationOutcome.Success -> {
-                    applySuggestion(t, outcome.result)
-                    cachedCount++ // counted whether cache hit or fresh call
-                    remoteCount++
+                    if (cached != null) cacheHits++ else remoteCalls++
+                    // Insert into the suggestion queue.
+                    suggestionRepository.insertFromResult(t, outcome.result)
+                    succeeded++
                 }
-                is AiCategorizationOutcome.Failed -> { failed++ }
-                AiCategorizationOutcome.Unclassified -> { failed++ }
+                is AiCategorizationOutcome.Failed -> failed++
+                AiCategorizationOutcome.Unclassified -> failed++
             }
             processed++
         }
+        if (currentJob?.isCancelled == true) canceled = true
         _state.value = BatchState.Done(
             BatchSummary(
                 processed = processed,
-                cached = cachedCount,
-                remote = remoteCount,
+                cacheHits = cacheHits,
+                remoteCalls = remoteCalls,
+                succeeded = succeeded,
                 failed = failed,
-                cancelled = false,
-            )
+                skipped = skipped,
+                canceled = canceled,
+            ),
         )
-    }
-
-    private suspend fun applySuggestion(t: TransactionEntity, result: AiCategorizationResult) {
-        val updated = t.copy(
-            categoryId = result.categoryId,
-            categorySource = com.baraa.masroof.transaction.CategorySource.FUTURE_AI,
-            categoryConfidence = result.confidence,
-            needsReview = true, // AI suggestion still requires user confirmation
-            updatedAt = System.currentTimeMillis(),
-        )
-        transactionRepository.update(updated)
     }
 
     private fun ensureActive() {
-        if (currentJob?.isActive != true) throw kotlinx.coroutines.CancellationException("cancelled")
+        if (currentJob?.isCancelled == true) {
+            throw kotlinx.coroutines.CancellationException("cancelled")
+        }
     }
 
     companion object {
@@ -175,7 +208,6 @@ class AiBatchCategorizationService(
             if (t.transactionType in NON_ELIGIBLE_TYPES) return false
             if (t.status == com.baraa.masroof.transaction.TransactionStatus.DECLINED ||
                 t.status == com.baraa.masroof.transaction.TransactionStatus.PENDING) return false
-            // If there's a user-confirmed memory for this merchant, skip — memory wins.
             val merchantKey = com.baraa.masroof.transaction.MerchantNormalizer.normalize(t.merchantOrBeneficiary)
             val mem = memories.firstOrNull { it.normalizedKey == merchantKey }
             if (mem != null && mem.confirmationCount >= 1 && mem.enabled) return false
@@ -197,7 +229,16 @@ class AiBatchCategorizationService(
 
 sealed interface BatchState {
     data object Idle : BatchState
-    data class Running(val processed: Int, val total: Int, val merchant: String?) : BatchState
+    data class Running(
+        val processed: Int,
+        val total: Int,
+        val merchant: String?,
+        val cacheHits: Int = 0,
+        val succeeded: Int = 0,
+        val failed: Int = 0,
+        val skipped: Int = 0,
+        val canceled: Boolean = false,
+    ) : BatchState
     data class Done(val summary: BatchSummary) : BatchState
     data class Error(val message: String) : BatchState
 }
@@ -210,9 +251,11 @@ data class BatchPlan(
 )
 
 data class BatchSummary(
-    val processed: Int,
-    val cached: Int,
-    val remote: Int,
-    val failed: Int,
-    val cancelled: Boolean,
+    val processed: Int = 0,
+    val cacheHits: Int = 0,
+    val remoteCalls: Int = 0,
+    val succeeded: Int = 0,
+    val failed: Int = 0,
+    val skipped: Int = 0,
+    val canceled: Boolean = false,
 )

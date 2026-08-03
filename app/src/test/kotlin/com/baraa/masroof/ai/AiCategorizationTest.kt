@@ -320,9 +320,9 @@ class AiCategorizationTest {
             // is not in the allowed list. The parser should still validate
             // and we'd want this to fall through. With our current mock,
             // we treat the provider's success as authoritative — but
-            // production OpenAI provider uses AiResponseParser.validate.
+            // production OpenAI provider uses AiResponseValidator.validate.
             // Test the parser directly:
-            val validated = AiResponseParser.validate(
+            val validated = AiResponseValidator.validate(
                 rawBody = "{\"category_id\":999,\"category_name\":\"x\",\"normalized_merchant_name\":\"Test\",\"confidence\":90,\"explanation\":\"x\"}",
                 request = req,
                 providerName = "mock",
@@ -343,10 +343,10 @@ class AiCategorizationTest {
             channel = Channel.POS,
             language = "ar",
         )
-        assertNull(AiResponseParser.validate("not json", req, "mock", "mock"))
-        assertNull(AiResponseParser.validate("", req, "mock", "mock"))
-        assertNull(AiResponseParser.validate("{}", req, "mock", "mock"))
-        assertNull(AiResponseParser.validate("{\"category_id\":1}", req, "mock", "mock"))
+        assertNull(AiResponseValidator.validate("not json", req, "mock", "mock"))
+        assertNull(AiResponseValidator.validate("", req, "mock", "mock"))
+        assertNull(AiResponseValidator.validate("{}", req, "mock", "mock"))
+        assertNull(AiResponseValidator.validate("{\"category_id\":1}", req, "mock", "mock"))
     }
 
     @Test
@@ -360,10 +360,10 @@ class AiCategorizationTest {
             channel = Channel.POS,
             language = "ar",
         )
-        assertNull(AiResponseParser.validate(
+        assertNull(AiResponseValidator.validate(
             "{\"category_id\":1,\"category_name\":\"x\",\"normalized_merchant_name\":\"t\",\"confidence\":150,\"explanation\":\"x\"}",
             req, "mock", "mock"))
-        assertNull(AiResponseParser.validate(
+        assertNull(AiResponseValidator.validate(
             "{\"category_id\":1,\"category_name\":\"x\",\"normalized_merchant_name\":\"t\",\"confidence\":-5,\"explanation\":\"x\"}",
             req, "mock", "mock"))
     }
@@ -660,6 +660,7 @@ private fun AiBatchCategorizationServiceTest_buildBatch(
             provider = provider,
             cache = AiCacheRepository(TestAiCacheDao()),
         ),
+        suggestionRepository = FakeAiSuggestionRepository(),
     )
 }
 
@@ -693,4 +694,52 @@ class TestAiCacheDao : com.baraa.masroof.data.db.AiCacheDao {
     override suspend fun deleteByCategoryId(categoryId: Long) {
         store.entries.removeAll { it.value.categoryId == categoryId }
     }
+}
+
+/**
+ * In-memory AI suggestion repository for tests. Backed by a list; no
+ * Room / coroutine machinery needed.
+ */
+class FakeAiSuggestionRepository : AiSuggestionRepository(
+    dao = InMemoryAiSuggestionDao(),
+    transactionDao = null,
+    categoryDao = null,
+) {
+    // Expose the dao for tests that need to inspect / seed rows directly.
+    @Suppress("unused")
+    val dao: com.baraa.masroof.data.db.AiSuggestionDao
+        get() = (super.dao())
+}
+
+// Make the inner class internal-visible so other test files can use it.
+internal class InMemoryAiSuggestionDao : com.baraa.masroof.data.db.AiSuggestionDao {
+    private val store = mutableListOf<com.baraa.masroof.data.db.AiSuggestionEntity>()
+    private var nextId = 1L
+
+    override suspend fun insert(entity: com.baraa.masroof.data.db.AiSuggestionEntity): Long {
+        val id = entity.id.takeIf { it > 0 } ?: nextId++
+        store.add(entity.copy(id = id))
+        return id
+    }
+
+    override suspend fun update(entity: com.baraa.masroof.data.db.AiSuggestionEntity): Int {
+        val idx = store.indexOfFirst { it.id == entity.id }
+        if (idx >= 0) { store[idx] = entity; return 1 }
+        return 0
+    }
+
+    override suspend fun getById(id: Long) = store.firstOrNull { it.id == id }
+    override suspend fun getByTransactionId(transactionId: Long) =
+        store.filter { it.transactionId == transactionId }.sortedByDescending { it.createdAt }
+    override fun observeAll() = kotlinx.coroutines.flow.MutableStateFlow(store.toList())
+    override fun observeByStatus(status: String) =
+        kotlinx.coroutines.flow.MutableStateFlow(store.filter { it.status == status }.sortedByDescending { it.createdAt })
+    override fun observePending() =
+        kotlinx.coroutines.flow.MutableStateFlow(store.filter { it.status == "PENDING" }.sortedByDescending { it.createdAt })
+    override suspend fun updateStatus(id: Long, status: String, now: Long): Int {
+        val idx = store.indexOfFirst { it.id == id }
+        if (idx >= 0) { store[idx] = store[idx].copy(status = status, updatedAt = now); return 1 }
+        return 0
+    }
+    override suspend fun deleteAll() { store.clear() }
 }

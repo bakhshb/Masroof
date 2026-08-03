@@ -49,9 +49,11 @@ class FakeAiHttpClient : AiHttpClient {
     var nextDelayMs: Long = 0L
     var networkException: Throwable? = null
     var cancelled: Boolean = false
+    var throwTooLarge: Boolean = false
 
     override suspend fun execute(request: AiHttpRequest): AiHttpResponse {
         requests.add(request)
+        if (throwTooLarge) throw AiResponseTooLargeException(999_999L, 100L)
         if (networkException != null) throw networkException!!
         if (nextDelayMs > 0) kotlinx.coroutines.delay(nextDelayMs)
         return nextResponse

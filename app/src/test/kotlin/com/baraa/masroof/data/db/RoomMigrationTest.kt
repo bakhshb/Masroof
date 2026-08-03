@@ -1,6 +1,7 @@
 package com.baraa.masroof.data.db
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -51,23 +52,19 @@ class RoomMigrationTest {
     }
 
     @Test
-    fun allMigrationsArrayContainsAllFourMigrations() {
+    fun migration5to6_startAndEndVersionsAreCorrect() {
+        assertEquals(5, MasroofDatabase.MIGRATION_5_6.startVersion)
+        assertEquals(6, MasroofDatabase.MIGRATION_5_6.endVersion)
+    }
+
+    @Test
+    fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
+        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6")
+        val missing = expected - versions.toSet()
         assertTrue(
-            "ALL_MIGRATIONS must contain 1->2 (was: $versions)",
-            versions.contains("1->2"),
-        )
-        assertTrue(
-            "ALL_MIGRATIONS must contain 2->3 (was: $versions)",
-            versions.contains("2->3"),
-        )
-        assertTrue(
-            "ALL_MIGRATIONS must contain 3->4 (was: $versions)",
-            versions.contains("3->4"),
-        )
-        assertTrue(
-            "ALL_MIGRATIONS must contain 4->5 (was: $versions)",
-            versions.contains("4->5"),
+            "ALL_MIGRATIONS missing $missing (was: $versions)",
+            missing.isEmpty(),
         )
     }
 
@@ -103,6 +100,32 @@ class RoomMigrationTest {
             "v2 -> v3 migration must create the financial_accounts table",
             source.contains("CREATE TABLE IF NOT EXISTS `financial_accounts`"),
         )
+    }
+
+    @Test
+    fun migration5to6AddsAiSuggestionsTable() {
+        // v5 -> v6 is purely additive: creates ai_suggestions table
+        // with foreign key to transactions. Existing tables are
+        // untouched.
+        val sourceFile = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt")
+        val source = sourceFile.readText()
+        assertTrue(
+            "v5 -> v6 migration must create the ai_suggestions table",
+            source.contains("CREATE TABLE IF NOT EXISTS `ai_suggestions`"),
+        )
+        assertTrue(
+            "v5 -> v6 migration must include a FK from ai_suggestions to transactions",
+            source.contains("FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`)"),
+        )
+        // No destructive operations.
+        val tables = listOf("transactions", "categories", "merchant_memory", "financial_accounts", "ai_cache", "ai_settings")
+        for (table in tables) {
+            val drop = Regex("""DROP\s+TABLE\s+[`"]?\Q$table\E[`"]?""")
+            assertFalse(
+                "no migration may drop $table (was found in source)",
+                drop.containsMatchIn(source),
+            )
+        }
     }
 
     @Test

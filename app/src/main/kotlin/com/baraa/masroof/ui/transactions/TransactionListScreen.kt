@@ -2,6 +2,8 @@ package com.baraa.masroof.ui.transactions
 
 import android.Manifest
 import android.content.pm.PackageManager
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.R
 import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.transaction.Currency
@@ -81,6 +84,21 @@ fun TransactionListScreen(
     var showMerchants by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAi by remember { mutableStateOf(false) }
+    var showAiSuggestions by remember { mutableStateOf(false) }
+    var showAiBatch by remember { mutableStateOf(false) }
+    var showAiBatchDisabled by remember { mutableStateOf(false) }
+    var showAiBatchPlan by remember { mutableStateOf<com.baraa.masroof.ai.BatchPlan?>(null) }
+    var aiMinimumConfidence by remember { mutableStateOf(80) }
+    var aiEnabled by remember { mutableStateOf(false) }
+
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as MasroofApplication
+    val scope = rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.runBlocking { app.aiSettingsRepository.load() }.let {
+            aiEnabled = it.enabled
+            aiMinimumConfidence = it.minimumConfidence
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -144,6 +162,24 @@ fun TransactionListScreen(
                 .padding(innerPadding),
         ) {
             CountLine(count = count)
+            if (aiEnabled && count > 0) {
+                com.baraa.masroof.ui.ai.AiBatchActionCard(
+                    onClick = {
+                        if (aiEnabled) {
+                            scope.launch {
+                                val plan = app.aiBatchService.plan()
+                                if (plan.eligible > 0) {
+                                    showAiBatchPlan = plan
+                                } else {
+                                    showAiBatchDisabled = true
+                                }
+                            }
+                        } else {
+                            showAiBatchDisabled = true
+                        }
+                    }
+                )
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 if (transactions.isEmpty()) {
                     EmptyState()
@@ -200,12 +236,46 @@ fun TransactionListScreen(
             onMerchants = { showMerchants = true; showSettings = false },
             onAccounts = { showAccounts = true; showSettings = false },
             onAi = { showAi = true; showSettings = false },
+            onAiSuggestions = { showAiSuggestions = true; showSettings = false },
+            onAiBatch = { showAiBatch = true; showSettings = false },
         )
         return
     }
 
     if (showAi) {
         com.baraa.masroof.ui.ai.AiSettingsScreen(onClose = { showAi = false })
+        return
+    }
+
+    if (showAiSuggestions) {
+        com.baraa.masroof.ui.ai.AiSuggestionsScreen(
+            onClose = { showAiSuggestions = false },
+            minimumConfidence = aiMinimumConfidence,
+        )
+        return
+    }
+
+    if (showAiBatchPlan != null) {
+        val plan = showAiBatchPlan!!
+        com.baraa.masroof.ui.ai.AiBatchDialog(
+            plan = plan,
+            providerLabel = app.aiSettingsRepository.let {
+                kotlinx.coroutines.runBlocking { it.load() }.providerLabel
+            },
+            modelName = app.aiSettingsRepository.let {
+                kotlinx.coroutines.runBlocking { it.load() }.modelName
+            },
+            onDismiss = { showAiBatchPlan = null },
+            batchService = app.aiBatchService,
+        )
+        return
+    }
+
+    if (showAiBatchDisabled) {
+        com.baraa.masroof.ui.ai.AiBatchDisabledDialog(
+            onDismiss = { showAiBatchDisabled = false },
+            onOpenSettings = { showAiBatchDisabled = false; showAi = true },
+        )
         return
     }
 

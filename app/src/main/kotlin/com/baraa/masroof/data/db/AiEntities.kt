@@ -2,8 +2,11 @@ package com.baraa.masroof.data.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+
+// TransactionEntity lives in this same package — no import needed.
 
 /**
  * Cached AI categorization. Stores only the **sanitized** fields:
@@ -125,3 +128,113 @@ data class AiSettingsEntity(
         )
     }
 }
+
+/**
+ * A pending AI suggestion attached to a transaction. Drives the
+ * review queue UI: اقتراحات التصنيف الذكي.
+ *
+ * Sanitized — only safe fields are persisted (no raw prompts or
+ * responses, no API key, no merchant raw text beyond the display name,
+ * no exact amounts).
+ *
+ * When the user accepts / rejects / modifies the suggestion, the
+ * corresponding [status] is updated and the underlying transaction's
+ * `categoryId` / `categorySource` / `userConfirmed` / `needsReview`
+ * fields are kept in sync.
+ */
+@Entity(
+    tableName = "ai_suggestions",
+    foreignKeys = [
+        ForeignKey(
+            entity = TransactionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["transactionId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["transactionId"]),
+        Index(value = ["status"]),
+        Index(value = ["createdAt"]),
+    ],
+)
+data class AiSuggestionEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "transactionId")
+    val transactionId: Long,
+
+    @ColumnInfo(name = "merchantDisplay")
+    val merchantDisplay: String,
+
+    @ColumnInfo(name = "amountBucket")
+    val amountBucket: String,
+
+    @ColumnInfo(name = "currency")
+    val currency: String,
+
+    @ColumnInfo(name = "categoryId")
+    val categoryId: Long,
+
+    @ColumnInfo(name = "categoryName")
+    val categoryName: String,
+
+    @ColumnInfo(name = "confidence")
+    val confidence: Int,
+
+    @ColumnInfo(name = "explanation")
+    val explanation: String,
+
+    @ColumnInfo(name = "providerName")
+    val providerName: String,
+
+    @ColumnInfo(name = "modelName")
+    val modelName: String,
+
+    @ColumnInfo(name = "promptVersion")
+    val promptVersion: String,
+
+    @ColumnInfo(name = "resultVersion")
+    val resultVersion: String,
+
+    /**
+     * One of PENDING, ACCEPTED, REJECTED, MODIFIED.
+     */
+    @ColumnInfo(name = "status")
+    val status: String,
+
+    @ColumnInfo(name = "createdAt")
+    val createdAt: Long,
+
+    @ColumnInfo(name = "updatedAt")
+    val updatedAt: Long,
+) {
+    companion object {
+        const val STATUS_PENDING: String = "PENDING"
+        const val STATUS_ACCEPTED: String = "ACCEPTED"
+        const val STATUS_REJECTED: String = "REJECTED"
+        const val STATUS_MODIFIED: String = "MODIFIED"
+    }
+}
+
+/** Domain-level read model for the AI suggestion queue. */
+data class AiSuggestion(
+    val id: Long,
+    val transactionId: Long,
+    val merchantDisplay: String,
+    val amountBucket: String,
+    val currency: String,
+    val categoryId: Long,
+    val categoryName: String,
+    val confidence: Int,
+    val explanation: String,
+    val providerName: String,
+    val modelName: String,
+    val promptVersion: String,
+    val resultVersion: String,
+    val status: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)

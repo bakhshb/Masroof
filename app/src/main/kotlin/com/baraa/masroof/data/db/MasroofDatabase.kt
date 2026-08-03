@@ -11,15 +11,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Local Room database for the Masroof app.
  *
- * **Schema version 5**. v5 adds:
- *  - `ai_cache` table — sanitized AI suggestion cache (no raw prompts,
- *    no raw responses, no API key, no merchant names beyond the
- *    normalized key, no exact amounts)
- *  - `ai_settings` table — AI provider settings (the API key itself is
- *    stored in Keystore-backed encrypted storage, never in Room)
+ * **Schema version 6**. v6 adds:
+ *  - `ai_suggestions` table — per-transaction AI suggestion queue used
+ *    by the review UI. Sanitized; foreign key to `transactions` with
+ *    CASCADE delete so removing a transaction cleans up its
+ *    suggestions.
  *
- * The DB is **device-local only**. No destructive migration is
- * configured. Every schema bump ships with an explicit [Migration].
+ * v5 introduced `ai_cache` and `ai_settings`. The DB is **device-local
+ * only**. No destructive migration is configured. Every schema bump
+ * ships with an explicit [Migration].
  */
 @Database(
     entities = [
@@ -29,8 +29,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FinancialAccountEntity::class,
         AiCacheEntity::class,
         AiSettingsEntity::class,
+        AiSuggestionEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -42,6 +43,7 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun financialAccountDao(): FinancialAccountDao
     abstract fun aiCacheDao(): AiCacheDao
     abstract fun aiSettingsDao(): AiSettingsDao
+    abstract fun aiSuggestionDao(): AiSuggestionDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -125,12 +127,6 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v4 → v5 migration: add `ai_cache` and `ai_settings` tables.
-         * No existing rows change. No API key is ever persisted in either
-         * of these tables — the key lives in Keystore-backed encrypted
-         * shared preferences.
-         */
         val MIGRATION_4_5: Migration = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -174,12 +170,48 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v5 → v6: add the `ai_suggestions` table. Per-transaction
+         * suggestion queue. Existing tables untouched.
+         */
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `ai_suggestions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `transactionId` INTEGER NOT NULL,
+                        `merchantDisplay` TEXT NOT NULL,
+                        `amountBucket` TEXT NOT NULL,
+                        `currency` TEXT NOT NULL,
+                        `categoryId` INTEGER NOT NULL,
+                        `categoryName` TEXT NOT NULL,
+                        `confidence` INTEGER NOT NULL,
+                        `explanation` TEXT NOT NULL,
+                        `providerName` TEXT NOT NULL,
+                        `modelName` TEXT NOT NULL,
+                        `promptVersion` TEXT NOT NULL,
+                        `resultVersion` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_suggestions_transactionId` ON `ai_suggestions`(`transactionId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_suggestions_status` ON `ai_suggestions`(`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_suggestions_createdAt` ON `ai_suggestions`(`createdAt`)")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
             MIGRATION_4_5,
+            MIGRATION_5_6,
         )
 
         fun build(context: Context): MasroofDatabase =
