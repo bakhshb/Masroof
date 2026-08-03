@@ -4,6 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.baraa.masroof.ledger.AccountLinkSource
+import com.baraa.masroof.ledger.TransactionPostingStatus
 import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
 import com.baraa.masroof.transaction.FinancialTreatment
@@ -88,4 +90,12 @@ data class TransactionEntity(
     val userConfirmed: Boolean = false,
     /** Diagnostic reason if the transaction is excluded from spending totals. */
     val exclusionReason: String? = null,
+    /** Ledger-account links are nullable until deterministic matching or user selection. */
+    val sourceAccountId: Long? = null,
+    val destinationAccountId: Long? = null,
+    val linkedJournalEntryId: Long? = null,
+    val accountLinkSource: AccountLinkSource = AccountLinkSource.UNLINKED,
+    val accountLinkConfidence: Int = 0,
+    val accountLinkNeedsReview: Boolean = true,
+    val postingStatus: TransactionPostingStatus = TransactionPostingStatus.UNPOSTED,
 )

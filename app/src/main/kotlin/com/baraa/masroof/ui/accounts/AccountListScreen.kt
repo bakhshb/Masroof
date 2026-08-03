@@ -56,6 +56,8 @@ fun AccountListScreen(onClose: () -> Unit) {
 
     LaunchedEffect(repo) { repo.observeAll().collectLatest { accounts = it } }
 
+    val visibleAccounts = accounts.filter { it.systemAccountKey == null }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -74,16 +76,16 @@ fun AccountListScreen(onClose: () -> Unit) {
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            if (accounts.isEmpty()) {
+            if (visibleAccounts.isEmpty()) {
                 EmptyAccountsState()
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val assets = accounts.filter { it.isActive && it.accountNature == AccountNature.ASSET }
-                    val liabilities = accounts.filter { it.isActive && it.accountNature == AccountNature.LIABILITY }
-                    val inactive = accounts.filterNot { it.isActive }
+                    val assets = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.ASSET }
+                    val liabilities = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.LIABILITY }
+                    val inactive = visibleAccounts.filterNot { it.isActive }
                     accountGroup("الأصول", assets) { editing = it }
                     accountGroup("الالتزامات", liabilities) { editing = it }
                     accountGroup("الحسابات غير النشطة", inactive) { editing = it }

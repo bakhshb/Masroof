@@ -26,6 +26,10 @@ import com.baraa.masroof.data.repository.RoomTransactionRepository
 import com.baraa.masroof.data.repository.TransactionImportService
 import com.baraa.masroof.data.repository.TransactionRepository
 import com.baraa.masroof.sms.SmsRepository
+import com.baraa.masroof.ledger.SystemAccountSeeder
+import com.baraa.masroof.ledger.LedgerRepository
+import com.baraa.masroof.ledger.JournalGenerationService
+import com.baraa.masroof.ledger.TransactionLinkingService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -194,12 +198,22 @@ class MasroofApplication : Application() {
         com.baraa.masroof.data.repository.RoomFinancialSetupRepository(database.financialSetupDao())
     }
 
+    val systemAccountSeeder: SystemAccountSeeder by lazy { SystemAccountSeeder(database.financialAccountDao()) }
+    val ledgerRepository: LedgerRepository by lazy { LedgerRepository(database) }
+    val journalGenerationService: JournalGenerationService by lazy {
+        JournalGenerationService(systemAccounts = { key -> systemAccountSeeder.accountId(key) })
+    }
+    val transactionLinkingService: TransactionLinkingService by lazy {
+        TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService)
+    }
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
         appScope.launch {
             runCatching { categoryRepository.seedIfEmpty() }
+            runCatching { systemAccountSeeder.seed() }
             // Pre-load the AI config so the first batch call doesn't
             // need to block on a DB read.
             runCatching { rebuildAiIfNeeded() }

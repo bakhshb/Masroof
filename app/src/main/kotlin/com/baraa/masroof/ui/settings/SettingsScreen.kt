@@ -46,6 +46,7 @@ fun SettingsScreen(
     onCategories: () -> Unit,
     onMerchants: () -> Unit,
     onAccounts: () -> Unit,
+    onAccountLinks: () -> Unit = {},
     onAi: () -> Unit,
     onAiSuggestions: () -> Unit,
     onAiBatch: () -> Unit,
@@ -108,6 +109,11 @@ fun SettingsScreen(
                 title = stringResource(id = R.string.settings_accounts_short),
                 icon = Icons.Filled.AccountBox,
                 onClick = onAccounts,
+            )
+            SettingsRow(
+                title = "ربط العمليات بالحسابات",
+                icon = Icons.Filled.AccountBox,
+                onClick = onAccountLinks,
             )
 
             HorizontalDivider()

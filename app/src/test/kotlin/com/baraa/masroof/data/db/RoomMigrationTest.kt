@@ -55,6 +55,8 @@ class RoomMigrationTest {
     fun migration5to6_startAndEndVersionsAreCorrect() {
         assertEquals(5, MasroofDatabase.MIGRATION_5_6.startVersion)
         assertEquals(6, MasroofDatabase.MIGRATION_5_6.endVersion)
+        assertEquals(7, MasroofDatabase.MIGRATION_7_8.startVersion)
+        assertEquals(8, MasroofDatabase.MIGRATION_7_8.endVersion)
     }
 
     @Test

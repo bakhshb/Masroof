@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Local Room database for the Masroof app.
  *
- * **Schema version 7**. v7 adds the financial-setup + opening-balance
+ * **Schema version 8**. v7 adds the financial-setup + opening-balance
  * foundation:
  *  - new columns on `financial_accounts` (accountNature, currency,
  *    openingBalance, openingBalanceDate, includeInNetWorth /
@@ -33,8 +33,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AiSettingsEntity::class,
         AiSuggestionEntity::class,
         FinancialSetupEntity::class,
+        JournalEntryEntity::class,
+        LedgerPostingEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +50,7 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun aiSettingsDao(): AiSettingsDao
     abstract fun aiSuggestionDao(): AiSuggestionDao
     abstract fun financialSetupDao(): FinancialSetupDao
+    abstract fun journalDao(): JournalDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -272,6 +275,28 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /** v7 → v8 adds ledger tables and nullable account-link fields. */
+        val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `financial_accounts` ADD COLUMN `systemAccountKey` TEXT")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_accounts_systemAccountKey` ON `financial_accounts`(`systemAccountKey`)")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `sourceAccountId` INTEGER")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `destinationAccountId` INTEGER")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedJournalEntryId` INTEGER")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `accountLinkSource` TEXT NOT NULL DEFAULT 'UNLINKED'")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `accountLinkConfidence` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `accountLinkNeedsReview` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `postingStatus` TEXT NOT NULL DEFAULT 'UNPOSTED'")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `journal_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceTransactionId` INTEGER, `journalType` TEXT NOT NULL, `postingStatus` TEXT NOT NULL, `effectiveDate` TEXT NOT NULL, `effectiveTime` TEXT NOT NULL, `descriptionCode` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `reversalOfJournalId` INTEGER, `notes` TEXT, `generatedBy` TEXT NOT NULL, `generationVersion` INTEGER NOT NULL, FOREIGN KEY(`sourceTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_journal_entries_sourceTransactionId` ON `journal_entries`(`sourceTransactionId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_journal_entries_postingStatus` ON `journal_entries`(`postingStatus`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_journal_entries_effectiveDate_effectiveTime` ON `journal_entries`(`effectiveDate`, `effectiveTime`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `ledger_postings` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `journalEntryId` INTEGER NOT NULL, `accountId` INTEGER NOT NULL, `postingSide` TEXT NOT NULL, `amount` TEXT NOT NULL, `currency` TEXT NOT NULL, `memoCode` TEXT, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`journalEntryId`) REFERENCES `journal_entries`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`accountId`) REFERENCES `financial_accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ledger_postings_journalEntryId` ON `ledger_postings`(`journalEntryId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ledger_postings_accountId` ON `ledger_postings`(`accountId`)")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -280,6 +305,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
 
         fun build(context: Context): MasroofDatabase =

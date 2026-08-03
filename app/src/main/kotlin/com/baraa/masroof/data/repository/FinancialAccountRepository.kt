@@ -78,6 +78,7 @@ class RoomFinancialAccountRepository(
             includeInNetWorth = includeInNetWorth,
             includeInLiquidity = includeInLiquidity,
             isOwnedByUser = true,
+            systemAccountKey = null,
             isActive = true,
             notes = notes?.takeIf { it.isNotBlank() },
             createdAt = n,
@@ -87,6 +88,7 @@ class RoomFinancialAccountRepository(
     }
 
     override suspend fun update(account: FinancialAccount) {
+        require(account.systemAccountKey == null) { "System accounts cannot be edited" }
         val n = now()
         dao.update(
             FinancialAccountEntity(
@@ -103,6 +105,7 @@ class RoomFinancialAccountRepository(
                 includeInNetWorth = account.includeInNetWorth,
                 includeInLiquidity = account.includeInLiquidity,
                 isOwnedByUser = account.isOwnedByUser,
+                systemAccountKey = account.systemAccountKey,
                 isActive = account.isActive,
                 notes = account.notes,
                 createdAt = account.createdAt,
@@ -112,6 +115,7 @@ class RoomFinancialAccountRepository(
     }
 
     override suspend fun delete(account: FinancialAccount) {
+        require(account.systemAccountKey == null) { "System accounts cannot be deleted" }
         dao.delete(
             FinancialAccountEntity(
                 id = account.id,
@@ -127,6 +131,7 @@ class RoomFinancialAccountRepository(
                 includeInNetWorth = account.includeInNetWorth,
                 includeInLiquidity = account.includeInLiquidity,
                 isOwnedByUser = account.isOwnedByUser,
+                systemAccountKey = account.systemAccountKey,
                 isActive = account.isActive,
                 notes = account.notes,
                 createdAt = account.createdAt,
@@ -154,6 +159,7 @@ internal fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAcco
     includeInNetWorth = includeInNetWorth,
     includeInLiquidity = includeInLiquidity,
     isOwnedByUser = isOwnedByUser,
+    systemAccountKey = systemAccountKey,
     isActive = isActive,
     notes = notes,
     createdAt = createdAt,

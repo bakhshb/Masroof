@@ -81,6 +81,7 @@ fun TransactionListScreen(
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var showDeleteAll by remember { mutableStateOf(false) }
     var showAccounts by remember { mutableStateOf(false) }
+    var showAccountLinks by remember { mutableStateOf(false) }
     var showCategories by remember { mutableStateOf(false) }
     var showMerchants by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
@@ -234,6 +235,11 @@ fun TransactionListScreen(
         return
     }
 
+    if (showAccountLinks) {
+        com.baraa.masroof.ui.accounts.AccountLinkingScreen(onClose = { showAccountLinks = false })
+        return
+    }
+
     if (showAccounts) {
         com.baraa.masroof.ui.accounts.AccountListScreen(onClose = { showAccounts = false })
         return
@@ -255,6 +261,7 @@ fun TransactionListScreen(
             onCategories = { showCategories = true; showSettings = false },
             onMerchants = { showMerchants = true; showSettings = false },
             onAccounts = { showAccounts = true; showSettings = false },
+            onAccountLinks = { showAccountLinks = true; showSettings = false },
             onAi = { showAi = true; showSettings = false },
             onAiSuggestions = { showAiSuggestions = true; showSettings = false },
             onAiBatch = { showAiBatch = true; showSettings = false },

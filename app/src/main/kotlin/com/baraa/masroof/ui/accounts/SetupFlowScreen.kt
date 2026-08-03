@@ -69,7 +69,9 @@ fun SetupFlowScreen(
         defaultCurrency = setup.defaultCurrency
     }
     LaunchedEffect(accountsRepository) {
-        accountsRepository.observeAll().collectLatest { accounts = it }
+        accountsRepository.observeAll().collectLatest { rows ->
+            accounts = rows.filter { it.systemAccountKey == null }
+        }
     }
 
     fun saveSetup(completed: Boolean) {

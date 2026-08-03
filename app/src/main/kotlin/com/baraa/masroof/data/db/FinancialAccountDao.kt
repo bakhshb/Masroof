@@ -23,6 +23,12 @@ interface FinancialAccountDao {
     @Query("SELECT * FROM financial_accounts WHERE id = :id")
     suspend fun getById(id: Long): FinancialAccountEntity?
 
+    @Query("SELECT * FROM financial_accounts WHERE systemAccountKey = :key LIMIT 1")
+    suspend fun getSystemAccount(key: String): FinancialAccountEntity?
+
+    @Query("SELECT * FROM financial_accounts WHERE systemAccountKey IS NOT NULL ORDER BY id")
+    suspend fun getSystemAccounts(): List<FinancialAccountEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(account: FinancialAccountEntity): Long
 

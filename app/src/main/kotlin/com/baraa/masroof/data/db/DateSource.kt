@@ -8,6 +8,9 @@ enum class DateSource {
     /** No date in the body; fell back to the SMS received timestamp. */
     FROM_SMS_METADATA,
 
+    /** User explicitly corrected the effective transaction date. */
+    USER_CORRECTION,
+
     /** No date available in the body or SMS metadata. */
     UNKNOWN,
 }

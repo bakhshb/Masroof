@@ -1,7 +1,9 @@
 package com.baraa.masroof.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.baraa.masroof.ledger.SystemAccountKey
 import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
@@ -27,7 +29,10 @@ import java.math.BigDecimal
  * The opening balance is **not** auto-updated from transactions in this
  * task. Future tasks will reconcile transactions against these balances.
  */
-@Entity(tableName = "financial_accounts")
+@Entity(
+    tableName = "financial_accounts",
+    indices = [Index(value = ["systemAccountKey"], unique = true)],
+)
 data class FinancialAccountEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -53,6 +58,8 @@ data class FinancialAccountEntity(
     val includeInNetWorth: Boolean = true,
     val includeInLiquidity: Boolean = false,
     val isOwnedByUser: Boolean = true,
+    /** Non-null only for hidden balancing accounts created by the system. */
+    val systemAccountKey: SystemAccountKey? = null,
     val isActive: Boolean = true,
     val notes: String? = null,
     val createdAt: Long,
@@ -74,6 +81,7 @@ data class FinancialAccount(
     val includeInNetWorth: Boolean,
     val includeInLiquidity: Boolean,
     val isOwnedByUser: Boolean,
+    val systemAccountKey: SystemAccountKey? = null,
     val isActive: Boolean,
     val notes: String?,
     val createdAt: Long = 0L,

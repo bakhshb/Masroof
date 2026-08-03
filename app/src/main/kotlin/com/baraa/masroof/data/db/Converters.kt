@@ -1,6 +1,14 @@
 package com.baraa.masroof.data.db
 
 import androidx.room.TypeConverter
+import com.baraa.masroof.ledger.AccountLinkSource
+import com.baraa.masroof.ledger.JournalGeneratedBy
+import com.baraa.masroof.ledger.JournalPostingStatus
+import com.baraa.masroof.ledger.JournalType
+import com.baraa.masroof.ledger.PostingSide
+import com.baraa.masroof.ledger.SystemAccountKey
+import com.baraa.masroof.ledger.TransactionPostingStatus
+import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
@@ -93,4 +101,21 @@ class Converters {
 
     @TypeConverter
     fun toAccountType(value: String): AccountType = AccountType.valueOf(value)
+
+    @TypeConverter fun fromAccountNature(value: AccountNature): String = value.name
+    @TypeConverter fun toAccountNature(value: String): AccountNature = AccountNature.valueOf(value)
+    @TypeConverter fun fromSystemAccountKey(value: SystemAccountKey?): String? = value?.name
+    @TypeConverter fun toSystemAccountKey(value: String?): SystemAccountKey? = value?.let(SystemAccountKey::valueOf)
+    @TypeConverter fun fromJournalType(value: JournalType): String = value.name
+    @TypeConverter fun toJournalType(value: String): JournalType = JournalType.valueOf(value)
+    @TypeConverter fun fromJournalStatus(value: JournalPostingStatus): String = value.name
+    @TypeConverter fun toJournalStatus(value: String): JournalPostingStatus = JournalPostingStatus.valueOf(value)
+    @TypeConverter fun fromPostingSide(value: PostingSide): String = value.name
+    @TypeConverter fun toPostingSide(value: String): PostingSide = PostingSide.valueOf(value)
+    @TypeConverter fun fromGeneratedBy(value: JournalGeneratedBy): String = value.name
+    @TypeConverter fun toGeneratedBy(value: String): JournalGeneratedBy = JournalGeneratedBy.valueOf(value)
+    @TypeConverter fun fromAccountLinkSource(value: AccountLinkSource): String = value.name
+    @TypeConverter fun toAccountLinkSource(value: String): AccountLinkSource = AccountLinkSource.valueOf(value)
+    @TypeConverter fun fromTransactionPostingStatus(value: TransactionPostingStatus): String = value.name
+    @TypeConverter fun toTransactionPostingStatus(value: String): TransactionPostingStatus = TransactionPostingStatus.valueOf(value)
 }
