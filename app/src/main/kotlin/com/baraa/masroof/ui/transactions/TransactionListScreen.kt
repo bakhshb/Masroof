@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -76,6 +77,9 @@ fun TransactionListScreen(
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var showDeleteAll by remember { mutableStateOf(false) }
     var showAccounts by remember { mutableStateOf(false) }
+    var showCategories by remember { mutableStateOf(false) }
+    var showMerchants by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -107,6 +111,12 @@ fun TransactionListScreen(
                         Icon(
                             imageVector = Icons.Filled.Add,
                             contentDescription = stringResource(id = R.string.action_import),
+                        )
+                    }
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(id = R.string.settings_title),
                         )
                     }
                     IconButton(onClick = { showAccounts = true }) {
@@ -156,6 +166,10 @@ fun TransactionListScreen(
                 viewModel.updateTransaction(updated)
                 editing = null
             },
+            onConfirmAndRememberMerchant = { updated ->
+                viewModel.confirmAndRemember(updated, rememberMerchant = true)
+                editing = null
+            },
             onConfirmDelete = {
                 viewModel.deleteTransaction(entity)
                 editing = null
@@ -165,6 +179,26 @@ fun TransactionListScreen(
 
     if (showAccounts) {
         com.baraa.masroof.ui.accounts.AccountListScreen(onClose = { showAccounts = false })
+        return
+    }
+
+    if (showCategories) {
+        com.baraa.masroof.ui.categories.CategoryListScreen(onClose = { showCategories = false })
+        return
+    }
+
+    if (showMerchants) {
+        com.baraa.masroof.ui.merchants.MerchantMemoryScreen(onClose = { showMerchants = false })
+        return
+    }
+
+    if (showSettings) {
+        com.baraa.masroof.ui.settings.SettingsScreen(
+            onClose = { showSettings = false },
+            onCategories = { showCategories = true; showSettings = false },
+            onMerchants = { showMerchants = true; showSettings = false },
+            onAccounts = { showAccounts = true; showSettings = false },
+        )
         return
     }
 

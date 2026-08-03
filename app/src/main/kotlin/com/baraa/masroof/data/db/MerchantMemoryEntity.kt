@@ -22,6 +22,8 @@ data class MerchantMemoryEntity(
     val preferredFinancialTreatment: FinancialTreatment?,
     val confirmationCount: Int = 1,
     val lastConfirmedAt: Long,
+    /** When false, the rule engine ignores this row (UI-set disable). */
+    val enabled: Boolean = true,
 )
 
 /** Domain-level read model. */
@@ -32,4 +34,5 @@ data class MerchantMemory(
     val preferredFinancialTreatment: FinancialTreatment?,
     val confirmationCount: Int,
     val lastConfirmedAt: Long,
+    val enabled: Boolean = true,
 )

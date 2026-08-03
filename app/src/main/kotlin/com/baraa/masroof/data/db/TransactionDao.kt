@@ -71,4 +71,19 @@ interface TransactionDao {
      */
     @Query("SELECT * FROM transactions WHERE transactionSimilarityKey = :key ORDER BY smsTimestamp DESC")
     suspend fun findBySimilarityKey(key: String): List<TransactionEntity>
+
+    /**
+     * Count transactions grouped by [TransactionEntity.categoryId]. The
+     * return type is a list of [CategoryTxCount] because Room cannot
+     * directly map a `Map<Long?, Int>` or `Pair<*,*>` return type. The
+     * repository converts the list to a map.
+     */
+    @Query("SELECT categoryId, COUNT(*) AS cnt FROM transactions WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    suspend fun countByCategory(): List<CategoryTxCount>
 }
+
+/** Row type for [TransactionDao.countByCategory]. */
+data class CategoryTxCount(
+    val categoryId: Long?,
+    val cnt: Int,
+)

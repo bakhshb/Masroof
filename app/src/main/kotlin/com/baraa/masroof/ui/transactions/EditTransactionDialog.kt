@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -19,28 +21,38 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.data.db.TransactionEntity
+import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
+import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionStatus
 import com.baraa.masroof.transaction.TransactionType
+import com.baraa.masroof.rules.ReviewStateMachine
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 /**
- * Edit dialog for a single [TransactionEntity].
+ * Edit / review dialog for a single [TransactionEntity].
  *
- * Editable fields (per spec): type, amount, currency, merchant, date, status.
- * The other fields (sender, fingerprint, timestamps) are not user-editable.
+ * Editable fields: type, amount, currency, merchant, date, status. The
+ * "review actions" row exposes quick actions for common user decisions:
+ * "تأكيد", "اعتبارها تحويلًا داخليًا", "اعتبارها استثمارًا", "تجاهل العملية".
  *
- * The dialog is a simple AlertDialog with text fields + drop-downs; on Save it
- * emits a copy of the entity with the edited values applied, leaving
- * non-editable fields untouched.
+ * A "تذكر هذا التصنيف لهذا التاجر مستقبلًا" checkbox appears whenever a
+ * callback for persisting the merchant memory is provided. When checked,
+ * saving the transaction also calls [onConfirmAndRememberMerchant] which
+ * is responsible for writing to [com.baraa.masroof.data.repository.MerchantMemoryRepository].
+ *
+ * All field transitions go through [ReviewStateMachine] so the
+ * `userConfirmed` / `needsReview` / `categorySource` / `categoryId` /
+ * `financialTreatment` flags cannot drift.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +61,8 @@ fun EditTransactionDialog(
     onDismiss: () -> Unit,
     onSave: (TransactionEntity) -> Unit,
     onConfirmDelete: () -> Unit,
+    onConfirmAndRememberMerchant: ((TransactionEntity) -> Unit)? = null,
+    rememberAvailable: Boolean = true,
 ) {
     var type by remember { mutableStateOf(entity.transactionType) }
     var amountText by remember { mutableStateOf(entity.amount?.toPlainString().orEmpty()) }
@@ -56,6 +70,7 @@ fun EditTransactionDialog(
     var merchant by remember { mutableStateOf(entity.merchantOrBeneficiary.orEmpty()) }
     var dateText by remember { mutableStateOf(entity.transactionDate?.toString().orEmpty()) }
     var status by remember { mutableStateOf(entity.status) }
+    var rememberMerchant by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val amountInvalidMsg = stringResource(id = R.string.edit_dialog_invalid_amount)
     val dateInvalidMsg = stringResource(id = R.string.edit_dialog_invalid_date)
@@ -149,6 +164,21 @@ fun EditTransactionDialog(
                     labelFor = { statusLabel(it) },
                     onSelect = { status = it },
                 )
+                if (rememberAvailable && onConfirmAndRememberMerchant != null && merchant.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = rememberMerchant,
+                            onCheckedChange = { rememberMerchant = it },
+                        )
+                        Text(
+                            text = stringResource(id = R.string.review_apply_and_remember),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
                 TextButton(onClick = { showDeleteConfirm = true }) {
                     Text(
                         text = stringResource(id = R.string.action_delete),
@@ -157,83 +187,71 @@ fun EditTransactionDialog(
                 }
                 TextButton(
                     onClick = {
-                        // Mark as confirmed by the user.
                         onSave(
-                            entity.copy(
-                                transactionType = type,
-                                amount = parseAmount(amountText),
-                                currency = currency,
-                                merchantOrBeneficiary = merchant.ifBlank { null },
-                                transactionDate = parseDate(dateText),
-                                status = status,
-                                userConfirmed = true,
-                                needsReview = false,
+                            ReviewStateMachine.confirm(
+                                entity = entity.copy(
+                                    transactionType = type,
+                                    amount = parseAmount(amountText),
+                                    currency = currency,
+                                    merchantOrBeneficiary = merchant.ifBlank { null },
+                                    transactionDate = parseDate(dateText),
+                                    status = status,
+                                ),
                             )
                         )
                     },
-                ) {
-                    Text(stringResource(id = R.string.review_action_confirm))
-                }
+                ) { Text(stringResource(id = R.string.review_action_confirm)) }
                 TextButton(
                     onClick = {
                         onSave(
-                            entity.copy(
-                                transactionType = type,
-                                amount = parseAmount(amountText),
-                                currency = currency,
-                                merchantOrBeneficiary = merchant.ifBlank { null },
-                                transactionDate = parseDate(dateText),
-                                status = status,
-                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.INTERNAL_TRANSFER,
-                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
-                                userConfirmed = true,
-                                needsReview = false,
+                            ReviewStateMachine.forceTreatment(
+                                entity = entity.copy(
+                                    transactionType = type,
+                                    amount = parseAmount(amountText),
+                                    currency = currency,
+                                    merchantOrBeneficiary = merchant.ifBlank { null },
+                                    transactionDate = parseDate(dateText),
+                                    status = status,
+                                ),
+                                treatment = FinancialTreatment.INTERNAL_TRANSFER,
                             )
                         )
                     },
-                ) {
-                    Text(stringResource(id = R.string.review_action_mark_internal))
-                }
+                ) { Text(stringResource(id = R.string.review_action_mark_internal)) }
                 TextButton(
                     onClick = {
                         onSave(
-                            entity.copy(
-                                transactionType = type,
-                                amount = parseAmount(amountText),
-                                currency = currency,
-                                merchantOrBeneficiary = merchant.ifBlank { null },
-                                transactionDate = parseDate(dateText),
-                                status = status,
-                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.INVESTMENT,
-                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
-                                userConfirmed = true,
-                                needsReview = false,
+                            ReviewStateMachine.forceTreatment(
+                                entity = entity.copy(
+                                    transactionType = type,
+                                    amount = parseAmount(amountText),
+                                    currency = currency,
+                                    merchantOrBeneficiary = merchant.ifBlank { null },
+                                    transactionDate = parseDate(dateText),
+                                    status = status,
+                                ),
+                                treatment = FinancialTreatment.INVESTMENT,
                             )
                         )
                     },
-                ) {
-                    Text(stringResource(id = R.string.review_action_mark_investment))
-                }
+                ) { Text(stringResource(id = R.string.review_action_mark_investment)) }
                 TextButton(
                     onClick = {
                         onSave(
-                            entity.copy(
-                                transactionType = type,
-                                amount = parseAmount(amountText),
-                                currency = currency,
-                                merchantOrBeneficiary = merchant.ifBlank { null },
-                                transactionDate = parseDate(dateText),
-                                status = status,
-                                financialTreatment = com.baraa.masroof.transaction.FinancialTreatment.IGNORED,
-                                categorySource = com.baraa.masroof.transaction.CategorySource.USER,
-                                userConfirmed = true,
-                                needsReview = false,
+                            ReviewStateMachine.forceTreatment(
+                                entity = entity.copy(
+                                    transactionType = type,
+                                    amount = parseAmount(amountText),
+                                    currency = currency,
+                                    merchantOrBeneficiary = merchant.ifBlank { null },
+                                    transactionDate = parseDate(dateText),
+                                    status = status,
+                                ),
+                                treatment = FinancialTreatment.IGNORED,
                             )
                         )
                     },
-                ) {
-                    Text(stringResource(id = R.string.review_action_ignore))
-                }
+                ) { Text(stringResource(id = R.string.review_action_ignore)) }
             }
         },
         confirmButton = {
@@ -249,23 +267,25 @@ fun EditTransactionDialog(
                         dateError = dateInvalidMsg
                         return@TextButton
                     }
-                    onSave(
-                        entity.copy(
-                            transactionType = type,
-                            amount = parsedAmount,
-                            currency = currency,
-                            merchantOrBeneficiary = merchant.ifBlank { null },
-                            transactionDate = parsedDate,
-                            status = status,
-                            categorySource = com.baraa.masroof.transaction.CategorySource.USER,
-                            userConfirmed = true,
-                            needsReview = false,
-                        )
+                    val updated = ReviewStateMachine.confirm(
+                        entity = entity,
+                        categoryId = entity.categoryId,
+                        categorySource = CategorySource.USER,
+                    ).copy(
+                        transactionType = type,
+                        amount = parsedAmount,
+                        currency = currency,
+                        merchantOrBeneficiary = merchant.ifBlank { null },
+                        transactionDate = parsedDate,
+                        status = status,
                     )
+                    if (rememberMerchant && onConfirmAndRememberMerchant != null) {
+                        onConfirmAndRememberMerchant(updated)
+                    } else {
+                        onSave(updated)
+                    }
                 },
-            ) {
-                Text(stringResource(id = R.string.action_save))
-            }
+            ) { Text(stringResource(id = R.string.action_save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {

@@ -189,6 +189,39 @@
     <string name="account_delete_title">حذف الحساب</string>
     <string name="account_delete_body">هل تريد حذف هذا الحساب؟ العمليات السابقة المرتبطة به ستبقى محفوظة.</string>
 
+    <!-- Category management -->
+    <string name="categories_title">إدارة التصنيفات</string>
+    <string name="categories_empty">لا توجد تصنيفات محفوظة</string>
+    <string name="category_add_parent">إضافة تصنيف رئيسي</string>
+    <string name="category_add_child">إضافة تصنيف فرعي</string>
+    <string name="category_field_name_ar">الاسم بالعربية</string>
+    <string name="category_field_name_en">الاسم بالإنجليزية (اختياري)</string>
+    <string name="category_field_sort_order">ترتيب العرض</string>
+    <string name="category_parent_label">ضمن: %1$s</string>
+    <string name="category_disabled_badge">معطّل</string>
+    <string name="category_tx_count">عدد العمليات: %1$d</string>
+    <string name="category_delete_title">حذف التصنيف</string>
+    <string name="category_delete_body">سيتم حذف التصنيف نهائيًا. لا يمكن التراجع.</string>
+    <string name="category_edit_title_add">إضافة تصنيف</string>
+    <string name="category_edit_title_edit">تعديل التصنيف</string>
+
+    <!-- Merchant memory management -->
+    <string name="merchants_title">التجار المحفوظون</string>
+    <string name="merchants_empty">لا توجد قواعد تجار محفوظة</string>
+    <string name="merchants_empty_hint">احفظ تصنيفًا لتاجر أثناء مراجعة عملية ليُستخدم تلقائيًا مستقبلاً.</string>
+    <string name="merchant_count_label">عدد مرات التأكيد: %1$d</string>
+    <string name="merchant_edit_category">تعديل التصنيف المحفوظ</string>
+    <string name="merchant_disable_memory">تعطيل التذكر</string>
+    <string name="merchant_delete_rule">حذف قاعدة التاجر</string>
+    <string name="merchant_disabled_badge">معطّل</string>
+    <string name="merchant_remember_feedback">تم حفظ التصنيف لهذا التاجر وسيُستخدم للعمليات المشابهة مستقبلاً</string>
+
+    <!-- Settings menu -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_categories">إدارة التصنيفات</string>
+    <string name="settings_merchants">التجار المحفوظون</string>
+    <string name="settings_accounts_short">الحسابات</string>
+
     <!-- Saved transactions count (Arabic plural rules) -->
     <plurals name="count_transactions">
         <item quantity="zero">لا توجد عمليات محفوظة</item>

@@ -51,17 +51,29 @@ object SpendingCalculator {
 
         for (t in transactions) {
             val amt = t.amount
+            // A transaction counts toward spending if it was either
+            // auto-classified confidently (`!needsReview`) OR the user
+            // explicitly confirmed it (`userConfirmed`).
+            val counted = !t.needsReview || t.userConfirmed
+            // Pending / review counter: any transaction still marked as
+            // needing review (whether needsReview is true, or the rule
+            // engine flagged it as PENDING_REVIEW) is one less than
+            // confirmed. Avoid double-counting when both flags are set.
+            when {
+                t.needsReview && !t.userConfirmed -> pending += 1
+                t.financialTreatment == FinancialTreatment.PENDING_REVIEW -> pending += 1
+            }
             when (t.financialTreatment) {
-                FinancialTreatment.EXPENSE -> if (!t.needsReview) gross = gross.add(amt ?: BigDecimal.ZERO)
+                FinancialTreatment.EXPENSE -> if (counted) gross = gross.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.REFUND -> refunds = refunds.add(amt ?: BigDecimal.ZERO)
-                FinancialTreatment.INCOME -> if (!t.needsReview) income = income.add(amt ?: BigDecimal.ZERO)
+                FinancialTreatment.INCOME -> if (counted) income = income.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.INVESTMENT -> investments = investments.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.INTERNAL_TRANSFER -> internal = internal.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.CREDIT_CARD_PAYMENT -> creditCard = creditCard.add(amt ?: BigDecimal.ZERO)
-                FinancialTreatment.BANK_FEE -> if (!t.needsReview) fees = fees.add(amt ?: BigDecimal.ZERO)
+                FinancialTreatment.BANK_FEE -> if (counted) fees = fees.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.CASH_WITHDRAWAL -> cashOut = cashOut.add(amt ?: BigDecimal.ZERO)
                 FinancialTreatment.IGNORED -> ignored = ignored.add(amt ?: BigDecimal.ZERO)
-                FinancialTreatment.PENDING_REVIEW -> pending += 1
+                FinancialTreatment.PENDING_REVIEW -> { /* counted above */ }
             }
         }
 

@@ -25,6 +25,7 @@ interface TransactionRepository {
     suspend fun count(): Int
     suspend fun existsByFingerprint(fingerprint: String): Boolean
     suspend fun findBySimilarityKey(key: String): List<TransactionEntity>
+    suspend fun countByCategory(): Map<Long?, Int>
 }
 
 /** Room-backed implementation. */
@@ -45,6 +46,9 @@ class RoomTransactionRepository(private val dao: TransactionDao) : TransactionRe
 
     override suspend fun findBySimilarityKey(key: String): List<TransactionEntity> =
         dao.findBySimilarityKey(key)
+
+    override suspend fun countByCategory(): Map<Long?, Int> =
+        dao.countByCategory().associate { (id, n) -> id to n }
 }
 
 /**
@@ -119,11 +123,18 @@ class FakeTransactionRepository : TransactionRepository {
         rows.filter { it.transactionSimilarityKey == key }
             .sortedByDescending { it.smsTimestamp }
 
+    override suspend fun countByCategory(): Map<Long?, Int> =
+        rows.filter { it.categoryId != null }
+            .groupBy { it.categoryId }
+            .mapValues { it.value.size }
+
     private fun nextId(): Long = (rows.maxOfOrNull { it.id } ?: 0L) + 1L
 }
 
 /** In-memory [CategoryRepository] for unit tests. */
-class FakeCategoryRepository : CategoryRepository {
+class FakeCategoryRepository(
+    private val transactionCountByCategory: suspend () -> Map<Long, Int> = { emptyMap() },
+) : CategoryRepository {
     private val rows = mutableListOf<com.baraa.masroof.data.db.Category>()
     private val flows = mutableListOf<MutableList<com.baraa.masroof.data.db.Category>>()
     private var nextId = 1L
@@ -163,8 +174,42 @@ class FakeCategoryRepository : CategoryRepository {
         val idx = rows.indexOfFirst { it.id == id }
         if (idx >= 0) rows[idx] = rows[idx].copy(sortOrder = sortOrder)
     }
-    override suspend fun deleteIfNotSystem(id: Long): Boolean {
-        return rows.removeAll { it.id == id && !it.isSystem }
+    override suspend fun move(id: Long, newParentId: Long?) {
+        // Cycle prevention: cannot move to itself.
+        if (newParentId == id) {
+            throw IllegalArgumentException("Cannot move category into itself")
+        }
+        // Cycle prevention: cannot move into its own descendant.
+        if (newParentId != null) {
+            val childrenByParent = rows.groupBy { it.parentId }
+            fun descendantsOf(target: Long): Set<Long> {
+                val result = HashSet<Long>()
+                val stack = ArrayDeque<Long>()
+                stack.addLast(target)
+                while (stack.isNotEmpty()) {
+                    val current = stack.removeLast()
+                    val kids = childrenByParent[current].orEmpty().map { it.id }
+                    for (k in kids) {
+                        if (result.add(k)) stack.addLast(k)
+                    }
+                }
+                return result
+            }
+            if (newParentId in descendantsOf(id)) {
+                throw IllegalArgumentException("Cannot move category into its descendant")
+            }
+        }
+        val idx = rows.indexOfFirst { it.id == id }
+        if (idx >= 0) rows[idx] = rows[idx].copy(parentId = newParentId)
+    }
+    override suspend fun delete(id: Long): DeleteResult {
+        val current = rows.firstOrNull { it.id == id } ?: return DeleteResult.Success
+        if (current.isSystem) return DeleteResult.Failure("لا يمكن حذف تصنيف من النظام")
+        if (rows.any { it.parentId == id }) {
+            return DeleteResult.Failure("لا يمكن حذف تصنيف يحتوي على تصنيفات فرعية")
+        }
+        return if (rows.removeAll { it.id == id }) DeleteResult.Success
+        else DeleteResult.Failure("تعذّر الحذف")
     }
     override fun resolveByName(name: String): suspend () -> com.baraa.masroof.data.db.Category? =
         { rows.firstOrNull { it.nameAr == name || it.nameEn == name } }
@@ -198,6 +243,7 @@ class FakeMerchantMemoryRepository : MerchantMemoryRepository {
                     preferredFinancialTreatment = treatment,
                     confirmationCount = 1,
                     lastConfirmedAt = 1_700_000_000_000L,
+                    enabled = true,
                 )
             )
         } else {
@@ -209,8 +255,26 @@ class FakeMerchantMemoryRepository : MerchantMemoryRepository {
             )
         }
     }
+    override suspend fun setEnabled(key: String, enabled: Boolean) {
+        val idx = rows.indexOfFirst { it.normalizedKey == key }
+        if (idx >= 0) rows[idx] = rows[idx].copy(enabled = enabled)
+    }
     override suspend fun delete(key: String) {
         rows.removeAll { it.normalizedKey == key }
+    }
+    override suspend fun merge(fromKey: String, intoKey: String) {
+        if (fromKey == intoKey) return
+        val fromIdx = rows.indexOfFirst { it.normalizedKey == fromKey }
+        if (fromIdx < 0) return
+        val intoIdx = rows.indexOfFirst { it.normalizedKey == intoKey }
+        if (intoIdx < 0) return
+        val from = rows[fromIdx]
+        val into = rows[intoIdx]
+        rows[intoIdx] = into.copy(
+            confirmationCount = into.confirmationCount + from.confirmationCount,
+            lastConfirmedAt = maxOf(into.lastConfirmedAt, from.lastConfirmedAt),
+        )
+        rows.removeAt(fromIdx)
     }
 }
 

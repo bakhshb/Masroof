@@ -18,7 +18,9 @@ interface MerchantMemoryRepository {
         categoryId: Long?,
         treatment: FinancialTreatment?,
     )
+    suspend fun setEnabled(key: String, enabled: Boolean)
     suspend fun delete(key: String)
+    suspend fun merge(fromKey: String, intoKey: String)
 }
 
 class RoomMerchantMemoryRepository(
@@ -52,6 +54,7 @@ class RoomMerchantMemoryRepository(
                 preferredFinancialTreatment = treatment,
                 confirmationCount = 1,
                 lastConfirmedAt = now(),
+                enabled = true,
             )
         } else {
             existing.copy(
@@ -65,8 +68,28 @@ class RoomMerchantMemoryRepository(
         dao.upsert(updated)
     }
 
+    override suspend fun setEnabled(key: String, enabled: Boolean) {
+        dao.setEnabled(key, enabled)
+    }
+
     override suspend fun delete(key: String) {
         dao.delete(key)
+    }
+
+    override suspend fun merge(fromKey: String, intoKey: String) {
+        if (fromKey == intoKey) return
+        val from = dao.getByKey(fromKey) ?: return
+        val into = dao.getByKey(intoKey) ?: return
+        dao.upsert(
+            into.copy(
+                displayName = into.displayName,
+                preferredCategoryId = into.preferredCategoryId,
+                preferredFinancialTreatment = into.preferredFinancialTreatment,
+                confirmationCount = into.confirmationCount + from.confirmationCount,
+                lastConfirmedAt = maxOf(into.lastConfirmedAt, from.lastConfirmedAt),
+            )
+        )
+        dao.delete(fromKey)
     }
 }
 
@@ -77,4 +100,5 @@ internal fun MerchantMemoryEntity.toDomain(): MerchantMemory = MerchantMemory(
     preferredFinancialTreatment = preferredFinancialTreatment,
     confirmationCount = confirmationCount,
     lastConfirmedAt = lastConfirmedAt,
+    enabled = enabled,
 )

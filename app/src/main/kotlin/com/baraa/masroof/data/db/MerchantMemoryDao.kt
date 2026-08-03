@@ -25,6 +25,9 @@ interface MerchantMemoryDao {
     @Update
     suspend fun update(memory: MerchantMemoryEntity): Int
 
+    @Query("UPDATE merchant_memory SET enabled = :enabled WHERE normalizedKey = :key")
+    suspend fun setEnabled(key: String, enabled: Boolean): Int
+
     @Query("DELETE FROM merchant_memory WHERE normalizedKey = :key")
     suspend fun delete(key: String): Int
 }

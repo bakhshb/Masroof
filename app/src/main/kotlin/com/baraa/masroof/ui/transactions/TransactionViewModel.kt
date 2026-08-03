@@ -48,6 +48,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val repo: TransactionRepository = app.transactionRepository
     private val smsRepo: SmsRepository = app.smsRepository
     private val importService: TransactionImportService = app.importService
+    private val merchantMemoryRepo = app.merchantMemoryRepository
 
     /** Observable list of saved transactions, newest first. */
     val transactions: StateFlow<List<TransactionEntity>> = repo.observeAll()
@@ -163,6 +164,29 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val updated = entity.copy(updatedAt = System.currentTimeMillis())
             withContext(Dispatchers.IO) { repo.update(updated) }
+        }
+    }
+
+    /**
+     * Persist the user's edit AND optionally write the merchant / category
+     * pair to [com.baraa.masroof.data.repository.MerchantMemoryRepository]
+     * so future transactions for the same merchant inherit the choice.
+     */
+    fun confirmAndRemember(entity: TransactionEntity, rememberMerchant: Boolean) {
+        viewModelScope.launch {
+            val updated = entity.copy(updatedAt = System.currentTimeMillis())
+            withContext(Dispatchers.IO) { repo.update(updated) }
+            if (rememberMerchant) {
+                val merchantText = updated.merchantOrBeneficiary
+                if (!merchantText.isNullOrBlank()) {
+                    merchantMemoryRepo.remember(
+                        rawMerchant = merchantText,
+                        displayName = merchantText,
+                        categoryId = updated.categoryId,
+                        treatment = updated.financialTreatment,
+                    )
+                }
+            }
         }
     }
 

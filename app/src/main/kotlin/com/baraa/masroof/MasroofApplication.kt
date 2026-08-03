@@ -28,7 +28,14 @@ class MasroofApplication : Application() {
     }
 
     val categoryRepository: RoomCategoryRepository by lazy {
-        RoomCategoryRepository(database.categoryDao())
+        RoomCategoryRepository(
+            dao = database.categoryDao(),
+            transactionCountByCategory = {
+                transactionRepository.countByCategory()
+                    .mapNotNull { (id, n) -> id?.let { it to n } }
+                    .toMap()
+            },
+        )
     }
 
     val merchantMemoryRepository: RoomMerchantMemoryRepository by lazy {

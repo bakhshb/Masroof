@@ -408,7 +408,7 @@ class RuleEngineTest {
 
     @Test
     fun engineRuleOrderMatchesDocumentedPriorities() {
-        val expected = RuleEngineFactory.documentedRuleOrder()
+        val expected = RuleEngineFactory.documentedPriorities
         val actual = RuleEngineFactory.build(emptyList(), null)
         // The engine's rule list must be sorted by the same priority order.
         // We test by invoking the engine with inputs designed to fire each

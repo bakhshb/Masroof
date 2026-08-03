@@ -1,10 +1,10 @@
 package com.baraa.masroof.rules
 
 import com.baraa.masroof.data.db.Category
+import com.baraa.masroof.rules.rules.ArabicMerchantCategoryRule
 import com.baraa.masroof.rules.rules.BankFeeRule
 import com.baraa.masroof.rules.rules.CardPaymentRule
 import com.baraa.masroof.rules.rules.DeclinedRule
-import com.baraa.masroof.rules.rules.GenericCategoryRule
 import com.baraa.masroof.rules.rules.HighConfidenceMerchantRule
 import com.baraa.masroof.rules.rules.InternalTransferRule
 import com.baraa.masroof.rules.rules.InvestmentTransferRule
@@ -12,22 +12,66 @@ import com.baraa.masroof.rules.rules.MerchantMemoryRule
 import com.baraa.masroof.rules.rules.PendingStatusRule
 import com.baraa.masroof.rules.rules.RefundRule
 import com.baraa.masroof.rules.rules.SalaryRule
+import com.baraa.masroof.rules.rules.WalletTopUpRule
 import com.baraa.masroof.transaction.TransactionType
 
 /**
- * Builds a fully-configured [RuleEngine] from the available stores.
- *
- * Rules are added in [RulePriority] order. The high-confidence merchant
- * rule and the generic category rule are seeded with curated example
- * patterns; the user can extend them in a future settings screen.
+ * Builds a fully-configured [RuleEngine]. The single source of truth for
+ * rule order is the [RulePriority] enum; this factory walks the enum and
+ * instantiates the matching rule for each non-FALLBACK priority. New
+ * priorities are added by introducing a new enum constant + a new rule
+ * class; no separate documentation list is maintained.
  */
 object RuleEngineFactory {
 
     /**
-     * High-confidence merchant tokens. Conservative — only very common
-     * merchants that the parser reliably identifies. Add new ones via the
-     * review UI in a future iteration.
+     * The set of priorities for which the engine registers a rule. Adding
+     * a rule for a new priority is a one-line change here.
      */
+    val REGISTERED_PRIORITIES: List<RulePriority> = listOf(
+        RulePriority.SAFETY,             // DeclinedRule + PendingStatusRule
+        RulePriority.SAFETY_CRITICAL,    // CardPaymentRule + RefundRule + BankFeeRule + SalaryRule
+        RulePriority.INTERNAL_TRANSFER,  // InternalTransferRule + InvestmentTransferRule + WalletTopUpRule
+        RulePriority.MERCHANT_MEMORY,    // MerchantMemoryRule
+        RulePriority.MERCHANT_RULE,      // HighConfidenceMerchantRule
+        RulePriority.CATEGORY_RULE,      // ArabicMerchantCategoryRule
+    )
+
+    fun build(
+        categories: List<Category>,
+        feeCategoryId: Long?,
+    ): RuleEngine {
+        val categoryByName = categories.associateBy { it.nameAr }
+        fun catByName(name: String): Category? = categoryByName[name]
+
+        val rules: List<TransactionRule> = listOf(
+            DeclinedRule(),
+            PendingStatusRule(),
+            CardPaymentRule(),
+            RefundRule(),
+            BankFeeRule(feeCategoryIdResolver = { feeCategoryId }),
+            SalaryRule(),
+            // InternalTransferRule + InvestmentTransferRule + WalletTopUpRule
+            // all run at INTERNAL_TRANSFER priority. They all return null
+            // when only one side is known (or none) so the engine falls
+            // through to PENDING_REVIEW.
+            InternalTransferRule(),
+            InvestmentTransferRule(),
+            WalletTopUpRule(),
+            // MerchantMemoryRule runs BEFORE the generic category rules so
+            // a user-confirmed mapping always wins over a generic pattern.
+            MerchantMemoryRule(),
+            HighConfidenceMerchantRule(
+                tokenToCategory = HIGH_CONFIDENCE_MERCHANT_TOKENS,
+                categoryByName = ::catByName,
+            ),
+            ArabicMerchantCategoryRule(categoryByName = ::catByName),
+        )
+        return RuleEngine(rules)
+    }
+
+    // -- High-confidence merchant tokens (English, conservative) ---------
+
     private val HIGH_CONFIDENCE_MERCHANT_TOKENS: Map<String, String> = mapOf(
         "starbucks" to "مقاهي",
         "caribou" to "مقاهي",
@@ -39,9 +83,6 @@ object RuleEngineFactory {
         "jahez" to "توصيل طعام",
         "hungerstation" to "توصيل طعام",
         "talabat" to "توصيل طعام",
-        "stc" to "جوال",
-        "mobily" to "جوال",
-        "zain" to "جوال",
         "almarai" to "مقاضي",
         "panda" to "مقاضي",
         "othaim" to "مقاضي",
@@ -49,73 +90,25 @@ object RuleEngineFactory {
         "lulu" to "مقاضي",
     )
 
-    /**
-     * Generic category patterns. The user's review confirmation can
-     * promote any of these to merchant memory.
-     */
-    private val GENERIC_CATEGORY_PATTERNS: List<Pair<Regex, String>> = listOf(
-        Regex("""\b(supermarket|grocery|hypermarket|بقالة|سوبرماركت|هايبر|تموينات)\b""") to "مقاضي",
-        Regex("""\b(fuel|gas|petrol|بنزين|وقود|محطة)\b""") to "وقود",
-        Regex("""\b(pharmacy|drug|صيدلية)\b""") to "صيدلية",
-        Regex("""\b(telecom|mobile|recharge|باقة|فاتورة|اتصالات|جوال)\b""") to "جوال",
-        Regex("""\b(internet|broadband|إنترنت|نت)\b""") to "إنترنت",
-        Regex("""\b(cafe|coffee|كوفي|قهوة|مقھى|كافيه)\b""") to "مقاهي",
-        Regex("""\b(restaurant|food|dining|مطعم|مطاعم|أكل)\b""") to "مطاعم",
-        Regex("""\b(delivery|توصيل)\b""") to "توصيل طعام",
-    )
-
-    fun build(
-        categories: List<Category>,
-        feeCategoryId: Long?,
-    ): RuleEngine {
-        val categoryByName = categories.associateBy { it.nameAr }
-        fun catByName(name: String): Category? = categoryByName[name]
-
-        val tokenToCategory = HIGH_CONFIDENCE_MERCHANT_TOKENS.mapValues { (_, name) ->
-            name
-        }
-
-        val rules: List<TransactionRule> = listOf(
-            DeclinedRule(),
-            PendingStatusRule(),
-            CardPaymentRule(),
-            RefundRule(),
-            BankFeeRule(feeCategoryIdResolver = { feeCategoryId }),
-            SalaryRule(),
-            // InternalTransferRule + InvestmentTransferRule must run before
-            // MerchantMemoryRule so a confirmed merchant memory can't
-            // override a safety/correctness-critical classification.
-            InternalTransferRule(),
-            InvestmentTransferRule(),
-            MerchantMemoryRule(),
-            HighConfidenceMerchantRule(
-                tokenToCategory = tokenToCategory,
-                categoryByName = ::catByName,
-            ),
-            GenericCategoryRule(
-                patternToCategoryName = GENERIC_CATEGORY_PATTERNS,
-                categoryByName = ::catByName,
-            ),
-        )
-        // Sanity: assert we cover the documented priority order. If a new
-        // rule is added without updating this list, the engine will still
-        // work but the priority coverage assertion below will fail in tests.
-        return RuleEngine(rules)
-    }
-
-    /** Exposed so the tests can verify the priority order documented above. */
-    fun documentedRuleOrder(): List<RulePriority> = listOf(
-        RulePriority.SAFETY,             // DeclinedRule + PendingStatusRule
-        RulePriority.SAFETY_CRITICAL,    // CardPaymentRule + RefundRule + BankFeeRule + SalaryRule
-        RulePriority.INTERNAL_TRANSFER,  // InternalTransferRule + InvestmentTransferRule
-        RulePriority.MERCHANT_MEMORY,    // MerchantMemoryRule
-        RulePriority.MERCHANT_RULE,      // HighConfidenceMerchantRule
-        RulePriority.CATEGORY_RULE,      // GenericCategoryRule
-    )
-
     /** Exposed so the test suite can reference the same constants. */
     val highConfidenceMerchantTokens: Map<String, String> get() = HIGH_CONFIDENCE_MERCHANT_TOKENS
-    val genericCategoryPatterns: List<Pair<Regex, String>> get() = GENERIC_CATEGORY_PATTERNS
+
+    /** Exposed so the test suite can verify the priority order. */
+    val documentedPriorities: List<RulePriority> get() = REGISTERED_PRIORITIES
+
+    /** Exposed for the diagnostic screen / debug export. */
+    fun describeActiveRules(): List<String> = REGISTERED_PRIORITIES
+        .flatMap { p ->
+            when (p) {
+                RulePriority.SAFETY -> listOf("DeclinedRule", "PendingStatusRule")
+                RulePriority.SAFETY_CRITICAL -> listOf("CardPaymentRule", "RefundRule", "BankFeeRule", "SalaryRule")
+                RulePriority.INTERNAL_TRANSFER -> listOf("InternalTransferRule", "InvestmentTransferRule", "WalletTopUpRule")
+                RulePriority.MERCHANT_MEMORY -> listOf("MerchantMemoryRule")
+                RulePriority.MERCHANT_RULE -> listOf("HighConfidenceMerchantRule")
+                RulePriority.CATEGORY_RULE -> listOf("ArabicMerchantCategoryRule")
+                RulePriority.FALLBACK -> emptyList()
+            }.map { "${it}@${p.name}#${p.order}" }
+        }
 
     /** Sanity helper: does a parsed type match a known safety pattern? */
     fun isTransferLikeType(t: TransactionType): Boolean = t in setOf(

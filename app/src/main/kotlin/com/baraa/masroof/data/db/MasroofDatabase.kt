@@ -11,9 +11,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Local Room database for the Masroof app.
  *
- * **Schema version 3**. v3 adds three new tables (`categories`,
- * `merchant_memory`, `financial_accounts`) and seven new columns to
- * `transactions` for the financial-treatment / category / review layer.
+ * **Schema version 4**. v4 adds an `enabled` column to `merchant_memory`
+ * so the user can disable a remembered merchant rule from the UI.
  *
  * The DB is **device-local only**: the application manifest disables cloud
  * backup and data extraction, no networking code touches this DB, and there
@@ -28,7 +27,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MerchantMemoryEntity::class,
         FinancialAccountEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -124,8 +123,21 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 → v4 migration: add the `enabled` column to `merchant_memory`.
+         * Existing rows default to enabled=1; the UI can flip it to 0 to
+         * disable a remembered rule.
+         */
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `merchant_memory` ADD COLUMN `enabled` INTEGER NOT NULL DEFAULT 1"
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
-        val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
         fun build(context: Context): MasroofDatabase =
             Room.databaseBuilder(

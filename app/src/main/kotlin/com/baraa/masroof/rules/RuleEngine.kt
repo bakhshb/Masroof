@@ -11,7 +11,7 @@ import com.baraa.masroof.transaction.FinancialTreatment
  * The engine is pure: no I/O, no logging, no Android dependencies. It can
  * be unit-tested with hand-built [RuleInput] and [RuleContext] objects.
  */
-class RuleEngine(private val rules: List<TransactionRule>) {
+class RuleEngine(val rules: List<TransactionRule>) {
 
     /**
      * The final verdict of running the rule engine. The [reason] string is

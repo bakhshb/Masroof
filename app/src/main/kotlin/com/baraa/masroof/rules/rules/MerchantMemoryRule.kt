@@ -29,6 +29,7 @@ class MerchantMemoryRule : TransactionRule {
         val memory = context.merchantMemories.firstOrNull { it.normalizedKey == key }
             ?: return null
         if (memory.confirmationCount <= 0) return null
+        if (!memory.enabled) return null
 
         val treatment = memory.preferredFinancialTreatment
             ?: com.baraa.masroof.transaction.FinancialTreatment.EXPENSE
