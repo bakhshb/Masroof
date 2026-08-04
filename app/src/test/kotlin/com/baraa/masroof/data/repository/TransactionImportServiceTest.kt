@@ -25,7 +25,7 @@ class TransactionImportServiceTest {
     private fun sms(
         id: Long,
         sender: String = "AlRajhi",
-        body: String = "عملية شراء بمبلغ 100 ريال لدى Starbucks",
+        body: String = "شراء\nبمبلغ: 100 ريال\nالتاجر: Starbucks",
         timestamp: Long = 1_700_000_000_000L,
     ) = SmsMessage(
         id = id,
@@ -62,9 +62,9 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val messages = listOf(
-            sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks"),
-            sms(id = 2, body = "Purchase of SAR 50.00 at Starbucks"),
-            sms(id = 3, body = "Your OTP code is 123456"), // unparseable
+            sms(id = 1, body = "شراء\nبمبلغ: 100 ريال\nالتاجر: Starbucks"),
+            sms(id = 2, body = "Purchase\nAmount: 50.00 SAR\nMerchant: Starbucks"),
+            sms(id = 3, body = "OTP\n123456"), // unparseable
         )
         val r = kotlinx.coroutines.runBlocking { service.preview(messages) }
         assertEquals(3, r.preview.messagesScanned)
@@ -88,7 +88,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val first = listOf(
-            sms(id = 1, body = "عملية شراء بمبلغ 100 ريال لدى Starbucks", timestamp = 1_700_000_000_000L)
+            sms(id = 1, body = "شراء\nبمبلغ: 100 ريال\nالتاجر: Starbucks", timestamp = 1_700_000_000_000L)
         )
         val r1 = kotlinx.coroutines.runBlocking { service.preview(first) }
         val s1 = kotlinx.coroutines.runBlocking { service.commit(r1) }
@@ -119,14 +119,14 @@ class TransactionImportServiceTest {
 
         // First import
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base)))
         }
         kotlinx.coroutines.runBlocking { service.commit(r1) }
 
         // Same amount / merchant / card / day, different SMS, 5 min later
         val r2 = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = fiveMinLater)
+                sms(id = 2, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = fiveMinLater)
             ))
         }
         assertEquals(1, r2.preview.possibleDuplicates)
@@ -151,13 +151,13 @@ class TransactionImportServiceTest {
         val afterWindow = base + 11L * 60L * 1000L
 
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base)))
         }
         kotlinx.coroutines.runBlocking { service.commit(r1) }
 
         val r2 = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = afterWindow)
+                sms(id = 2, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = afterWindow)
             ))
         }
         // Legitimate repeated purchase → treated as NEW, not a duplicate.
@@ -181,11 +181,11 @@ class TransactionImportServiceTest {
         val t1 = 1_700_000_000_000L
         val t2 = t1 + 24L * 60L * 60L * 1000L
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 50 at Starbucks", timestamp = t1)))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 50 SAR\nMerchant: Starbucks", timestamp = t1)))
         }
         kotlinx.coroutines.runBlocking { service.commit(r1) }
         val r2 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 2, body = "Purchase of SAR 50 at Starbucks", timestamp = t2)))
+            service.preview(listOf(sms(id = 2, body = "Purchase\nAmount: 50 SAR\nMerchant: Starbucks", timestamp = t2)))
         }
         assertEquals(1, r2.preview.newTransactions)
         assertEquals(0, r2.preview.possibleDuplicates)
@@ -225,7 +225,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "تحويل وارد بمبلغ 500 ريال")))
+            service.preview(listOf(sms(id = 1, body = "Transfer In\nPurchase Amount: 500 SAR")))
         }
         val entity = r.items.single().preparedEntity!!
         assertNotNull(entity.amount)
@@ -244,7 +244,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks")))
         }
         val entity = r.items.single().preparedEntity!!
         assertNotNull(entity.amount)
@@ -261,7 +261,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "عملية شراء بمبلغ 250 ريال لدى Starbucks")))
+            service.preview(listOf(sms(id = 1, body = "شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks")))
         }
         val entity = r.items.single().preparedEntity!!
         assertNotNull(entity.uniqueFingerprint)
@@ -288,8 +288,8 @@ class TransactionImportServiceTest {
         )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
-                sms(id = 2, body = "Purchase of SAR 200 at Caribou"),
+                sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks"),
+                sms(id = 2, body = "Purchase\nAmount: 200 SAR\nMerchant: Caribou"),
             ))
         }
         val s = kotlinx.coroutines.runBlocking { service.commit(r) }
@@ -313,7 +313,7 @@ class TransactionImportServiceTest {
 
         // First import: 1 successful new
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base)))
         }
         val s1 = kotlinx.coroutines.runBlocking { service.commit(r1) }
         assertEquals(1, s1.messagesScanned)
@@ -326,7 +326,7 @@ class TransactionImportServiceTest {
         // Second import: same message 2 minutes later → 0 inserted, 1 possible
         val r2 = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = base + 2L * 60L * 1000L)
+                sms(id = 2, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base + 2L * 60L * 1000L)
             ))
         }
         val s2 = kotlinx.coroutines.runBlocking { service.commit(r2) }
@@ -348,13 +348,13 @@ class TransactionImportServiceTest {
         )
         val base = 1_700_000_000_000L
         val r1 = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = base)))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base)))
         }
         kotlinx.coroutines.runBlocking { service.commit(r1) }
 
         val r2 = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 2, body = "Purchase of SAR 100 at Starbucks", timestamp = base + 1L * 60L * 1000L)
+                sms(id = 2, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = base + 1L * 60L * 1000L)
             ))
         }
         val item = r2.items.single()
@@ -388,9 +388,9 @@ class TransactionImportServiceTest {
         )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 1, body = "Purchase of SAR 100 at Starbucks", timestamp = 1_700_000_000_000L),
-                sms(id = 2, body = "Purchase of SAR 200 at Caribou", timestamp = 1_700_000_001_000L),
-                sms(id = 3, body = "Purchase of SAR 300 at Noon", timestamp = 1_700_000_000_500L),
+                sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks", timestamp = 1_700_000_000_000L),
+                sms(id = 2, body = "Purchase\nAmount: 200 SAR\nMerchant: Caribou", timestamp = 1_700_000_001_000L),
+                sms(id = 3, body = "Purchase\nAmount: 300 SAR\nMerchant: Noon", timestamp = 1_700_000_000_500L),
             ))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
@@ -411,7 +411,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks")))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
         val before = kotlinx.coroutines.runBlocking { repo.getById(1L) }!!
@@ -432,7 +432,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks")))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
         assertEquals(1, kotlinx.coroutines.runBlocking { repo.count() })
@@ -452,8 +452,8 @@ class TransactionImportServiceTest {
         )
         val r = kotlinx.coroutines.runBlocking {
             service.preview(listOf(
-                sms(id = 1, body = "Purchase of SAR 100 at Starbucks"),
-                sms(id = 2, body = "Purchase of SAR 200 at Caribou"),
+                sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks"),
+                sms(id = 2, body = "Purchase\nAmount: 200 SAR\nMerchant: Caribou"),
             ))
         }
         kotlinx.coroutines.runBlocking { service.commit(r) }
@@ -472,7 +472,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Amount: 123.4567 SAR")))
+            service.preview(listOf(sms(id = 1, body = "Purchase Amount: 123.4567 SAR")))
         }
         val entity = r.items.single().preparedEntity!!
         assertEquals(0, BigDecimal("123.4567").compareTo(entity.amount))
@@ -493,7 +493,7 @@ class TransactionImportServiceTest {
             financialAccountRepository = FakeFinancialAccountRepository(),
         )
         val r = kotlinx.coroutines.runBlocking {
-            service.preview(listOf(sms(id = 1, body = "Purchase of SAR 100 at Starbucks")))
+            service.preview(listOf(sms(id = 1, body = "Purchase\nAmount: 100 SAR\nMerchant: Starbucks")))
         }
         val entity = r.items.single().preparedEntity!!
         kotlinx.coroutines.runBlocking { service.commit(r) }

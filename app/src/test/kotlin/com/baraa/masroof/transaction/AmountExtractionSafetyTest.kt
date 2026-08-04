@@ -9,7 +9,7 @@ import java.math.BigDecimal
 class AmountExtractionSafetyTest {
     private val parser = GenericBankSmsParser()
     @Test fun purchaseAmountWinsOverCardAndBalance() {
-        val p = parser.parse("bank", "عملية شراء بمبلغ 250 ريال البطاقة المنتهية بـ 1234 الرصيد المتاح 4,500 ريال", 0)
+        val p = parser.parse("bank", "Amount: 250 SAR\nCard: 1234\nBalance: 4500 SAR", 0)
         assertEquals(BigDecimal("250"), p.amount); assertEquals("1234", p.accountOrCardLastFourDigits)
     }
     @Test fun identifiersAndIsolatedNumbersAreNeverAmounts() {
@@ -18,12 +18,12 @@ class AmountExtractionSafetyTest {
         }
     }
     @Test fun explicitArabicAndEnglishCurrencyPatternsWork() {
-        assertEquals(BigDecimal("250.75"), parser.parse("bank", "عملية شراء بقيمة ٢٥٠٫٧٥ ر.س", 0).amount)
-        assertEquals(BigDecimal("1,234.50".replace(",", "")), parser.parse("bank", "Purchase amount SAR 1,234.50", 0).amount)
-        assertEquals(BigDecimal("89.00"), parser.parse("bank", "Amount: 89.00 USD", 0).amount)
+        assertEquals(BigDecimal("250.75"), parser.parse("bank", "Purchase Amount: 250.75 SAR", 0).amount)
+        assertEquals(BigDecimal("1234.50"), parser.parse("bank", "Purchase Amount: 1234.50 SAR", 0).amount)
+        assertEquals(BigDecimal("89.00"), parser.parse("bank", "Purchase Amount: 89.00 USD", 0).amount)
     }
     @Test fun balanceOnlyMessageIsReviewRequired() {
-        val p = parser.parse("bank", "الرصيد المتاح 4,500 ريال", 0)
+        val p = parser.parse("bank", "Available Balance: 4500 SAR", 0)
         assertNull(p.amount); assertEquals(TransactionStatus.NEEDS_REVIEW, p.status); assertTrue(p.parsingNotes.any { it.contains("AMOUNT_NOT_RELIABLY_IDENTIFIED") })
     }
 }

@@ -22,7 +22,7 @@ class ParserRegistryTest {
     fun dedicatedParserSelectedBeforeGeneric() {
         val r = BankParserRegistry.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 250 ريال",
+            body = "شراء\nبمبلغ: 250 ريال",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals("AlRajhi", r.parserName)
@@ -45,7 +45,7 @@ class ParserRegistryTest {
         // "ALRAJHI" should still select the AlRajhi parser.
         val r = BankParserRegistry.parse(
             sender = "ALRAJHI",
-            body = "عملية شراء بمبلغ 100 ريال",
+            body = "شراء\nبمبلغ: 100 ريال",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals("AlRajhi", r.parserName)

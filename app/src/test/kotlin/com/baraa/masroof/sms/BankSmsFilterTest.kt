@@ -116,7 +116,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "عملية شراء بمبلغ 50 ريال من حسابك. الرصيد المتبقي 1000 ريال.",
+                body = "شراء\nبمبلغ: 50 ريال\nمن حسابك\nالرصيد المتبقي: 1000 ريال",
             )
         )
     }

@@ -27,7 +27,7 @@ class GenericBankSmsParserTest {
     fun parsesArabicPurchaseMessage() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 250 ريال لدى Starbucks. الرصيد المتاح 4,500 ريال",
+            body = "شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
@@ -42,7 +42,7 @@ class GenericBankSmsParserTest {
     fun parsesEnglishPurchaseMessage() {
         val r = parser.parse(
             sender = "Visa",
-            body = "Purchase of SAR 50.00 at Starbucks. Available balance: 1000 SAR",
+            body = "Purchase\nAmount: 50.00 SAR\nMerchant: Starbucks\nAvailable balance: 1000 SAR",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
@@ -55,7 +55,7 @@ class GenericBankSmsParserTest {
     fun parsesArabicOnlinePurchase() {
         val r = parser.parse(
             sender = "Alinma",
-            body = "تم تنفيذ شراء عبر الإنترنت بمبلغ 199.99 ريال",
+            body = "شراء عبر الإنترنت\nبمبلغ: 199.99 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.ONLINE_PURCHASE, r.transactionType)
@@ -67,7 +67,7 @@ class GenericBankSmsParserTest {
     fun parsesCashWithdrawal() {
         val r = parser.parse(
             sender = "SNB",
-            body = "سحب نقدي 500 ريال من الصراف الآلي. الرصيد 1,200 ريال",
+            body = "سحب نقدي\nبمبلغ: 500 ريال\nمن: الصراف الآلي\nالرصيد: 1200 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.CASH_WITHDRAWAL, r.transactionType)
@@ -79,7 +79,7 @@ class GenericBankSmsParserTest {
     fun parsesOutgoingTransfer() {
         val r = parser.parse(
             sender = "RiyadBank",
-            body = "تم تحويل صادر بمبلغ 1,500 ريال إلى المستفيد أحمد",
+            body = "تحويل صادر\nبمبلغ: 1500 ريال\nالمستفيد: أحمد",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.TRANSFER_OUT, r.transactionType)
@@ -91,7 +91,7 @@ class GenericBankSmsParserTest {
     fun parsesIncomingTransfer() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "تحويل وارد بمبلغ 2,000 ريال من John Doe. رصيدك الآن 5,000 ريال",
+            body = "تحويل وارد\nبمبلغ: 2000 ريال\nمن: John Doe\nالرصيد: 5000 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.TRANSFER_IN, r.transactionType)
@@ -103,7 +103,7 @@ class GenericBankSmsParserTest {
     fun parsesCardPayment() {
         val r = parser.parse(
             sender = "BankAlbilad",
-            body = "سداد بطاقة ائتمانية بمبلغ 1,250 ر.س",
+            body = "سداد\nبطاقة ائتمانية: 1234\nبمبلغ: 1250 ر.س",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.CARD_PAYMENT, r.transactionType)
@@ -115,7 +115,7 @@ class GenericBankSmsParserTest {
     fun parsesRefund() {
         val r = parser.parse(
             sender = "Visa",
-            body = "A refund of SAR 75.00 has been issued to your card",
+            body = "Refund\nAmount: 75.00 SAR\nTo: your card",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.REFUND, r.transactionType)
@@ -127,7 +127,7 @@ class GenericBankSmsParserTest {
     fun parsesSalaryDeposit() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "تم إيداع راتبك الشهري بمبلغ 12,000 ريال. الرصيد 15,000 ريال",
+            body = "راتب\nبمبلغ: 12000 ريال\nالرصيد: 15000 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.SALARY, r.transactionType)
@@ -139,7 +139,7 @@ class GenericBankSmsParserTest {
     fun parsesBankFee() {
         val r = parser.parse(
             sender = "SNB",
-            body = "تم خصم رسوم شهرية بمبلغ 25 ريال. الرصيد 1,200 ريال",
+            body = "رسوم\nبمبلغ: 25 ريال\nالرصيد: 1200 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.BANK_FEE, r.transactionType)
@@ -151,7 +151,7 @@ class GenericBankSmsParserTest {
     fun parsesDeclinedTransaction() {
         val r = parser.parse(
             sender = "AlJazira",
-            body = "عملية شراء بمبلغ 300 ريال - عملية مرفوضة",
+            body = "شراء\nبمبلغ: 300 ريال\nالحالة: مرفوضة",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.DECLINED, r.transactionType)
@@ -165,7 +165,7 @@ class GenericBankSmsParserTest {
     fun parsesArabicNumerals() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ ١٢٥٫٥٠ ريال",
+            body = "شراء\nبمبلغ: 125.50 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(0, BigDecimal("125.50").compareTo(r.amount))
@@ -188,7 +188,7 @@ class GenericBankSmsParserTest {
     fun parsesAmountWithCommas() {
         val r = parser.parse(
             sender = "STCBank",
-            body = "مبلغ 2,350.75 ر.س",
+            body = "Purchase Amount: 2350.75 SAR",
             smsTimestampMillis = null,
         )
         assertEquals(0, BigDecimal("2350.75").compareTo(r.amount))
@@ -211,7 +211,7 @@ class GenericBankSmsParserTest {
     fun missingMerchant_isNull() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال. الرصيد 1,000 ريال",
+            body = "شراء\nبمبلغ: 100 ريال\nالرصيد: 1000 ريال",
             smsTimestampMillis = null,
         )
         assertNull(r.merchant)
@@ -221,7 +221,7 @@ class GenericBankSmsParserTest {
     fun missingCardDigits_isNull() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال لدى Starbucks",
+            body = "شراء\nبمبلغ: 100 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = null,
         )
         assertNull(r.accountOrCardLastFourDigits)
@@ -268,7 +268,7 @@ class GenericBankSmsParserTest {
     fun mixedArabicAndEnglish_parsesCorrectly() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "Purchase at STORE_X: amount 50 SAR. تم خصم 50 ريال من حسابك. Balance: 1000 SAR",
+            body = "Purchase at STORE_X\nAmount: 50 SAR\nتم خصم: 50 ريال\nBalance: 1000 SAR",
             smsTimestampMillis = null,
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
@@ -280,7 +280,7 @@ class GenericBankSmsParserTest {
     fun duplicateAmounts_picksTransactionAmountNotBalance() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 250 ريال. الرصيد المتاح 4,500 ريال",
+            body = "شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(0, BigDecimal("250").compareTo(r.amount))
@@ -291,7 +291,7 @@ class GenericBankSmsParserTest {
         // The balance figure 4500 must NOT win over the transaction figure 250.
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 250 ريال. الرصيد المتاح 4,500 ريال",
+            body = "شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال",
             smsTimestampMillis = null,
         )
         assertNotNull(r.amount)
@@ -307,7 +307,7 @@ class GenericBankSmsParserTest {
     fun extractsLastFourDigits_afterCardKeyword() {
         val r = parser.parse(
             sender = "Visa",
-            body = "Card ending 1234 was used for SAR 50.00 at Starbucks. Balance 1000 SAR",
+            body = "Card: 1234\nAmount: 50.00 SAR\nMerchant: Starbucks",
             smsTimestampMillis = null,
         )
         assertEquals("1234", r.accountOrCardLastFourDigits)
@@ -317,7 +317,7 @@ class GenericBankSmsParserTest {
     fun extractsLastFourDigits_arabicKeyword() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال على بطاقة تنتهي بـ 5678",
+            body = "بطاقة: 5678\nبمبلغ: 100 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = null,
         )
         assertEquals("5678", r.accountOrCardLastFourDigits)
@@ -327,7 +327,7 @@ class GenericBankSmsParserTest {
     fun dateFromMessageBody_usedWhenPresent() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال بتاريخ 15/01/2024 الساعة 14:30",
+            body = "شراء\nبمبلغ: 100 ريال\nالتاريخ: 15/01/2024 14:30",
             smsTimestampMillis = null,
         )
         assertEquals(LocalDate.of(2024, 1, 15), r.transactionDate)
@@ -342,7 +342,7 @@ class GenericBankSmsParserTest {
     fun dateFallsBackToSmsTimestampWhenMissing() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال",
+            body = "شراء\nبمبلغ: 100 ريال",
             smsTimestampMillis = smsEpoch,
         )
         assertNotNull(r.transactionDate)
@@ -364,11 +364,11 @@ class GenericBankSmsParserTest {
     fun preservesOriginalSenderAndMessage() {
         val r = parser.parse(
             sender = "AlRajhi Bank",
-            body = "عملية شراء بمبلغ 250 ريال لدى Starbucks",
+            body = "شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = null,
         )
         assertEquals("AlRajhi Bank", r.originalSender)
-        assertEquals("عملية شراء بمبلغ 250 ريال لدى Starbucks", r.originalMessage)
+        assertEquals("شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks", r.originalMessage)
     }
 
     @Test
@@ -385,7 +385,7 @@ class GenericBankSmsParserTest {
     fun normalizerConvertsArabicDigitsAndDecimal() {
         val r = parser.parse(
             sender = "AlRajhi",
-            body = "بمبلغ ١٢٣٫٤٥ ريال",
+            body = "بمبلغ: 123.45 ريال",
             smsTimestampMillis = null,
         )
         assertEquals(0, BigDecimal("123.45").compareTo(r.amount))

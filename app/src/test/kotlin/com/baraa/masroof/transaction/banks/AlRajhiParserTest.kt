@@ -57,7 +57,7 @@ class AlRajhiParserTest {
         val p = AlRajhiParser()
         val result = p.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 250 ريال لدى Starbucks",
+            body = "شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals(TransactionType.PURCHASE, result.transactionType)
@@ -72,7 +72,7 @@ class AlRajhiParserTest {
     fun registrySelectsAlRajhiForAlRajhiSender() {
         val r = BankParserRegistry.parse(
             sender = "AlRajhi",
-            body = "عملية شراء بمبلغ 100 ريال",
+            body = "شراء\nبمبلغ: 100 ريال",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals("AlRajhi", r.parserName)

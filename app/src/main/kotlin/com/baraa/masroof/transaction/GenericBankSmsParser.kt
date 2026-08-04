@@ -78,10 +78,10 @@ open class GenericBankSmsParser : BankSmsParser {
         val currency = detectCurrency(normalized, notes, matchedRules)
         val type = detectType(normalized, notes, matchedRules)
         val status = detectStatus(normalized, type)
-        val amount = extractAmount(normalized, type, notes, matchedRules)
-        val cardOrAccount = extractLastFourDigits(normalized, notes, matchedRules)
+        val amount = extractAmount(normalized, body, type, notes, matchedRules)
+        val cardOrAccount = extractLastFourDigits(body, notes, matchedRules)
         val merchant = extractMerchant(body, notes, matchedRules)
-        val (date, time) = extractDateTime(normalized, smsTimestampMillis, notes)
+        val (date, time) = extractDateTime(body, smsTimestampMillis, notes)
         val confidence = computeConfidence(
             amount = amount,
             currency = currency,
@@ -252,53 +252,37 @@ open class GenericBankSmsParser : BankSmsParser {
      */
     private fun extractAmount(
         normalized: String,
+        originalBody: String?,
         type: TransactionType,
         notes: MutableList<String>,
         matchedRules: MutableList<String>,
     ): BigDecimal? {
-        val candidates = NUMBER_REGEX.findAll(normalized).map { match ->
-            val before = normalized.substring(maxOf(0, match.range.first - CONTEXT_WINDOW), match.range.first)
-            val after = normalized.substring(match.range.last + 1, minOf(normalized.length, match.range.last + 1 + CONTEXT_WINDOW))
-            // Identifiers/balances are identified by the label immediately before
-            // their number; a later card label must not reject an earlier amount.
-            val nearby = before.takeLast(24)
-            val currency = detectCandidateCurrency(before, after)
-            val explicitLabel = AMOUNT_LABELS.any { before.takeLast(20).contains(it) }
-            val hasCurrency = currency != Currency.UNKNOWN
-            val isFourDigitIdentifier = match.value.length == 4 && match.value.all(Char::isDigit)
-            val exclusion = BALANCE_MARKERS.firstOrNull { it in nearby }
-                ?: EXCLUSION_MARKERS.firstOrNull { it in nearby && isFourDigitIdentifier && !explicitLabel }
-                ?: EXCLUSION_MARKERS.firstOrNull { it in nearby && !explicitLabel && !hasCurrency }
-                ?: if (PHONE_OR_LONG_ID_REGEX.matches(match.value)) "long_identifier" else null
-                ?: if (DATE_OR_TIME_CONTEXT_REGEX.containsMatchIn(nearby)) "date_or_time" else null
-            var score = 0
-            if (explicitLabel) score += 65
-            if (hasCurrency) score += 45
-            if (type != TransactionType.UNKNOWN && (explicitLabel || hasCurrency)) score += 10
-            if (match.value.contains('.') || match.value.contains(',')) score += 5
-            if (exclusion != null) score = -100
-            AmountCandidate(
-                parsedValue = runCatching { BigDecimal(match.value.replace(",", "")) }.getOrNull(),
-                originalTextRange = match.range,
-                currency = currency,
-                precedingContext = before,
-                followingContext = after,
-                confidence = score.coerceIn(0, 100),
-                exclusionReason = exclusion,
-                sourcePattern = when { explicitLabel && hasCurrency -> "amount_label_currency"; explicitLabel -> "amount_label"; hasCurrency -> "currency_adjacent"; else -> "number_only" },
-            )
-        }.toList()
-        val valid = candidates.filter { it.exclusionReason == null && it.parsedValue != null }
-        val best = valid.maxByOrNull { it.confidence }
-        notes.add("amount candidates=${candidates.size}; excluded=${candidates.count { it.exclusionReason != null }}")
-        if (best == null || best.confidence < MIN_AMOUNT_CONFIDENCE) {
+        val lines = LineBasedFieldParser.splitLines(originalBody.orEmpty())
+        if (lines.isEmpty()) {
             notes.add("AMOUNT_NOT_RELIABLY_IDENTIFIED")
             return null
         }
-        matchedRules.add("amount_pattern:${best.sourcePattern}")
-        matchedRules.add("amount_confidence:${best.confidence}")
-        return best.parsedValue
+        val matched = lines.firstOrNull { LineBasedFieldParser.isAmountLabel(it.label) }
+        if (matched != null) {
+            val cleaned = matched.value.replace(",", "")
+            val amountText = Regex("""[-+]?\d+(?:\.\d+)?""").find(cleaned)?.value
+            if (amountText != null) {
+                val value = runCatching { BigDecimal(amountText) }.getOrNull()
+                if (value != null && value.signum() > 0) {
+                    matchedRules.add("amount_pattern:line_label:${matched.label}")
+                    return value
+                }
+            }
+        }
+        notes.add("AMOUNT_NOT_RELIABLY_IDENTIFIED")
+        return null
     }
+
+    private fun extractAmountLegacyProbe(originalBody: String?): BigDecimal? = null
+
+    private val MONEY_REGEX_LINE = Regex("""^[A-Z]{2,3}\s+([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)$|^([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s+[A-Z]{2,3}$|^\d{1,3}(?:,\d{3})+(?:\.\d+)?$|^\d+(?:\.\d+)?$""")
+
+    @Suppress("unused") private val normalizedReference: String? = null
 
     private fun detectCandidateCurrency(before: String, after: String): Currency {
         val context = "$before $after"
@@ -313,17 +297,25 @@ open class GenericBankSmsParser : BankSmsParser {
     // -- Last four digits -----------------------------------------------------
 
     private fun extractLastFourDigits(
-        normalized: String,
+        body: String?,
         notes: MutableList<String>,
         matchedRules: MutableList<String>,
     ): String? {
-        val match = LAST_FOUR_REGEX.find(normalized) ?: return null
-        val digits = match.groupValues[1]
-        // Reject obviously-not-card values (e.g., "0000") only if the user
-        // chose strict mode — for now, accept whatever the regex matched.
-        matchedRules.add("card_or_account_digits")
-        notes.add("last 4 digits found: $digits")
-        return digits
+        val lines = LineBasedFieldParser.splitLines(body.orEmpty())
+        for (line in lines) {
+            if (LineBasedFieldParser.cardLabelRegex().matches(line.label) || LineBasedFieldParser.accountLabelRegex().matches(line.label)) {
+                val normalized = BankTextNormalizer.normalizeForParsing(line.value)
+                val masked = Regex("""\*+(\d{4})""").find(line.value)?.groupValues?.get(1)
+                val digits = Regex("""\d{4,6}""").find(normalized)?.value
+                val candidate = masked ?: digits?.takeLast(4)
+                if (candidate != null) {
+                    matchedRules.add("card_or_account_digits:line_label:${line.label}")
+                    notes.add("last 4 digits found: $candidate")
+                    return candidate.takeLast(4)
+                }
+            }
+        }
+        return null
     }
 
     // -- Merchant -------------------------------------------------------------
@@ -334,6 +326,22 @@ open class GenericBankSmsParser : BankSmsParser {
         matchedRules: MutableList<String>,
     ): String? {
         if (originalBody.isNullOrBlank()) return null
+        val merchantLabel = LineBasedFieldParser.merchantLabelRegex()
+        LineBasedFieldParser.splitLines(originalBody).forEach { line ->
+            if (merchantLabel.matches(line.label)) {
+                // Preserve original casing when reading from the original body.
+                val original = originalBody.split('\n').firstOrNull { raw ->
+                    val normalized = BankTextNormalizer.normalizeForParsing(raw)
+                    val (label, _) = LineBasedFieldParser.splitLabelAndValue(normalized); merchantLabel.matches(label)
+                }
+                val trimmed = (original?.substringAfter(':') ?: line.value).trim().trim('.', ' ', ',')
+                if (trimmed.isNotEmpty()) {
+                    matchedRules.add("merchant_pattern:line_label:${line.label}")
+                    notes.add("merchant matched pattern")
+                    return trimmed
+                }
+            }
+        }
         for (pattern in MERCHANT_PATTERNS) {
             val match = pattern.find(originalBody) ?: continue
             val candidate = match.groupValues[1].trim().trim('.', ' ', ',')
@@ -349,24 +357,15 @@ open class GenericBankSmsParser : BankSmsParser {
     // -- Date / time ----------------------------------------------------------
 
     private fun extractDateTime(
-        normalized: String,
+        body: String?,
         smsTimestampMillis: Long?,
         notes: MutableList<String>,
     ): Pair<LocalDate?, LocalTime?> {
-        // Try each date pattern until one yields a valid date.
-        for (pattern in DATE_PATTERNS) {
-            val match = pattern.find(normalized) ?: continue
-            val date = parseDateMatch(match) ?: continue
-            val time = TIME_PATTERN.find(normalized)?.let { parseTimeMatch(it) }
-            if (time != null) {
-                notes.add("date and time from message body")
-            } else {
-                notes.add("date from message body")
-            }
+        val (date, time) = LineBasedFieldParser.parseDateTimeField(LineBasedFieldParser.splitLines(body.orEmpty()))
+        if (date != null) {
+            notes.add(if (time != null) "date and time from message body" else "date from message body")
             return date to time
         }
-
-        // Fall back to SMS metadata.
         if (smsTimestampMillis != null && smsTimestampMillis > 0L) {
             val zone = ZoneId.systemDefault()
             val instant = Instant.ofEpochMilli(smsTimestampMillis)
@@ -380,37 +379,9 @@ open class GenericBankSmsParser : BankSmsParser {
         return null to null
     }
 
-    private fun parseDateMatch(match: MatchResult): LocalDate? = when (match.value.length) {
-        // We don't switch on length — we switch on the pattern that matched.
-        else -> {
-            val groups = match.groupValues.drop(1).filter { it.isNotEmpty() }
-            tryParseDate(groups)
-        }
-    }
-
-    private fun tryParseDate(groups: List<String>): LocalDate? {
-        // groups are the three captured numeric parts of a date pattern.
-        // If the first group is 4 digits the format is YYYY-MM-DD; otherwise
-        // the format is DD-MM-YYYY (Saudi / European convention).
-        if (groups.size != 3) return null
-        val a = groups[0]
-        val b = groups[1]
-        val c = groups[2]
-        return runCatching {
-            if (a.length == 4) {
-                LocalDate.of(a.toInt(), b.toInt(), c.toInt())
-            } else {
-                LocalDate.of(c.toInt(), b.toInt(), a.toInt())
-            }
-        }.getOrNull()
-    }
-
-    private fun parseTimeMatch(match: MatchResult): LocalTime? {
-        val h = match.groupValues[1].toIntOrNull() ?: return null
-        val m = match.groupValues[2].toIntOrNull() ?: return null
-        val s = match.groupValues.getOrNull(3)?.toIntOrNull() ?: 0
-        return runCatching { LocalTime.of(h, m, s) }.getOrNull()
-    }
+    private fun parseDateMatch(match: MatchResult): LocalDate? { error("removed") }
+    private fun tryParseDate(groups: List<String>): LocalDate? { error("removed") }
+    private fun parseTimeMatch(match: MatchResult): LocalTime? { error("removed") }
 
     // -- Confidence -----------------------------------------------------------
 
