@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import com.baraa.masroof.ui.accounts.AccountListScreen
 import com.baraa.masroof.ui.accounts.AccountLinkRulesScreen
 import com.baraa.masroof.ui.history.FinancialHistoryScreen
-import com.baraa.masroof.ui.transactions.TransactionListScreen
+import com.baraa.masroof.ui.transactions.TransactionOperationsScreen
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (PrimaryTab.values()[tab]) {
                 PrimaryTab.HOME -> HomeDashboard()
-                PrimaryTab.TRANSACTIONS -> TransactionListScreen()
+                PrimaryTab.TRANSACTIONS -> TransactionOperationsScreen()
                 PrimaryTab.ACCOUNTS -> AccountListScreen(onClose = {})
                 PrimaryTab.MORE -> MoreMenu(onSettings = { showSettings = true }, onHistory = { showFinancialHistory = true }, onRules = { showAccountLinkRules = true })
             }
