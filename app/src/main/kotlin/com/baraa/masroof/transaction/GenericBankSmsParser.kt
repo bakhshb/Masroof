@@ -104,8 +104,8 @@ open class GenericBankSmsParser : BankSmsParser {
         // Below the confidence floor -> mark as NEEDS_REVIEW so the UI can
         // surface it. The threshold matches the existing import service
         // `PARSE_CONFIDENCE_THRESHOLD`.
-        val finalStatus = if (confidence < NEEDS_REVIEW_CONFIDENCE_FLOOR) {
-            if (status == TransactionStatus.COMPLETED) TransactionStatus.NEEDS_REVIEW else status
+        val finalStatus = if (amount == null || confidence < NEEDS_REVIEW_CONFIDENCE_FLOOR) {
+            if (status == TransactionStatus.DECLINED) status else TransactionStatus.NEEDS_REVIEW
         } else {
             status
         }
@@ -256,61 +256,58 @@ open class GenericBankSmsParser : BankSmsParser {
         notes: MutableList<String>,
         matchedRules: MutableList<String>,
     ): BigDecimal? {
-        val candidates = NUMBER_REGEX.findAll(normalized).toList()
-        if (candidates.isEmpty()) {
-            notes.add("no numeric candidate found for amount")
+        val candidates = NUMBER_REGEX.findAll(normalized).map { match ->
+            val before = normalized.substring(maxOf(0, match.range.first - CONTEXT_WINDOW), match.range.first)
+            val after = normalized.substring(match.range.last + 1, minOf(normalized.length, match.range.last + 1 + CONTEXT_WINDOW))
+            // Identifiers/balances are identified by the label immediately before
+            // their number; a later card label must not reject an earlier amount.
+            val nearby = before.takeLast(24)
+            val currency = detectCandidateCurrency(before, after)
+            val explicitLabel = AMOUNT_LABELS.any { before.takeLast(20).contains(it) }
+            val hasCurrency = currency != Currency.UNKNOWN
+            val isFourDigitIdentifier = match.value.length == 4 && match.value.all(Char::isDigit)
+            val exclusion = BALANCE_MARKERS.firstOrNull { it in nearby }
+                ?: EXCLUSION_MARKERS.firstOrNull { it in nearby && isFourDigitIdentifier && !explicitLabel }
+                ?: EXCLUSION_MARKERS.firstOrNull { it in nearby && !explicitLabel && !hasCurrency }
+                ?: if (PHONE_OR_LONG_ID_REGEX.matches(match.value)) "long_identifier" else null
+                ?: if (DATE_OR_TIME_CONTEXT_REGEX.containsMatchIn(nearby)) "date_or_time" else null
+            var score = 0
+            if (explicitLabel) score += 65
+            if (hasCurrency) score += 45
+            if (type != TransactionType.UNKNOWN && (explicitLabel || hasCurrency)) score += 10
+            if (match.value.contains('.') || match.value.contains(',')) score += 5
+            if (exclusion != null) score = -100
+            AmountCandidate(
+                parsedValue = runCatching { BigDecimal(match.value.replace(",", "")) }.getOrNull(),
+                originalTextRange = match.range,
+                currency = currency,
+                precedingContext = before,
+                followingContext = after,
+                confidence = score.coerceIn(0, 100),
+                exclusionReason = exclusion,
+                sourcePattern = when { explicitLabel && hasCurrency -> "amount_label_currency"; explicitLabel -> "amount_label"; hasCurrency -> "currency_adjacent"; else -> "number_only" },
+            )
+        }.toList()
+        val valid = candidates.filter { it.exclusionReason == null && it.parsedValue != null }
+        val best = valid.maxByOrNull { it.confidence }
+        notes.add("amount candidates=${candidates.size}; excluded=${candidates.count { it.exclusionReason != null }}")
+        if (best == null || best.confidence < MIN_AMOUNT_CONFIDENCE) {
+            notes.add("AMOUNT_NOT_RELIABLY_IDENTIFIED")
             return null
         }
+        matchedRules.add("amount_pattern:${best.sourcePattern}")
+        matchedRules.add("amount_confidence:${best.confidence}")
+        return best.parsedValue
+    }
 
-        var best: Pair<MatchResult, Int>? = null
-        for ((idx, match) in candidates.withIndex()) {
-            val before30Start = maxOf(0, match.range.first - CONTEXT_WINDOW)
-            val contextBefore30 = normalized.substring(before30Start, match.range.first)
-            val contextBefore15 = contextBefore30.takeLast(BALANCE_WINDOW)
-            val afterStart = match.range.last + 1
-            val after30End = minOf(normalized.length, afterStart + CONTEXT_WINDOW)
-            val contextAfter30 = normalized.substring(afterStart, after30End)
-
-            var score = -idx // slight preference for earlier candidates
-            // Balance markers are only checked in the IMMEDIATELY preceding
-            // 15 chars. Checking the after-context would capture the NEXT
-            // number's balance line (e.g. "12,000 ريال. الرصيد 15,000"
-            // would falsely demote 12,000).
-            if (BALANCE_MARKERS.any { it in contextBefore15 }) {
-                score -= 100
-            }
-            if (TRANSACTION_MARKERS.any { it in contextBefore30 || it in contextAfter30 }) {
-                score += 50
-            }
-            if (type != TransactionType.UNKNOWN) score += 5
-
-            if (best == null || score > best.second) {
-                best = match to score
-            }
+    private fun detectCandidateCurrency(before: String, after: String): Currency {
+        val context = "$before $after"
+        return when {
+            CURRENCY_SAR.any { it in context } -> Currency.SAR
+            CURRENCY_USD.any { it in context } -> Currency.USD
+            CURRENCY_EUR.any { it in context } -> Currency.EUR
+            else -> Currency.UNKNOWN
         }
-
-        val (bestMatch, bestScore) = best ?: run {
-            notes.add("could not select an amount candidate")
-            return null
-        }
-
-        // Reject any candidate that didn't beat the floor — this protects
-        // against random numbers in ads / OTP codes / phone numbers being
-        // misread as the transaction amount.
-        if (bestScore < MIN_AMOUNT_SCORE) {
-            notes.add("no amount candidate met the minimum score (best=$bestScore)")
-            return null
-        }
-
-        val raw = bestMatch.value
-        val amount = runCatching { BigDecimal(raw.replace(",", "")) }.getOrNull()
-        if (amount == null) {
-            notes.add("amount candidate '$raw' could not be parsed as BigDecimal")
-            return null
-        }
-        matchedRules.add("amount_pattern")
-        notes.add("amount picked from candidates=$raw at pos=${bestMatch.range.first}")
-        return amount
     }
 
     // -- Last four digits -----------------------------------------------------
@@ -481,7 +478,8 @@ open class GenericBankSmsParser : BankSmsParser {
         // transaction amount. The +50 "transaction marker" boost clears this
         // for legitimate messages; OTP codes / ad percentages / phone numbers
         // stay at 0 and are rejected.
-        private const val MIN_AMOUNT_SCORE = 30
+        /** A numeric value needs an explicit amount label or adjacent currency. */
+        const val MIN_AMOUNT_CONFIDENCE = 45
 
         // Match numbers like "1,234.56", "1.234,56" (after normalization
         // commas and dots are ASCII, so this works for both). We avoid
@@ -490,6 +488,13 @@ open class GenericBankSmsParser : BankSmsParser {
         // marker is much more likely a card fragment or year in a date —
         // the scoring algorithm handles this via context.
         private val NUMBER_REGEX = Regex("""\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?""")
+        private val PHONE_OR_LONG_ID_REGEX = Regex("""\d{7,}""")
+        private val DATE_OR_TIME_CONTEXT_REGEX = Regex("""\d{1,2}[:/-]\d{1,2}|[:/-]\d{2,4}""")
+        private val AMOUNT_LABELS = listOf("بمبلغ", "بقيمة", "قيمة العملية", "قيمة الشراء", "قيمة التحويل", "المبلغ", "مبلغ", "amount", "purchase amount", "transaction amount", "payment amount", "transfer amount")
+        private val CURRENCY_SAR = listOf("sar", "ريال", "ر.س", "ر س", "رس", "sr")
+        private val CURRENCY_USD = listOf("usd", "$")
+        private val CURRENCY_EUR = listOf("eur", "€")
+        private val EXCLUSION_MARKERS = listOf("البطاقة", "بطاقة", "حساب", "الحساب", "ايبان", "آيبان", "المنتهية", "آخر أربعة", "آخر 4", "رقم البطاقة", "رقم الحساب", "card", "account", "iban", "ending", "last four", "last 4", "card number", "account number", "الرصيد", "رصيد", "المتاح", "المتبقي", "balance", "available balance", "current balance", "remaining balance", "رمز", "رمز التحقق", "مرجع", "الرقم المرجعي", "تفويض", "فاتورة", "جهاز", "نقطة البيع", "otp", "verification", "reference", "ref", "authorization", "auth", "invoice", "terminal", "pos id")
 
         // 4 consecutive digits preceded by a card/account keyword within
         // 40 characters. The keyword list is the union of Arabic and English.
