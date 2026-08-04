@@ -47,6 +47,7 @@ fun SettingsScreen(
     onMerchants: () -> Unit,
     onAccounts: () -> Unit,
     onAccountLinks: () -> Unit = {},
+    onFinancialHistory: () -> Unit = {},
     onAi: () -> Unit,
     onAiSuggestions: () -> Unit,
     onAiBatch: () -> Unit,
@@ -114,6 +115,11 @@ fun SettingsScreen(
                 title = "ربط العمليات بالحسابات",
                 icon = Icons.Filled.AccountBox,
                 onClick = onAccountLinks,
+            )
+            SettingsRow(
+                title = "السجل المالي",
+                icon = Icons.Filled.Info,
+                onClick = onFinancialHistory,
             )
 
             HorizontalDivider()

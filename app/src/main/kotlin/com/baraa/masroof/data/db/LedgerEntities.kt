@@ -3,6 +3,8 @@ package com.baraa.masroof.data.db
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Embedded
+import androidx.room.Relation
 import androidx.room.PrimaryKey
 import com.baraa.masroof.ledger.JournalGeneratedBy
 import com.baraa.masroof.ledger.JournalPostingStatus
@@ -75,6 +77,7 @@ data class LedgerPostingEntity(
 )
 
 data class JournalWithPostings(
-    val journal: JournalEntryEntity,
+    @Embedded val journal: JournalEntryEntity,
+    @Relation(parentColumn = "id", entityColumn = "journalEntryId")
     val postings: List<LedgerPostingEntity>,
 )

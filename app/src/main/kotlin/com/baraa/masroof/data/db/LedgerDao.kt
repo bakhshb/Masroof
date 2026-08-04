@@ -46,4 +46,9 @@ interface JournalDao {
 
     @Query("SELECT * FROM journal_entries WHERE postingStatus = 'POSTED' ORDER BY effectiveDate DESC, effectiveTime DESC")
     fun observePosted(): Flow<List<JournalEntryEntity>>
+
+    /** Fixed two-query Room relation load for a whole historical range; never per day. */
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE postingStatus = 'POSTED' AND effectiveDate <= :endDate ORDER BY effectiveDate, effectiveTime, id")
+    suspend fun getPostedThrough(endDate: LocalDate): List<JournalWithPostings>
 }

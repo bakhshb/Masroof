@@ -96,6 +96,7 @@ fun TransactionListScreen(
     var aiMinimumConfidence by remember { mutableStateOf(80) }
     var aiEnabled by remember { mutableStateOf(false) }
     var showFinancialSetup by remember { mutableStateOf(false) }
+    var showFinancialHistory by remember { mutableStateOf(false) }
 
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
@@ -235,6 +236,11 @@ fun TransactionListScreen(
         return
     }
 
+    if (showFinancialHistory) {
+        com.baraa.masroof.ui.history.FinancialHistoryScreen(onClose = { showFinancialHistory = false })
+        return
+    }
+
     if (showAccountLinks) {
         com.baraa.masroof.ui.accounts.AccountLinkingScreen(onClose = { showAccountLinks = false })
         return
@@ -262,6 +268,7 @@ fun TransactionListScreen(
             onMerchants = { showMerchants = true; showSettings = false },
             onAccounts = { showAccounts = true; showSettings = false },
             onAccountLinks = { showAccountLinks = true; showSettings = false },
+            onFinancialHistory = { showFinancialHistory = true; showSettings = false },
             onAi = { showAi = true; showSettings = false },
             onAiSuggestions = { showAiSuggestions = true; showSettings = false },
             onAiBatch = { showAiBatch = true; showSettings = false },
