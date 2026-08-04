@@ -47,7 +47,7 @@ class TransactionLinkingService(
                 sourceAccountId = null,
                 accountLinkSource = match.source,
                 accountLinkConfidence = match.confidence,
-                accountLinkNeedsReview = true,
+                accountLinkNeedsReview = match.needsReview,
                 postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
                 updatedAt = now(),
             )
@@ -56,14 +56,14 @@ class TransactionLinkingService(
                 destinationAccountId = null,
                 accountLinkSource = match.source,
                 accountLinkConfidence = match.confidence,
-                accountLinkNeedsReview = true,
+                accountLinkNeedsReview = match.needsReview,
                 postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
                 updatedAt = now(),
             )
             else -> transaction.copy(
                 accountLinkSource = match.source,
                 accountLinkConfidence = match.confidence,
-                accountLinkNeedsReview = true,
+                accountLinkNeedsReview = match.needsReview,
                 postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
                 updatedAt = now(),
             )
