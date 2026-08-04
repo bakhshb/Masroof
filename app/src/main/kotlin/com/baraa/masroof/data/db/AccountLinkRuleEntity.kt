@@ -23,5 +23,6 @@ data class AccountLinkRuleEntity(
     val accountId: Long,
     val confirmationCount: Int = 1,
     val lastConfirmedAt: Long,
+    val lastUsedAt: Long = 0L,
     val active: Boolean = true,
 )

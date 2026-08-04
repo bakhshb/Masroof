@@ -20,6 +20,7 @@ class TransactionLinkingService(
         destinationAccountId: Long?,
         accounts: List<FinancialAccount>,
         rememberForFuture: Boolean = false,
+        proposedAccountId: Long? = null,
     ): TransactionEntity {
         require(transaction.postingStatus != TransactionPostingStatus.POSTED) { "posted_transaction_requires_correction" }
         val linked = transaction.copy(
@@ -38,8 +39,8 @@ class TransactionLinkingService(
         val journalId = if (transaction.linkedJournalEntryId == null) ledger.create(draft)
         else ledger.regenerateDraft(transaction.id, draft)
         if (rememberForFuture) {
-            val preferred = source ?: destination
-            if (preferred != null) runCatching { rules?.remember(linked, preferred, if (source != null) "source" else "destination") }
+            val preferred = accounts.firstOrNull { it.id == proposedAccountId } ?: (source ?: destination)
+            if (preferred != null) runCatching { rules?.remember(linked, preferred, if (preferred == source) "source" else "destination") }
         }
         return linked.copy(linkedJournalEntryId = journalId, updatedAt = now()).also { transactions.update(it) }
     }

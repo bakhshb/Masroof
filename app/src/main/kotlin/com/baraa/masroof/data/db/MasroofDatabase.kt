@@ -37,7 +37,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LedgerPostingEntity::class,
         AccountLinkRuleEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -308,6 +308,13 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /** v9 → v10 adds lastUsedAt for learned linking UI. */
+        val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `account_link_rules` ADD COLUMN `lastUsedAt` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -318,6 +325,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
         )
 
         fun build(context: Context): MasroofDatabase =

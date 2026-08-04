@@ -1,35 +1,12 @@
 package com.baraa.masroof.ui.accounts
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -40,7 +17,6 @@ import com.baraa.masroof.ledger.TransactionPostingStatus
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-/** Review-only account linking. Generated journals remain NEEDS_REVIEW until the user posts them. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountLinkingScreen(onClose: () -> Unit) {
@@ -52,19 +28,18 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     var chooser by remember { mutableStateOf<LinkSelection?>(null) }
     var rememberFuture by remember { mutableStateOf(false) }
-    var existingRule by remember { mutableStateOf<com.baraa.masroof.ui.accounts.ManualLinkComposer.ExistingRule?>(null) }
+    var existingRule by remember { mutableStateOf<ExistingRuleView?>(null) }
+    var updatePending by remember { mutableStateOf<UpdateRequest?>(null) }
     LaunchedEffect(Unit) { app.transactionRepository.observeAll().collectLatest { transactions = it } }
     LaunchedEffect(Unit) { app.financialAccountRepository.observeAll().collectLatest { rows -> accounts = rows.filter { it.isOwnedByUser && it.isActive } } }
     val eligible = transactions.filter { it.postingStatus != TransactionPostingStatus.POSTED }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("ربط العمليات بالحسابات") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") } },
-            )
-        },
-    ) { padding ->
+    Scaffold(topBar = {
+        CenterAlignedTopAppBar(
+            title = { Text("ربط العمليات بالحسابات") },
+            navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") } },
+        )
+    }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -74,8 +49,8 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
                 Text("${eligible.size} عملية مؤهلة؛ القيود الجديدة ستحتاج مراجعة ولن تُعتمد تلقائيًا.")
                 Button(onClick = {
                     scope.launch {
-                        val accounts = app.financialAccountRepository.getOwnedActive()
-                        eligible.forEach { app.transactionLinkingService.linkAndGenerate(it, accounts) }
+                        val owned = app.financialAccountRepository.getOwnedActive()
+                        eligible.forEach { app.transactionLinkingService.linkAndGenerate(it, owned) }
                         message = "تم إنشاء مقترحات الربط للمراجعة"
                     }
                 }) { Text("ربط العمليات تلقائيًا") }
@@ -94,17 +69,14 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
             linkGroup("قيود معتمدة", transactions.filter { it.postingStatus == TransactionPostingStatus.POSTED }) { LinkCard(it) }
         }
     }
+
     chooser?.let { choice ->
-        val selectedAccountId = if (choice.isSource) choice.transaction.sourceAccountId else choice.transaction.destinationAccountId
-        LaunchedEffect(choice, selectedAccountId) {
-            if (selectedAccountId != null) {
-                val account = accounts.firstOrNull { it.id == selectedAccountId }
-                if (account != null) {
-                    val existing = app.accountLinkRuleRepository.find(choice.transaction, accounts)
-                    existingRule = existing?.let {
-                        ManualLinkComposer.ExistingRule(account.displayName, 1, System.currentTimeMillis(), ruleId = 0L)
-                    }
-                }
+        LaunchedEffect(choice) {
+            existingRule = null
+            val rule = app.accountLinkRuleRepository.findRule(choice.transaction)
+            if (rule != null) {
+                val account = accounts.firstOrNull { it.id == rule.accountId }
+                existingRule = ruleViewOf(rule, account)
             }
         }
         AlertDialog(
@@ -117,7 +89,12 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
                             scope.launch {
                                 val decision = ManualLinkComposer.evaluate(choice.transaction, accounts, account)
                                 if (rememberFuture && !decision.canRemember) {
-                                    message = "لا يمكن تذكر هذا الربط لأن بيانات العملية غير كافية أو متعارضة"
+                                    message = "لا يمكن حفظ هذا الربط لأن بيانات العملية غير كافية أو متعارضة"
+                                    chooser = null; rememberFuture = false; return@launch
+                                }
+                                val existing = app.accountLinkRuleRepository.findRule(choice.transaction)
+                                if (rememberFuture && decision.canRemember && existing != null && existing.accountId != account.id) {
+                                    updatePending = UpdateRequest(choice, account)
                                     chooser = null
                                     rememberFuture = false
                                     return@launch
@@ -130,25 +107,92 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
                                     rememberForFuture = rememberFuture && decision.canRemember,
                                 )
                                 chooser = null
-                                message = if (rememberFuture && decision.canRemember) "تم حفظ الربط وسيُستخدم تلقائيًا للعمليات المشابهة مستقبلًا" else "تم ربط العملية دون حفظ قاعدة مستقبلية"
+                                message = if (rememberFuture && decision.canRemember) "تم ربط العملية وحفظ القاعدة للعمليات المشابهة" else "تم ربط العملية دون حفظ قاعدة مستقبلية"
                                 rememberFuture = false
                             }
                         }) { Text(account.displayName) }
                     }
                     HorizontalDivider()
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        androidx.compose.material3.Checkbox(checked = rememberFuture, onCheckedChange = { rememberFuture = it })
+                        Checkbox(checked = rememberFuture, onCheckedChange = { rememberFuture = it })
                         Text("تذكر هذا الربط للعمليات المشابهة مستقبلًا")
                     }
-                    existingRule?.let { Text("يوجد ربط محفوظ لهذه العمليات") }
+                    existingRule?.let { rule ->
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("يوجد ربط محفوظ لهذه العمليات", style = MaterialTheme.typography.titleSmall)
+                                Text("الحساب: ${rule.targetAccountName}")
+                                Text("نوع الحساب: ${rule.expectedAccountType}")
+                                Text("تم تأكيده ${rule.confirmationCount} مرة")
+                                Text("آخر استخدام: ${formatLastUsed(rule.lastUsedAt)}")
+                                Text(if (rule.active) "الحالة: نشطة" else "الحالة: معطلة")
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = {
+                                        scope.launch {
+                                            app.accountLinkRuleRepository.applyExisting(choice.transaction, accounts)
+                                            chooser = null
+                                            message = "تم استخدام الربط المحفوظ"
+                                        }
+                                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("استخدام الربط المحفوظ") }
+                                    OutlinedButton(onClick = { chooser = null; rememberFuture = true; existingRule = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("تحديث الربط") }
+                                    OutlinedButton(onClick = {
+                                        scope.launch {
+                                            app.transactionLinkingService.applyUserLink(choice.transaction, choice.transaction.sourceAccountId, choice.transaction.destinationAccountId, accounts, rememberForFuture = false)
+                                            chooser = null
+                                            message = "تم تطبيقه على هذه العملية فقط"
+                                        }
+                                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("تطبيق على هذه العملية فقط") }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {},
         )
     }
+
+    updatePending?.let { request ->
+        val current = accounts.firstOrNull { it.id == request.existingRuleAccountId }
+        AlertDialog(
+            onDismissRequest = { updatePending = null },
+            title = { Text("تحديث قاعدة الربط؟") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("سيتم استخدام الحساب الجديد تلقائيًا للعمليات المشابهة مستقبلًا بدلًا من الحساب المحفوظ حاليًا.")
+                    Text("الحساب الحالي: ${current?.displayName ?: "غير معروف"}")
+                    Text("الحساب المقترح: ${request.proposed.displayName}")
+                    Text("نوع العملية: ${request.choice.transaction.transactionType}")
+                    Text("المرسل / المؤسسة: ${request.choice.transaction.originalSender ?: request.proposed.institutionName ?: "غير معروف"}")
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
+                        app.transactionLinkingService.applyUserLink(request.choice.transaction, request.choice.transaction.sourceAccountId, request.choice.transaction.destinationAccountId, accounts, rememberForFuture = true, proposedAccountId = request.proposed.id)
+                        message = "تم تحديث القاعدة بنجاح"
+                        updatePending = null
+                    }
+                }) { Text("تحديث القاعدة") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            app.transactionLinkingService.applyUserLink(request.choice.transaction, request.choice.transaction.sourceAccountId, request.choice.transaction.destinationAccountId, accounts, rememberForFuture = false)
+                            message = "تم تطبيقه على هذه العملية فقط"
+                            updatePending = null
+                        }
+                    }) { Text("تطبيق على هذه العملية فقط") }
+                    TextButton(onClick = { updatePending = null }) { Text("إلغاء") }
+                }
+            },
+        )
+    }
 }
 
 private data class LinkSelection(val transaction: TransactionEntity, val isSource: Boolean)
+private data class UpdateRequest(val choice: LinkSelection, val proposed: FinancialAccount, val existingRuleAccountId: Long? = null)
 
 private fun androidx.compose.foundation.lazy.LazyListScope.linkGroup(
     title: String,
