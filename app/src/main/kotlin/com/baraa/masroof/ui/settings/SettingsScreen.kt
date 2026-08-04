@@ -48,6 +48,7 @@ fun SettingsScreen(
     onAccounts: () -> Unit,
     onAccountLinks: () -> Unit = {},
     onFinancialHistory: () -> Unit = {},
+    onAccountLinkRules: () -> Unit = {},
     onAi: () -> Unit,
     onAiSuggestions: () -> Unit,
     onAiBatch: () -> Unit,
@@ -120,6 +121,11 @@ fun SettingsScreen(
                 title = "السجل المالي",
                 icon = Icons.Filled.Info,
                 onClick = onFinancialHistory,
+            )
+            SettingsRow(
+                title = "قواعد الربط المحفوظة",
+                icon = Icons.Filled.AccountBox,
+                onClick = onAccountLinkRules,
             )
 
             HorizontalDivider()

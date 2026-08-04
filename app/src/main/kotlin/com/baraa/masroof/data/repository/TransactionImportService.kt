@@ -53,6 +53,8 @@ class TransactionImportService(
     private val onParseFailure: (() -> Unit)? = null,
     private val onExactDuplicate: (() -> Unit)? = null,
     private val onPossibleDuplicate: (() -> Unit)? = null,
+    /** Safe post-commit hook used for local automatic account linking. */
+    private val onCommitted: suspend (List<Long>) -> Unit = {},
 ) {
 
     companion object {
@@ -183,6 +185,7 @@ class TransactionImportService(
             .mapNotNull { it.preparedEntity }
         val insertedIds = transactionRepository.insertAll(toInsert)
         val inserted = insertedIds.count { it != -1L }
+        onCommitted(insertedIds.filter { it > 0L })
         val ignoredAtDb = toInsert.size - inserted
 
         val exactDupSkipped = preview.items.count { it.status == ImportItemStatus.EXACT_DUPLICATE }

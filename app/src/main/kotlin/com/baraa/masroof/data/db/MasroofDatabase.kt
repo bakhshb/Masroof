@@ -35,8 +35,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FinancialSetupEntity::class,
         JournalEntryEntity::class,
         LedgerPostingEntity::class,
+        AccountLinkRuleEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -51,6 +52,7 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun aiSuggestionDao(): AiSuggestionDao
     abstract fun financialSetupDao(): FinancialSetupDao
     abstract fun journalDao(): JournalDao
+    abstract fun accountLinkRuleDao(): AccountLinkRuleDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -297,6 +299,15 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /** v8 → v9 stores safe, user-confirmed account-link signatures. */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `account_link_rules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `signature` TEXT NOT NULL, `senderKey` TEXT NOT NULL, `institutionKey` TEXT, `parserName` TEXT NOT NULL, `transactionType` TEXT NOT NULL, `financialTreatment` TEXT NOT NULL, `channel` TEXT NOT NULL, `direction` TEXT NOT NULL, `expectedAccountType` TEXT NOT NULL, `accountId` INTEGER NOT NULL, `confirmationCount` INTEGER NOT NULL, `lastConfirmedAt` INTEGER NOT NULL, `active` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_account_link_rules_signature` ON `account_link_rules` (`signature`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_account_link_rules_accountId` ON `account_link_rules` (`accountId`)")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -306,6 +317,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
 
         fun build(context: Context): MasroofDatabase =

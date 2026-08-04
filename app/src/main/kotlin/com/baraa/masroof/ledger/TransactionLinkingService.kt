@@ -10,6 +10,7 @@ class TransactionLinkingService(
     private val transactions: TransactionRepository,
     private val ledger: LedgerRepository,
     private val generator: JournalGenerationService,
+    private val rules: AccountLinkRuleRepository? = null,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     /** Applies an explicit user-selected source/destination pair, then creates a review-only journal. */
@@ -40,7 +41,9 @@ class TransactionLinkingService(
 
     suspend fun linkAndGenerate(transaction: TransactionEntity, accounts: List<FinancialAccount>): TransactionEntity {
         if (transaction.postingStatus == TransactionPostingStatus.POSTED || transaction.linkedJournalEntryId != null) return transaction
-        val match = AccountMatcher.match(transaction, accounts)
+        val direct = AccountMatcher.match(transaction, accounts)
+        val remembered = if (direct.level == AccountLinkConfidence.UNMATCHED) rules?.find(transaction, accounts) else null
+        val match = if (remembered == null) direct else AccountMatcher.Match(remembered, AccountLinkSource.OWNED_ACCOUNT_RULE, 85, false, AccountLinkConfidence.HIGH, "learned_rule")
         val linked = when (transaction.financialTreatment) {
             FinancialTreatment.INCOME, FinancialTreatment.REFUND -> transaction.copy(
                 destinationAccountId = match.account?.id,

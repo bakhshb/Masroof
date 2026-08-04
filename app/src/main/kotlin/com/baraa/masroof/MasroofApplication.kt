@@ -30,6 +30,7 @@ import com.baraa.masroof.ledger.SystemAccountSeeder
 import com.baraa.masroof.ledger.LedgerRepository
 import com.baraa.masroof.ledger.JournalGenerationService
 import com.baraa.masroof.ledger.TransactionLinkingService
+import com.baraa.masroof.ledger.AccountLinkRuleRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -81,6 +82,10 @@ class MasroofApplication : Application() {
             onParseFailure = { diagnosticCollector.metrics.parseFailureCount++ },
             onExactDuplicate = { diagnosticCollector.metrics.exactDuplicatesCount++ },
             onPossibleDuplicate = { diagnosticCollector.metrics.possibleDuplicatesCount++ },
+            onCommitted = { ids ->
+                val accounts = financialAccountRepository.getOwnedActive()
+                ids.forEach { id -> transactionRepository.getById(id)?.let { transactionLinkingService.linkAndGenerate(it, accounts) } }
+            },
         )
     }
 
@@ -198,13 +203,14 @@ class MasroofApplication : Application() {
         com.baraa.masroof.data.repository.RoomFinancialSetupRepository(database.financialSetupDao())
     }
 
+    val accountLinkRuleRepository: AccountLinkRuleRepository by lazy { AccountLinkRuleRepository(database.accountLinkRuleDao()) }
     val systemAccountSeeder: SystemAccountSeeder by lazy { SystemAccountSeeder(database.financialAccountDao()) }
     val ledgerRepository: LedgerRepository by lazy { LedgerRepository(database) }
     val journalGenerationService: JournalGenerationService by lazy {
         JournalGenerationService(systemAccounts = { key -> systemAccountSeeder.accountId(key) })
     }
     val transactionLinkingService: TransactionLinkingService by lazy {
-        TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService)
+        TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountLinkRuleRepository)
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
