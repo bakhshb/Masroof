@@ -19,6 +19,7 @@ class TransactionLinkingService(
         sourceAccountId: Long?,
         destinationAccountId: Long?,
         accounts: List<FinancialAccount>,
+        rememberForFuture: Boolean = false,
     ): TransactionEntity {
         require(transaction.postingStatus != TransactionPostingStatus.POSTED) { "posted_transaction_requires_correction" }
         val linked = transaction.copy(
@@ -36,6 +37,10 @@ class TransactionLinkingService(
         val draft = generator.generate(linked, source, destination) ?: return linked
         val journalId = if (transaction.linkedJournalEntryId == null) ledger.create(draft)
         else ledger.regenerateDraft(transaction.id, draft)
+        if (rememberForFuture) {
+            val preferred = source ?: destination
+            if (preferred != null) runCatching { rules?.remember(linked, preferred, if (source != null) "source" else "destination") }
+        }
         return linked.copy(linkedJournalEntryId = journalId, updatedAt = now()).also { transactions.update(it) }
     }
 

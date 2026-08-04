@@ -43,6 +43,8 @@ fun TransactionOperationsScreen() {
     val visible = remember(transactions, accounts, filter, debouncedQuery) { TransactionSearchEngine.search(transactions, accounts, categoriesById, filter.copy(query = debouncedQuery)) }
     val reviewQueue = visible.filter { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || it.accountLinkSource.name == "UNLINKED" }
     var batchResult by remember { mutableStateOf<TransactionBatchReview.BatchOutcome?>(null) }
+    var rememberBatch by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
     var showFilters by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
     Scaffold(topBar = {
@@ -66,15 +68,29 @@ fun TransactionOperationsScreen() {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
                 items(reviewQueue, key = { it.id }) { tx -> ReviewCard(tx, accounts, categories, showAdvanced) }
             }
+            val firstCompatibleAccount = accounts.firstOrNull { acc -> reviewQueue.all { tx -> (tx.sourceAccountId == acc.id || tx.destinationAccountId == acc.id) && com.baraa.masroof.ui.accounts.ManualLinkComposer.evaluate(tx, accounts, acc).canRemember } }
             if (reviewQueue.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         scope.launch {
                             val outcome = TransactionBatchReview.postValidated(reviewQueue, accounts, app.ledgerRepository)
                             batchResult = outcome
+                            if (rememberBatch && firstCompatibleAccount != null) {
+                                val decision = com.baraa.masroof.ui.accounts.ManualLinkComposer.batchDecision(reviewQueue, firstCompatibleAccount)
+                                if (decision.canRemember) reviewQueue.forEach { tx -> runCatching { app.transactionLinkingService.applyUserLink(tx, tx.sourceAccountId, tx.destinationAccountId, accounts, rememberForFuture = true) } }
+                                message = if (decision.canRemember) "تم حفظ الربط وسيُستخدم تلقائيًا للعمليات المشابهة مستقبلًا" else "تم تأكيد العمليات دون حفظ قاعدة للعمليات غير المتوافقة"
+                                rememberBatch = false
+                            } else if (rememberBatch) {
+                                message = "لا يمكن تذكر هذا الربط لأن بيانات العمليات غير متطابقة"
+                                rememberBatch = false
+                            }
                         }
                     }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("تأكيد المحدد") }
                     OutlinedButton(onClick = { scope.launch { reviewQueue.forEach { app.transactionRepository.delete(it) } } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("تجاهل المحدد") }
+                }
+                if (firstCompatibleAccount != null) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(checked = rememberBatch, onCheckedChange = { rememberBatch = it })
+                    Text("تذكر هذا الربط للعمليات المشابهة")
                 }
             }
             batchResult?.let {

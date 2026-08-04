@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,6 +51,8 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
     var accounts by remember { mutableStateOf<List<FinancialAccount>>(emptyList()) }
     var message by remember { mutableStateOf<String?>(null) }
     var chooser by remember { mutableStateOf<LinkSelection?>(null) }
+    var rememberFuture by remember { mutableStateOf(false) }
+    var existingRule by remember { mutableStateOf<com.baraa.masroof.ui.accounts.ManualLinkComposer.ExistingRule?>(null) }
     LaunchedEffect(Unit) { app.transactionRepository.observeAll().collectLatest { transactions = it } }
     LaunchedEffect(Unit) { app.financialAccountRepository.observeAll().collectLatest { rows -> accounts = rows.filter { it.isOwnedByUser && it.isActive } } }
     val eligible = transactions.filter { it.postingStatus != TransactionPostingStatus.POSTED }
@@ -92,25 +95,52 @@ fun AccountLinkingScreen(onClose: () -> Unit) {
         }
     }
     chooser?.let { choice ->
+        val selectedAccountId = if (choice.isSource) choice.transaction.sourceAccountId else choice.transaction.destinationAccountId
+        LaunchedEffect(choice, selectedAccountId) {
+            if (selectedAccountId != null) {
+                val account = accounts.firstOrNull { it.id == selectedAccountId }
+                if (account != null) {
+                    val existing = app.accountLinkRuleRepository.find(choice.transaction, accounts)
+                    existingRule = existing?.let {
+                        ManualLinkComposer.ExistingRule(account.displayName, 1, System.currentTimeMillis(), ruleId = 0L)
+                    }
+                }
+            }
+        }
         AlertDialog(
-            onDismissRequest = { chooser = null },
+            onDismissRequest = { chooser = null; rememberFuture = false; existingRule = null },
             title = { Text(if (choice.isSource) "اختيار الحساب المصدر" else "اختيار الحساب المستفيد") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     accounts.forEach { account ->
                         OutlinedButton(onClick = {
                             scope.launch {
+                                val decision = ManualLinkComposer.evaluate(choice.transaction, accounts, account)
+                                if (rememberFuture && !decision.canRemember) {
+                                    message = "لا يمكن تذكر هذا الربط لأن بيانات العملية غير كافية أو متعارضة"
+                                    chooser = null
+                                    rememberFuture = false
+                                    return@launch
+                                }
                                 app.transactionLinkingService.applyUserLink(
                                     choice.transaction,
                                     sourceAccountId = if (choice.isSource) account.id else choice.transaction.sourceAccountId,
                                     destinationAccountId = if (choice.isSource) choice.transaction.destinationAccountId else account.id,
                                     accounts = accounts,
+                                    rememberForFuture = rememberFuture && decision.canRemember,
                                 )
                                 chooser = null
-                                message = "تم تأكيد الربط؛ راجع القيد قبل اعتماده"
+                                message = if (rememberFuture && decision.canRemember) "تم حفظ الربط وسيُستخدم تلقائيًا للعمليات المشابهة مستقبلًا" else "تم ربط العملية دون حفظ قاعدة مستقبلية"
+                                rememberFuture = false
                             }
                         }) { Text(account.displayName) }
                     }
+                    HorizontalDivider()
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = rememberFuture, onCheckedChange = { rememberFuture = it })
+                        Text("تذكر هذا الربط للعمليات المشابهة مستقبلًا")
+                    }
+                    existingRule?.let { Text("يوجد ربط محفوظ لهذه العمليات") }
                 }
             },
             confirmButton = {},
