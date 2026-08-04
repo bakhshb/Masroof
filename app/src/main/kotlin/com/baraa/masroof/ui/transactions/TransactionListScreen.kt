@@ -230,10 +230,7 @@ fun TransactionListScreen(
     }
 
     if (showFinancialSetup) {
-        com.baraa.masroof.ui.accounts.SetupFlowScreen(
-            onClose = { showFinancialSetup = false },
-            onFinished = { showFinancialSetup = false },
-        )
+        com.baraa.masroof.ui.onboarding.OnboardingScreen(onFinished = { showFinancialSetup = false })
         return
     }
 
