@@ -21,7 +21,13 @@ import kotlinx.coroutines.flow.Flow
     @Query("SELECT * FROM account_identifiers WHERE normalizedValue = :value AND isActive = 1")
     suspend fun findByValue(value: String): AccountIdentifierEntity?
 
-    @Insert(onConflict = OnConflictStrategy.ABORT)
+    @Query("SELECT * FROM account_identifiers WHERE identifierType = :type AND normalizedValue = :value AND isActive = 1")
+    suspend fun findByTypeAndValue(type: AccountIdentifierType, value: String): AccountIdentifierEntity?
+
+    @Query("SELECT * FROM account_identifiers WHERE identifierType = :type AND isActive = 1")
+    suspend fun getByType(type: AccountIdentifierType): List<AccountIdentifierEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(identifier: AccountIdentifierEntity): Long
 
     @Update

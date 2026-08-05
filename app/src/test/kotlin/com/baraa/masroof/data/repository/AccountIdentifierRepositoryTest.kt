@@ -1,0 +1,134 @@
+package com.baraa.masroof.data.repository
+
+import com.baraa.masroof.data.db.AccountIdentifierType
+import com.baraa.masroof.data.db.FinancialAccountEntity
+import com.baraa.masroof.ledger.FakeAccountDao
+import com.baraa.masroof.ledger.FakeIdentifierDao
+import com.baraa.masroof.transaction.AccountNature
+import com.baraa.masroof.transaction.AccountType
+import com.baraa.masroof.transaction.Currency
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Test
+import java.math.BigDecimal
+
+class AccountIdentifierRepositoryTest {
+    private fun bank(id: Long, type: AccountType = AccountType.BANK_ACCOUNT, institution: String? = "Bank") = FinancialAccountEntity(
+        id = id, displayName = "A$id", institutionName = institution, accountType = type,
+        accountNature = AccountNature.ASSET, lastFourDigits = null, senderAliases = "",
+        currency = Currency.SAR, openingBalance = BigDecimal.ZERO, openingBalanceDate = 0L,
+        includeInNetWorth = true, includeInLiquidity = type == AccountType.BANK_ACCOUNT,
+        isOwnedByUser = true, systemAccountKey = null, isActive = true, notes = null,
+        createdAt = 0L, updatedAt = 0L,
+    )
+
+    private fun newRepo(vararg entities: FinancialAccountEntity): AccountIdentifierRepository {
+        val accountDao = FakeAccountDao(entities.toList())
+        return AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+    }
+
+    @Test fun addAccountLastFourStoresNormalizedArabicDigits() = runBlocking {
+        val repo = newRepo(bank(1))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "حساب", "١٢٣٤"))
+        assertEquals(IdentifierAddResult.Added, outcome.result)
+        val stored = repo.getForAccount(1).single()
+        assertEquals("1234", stored.normalizedValue)
+    }
+
+    @Test fun duplicateOnSameAccountUpdatesLabel() = runBlocking {
+        val repo = newRepo(bank(1))
+        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "Old", "1234"))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "New", "1234"))
+        assertEquals(IdentifierAddResult.Updated, outcome.result)
+        val stored = repo.getForAccount(1).single()
+        assertEquals("New", stored.displayLabel)
+        assertEquals(1, repo.getForAccount(1).size)
+    }
+
+    @Test fun duplicateAcrossAccountsFlagsConflict() = runBlocking {
+        val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD), bank(2, type = AccountType.CREDIT_CARD))
+        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "A1", "7271"))
+        val outcome = repo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "A2", "7271"))
+        assertEquals(IdentifierAddResult.DisabledDuplicate, outcome.result)
+        assertNotNull(outcome.message)
+        assertEquals(1, outcome.conflictingAccounts.size)
+    }
+
+    @Test fun disabledIdentifierNotUsedForLookup() = runBlocking {
+        val repo = newRepo(bank(1))
+        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.DEBIT_CARD_LAST4, "Active", "8219"))
+        val ids = repo.getForAccount(1)
+        repo.setActive(ids.single().id, false)
+        val found = repo.findAccountsByIdentifier(AccountIdentifierType.DEBIT_CARD_LAST4, "8219")
+        assertTrue(found.isEmpty())
+    }
+
+    @Test fun senderAliasMatchingIsCaseInsensitive() = runBlocking {
+        val repo = newRepo(bank(1))
+        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "AlRajhi", "alrajhi"))
+        val matches = repo.accountsForSender("ALRAJHI")
+        assertEquals(1, matches.size)
+        assertEquals(1L, matches.single().id)
+    }
+
+    @Test fun incompatibleIdentifierTypeIsRejected() = runBlocking {
+        val repo = newRepo(bank(1, type = AccountType.BANK_ACCOUNT))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "x", "1234"))
+        assertEquals(IdentifierAddResult.Rejected, outcome.result)
+    }
+
+    @Test fun backfillFromLegacyLastFourIsIdempotent() = runBlocking {
+        val repo = newRepo(
+            bank(1).copy(lastFourDigits = "1234"),
+            bank(2, type = AccountType.CREDIT_CARD).copy(lastFourDigits = "9999"),
+        )
+        val first = repo.backfillFromLegacyLastFour()
+        val second = repo.backfillFromLegacyLastFour()
+        assertTrue(first >= 2)
+        assertEquals("Backfill must be idempotent", 0, second)
+    }
+
+    @Test fun backfillMapsCreditCardLastFourToCreditCardIdentifier() = runBlocking {
+        val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD).copy(lastFourDigits = "7777"))
+        repo.backfillFromLegacyLastFour()
+        val stored = repo.findByTypeAndValue(AccountIdentifierType.CREDIT_CARD_LAST4, "7777")
+        assertNotNull(stored)
+        assertEquals(1L, stored!!.accountId)
+    }
+
+    @Test fun existingUserIdentifierIsNotOverwrittenByBackfill() = runBlocking {
+        val repo = newRepo(bank(1).copy(lastFourDigits = "7777"))
+        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "Keep", "7777"))
+        repo.backfillFromLegacyLastFour()
+        val all = repo.getForAccount(1)
+        assertEquals(1, all.size)
+        assertEquals("Keep", all.single().displayLabel)
+    }
+
+    @Test fun walletLastFourBackfilledForDigitalWallet() = runBlocking {
+        val repo = newRepo(bank(1, type = AccountType.DIGITAL_WALLET).copy(lastFourDigits = "4321"))
+        repo.backfillFromLegacyLastFour()
+        val stored = repo.findByTypeAndValue(AccountIdentifierType.WALLET_LAST4, "4321")
+        assertNotNull(stored)
+    }
+
+    @Test fun bankAccountLastFourBackfilledForBankAccount() = runBlocking {
+        val repo = newRepo(bank(1).copy(lastFourDigits = "1111"))
+        repo.backfillFromLegacyLastFour()
+        val stored = repo.findByTypeAndValue(AccountIdentifierType.ACCOUNT_LAST4, "1111")
+        assertNotNull(stored)
+    }
+
+    @Test fun senderAliasRejectsBlank() = runBlocking {
+        val repo = newRepo(bank(1))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "x", "   "))
+        assertEquals(IdentifierAddResult.Rejected, outcome.result)
+    }
+
+    @Test fun ibanLastFourStoredAsFourDigits() = runBlocking {
+        val repo = newRepo(bank(1))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.IBAN_LAST4, "IBAN", "SA0380000000608010167519"))
+        assertEquals(IdentifierAddResult.Added, outcome.result)
+        assertEquals("7519", outcome.identifier?.normalizedValue)
+    }
+}

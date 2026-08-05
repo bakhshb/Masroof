@@ -204,13 +204,14 @@ class MasroofApplication : Application() {
     }
 
     val accountLinkRuleRepository: AccountLinkRuleRepository by lazy { AccountLinkRuleRepository(database.accountLinkRuleDao()) }
+    val accountIdentifierRepository: com.baraa.masroof.data.repository.AccountIdentifierRepository by lazy { com.baraa.masroof.data.repository.AccountIdentifierRepository(database.accountIdentifierDao(), database.financialAccountDao()) }
     val systemAccountSeeder: SystemAccountSeeder by lazy { SystemAccountSeeder(database.financialAccountDao()) }
     val ledgerRepository: LedgerRepository by lazy { LedgerRepository(database) }
     val journalGenerationService: JournalGenerationService by lazy {
         JournalGenerationService(systemAccounts = { key -> systemAccountSeeder.accountId(key) })
     }
     val transactionLinkingService: TransactionLinkingService by lazy {
-        TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountLinkRuleRepository)
+        TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountIdentifierRepository, accountLinkRuleRepository)
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -220,6 +221,7 @@ class MasroofApplication : Application() {
         appScope.launch {
             runCatching { categoryRepository.seedIfEmpty() }
             runCatching { systemAccountSeeder.seed() }
+            runCatching { accountIdentifierRepository.backfillFromLegacyLastFour() }
             // Pre-load the AI config so the first batch call doesn't
             // need to block on a DB read.
             runCatching { rebuildAiIfNeeded() }

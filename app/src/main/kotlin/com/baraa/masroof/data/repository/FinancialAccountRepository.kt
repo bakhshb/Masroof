@@ -144,7 +144,7 @@ class RoomFinancialAccountRepository(
 private fun sanitizeLastFour(value: String?): String? =
     value?.trim()?.takeIf { it.length == 4 && it.all(Char::isDigit) }
 
-internal fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
+fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
     id = id,
     displayName = displayName,
     institutionName = institutionName,

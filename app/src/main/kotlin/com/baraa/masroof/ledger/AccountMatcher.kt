@@ -1,13 +1,15 @@
 package com.baraa.masroof.ledger
 
+import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.TransactionEntity
+import com.baraa.masroof.data.repository.AccountIdentifierRepository
+import com.baraa.masroof.rules.AccountMatching
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionType
-import com.baraa.masroof.rules.AccountMatching
 
-/** Conservative, parser/UI-independent matching. No diagnostic contains identifiers. */
+/** Uses the AccountIdentifier system as the source of truth for typed identifier linking. */
 object AccountMatcher {
     data class Match(
         val account: FinancialAccount?,
@@ -18,27 +20,61 @@ object AccountMatcher {
         val diagnosticCode: String,
     )
 
-    fun match(transaction: TransactionEntity, accounts: List<FinancialAccount>): Match {
+    suspend fun match(
+        transaction: TransactionEntity,
+        accounts: List<FinancialAccount>,
+        identifierRepository: AccountIdentifierRepository,
+    ): Match {
         val eligible = accounts.filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
         val lastFour = transaction.accountOrCardLastFourDigits?.let(AccountMatching::normalizeDigits)
-        val aliasMatches = eligible.filter { AccountMatching.matchBySender(transaction.originalSender, listOf(it)) != null }
-        if (!lastFour.isNullOrBlank()) {
-            val candidates = eligible.filter { it.lastFourDigits == lastFour }
-            val compatible = candidates.filter { compatible(it.accountType, transaction) }
-            if (compatible.size > 1) return unmatched("ambiguous_last_four")
-            if (compatible.size == 1) {
-                val account = compatible.single()
-                if (account in aliasMatches) return Match(account, AccountLinkSource.LAST_FOUR_MATCH, 100, false, AccountLinkConfidence.CONFIRMED, "sender_last_four_type")
-                if (institutionMatches(account, transaction)) return Match(account, AccountLinkSource.LAST_FOUR_MATCH, 90, false, AccountLinkConfidence.HIGH, "last_four_institution_type")
-                return Match(account, AccountLinkSource.LAST_FOUR_MATCH, 65, true, AccountLinkConfidence.MEDIUM, "last_four_only")
-            }
-            if (candidates.isNotEmpty()) return unmatched("incompatible_last_four")
+        val candidatesByIdentifier = if (!lastFour.isNullOrBlank()) {
+            identifierRepository.findAccountsByIdentifier(
+                AccountIdentifierType.CREDIT_CARD_LAST4,
+                lastFour,
+            ).filter { compatible(it.accountType, transaction) } +
+                identifierRepository.findAccountsByIdentifier(
+                    AccountIdentifierType.ACCOUNT_LAST4,
+                    lastFour,
+                ).filter { compatible(it.accountType, transaction) } +
+                identifierRepository.findAccountsByIdentifier(
+                    AccountIdentifierType.DEBIT_CARD_LAST4,
+                    lastFour,
+                ).filter { compatible(it.accountType, transaction) }
+        } else emptyList()
+        val unique = candidatesByIdentifier.distinctBy { it.id }
+        if (unique.size > 1) return unmatched("ambiguous_typed_identifier")
+        if (unique.size == 1) {
+            val account = unique.single()
+            return Match(
+                account = account,
+                source = AccountLinkSource.LAST_FOUR_MATCH,
+                confidence = 100,
+                needsReview = false,
+                level = AccountLinkConfidence.CONFIRMED,
+                diagnosticCode = "typed_identifier_match",
+            )
         }
-        val compatibleAliases = aliasMatches.filter { compatible(it.accountType, transaction) }
-        if (compatibleAliases.size == 1) return Match(compatibleAliases.single(), AccountLinkSource.OWNED_ACCOUNT_RULE, 85, false, AccountLinkConfidence.HIGH, "sender_single_compatible")
-        if (compatibleAliases.size > 1) return unmatched("ambiguous_sender")
+        // Sender-only fallback: institution match but never cross between bank account and credit card.
+        val senderMatches = identifierRepository.accountsForSender(transaction.originalSender)
+        val compatibleSenderMatches = senderMatches.filter { compatible(it.accountType, transaction) }
+        if (compatibleSenderMatches.size == 1) return Match(
+            account = compatibleSenderMatches.single(),
+            source = AccountLinkSource.OWNED_ACCOUNT_RULE,
+            confidence = 75,
+            needsReview = true,
+            level = AccountLinkConfidence.MEDIUM,
+            diagnosticCode = "sender_only_compatible",
+        )
+        if (compatibleSenderMatches.size > 1) return unmatched("ambiguous_sender")
         val institutions = eligible.filter { institutionMatches(it, transaction) && compatible(it.accountType, transaction) }
-        if (institutions.size == 1) return Match(institutions.single(), AccountLinkSource.INSTITUTION_MATCH, 60, true, AccountLinkConfidence.MEDIUM, "institution_type")
+        if (institutions.size == 1) return Match(
+            account = institutions.single(),
+            source = AccountLinkSource.INSTITUTION_MATCH,
+            confidence = 55,
+            needsReview = true,
+            level = AccountLinkConfidence.MEDIUM,
+            diagnosticCode = "institution_only",
+        )
         return unmatched(if (institutions.size > 1) "ambiguous_institution" else "unmatched")
     }
 

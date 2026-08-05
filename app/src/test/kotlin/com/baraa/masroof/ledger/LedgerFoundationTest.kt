@@ -96,15 +96,51 @@ class LedgerFoundationTest {
         assertEquals(BigDecimal("1000"), AccountBalanceService.balance(bank, listOf(evening), day, LocalTime.NOON))
         assertEquals(BigDecimal("990"), AccountBalanceService.balance(bank, listOf(evening), day))
     }
-    @Test fun ambiguousLastFourNeedsReview() {
+    @Test fun ambiguousLastFourNeedsReview() = kotlinx.coroutines.runBlocking {
         val tx = transaction(lastFour = "1001")
-        val a = account(1); val duplicate = account(3).copy(lastFourDigits = "1001")
-        val result = AccountMatcher.match(tx, listOf(a, duplicate))
+        val a = account(1); val duplicate = account(3).copy(lastFourDigits = null)
+        val accountDao = FakeAccountDao(listOf(
+            com.baraa.masroof.data.db.FinancialAccountEntity(
+                id = a.id, displayName = a.displayName, institutionName = a.institutionName,
+                accountType = a.accountType, accountNature = a.accountNature, lastFourDigits = null,
+                senderAliases = a.senderAliases.joinToString(","), currency = a.currency,
+                openingBalance = a.openingBalance, openingBalanceDate = a.openingBalanceDate,
+                includeInNetWorth = a.includeInNetWorth, includeInLiquidity = a.includeInLiquidity,
+                isOwnedByUser = a.isOwnedByUser, systemAccountKey = a.systemAccountKey,
+                isActive = a.isActive, notes = a.notes, createdAt = 0L, updatedAt = 0L,
+            ),
+            com.baraa.masroof.data.db.FinancialAccountEntity(
+                id = duplicate.id, displayName = duplicate.displayName, institutionName = duplicate.institutionName,
+                accountType = duplicate.accountType, accountNature = duplicate.accountNature, lastFourDigits = null,
+                senderAliases = duplicate.senderAliases.joinToString(","), currency = duplicate.currency,
+                openingBalance = duplicate.openingBalance, openingBalanceDate = duplicate.openingBalanceDate,
+                includeInNetWorth = duplicate.includeInNetWorth, includeInLiquidity = duplicate.includeInLiquidity,
+                isOwnedByUser = duplicate.isOwnedByUser, systemAccountKey = duplicate.systemAccountKey,
+                isActive = duplicate.isActive, notes = duplicate.notes, createdAt = 0L, updatedAt = 0L,
+            ),
+        ))
+        val repo = com.baraa.masroof.data.repository.AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        repo.addOrUpdate(1, com.baraa.masroof.data.repository.IdentifierForm(com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4, "A1", "1001"))
+        repo.addOrUpdate(3, com.baraa.masroof.data.repository.IdentifierForm(com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4, "A3", "1001"))
+        val result = AccountMatcher.match(tx, listOf(a, duplicate), repo)
         assertNull(result.account); assertTrue(result.needsReview)
     }
-    @Test fun exactLastFourMatchesWithoutStoringFullNumber() {
+
+    @Test fun exactLastFourMatchesWithoutStoringFullNumber() = kotlinx.coroutines.runBlocking {
         val tx = transaction(lastFour = "1001")
-        val result = AccountMatcher.match(tx, listOf(account(1)))
+        val a = account(1)
+        val accountDao = FakeAccountDao(listOf(com.baraa.masroof.data.db.FinancialAccountEntity(
+            id = a.id, displayName = a.displayName, institutionName = a.institutionName,
+            accountType = a.accountType, accountNature = a.accountNature, lastFourDigits = null,
+            senderAliases = a.senderAliases.joinToString(","), currency = a.currency,
+            openingBalance = a.openingBalance, openingBalanceDate = a.openingBalanceDate,
+            includeInNetWorth = a.includeInNetWorth, includeInLiquidity = a.includeInLiquidity,
+            isOwnedByUser = a.isOwnedByUser, systemAccountKey = a.systemAccountKey,
+            isActive = a.isActive, notes = a.notes, createdAt = 0L, updatedAt = 0L,
+        )))
+        val repo = com.baraa.masroof.data.repository.AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        repo.addOrUpdate(1, com.baraa.masroof.data.repository.IdentifierForm(com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4, "A1", "1001"))
+        val result = AccountMatcher.match(tx, listOf(a), repo)
         assertEquals(1L, result.account?.id); assertEquals(AccountLinkSource.LAST_FOUR_MATCH, result.source)
     }
     @Test fun foreignCurrenciesAreNotConsolidatedIntoSar() {
