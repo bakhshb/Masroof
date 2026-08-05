@@ -39,7 +39,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AccountIdentifierEntity::class,
         SenderInstitutionMappingEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -339,6 +339,17 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v12 → v13 adds credit-card credit limit + opening-balance kind
+         * to `financial_accounts`. Default values keep existing rows valid.
+         */
+        val MIGRATION_12_13: Migration = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `financial_accounts` ADD COLUMN `creditLimit` TEXT")
+                db.execSQL("ALTER TABLE `financial_accounts` ADD COLUMN `openingBalanceKind` TEXT NOT NULL DEFAULT 'OUTSTANDING'")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -352,6 +363,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_9_10,
             MIGRATION_10_11,
             MIGRATION_11_12,
+            MIGRATION_12_13,
         )
 
         fun build(context: Context): MasroofDatabase =

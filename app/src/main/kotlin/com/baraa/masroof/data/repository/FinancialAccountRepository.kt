@@ -164,4 +164,6 @@ fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
     notes = notes,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    creditLimit = creditLimit,
+    openingBalanceKind = openingBalanceKind,
 )

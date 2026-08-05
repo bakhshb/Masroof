@@ -64,6 +64,21 @@ data class FinancialAccountEntity(
     val notes: String? = null,
     val createdAt: Long,
     val updatedAt: Long,
+    /**
+     * Credit-card credit limit. `null` for non credit-card accounts; the
+     * value is the **total** card limit as entered by the user. With
+     * [openingBalanceKind] = AVAILABLE this enables the
+     * `openingOutstanding = creditLimit - openingAvailable` conversion.
+     */
+    val creditLimit: BigDecimal? = null,
+    /**
+     * How [openingBalance] should be interpreted for credit cards.
+     *  - [OpeningBalanceKind.OUTSTANDING]: openingBalance is the amount owed.
+     *  - [OpeningBalanceKind.AVAILABLE]:  openingBalance is the available
+     *    credit on day one; outstanding = creditLimit - openingBalance.
+     * For non-credit-card accounts this is always OUTSTANDING (semantic only).
+     */
+    val openingBalanceKind: OpeningBalanceKind = OpeningBalanceKind.OUTSTANDING,
 )
 
 /** Domain-level read model. */
@@ -86,4 +101,9 @@ data class FinancialAccount(
     val notes: String?,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
+    val creditLimit: BigDecimal? = null,
+    val openingBalanceKind: OpeningBalanceKind = OpeningBalanceKind.OUTSTANDING,
 )
+
+/** How opening balance for a credit-card account is encoded. */
+enum class OpeningBalanceKind { OUTSTANDING, AVAILABLE }

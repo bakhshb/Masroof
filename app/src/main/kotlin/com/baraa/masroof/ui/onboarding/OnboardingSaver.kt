@@ -12,14 +12,14 @@ val OnboardingSaver: Saver<OnboardingState, Any> = Saver(
             "type" to state.accountType.name, "name" to state.displayName, "institution" to state.institution,
             "lastFour" to state.lastFour, "openingBalance" to state.openingBalance, "currency" to state.currency.name,
             "liquidity" to state.includeLiquidity, "netWorth" to state.includeNetWorth,
-            "denied" to state.permissionDenied, "permanent" to state.permissionPermanentlyDenied, "skipped" to state.skipped,
+            "skipped" to state.skipped,
         )
     },
     restore = { map ->
         @Suppress("UNCHECKED_CAST")
         val m = map as Map<String, Any?>
         OnboardingState().apply {
-            step = runCatching { OnboardingStep.valueOf(m["step"] as String) }.getOrDefault(OnboardingStep.WELCOME)
+            step = runCatching { OnboardingStep.valueOf(m["step"] as String) }.getOrDefault(OnboardingStep.PERMISSION)
             option = runCatching { StartDateOption.valueOf(m["option"] as String) }.getOrDefault(StartDateOption.TODAY)
             trackingDate = runCatching { LocalDate.parse(m["date"] as String) }.getOrDefault(LocalDate.now())
             accountType = runCatching { AccountType.valueOf(m["type"] as String) }.getOrDefault(AccountType.BANK_ACCOUNT)
@@ -30,8 +30,6 @@ val OnboardingSaver: Saver<OnboardingState, Any> = Saver(
             currency = runCatching { Currency.valueOf(m["currency"] as String) }.getOrDefault(Currency.SAR)
             includeLiquidity = m["liquidity"] as? Boolean ?: true
             includeNetWorth = m["netWorth"] as? Boolean ?: true
-            permissionDenied = m["denied"] as? Boolean ?: false
-            permissionPermanentlyDenied = m["permanent"] as? Boolean ?: false
             skipped = m["skipped"] as? Boolean ?: false
         }
     },

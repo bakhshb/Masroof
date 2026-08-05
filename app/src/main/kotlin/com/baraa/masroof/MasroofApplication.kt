@@ -224,6 +224,29 @@ class MasroofApplication : Application() {
         TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountIdentifierRepository, accountLinkRuleRepository)
     }
 
+    /**
+     * Atomic, single-Room-transaction SMS importer. Replaces the previous
+     * two-stage `importService.preview/commit` flow that left transactions
+     * `NEEDS_REVIEW` and never auto-posted their postings, which is why
+     * account balances never moved in the UI. Each `import()` call returns
+     * the **structured result** with actual posted-journal counts so the
+     * UI cannot claim "linked N transactions" without evidence.
+     */
+    val importOrchestrator: com.baraa.masroof.data.repository.SmsImportOrchestrator by lazy {
+        com.baraa.masroof.data.repository.SmsImportOrchestrator(
+            database = database,
+            transactionRepository = transactionRepository,
+            categoryRepository = categoryRepository,
+            merchantMemoryRepository = merchantMemoryRepository,
+            accountIdentifierRepository = accountIdentifierRepository,
+            accountMatcher = com.baraa.masroof.ledger.AccountMatcher,
+            journalGenerationService = journalGenerationService,
+            ledgerRepository = ledgerRepository,
+            systemAccounts = { key -> systemAccountSeeder.accountId(key) },
+            institutionResolver = institutionResolver,
+        )
+    }
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {

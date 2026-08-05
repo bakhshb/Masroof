@@ -29,6 +29,9 @@ interface JournalDao {
     @Query("SELECT * FROM ledger_postings WHERE journalEntryId = :journalId ORDER BY id")
     suspend fun getPostings(journalId: Long): List<LedgerPostingEntity>
 
+    /** Alias kept for clarity in the orchestrator. */
+    suspend fun getPostingsFor(journalId: Long): List<LedgerPostingEntity> = getPostings(journalId)
+
     @Transaction
     suspend fun getWithPostings(id: Long): JournalWithPostings? {
         val journal = getJournal(id) ?: return null
@@ -51,4 +54,13 @@ interface JournalDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE postingStatus = 'POSTED' AND effectiveDate <= :endDate ORDER BY effectiveDate, effectiveTime, id")
     suspend fun getPostedThrough(endDate: LocalDate): List<JournalWithPostings>
+
+    /**
+     * Returns every POSTED journal with postings, regardless of date.
+     * Used by the atomic importer to recompute every affected account's
+     * balance after a single transaction boundary.
+     */
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE postingStatus = 'POSTED' ORDER BY effectiveDate, effectiveTime, id")
+    suspend fun getAllForRecalculation(): List<JournalWithPostings>
 }

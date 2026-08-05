@@ -118,4 +118,6 @@ class Converters {
     @TypeConverter fun toAccountLinkSource(value: String): AccountLinkSource = AccountLinkSource.valueOf(value)
     @TypeConverter fun fromTransactionPostingStatus(value: TransactionPostingStatus): String = value.name
     @TypeConverter fun toTransactionPostingStatus(value: String): TransactionPostingStatus = TransactionPostingStatus.valueOf(value)
+    @TypeConverter fun fromOpeningBalanceKind(value: OpeningBalanceKind): String = value.name
+    @TypeConverter fun toOpeningBalanceKind(value: String): OpeningBalanceKind = OpeningBalanceKind.valueOf(value)
 }

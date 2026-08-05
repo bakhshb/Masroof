@@ -18,6 +18,13 @@ object AccountMatcher {
         val needsReview: Boolean,
         val level: AccountLinkConfidence,
         val diagnosticCode: String,
+        /**
+         * When the matched transaction is an internal transfer between two
+         * of the user's owned accounts, this is the destination side. The
+         * journal generator + the atomic importer use it to record the
+         * transfer without invalidating account-link priority rules.
+         */
+        val destinationAccountCandidate: FinancialAccount? = null,
     )
 
     suspend fun match(
