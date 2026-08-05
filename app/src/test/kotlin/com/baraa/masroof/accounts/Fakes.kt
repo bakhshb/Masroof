@@ -29,5 +29,5 @@ class FakeFinancialSetupRepository(
     }
 
     /** Observable form for views that want to react to changes. */
-    fun observe(): Flow<FinancialSetup> = flow.map { it }
+    override fun observe(): Flow<FinancialSetup> = flow.map { it }
 }

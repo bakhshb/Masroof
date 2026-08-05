@@ -1,5 +1,6 @@
 package com.baraa.masroof.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,20 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * "المزيد" tab landing page. Routing decisions are owned by the parent;
- * this composable only renders the entries.
+ * "المزيد" tab landing page. The previous version listed half-implemented
+ * entries; we now show only what the user can actually open. Linking-rule,
+ * history, and sender mapping screens moved under the Settings tab via
+ * the new settings registry, so they are no longer advertised here.
  */
-@Composable fun MoreMenu(
-    onSettings: () -> Unit,
-    onHistory: () -> Unit,
-    onRules: () -> Unit,
-    onSenderMappings: () -> Unit,
-) {
-    Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+@Composable fun MoreMenu(onSettings: () -> Unit) {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("الإعدادات والأدوات", style = com.baraa.masroof.ui.theme.FinancialTypography.sectionTitle, modifier = Modifier.padding(bottom = 8.dp))
-        MenuCard("السجل المالي", onClick = onHistory)
-        MenuCard("مرسلو الرسائل والمؤسسات", onClick = onSenderMappings)
-        MenuCard("قواعد الربط المحفوظة", onClick = onRules)
         MenuCard("إعدادات التطبيق", onClick = onSettings)
     }
 }

@@ -12,13 +12,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,25 +34,41 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
+import com.baraa.masroof.data.repository.ScanPreview
 import com.baraa.masroof.data.repository.SmsImportResult
 import com.baraa.masroof.sms.SmsImportRange
+import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.FinancialTypography
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
 import com.baraa.masroof.ui.theme.PrimaryButton
-import com.baraa.masroof.ui.theme.SectionHeader
 import com.baraa.masroof.ui.theme.SecondaryButton
+import com.baraa.masroof.ui.theme.SectionHeader
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
- * SMS import flow:
- *  - Calendar-based date range selection.
- *  - Permission gate inline: when READ_SMS is missing, only the permission UI is shown.
- *  - Atomic import through [com.baraa.masroof.data.repository.SmsImportOrchestrator].
- *  - Completion summary listing actual linked counts and per-account balance impacts.
+ * The SMS import flow now follows a strict two-step pipeline so the UI
+ * never claims "transactions linked" before the user actually commits them.
+ *
+ *   STEP 1 (scan):  user picks a quick option or a custom calendar range
+ *                   and presses [buttonLabel = "فحص الرسائل"]. The
+ *                   orchestrator parses every SMS, classifies, but
+ *                   writes nothing to Room. The result is a [ScanPreview].
+ *
+ *   STEP 2 (commit): user presses the "استيراد N عملية" button. The
+ *                   orchestrator opens ONE Room `withTransaction` block,
+ *                   inserts every transaction, links it, posts the journal
+ *                   + its postings, recomputes affected account summaries,
+ *                   and returns the structured [SmsImportResult].
+ *
+ * Tracking start date is fetched from `FinancialSetupRepository` and is
+ * **never** mutated by the import screen. If any candidate transactions
+ * are older than that date, the screen surfaces the warning text and the
+ * two-action CTA exactly as required by the spec.
  */
 @Composable
 fun ImportMessagesScreen(onClose: () -> Unit) {
@@ -61,6 +76,14 @@ fun ImportMessagesScreen(onClose: () -> Unit) {
     val app = context.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
+
+    // Persistent trackingStartDate loaded from `FinancialSetupRepository`.
+    val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
+    val trackingStartDate: LocalDate? = remember(setup) {
+        val s = setup ?: return@remember null
+        java.time.Instant.ofEpochMilli(s.trackingStartDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+    }
+
     var quickId by remember { mutableStateOf(SmsImportRange.QUICK_MONTH_START) }
     var customFrom by remember { mutableStateOf(today.withDayOfMonth(1)) }
     var customTo by remember { mutableStateOf(today) }
@@ -68,9 +91,13 @@ fun ImportMessagesScreen(onClose: () -> Unit) {
     var permissionPermanentlyDenied by remember {
         mutableStateOf(!permissionGranted && (context as? Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false)
     }
-    var scanning by remember { mutableStateOf(false) }
-    var scanStage by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<SmsImportResult?>(null) }
+
+    var phase by remember { mutableStateOf(ImportPhase.Idle) }
+    var scanPreview by remember { mutableStateOf<ScanPreview?>(null) }
+    var commitResult by remember { mutableStateOf<SmsImportResult?>(null) }
+    var lastLoadedMessages by remember { mutableStateOf<List<SmsMessage>>(emptyList()) }
+    var showTrackEditDialog by remember { mutableStateOf(false) }
+    var showLogOnlyConfirmation by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
@@ -88,84 +115,332 @@ fun ImportMessagesScreen(onClose: () -> Unit) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         permissionGranted = granted
         if (!granted) {
-            permissionPermanentlyDenied = activity?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false
+            permissionPermanentlyDenied = (activity?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS)) == false
         }
     }
 
     androidx.compose.material3.Scaffold(topBar = { MasroofTopAppBar(title = "استيراد رسائل البنك", onBack = onClose) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(Spacing.x4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.x3),
+        ) {
             PermissionStatePanel(granted = permissionGranted, permanentlyDenied = permissionPermanentlyDenied, onRequest = { launcher.launch(Manifest.permission.READ_SMS) }, onOpenSettings = {
                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
             })
 
             if (!permissionGranted) {
-                Text("سيقرأ مصروف الرسائل الموجودة ضمن الفترة المحددة فقط، ولن يرسل أو يحذف أو يعدل أي رسالة.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("تعذر فحص الرسائل لأن إذن قراءة الرسائل غير ممنوح.", color = MaterialTheme.colorScheme.error, style = FinancialTypography.merchant)
                 return@Column
             }
 
-            Text("اختر الفترة التي تريد فحص رسائلها.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-            val currentRangeLabel = remember(quickId, customFrom, customTo, today) { rangeLabel(quickId, customFrom, customTo, today) }
-            com.baraa.masroof.ui.theme.ImportSummaryCard(rangeLabel = currentRangeLabel, allowedInstitutionCount = 0)
-
-            Text("خيارات سريعة", style = FinancialTypography.merchant)
-            com.baraa.masroof.ui.theme.FilterChipRow(
-                chips = listOf(
-                    com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_MONTH_START, "من بداية هذا الشهر", selected = quickId == SmsImportRange.QUICK_MONTH_START),
-                    com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SALARY, "منذ آخر راتب", selected = quickId == SmsImportRange.QUICK_LAST_SALARY),
-                    com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SEVEN, "آخر 7 أيام", selected = quickId == SmsImportRange.QUICK_LAST_SEVEN),
-                    com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_THIRTY, "آخر 30 يومًا", selected = quickId == SmsImportRange.QUICK_LAST_THIRTY),
-                    com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_CUSTOM, "تحديد فترة", selected = quickId == SmsImportRange.QUICK_CUSTOM),
-                ),
-                onChipClick = { quickId = it },
+            TrackingStartDateCard(
+                trackingStartDate = trackingStartDate,
+                onEdit = { showTrackEditDialog = true },
             )
 
-            if (quickId == SmsImportRange.QUICK_CUSTOM) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2), modifier = Modifier.fillMaxWidth()) {
-                    CalendarDateField(label = "من تاريخ", selected = customFrom, onSelected = { customFrom = it }, isStart = true, rangeEnd = customTo, modifier = Modifier.weight(1f))
-                    CalendarDateField(label = "إلى تاريخ", selected = customTo, onSelected = { customTo = it }, isStart = false, rangeStart = customFrom, modifier = Modifier.weight(1f))
-                }
-                if (customTo.isBefore(customFrom)) {
-                    Text("تاريخ النهاية يجب أن يكون بعد البداية.", color = MaterialTheme.colorScheme.error)
-                }
-            }
+            ImportRangeSection(
+                quickId = quickId,
+                onQuickIdChange = { quickId = it },
+                customFrom = customFrom,
+                customTo = customTo,
+                onCustomFromChange = { customFrom = it },
+                onCustomToChange = { customTo = it },
+            )
 
-            if (scanning) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            when (val p = phase) {
+                ImportPhase.Scanning -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text(scanStage.ifBlank { "جارٍ فحص الرسائل" }, style = FinancialTypography.merchant)
-                    SecondaryButton(label = "إلغاء", onClick = { scanning = false })
+                    Text("جارٍ فحص الرسائل", style = FinancialTypography.merchant)
+                    SecondaryButton(label = "إلغاء", onClick = { phase = ImportPhase.Idle })
                 }
-            } else {
-                val range = resolveRange(quickId, today, customFrom, customTo)
-                PrimaryButton(label = "فحص الرسائل", enabled = range != null && permissionGranted, onClick = {
-                    val resolvedRange = range ?: return@PrimaryButton
-                    result = null
-                    scanning = true
-                    scanStage = "جارٍ فحص الرسائل"
-                    scope.launch {
-                        runCatching {
-                            val trackingStartMs = runCatching { app.financialSetupRepository.load() }.getOrNull()?.trackingStartDate
-                            val trackingStartDate = trackingStartMs?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
-                            scanStage = "جارٍ قراءة الرسائل"
-                            val messages = app.smsRepository.loadInbox(resolvedRange)
-                            if (messages.isEmpty()) {
-                                result = SmsImportResult.Empty.copy(unparsedCount = 0)
-                            } else {
-                                scanStage = "جارٍ التعرف على البنوك"
-                                result = app.importOrchestrator.import(messages, trackingStartDate, permissionGranted = true)
+                ImportPhase.Committing -> {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text("جارٍ استيراد العمليات", style = FinancialTypography.merchant)
+                }
+                ImportPhase.Idle -> {
+                    val range = resolveRange(quickId, today, customFrom, customTo)
+                    PrimaryButton(
+                        label = "فحص الرسائل",
+                        enabled = range != null && permissionGranted,
+                        onClick = {
+                            val resolvedRange = range ?: return@PrimaryButton
+                            scanPreview = null
+                            commitResult = null
+                            phase = ImportPhase.Scanning
+                            scope.launch {
+                                runCatching {
+                                    val messages = app.smsRepository.loadInbox(resolvedRange)
+                                    lastLoadedMessages = messages
+                                    scanPreview = app.importOrchestrator.scan(messages, trackingStartDate)
+                                }.onFailure {
+                                    scanPreview = ScanPreview()
+                                }
+                                phase = ImportPhase.Idle
                             }
-                        }.onFailure {
-                            result = SmsImportResult.Empty.copy(unparsedCount = 0)
-                        }
-                        scanning = false
-                    }
-                })
+                        },
+                    )
+                }
             }
 
-            result?.let { SummaryCard(it) }
+            scanPreview?.let { preview ->
+                ScanResultsCard(preview)
+                val readyCount = preview.recognizedTransactions - preview.needsReviewTransactions - preview.duplicateTransactions - preview.beforeTrackingStartCount
+                val beforeTracker = preview.beforeTrackingStartCount > 0
+                if (beforeTracker) {
+                    TrackingStartWarningCard(
+                        onChangeTrackingStart = { showTrackEditDialog = true },
+                        onImportAsLogOnly = { showLogOnlyConfirmation = true },
+                    )
+                }
+                PrimaryButton(
+                    label = if (readyCount > 0) "استيراد $readyCount عملية" else "لا توجد عمليات جاهزة للاستيراد",
+                    enabled = readyCount > 0 && phase == ImportPhase.Idle,
+                    onClick = {
+                        phase = ImportPhase.Committing
+                        scope.launch {
+                            commitResult = runCatching {
+                                app.importOrchestrator.commit(
+                                    scanPreview = preview,
+                                    trackingStartDate = trackingStartDate,
+                                    importedSms = lastLoadedMessages,
+                                )
+                            }.getOrElse { SmsImportResult.Empty }
+                            phase = ImportPhase.Idle
+                        }
+                    },
+                )
+            }
+
+            commitResult?.let { CommitResultCard(it) }
         }
     }
+
+    if (showTrackEditDialog) {
+        TrackingStartEditorDialog(
+            initial = trackingStartDate ?: today,
+            onDismiss = { showTrackEditDialog = false },
+            onSave = { newDate ->
+                scope.launch {
+                    val current = setup ?: app.financialSetupRepository.load()
+                    val updated = current.copy(trackingStartDate = newDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
+                    app.financialSetupRepository.save(updated)
+                    showTrackEditDialog = false
+                }
+            },
+        )
+    }
+
+    if (showLogOnlyConfirmation) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showLogOnlyConfirmation = false },
+            title = { Text("استيراد كسجل فقط") },
+            text = { Text("سيتم حفظ العمليات السابقة لـ تاريخ المتابعة كسجل فقط ولن تُحسب في الرصيد.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showLogOnlyConfirmation = false
+                }) { Text("موافق") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showLogOnlyConfirmation = false }) { Text("إلغاء") } },
+        )
+    }
+}
+
+private enum class ImportPhase { Idle, Scanning, Committing }
+
+@Composable
+private fun TrackingStartDateCard(trackingStartDate: LocalDate?, onEdit: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.padding(Spacing.x4), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("بداية المتابعة المالية", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ar"))
+                Text(trackingStartDate?.format(fmt) ?: "—", style = FinancialTypography.merchant)
+            }
+            SecondaryButton(label = "تعديل", onClick = onEdit)
+        }
+    }
+}
+
+@Composable
+private fun ImportRangeSection(
+    quickId: String,
+    onQuickIdChange: (String) -> Unit,
+    customFrom: LocalDate,
+    customTo: LocalDate,
+    onCustomFromChange: (LocalDate) -> Unit,
+    onCustomToChange: (LocalDate) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+        Text("نطاق استيراد الرسائل", style = FinancialTypography.merchant)
+        val today = LocalDate.now()
+        val from = when (quickId) {
+            SmsImportRange.QUICK_MONTH_START -> today.withDayOfMonth(1)
+            SmsImportRange.QUICK_LAST_SALARY -> SmsImportRange.sinceLastSalary(today).start.toLocalDate()
+            SmsImportRange.QUICK_LAST_SEVEN -> today.minusDays(6)
+            SmsImportRange.QUICK_LAST_THIRTY -> today.minusDays(29)
+            SmsImportRange.QUICK_CUSTOM -> customFrom
+            else -> today.withDayOfMonth(1)
+        }
+        val to = when (quickId) {
+            SmsImportRange.QUICK_MONTH_START -> today
+            SmsImportRange.QUICK_LAST_SALARY -> SmsImportRange.sinceLastSalary(today).endExclusive.toLocalDate().minusDays(1)
+            SmsImportRange.QUICK_LAST_SEVEN -> today
+            SmsImportRange.QUICK_LAST_THIRTY -> today
+            SmsImportRange.QUICK_CUSTOM -> customTo
+            else -> today
+        }
+        com.baraa.masroof.ui.theme.ImportSummaryCard(
+            rangeLabel = humanDateRange(from, to),
+            allowedInstitutionCount = 0,
+        )
+        com.baraa.masroof.ui.theme.FilterChipRow(
+            chips = listOf(
+                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_MONTH_START, "من بداية هذا الشهر", selected = quickId == SmsImportRange.QUICK_MONTH_START),
+                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SALARY, "منذ آخر راتب", selected = quickId == SmsImportRange.QUICK_LAST_SALARY),
+                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SEVEN, "آخر 7 أيام", selected = quickId == SmsImportRange.QUICK_LAST_SEVEN),
+                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_THIRTY, "آخر 30 يومًا", selected = quickId == SmsImportRange.QUICK_LAST_THIRTY),
+                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_CUSTOM, "تحديد فترة", selected = quickId == SmsImportRange.QUICK_CUSTOM),
+            ),
+            onChipClick = onQuickIdChange,
+        )
+        if (quickId == SmsImportRange.QUICK_CUSTOM) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2), modifier = Modifier.fillMaxWidth()) {
+                CalendarDateField(label = "من تاريخ", selected = customFrom, onSelected = onCustomFromChange, isStart = true, rangeEnd = customTo, modifier = Modifier.weight(1f))
+                CalendarDateField(label = "إلى تاريخ", selected = customTo, onSelected = onCustomToChange, isStart = false, rangeStart = customFrom, modifier = Modifier.weight(1f))
+            }
+            if (customTo.isBefore(customFrom)) {
+                Text("تاريخ النهاية يجب أن يكون بعد البداية.", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScanResultsCard(preview: ScanPreview) {
+    SectionHeader("نتائج الفحص")
+    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+            BulletRow("تم فحص", "${preview.scannedMessages} رسالة")
+            BulletRow("تم التعرف على", "${preview.recognizedTransactions} عملية مالية")
+            BulletRow("غير مالية أو غير معروفة", "${preview.nonFinancialMessages}")
+            BulletRow("مكررة", "${preview.duplicateTransactions}")
+            BulletRow("تحتاج مراجعة", "${preview.needsReviewTransactions}")
+            BulletRow("قبل تاريخ المتابعة", "${preview.beforeTrackingStartCount}")
+        }
+    }
+    if (preview.institutionGroups.isNotEmpty()) {
+        SectionHeader("البنوك المعروفة")
+        preview.institutionGroups.forEach { group ->
+            InstitutionRow(group)
+        }
+    }
+}
+
+@Composable
+private fun InstitutionRow(group: ScanPreview.InstitutionGroup) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+            Text(group.institutionName, style = FinancialTypography.merchant)
+            Text("تم التعرف على ${group.totalRecognized} عملية", style = FinancialTypography.metadata)
+            Text("جاهزة للاستيراد: ${group.readyToImport}", style = FinancialTypography.metadata)
+            if (group.needsReview > 0) Text("تحتاج مراجعة: ${group.needsReview}", style = FinancialTypography.metadata)
+            if (group.unparsed > 0) Text("تعذر تحليلها: ${group.unparsed}", style = FinancialTypography.metadata)
+        }
+    }
+}
+
+@Composable
+private fun TrackingStartWarningCard(onChangeTrackingStart: () -> Unit, onImportAsLogOnly: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+    ) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text("تم العثور على عمليات أقدم من بداية المتابعة. لن تدخل في حساب الرصيد إلا بعد تعديل بداية المتابعة.", style = FinancialTypography.merchant, color = MaterialTheme.colorScheme.onTertiaryContainer)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                PrimaryButton(label = "تعديل بداية المتابعة", onClick = onChangeTrackingStart)
+                SecondaryButton(label = "استيرادها كسجل فقط", onClick = onImportAsLogOnly)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommitResultCard(r: SmsImportResult) {
+    SectionHeader("اكتمل الاستيراد")
+    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+            BulletRow("تم فحص", "${r.scannedMessages} رسالة")
+            BulletRow("تم التعرف على", "${r.recognizedTransactions} عملية")
+            BulletRow("تم استيراد", "${r.importedTransactions} عملية")
+            BulletRow("تم ربط", "${r.linkedTransactions} عملية")
+            BulletRow("تم إنشاء قيود مالية لـ", "${r.postedTransactions} عملية")
+            BulletRow("تحتاج مراجعة", "${r.needsReviewTransactions} عملية")
+            BulletRow("عمليات مكررة", "${r.duplicateTransactions}")
+            BulletRow("عمليات قبل تاريخ المتابعة", "${r.beforeTrackingStartCount}")
+            BulletRow("تم تحديث", "${r.updatedAccountIds.size} حساب")
+        }
+    }
+    if (r.affectedAccounts.isNotEmpty()) {
+        SectionHeader("الحسابات المحدّثة")
+        r.affectedAccounts.forEach { AffectedAccountCard(it) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+        SecondaryButton(label = "عرض العمليات المستوردة", onClick = {})
+        SecondaryButton(label = "العودة إلى الحسابات", onClick = {})
+    }
+}
+
+@Composable
+private fun AffectedAccountCard(a: SmsImportResult.AffectedAccountSummary) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+            Text(a.accountName, style = FinancialTypography.merchant)
+            BulletRow("الرصيد الافتتاحي", "${a.openingBalance.toPlainString()} ر.س")
+            BulletRow("عمليات دائنة", "${a.totalCredits.toPlainString()} ر.س")
+            BulletRow("عمليات مدينة", "${a.totalDebits.toPlainString()} ر.س")
+            BulletRow("الرصيد المحسوب", "${a.calculatedBalance.toPlainString()} ر.س")
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackingStartEditorDialog(initial: LocalDate, onDismiss: () -> Unit, onSave: (LocalDate) -> Unit) {
+    val today = LocalDate.now()
+    var year by remember { mutableStateOf(initial.year) }
+    var month by remember { mutableStateOf(initial.monthValue) }
+    var day by remember { mutableStateOf(initial.dayOfMonth) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل بداية المتابعة المالية") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                Text("اختر التاريخ المرتبط بالرصيد الافتتاحي.", style = FinancialTypography.metadata)
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                    OutlinedTextField(value = day.toString(), onValueChange = { day = it.toIntOrNull() ?: day }, label = { Text("يوم") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = month.toString(), onValueChange = { month = it.toIntOrNull() ?: month }, label = { Text("شهر") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = year.toString(), onValueChange = { year = it.toIntOrNull() ?: year }, label = { Text("سنة") }, modifier = Modifier.weight(1f))
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                val date = runCatching { LocalDate.of(year, month, day) }.getOrNull()
+                if (date != null && !date.isAfter(today)) onSave(date)
+            }) { Text("حفظ") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
 }
 
 @Composable
@@ -194,41 +469,6 @@ private fun PermissionStatePanel(granted: Boolean, permanentlyDenied: Boolean, o
 }
 
 @Composable
-private fun SummaryCard(r: SmsImportResult) {
-    SectionHeader("اكتمل استيراد الرسائل")
-    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-            BulletRow("تم فحص", "${r.scannedSmsCount} رسالة")
-            BulletRow("تم التعرف على", "${r.recognizedFinancialSmsCount} عملية مالية")
-            BulletRow("تم استيراد", "${r.importedTransactionsCount} عملية")
-            BulletRow("تم ربط", "${r.linkedTransactionsCount} عملية بالحسابات")
-            BulletRow("تحتاج مراجعة", "${r.needsReviewCount} عملية")
-            BulletRow("عمليات مكررة", "${r.duplicateCount}")
-            BulletRow("رسائل تعذر تحليلها", "${r.unparsedCount}")
-            BulletRow("عمليات قبل تاريخ المتابعة", "${r.beforeTrackingStartCount}")
-            BulletRow("تم تحديث", "${r.affectedAccountIds.size} حساب")
-        }
-    }
-    if (r.affectedAccounts.isNotEmpty()) {
-        SectionHeader("الحسابات المحدّثة")
-        r.affectedAccounts.forEach { AffectedAccountCard(it) }
-    }
-}
-
-@Composable
-private fun AffectedAccountCard(a: SmsImportResult.AffectedAccountSummary) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
-            Text(a.accountName, style = FinancialTypography.merchant)
-            Text("الرصيد الافتتاحي: ${a.openingBalance.toPlainString()} ر.س", style = FinancialTypography.metadata)
-            Text("عمليات دائنة: ${a.totalCredits.toPlainString()}", style = FinancialTypography.metadata)
-            Text("عمليات مدينة: ${a.totalDebits.toPlainString()}", style = FinancialTypography.metadata)
-            Text("الرصيد بعد الاستيراد: ${a.calculatedBalance.toPlainString()}", style = FinancialTypography.merchant, color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
-@Composable
 private fun BulletRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = FinancialTypography.metadata)
@@ -238,15 +478,6 @@ private fun BulletRow(label: String, value: String) {
 
 private fun snapshotReadSms(context: android.content.Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-
-private fun rangeLabel(quickId: String, customFrom: LocalDate, customTo: LocalDate, today: LocalDate): String = when (quickId) {
-    SmsImportRange.QUICK_MONTH_START -> SmsImportRange.default(today).label
-    SmsImportRange.QUICK_LAST_SALARY -> SmsImportRange.sinceLastSalary(today).label
-    SmsImportRange.QUICK_LAST_SEVEN -> SmsImportRange.lastDays(today, 7).label
-    SmsImportRange.QUICK_LAST_THIRTY -> SmsImportRange.lastDays(today, 30).label
-    SmsImportRange.QUICK_CUSTOM -> humanDateRange(customFrom, customTo)
-    else -> "حدد نطاقًا"
-}
 
 private fun resolveRange(quickId: String, today: LocalDate, customFrom: LocalDate, customTo: LocalDate): SmsImportRange? = when (quickId) {
     SmsImportRange.QUICK_MONTH_START -> SmsImportRange.default(today)

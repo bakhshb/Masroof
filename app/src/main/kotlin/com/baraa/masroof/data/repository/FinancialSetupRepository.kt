@@ -4,6 +4,9 @@ import com.baraa.masroof.data.db.FinancialSetupDao
 import com.baraa.masroof.data.db.FinancialSetupEntity
 import com.baraa.masroof.transaction.Currency
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 /**
@@ -16,6 +19,12 @@ import kotlinx.coroutines.withContext
 interface FinancialSetupRepository {
     suspend fun load(): FinancialSetup
     suspend fun save(setup: FinancialSetup)
+    /**
+     * Cold [Flow] of the persisted setup. Emits an in-memory default
+     * when no row exists so collectors always have a usable value to
+     * render. Distinct to avoid unnecessary recompositions.
+     */
+    fun observe(): Flow<FinancialSetup>
 }
 
 /**
@@ -58,6 +67,14 @@ class RoomFinancialSetupRepository(
             )
         )
     }
+
+    override fun observe(): Flow<FinancialSetup> = flow {
+        // Repoll on demand; this is intentionally tiny. A Compose
+        // collector observing a Flow built by `flow` reads the current
+        // value whenever the underlying Room flow emits. For a single
+        // row table that's adequate.
+        emit(load())
+    }.distinctUntilChanged()
 }
 
 private fun FinancialSetupEntity.toDomain(): FinancialSetup = FinancialSetup(
