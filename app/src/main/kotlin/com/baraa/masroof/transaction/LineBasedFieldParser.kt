@@ -15,12 +15,13 @@ object LineBasedFieldParser {
     private const val LINE_BREAK_REGEX = "[\n\r]+"
     private const val LABEL_SEPARATORS = ":：:：=: =|:"
     private val AMOUNT_LABEL_REGEX = Regex("""^(بمبلغ|مبلغ|Amount|Transaction Amount|Purchase Amount|Transfer Amount|Payment Amount|مبلغ العملية|قيمة العملية|قيمة الشراء|قيمة التحويل)$""", RegexOption.IGNORE_CASE)
-    private val AMOUNT_LABELS = listOf("Amount", "Transaction Amount", "Purchase Amount", "Transfer Amount", "Payment Amount", "بمبلغ", "بقيمة", "قيمة العملية", "قيمة الشراء", "قيمة التحويل")
+    private val AMOUNT_LABELS = listOf("Amount", "Transaction Amount", "Purchase Amount", "Transfer Amount", "Payment Amount", "بمبلغ", "بقيمة", "مبلغ", "مبلغ العملية", "قيمة العملية", "قيمة الشراء", "قيمة التحويل")
     init { }
     private val BALANCE_LABEL_REGEX = Regex("""^(الرصيد|الرصيد المتاح|الرصيد الحالي|المتبقي|إجمالي المبلغ المستحق|المبلغ المستحق|الحد الائتماني|Available Balance|Current Balance|Remaining Balance|Total Amount Due|Amount Due|Credit Limit)$""", RegexOption.IGNORE_CASE)
-    private val CARD_LABEL_REGEX = Regex("""^(بطاقة ائتمانية|البطاقة|بطاقة|Card|Credit Card)$""", RegexOption.IGNORE_CASE)
-    private val ACCOUNT_LABEL_REGEX = Regex("""^(رقم الحساب|الحساب|Account|Account Number|IBAN|رقم الآيبان)$""", RegexOption.IGNORE_CASE)
-    private val MERCHANT_LABEL_REGEX = Regex("""^(Merchant|التاجر|المستفيد|لدى|من\s+الجهة)$""", RegexOption.IGNORE_CASE)
+    private val CARD_LABEL_REGEX = Regex("""^(بطاقة ائتمانية|البطاقة|بطاقة|Card|Credit Card|بطاقة مدى رقم|بطاقة مدى)$""", RegexOption.IGNORE_CASE)
+    private val ACCOUNT_LABEL_REGEX = Regex("""^(رقم الحساب|الحساب|خصمت من حساب|الى|إلى حساب|إلى|من حساب|Account|Debited from account|Credited to account)$""", RegexOption.IGNORE_CASE)
+    private val MERCHANT_LABEL_REGEX = Regex("""^(Merchant|التاجر|المستفيد|لدى|في|Name|اسم المرسل)$""", RegexOption.IGNORE_CASE)
+    private val BANK_ACCOUNT_LABEL_REGEX = Regex("""^(رقم الحساب|الحساب|خصمت من حساب|الى حساب|إلى حساب|الى|إلى|من حساب|Account|Debited from account|Credited to account)$""", RegexOption.IGNORE_CASE)
     private val CARD_DIGIT_REGEX = Regex("""^\*+(\d{4})$|^\d{4}$""")
     private val MONEY_REGEX = Regex("""^([A-Z]{2,3})?\s*([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*([A-Z]{2,3})?$""")
     private val TIME_REGEX = Regex("""(\d{1,2}):(\d{2})(?::(\d{2}))?""")
@@ -30,13 +31,22 @@ object LineBasedFieldParser {
         val rawLines = body.split(Regex(LINE_BREAK_REGEX))
         val lines = mutableListOf<ParsedLine>()
         for (raw in rawLines) {
-            val normalized = BankTextNormalizer.normalizeForParsing(raw).trim()
-            if (normalized.isEmpty()) continue
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) continue
+            val normalized = BankTextNormalizer.normalizeForParsing(trimmed)
             val split = splitLabelAndValue(normalized)
-            if (split.first.isEmpty() || split.second.isEmpty()) continue
-            lines += ParsedLine(split.first, split.second)
+            if (split.first.isEmpty()) continue
+            val originalSplit = splitLabelAndValue(trimmed)
+            val originalValue = if (originalSplit.first.isEmpty()) split.second else originalSplit.second
+            lines += ParsedLine(split.first, originalValue.trim())
         }
         return lines
+    }
+
+    fun lastFourFromValue(value: String): String? {
+        val digits = value.replace("*", "").trim()
+        return digits.lastOrNull { it.isDigit() }?.let { digits.takeLastWhile { it.isDigit() || it == '-' } }?.let { it.replace("-", "").takeLast(4) }
+            ?: digits.takeLast(4).takeIf { it.length == 4 && it.all(Char::isDigit) }
     }
 
     fun parseLabeledMoneyField(lines: List<ParsedLine>, labels: List<Regex>): BigDecimal? {
@@ -107,13 +117,19 @@ fun containsAmountLabel(label: String): Boolean {
     fun cardLabelRegex(): Regex = CARD_LABEL_REGEX
     fun accountLabelRegex(): Regex = ACCOUNT_LABEL_REGEX
     fun merchantLabelRegex(): Regex = MERCHANT_LABEL_REGEX
+    fun bankAccountLabelRegex(): Regex = BANK_ACCOUNT_LABEL_REGEX
 
     fun splitLabelAndValue(line: String): Pair<String, String> {
-        for (separator in LABEL_SEPARATORS.split("|").filter { it.isNotEmpty() }) {
-            val idx = line.indexOf(separator); if (idx in 1..(line.length - 1)) return line.substring(0, idx).trim() to line.substring(idx + separator.length).trim()
-        }
-        return "" to ""
+    for (separator in LABEL_SEPARATORS.split("|").filter { it.isNotEmpty() }) {
+        val idx = line.indexOf(separator); if (idx in 1..(line.length - 1)) return line.substring(0, idx).trim() to line.substring(idx + separator.length).trim()
     }
+    val colon = line.indexOf(':')
+    if (colon in 1..(line.length - 1)) return line.substring(0, colon).trim() to line.substring(colon + 1).trim()
+    // Lines without any separator are treated as label-only entries. This
+    // preserves multi-word labels like "شراء عبر الانترنت" so type-detection
+    // can match them later.
+    return line.trim() to ""
+}
 
     /** Parses a money literal; returns the BigDecimal plus any captured currency code. */
     private fun parseMoney(value: String): Pair<BigDecimal, String>? {

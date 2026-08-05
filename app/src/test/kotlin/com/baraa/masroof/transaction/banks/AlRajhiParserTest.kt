@@ -57,7 +57,7 @@ class AlRajhiParserTest {
         val p = AlRajhiParser()
         val result = p.parse(
             sender = "AlRajhi",
-            body = "شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
+            body = "Type: شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals(TransactionType.PURCHASE, result.transactionType)
@@ -99,7 +99,7 @@ class AlRajhiParserTest {
         val p = GenericBankSmsParser()
         val result: ParsedTransaction = p.parse(
             sender = "AlRajhi",
-            body = "Purchase of SAR 100 at Starbucks",
+            body = "Type: Purchase\nAmount: 100 SAR\nMerchant: Starbucks",
             smsTimestampMillis = 1_700_000_000_000L,
         )
         assertEquals("Generic", result.parserName)

@@ -8,9 +8,10 @@ class LineBasedFieldParserTest {
     @Test fun splitsLabeledLines() {
         val body = "شراء\nبمبلغ: 250 ريال\nالبطاقة: 1234\nالرصيد المتاح: 4500 ريال"
         val lines = LineBasedFieldParser.splitLines(body)
-        assertEquals(3, lines.size)
-        assertEquals("بمبلغ", lines[0].label)
-        assertEquals("250 ريال", lines[0].value)
+        assertEquals(4, lines.size)
+        assertEquals("شراء", lines[0].label)
+        assertEquals("بمبلغ", lines[1].label)
+        assertEquals("250 ريال", lines[1].value)
     }
     @Test fun amountLabelMatches() {
         assertTrue(LineBasedFieldParser.containsAmountLabel("Amount"))

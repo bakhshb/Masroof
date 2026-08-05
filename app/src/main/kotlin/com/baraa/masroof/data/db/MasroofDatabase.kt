@@ -36,8 +36,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         JournalEntryEntity::class,
         LedgerPostingEntity::class,
         AccountLinkRuleEntity::class,
+        AccountIdentifierEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -53,6 +54,7 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun financialSetupDao(): FinancialSetupDao
     abstract fun journalDao(): JournalDao
     abstract fun accountLinkRuleDao(): AccountLinkRuleDao
+    abstract fun accountIdentifierDao(): AccountIdentifierDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -315,6 +317,15 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /** v10 → v11 introduces account_identifiers with safe per-account last-four support. */
+        val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `account_identifiers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `accountId` INTEGER NOT NULL, `identifierType` TEXT NOT NULL, `normalizedValue` TEXT NOT NULL, `displayLabel` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_account_identifiers_normalizedValue` ON `account_identifiers` (`normalizedValue`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_account_identifiers_accountId` ON `account_identifiers` (`accountId`)")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -326,6 +337,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
+            MIGRATION_10_11,
         )
 
         fun build(context: Context): MasroofDatabase =
