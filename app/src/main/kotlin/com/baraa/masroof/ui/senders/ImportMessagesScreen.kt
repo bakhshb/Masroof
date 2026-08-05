@@ -71,7 +71,11 @@ import java.time.LocalDate
  * two-action CTA exactly as required by the spec.
  */
 @Composable
-fun ImportMessagesScreen(onClose: () -> Unit) {
+fun ImportMessagesScreen(
+    onClose: () -> Unit,
+    onShowImportedTransactions: () -> Unit = {},
+    onNavigateToAccounts: () -> Unit = {},
+) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
@@ -214,7 +218,7 @@ fun ImportMessagesScreen(onClose: () -> Unit) {
                 )
             }
 
-            commitResult?.let { CommitResultCard(it) }
+            commitResult?.let { CommitResultCard(it, onShowImportedTransactions, onNavigateToAccounts) }
         }
     }
 
@@ -375,7 +379,11 @@ private fun TrackingStartWarningCard(onChangeTrackingStart: () -> Unit, onImport
 }
 
 @Composable
-private fun CommitResultCard(r: SmsImportResult) {
+private fun CommitResultCard(
+    r: SmsImportResult,
+    onShowImportedTransactions: () -> Unit,
+    onNavigateToAccounts: () -> Unit,
+) {
     SectionHeader("اكتمل الاستيراد")
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
@@ -395,8 +403,8 @@ private fun CommitResultCard(r: SmsImportResult) {
         r.affectedAccounts.forEach { AffectedAccountCard(it) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-        SecondaryButton(label = "عرض العمليات المستوردة", onClick = {})
-        SecondaryButton(label = "العودة إلى الحسابات", onClick = {})
+        SecondaryButton(label = "عرض العمليات المستوردة", onClick = onShowImportedTransactions)
+        SecondaryButton(label = "العودة إلى الحسابات", onClick = onNavigateToAccounts)
     }
 }
 

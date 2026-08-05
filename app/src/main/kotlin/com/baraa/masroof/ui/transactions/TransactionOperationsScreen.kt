@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -12,18 +11,24 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.TransactionEntity
-import com.baraa.masroof.ledger.AccountLinkConfidence
 import com.baraa.masroof.ledger.TransactionPostingStatus
+import com.baraa.masroof.ui.sms.SmsPermissionRequiredBanner
+import com.baraa.masroof.ui.theme.PrimaryButton
+import com.baraa.masroof.ui.theme.SecondaryButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/**
+ * Operations tab. Always observes Room via Flow; never caches a stale
+ * balance or list. The canonical [com.baraa.masroof.data.repository.SmsImportOrchestrator]
+ * is the only path that creates new transactions.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionOperationsScreen() {
@@ -36,30 +41,26 @@ fun TransactionOperationsScreen() {
     val state = rememberSaveable(saver = TransactionOpsStateSaver) { TransactionOpsState() }
     var debouncedQuery by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(state.query) { delay(250); debouncedQuery = state.query }
-    val selectedAccounts = remember { mutableStateListOf<Long>() }
-    val selectedCategories = remember { mutableStateListOf<Long>() }
-    val filter = state.toFilter()
     var showImportScreen by remember { mutableStateOf(false) }
     val categoriesById = categories.associate { it.id to it.nameAr }
-    val visible = remember(transactions, accounts, filter, debouncedQuery) { TransactionSearchEngine.search(transactions, accounts, categoriesById, filter.copy(query = debouncedQuery)) }
-    val reviewQueue = visible.filter { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || it.accountLinkSource.name == "UNLINKED" }
-    var batchResult by remember { mutableStateOf<TransactionBatchReview.BatchOutcome?>(null) }
-    var rememberBatch by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
+    val visible = remember(transactions, accounts, state, debouncedQuery) {
+        TransactionSearchEngine.search(transactions, accounts, categoriesById, state.toFilter().copy(query = debouncedQuery))
+    }
     var showFilters by remember { mutableStateOf(false) }
-    var showAdvanced by remember { mutableStateOf(false) }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(topBar = {
         CenterAlignedTopAppBar(title = { Text("العمليات") }, actions = {
             IconButton(onClick = { showFilters = true }) { Icon(Icons.Filled.Search, "فلترة") }
-            IconButton(onClick = { showImportScreen = true }) { Icon(Icons.Filled.Add, "استيراد") }
             IconButton(onClick = { showAdvanced = !showAdvanced }) { Text(if (showAdvanced) "إخفاء التفاصيل الفنية" else "إظهار التفاصيل الفنية") }
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                com.baraa.masroof.ui.theme.PrimaryButton(label = "استيراد رسائل البنك", onClick = { showImportScreen = true }, modifier = Modifier.weight(1f))
-                com.baraa.masroof.ui.theme.SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
+                PrimaryButton(label = "استيراد رسائل البنك", onClick = { showImportScreen = true }, modifier = Modifier.weight(1f))
+                SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
             }
+            SmsPermissionRequiredBanner(onImportClick = { showImportScreen = true }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(state.query, { state.query = it; if (it.isEmpty()) debouncedQuery = "" }, label = { Text("بحث") }, modifier = Modifier.fillMaxWidth(), trailingIcon = { if (state.query.isNotEmpty()) IconButton(onClick = { state.query = ""; debouncedQuery = "" }) { Icon(Icons.Filled.Close, "مسح") } })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = state.needsReview, onClick = { state.needsReview = !state.needsReview }, label = { Text("يحتاج مراجعة") })
@@ -69,48 +70,18 @@ fun TransactionOperationsScreen() {
             }
             Text("عدد النتائج: ${visible.size}")
             if (visible.isEmpty()) Text("لا توجد نتائج مطابقة", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else if (reviewQueue.isNotEmpty()) Text("طابور المراجعة: ${reviewQueue.size}")
+            else Text("طابور المراجعة: ${visible.count { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW }}")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                items(reviewQueue, key = { it.id }) { tx -> ReviewCard(tx, accounts, categories, showAdvanced) }
-            }
-            val firstCompatibleAccount = accounts.firstOrNull { acc -> reviewQueue.all { tx -> (tx.sourceAccountId == acc.id || tx.destinationAccountId == acc.id) && com.baraa.masroof.ui.accounts.ManualLinkComposer.evaluate(tx, accounts, acc).canRemember } }
-            if (reviewQueue.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = {
-                        scope.launch {
-                            val outcome = TransactionBatchReview.postValidated(reviewQueue, accounts, app.ledgerRepository)
-                            batchResult = outcome
-                            if (rememberBatch && firstCompatibleAccount != null) {
-                                val decision = com.baraa.masroof.ui.accounts.ManualLinkComposer.batchDecision(reviewQueue, firstCompatibleAccount)
-                                if (decision.canRemember) reviewQueue.forEach { tx -> runCatching { app.transactionLinkingService.applyUserLink(tx, tx.sourceAccountId, tx.destinationAccountId, accounts, rememberForFuture = true) } }
-                                message = if (decision.canRemember) "تم حفظ الربط وسيُستخدم تلقائيًا للعمليات المشابهة مستقبلًا" else "تم تأكيد العمليات دون حفظ قاعدة للعمليات غير المتوافقة"
-                                rememberBatch = false
-                            } else if (rememberBatch) {
-                                message = "لا يمكن تذكر هذا الربط لأن بيانات العمليات غير متطابقة"
-                                rememberBatch = false
-                            }
-                        }
-                    }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("تأكيد المحدد") }
-                    OutlinedButton(onClick = { scope.launch { reviewQueue.forEach { app.transactionRepository.delete(it) } } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("تجاهل المحدد") }
-                }
-                if (firstCompatibleAccount != null) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(checked = rememberBatch, onCheckedChange = { rememberBatch = it })
-                    Text("تذكر هذا الربط للعمليات المشابهة")
-                }
-            }
-            batchResult?.let {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("تم اعتماد ${it.confirmed} عملية")
-                        Text("تعذر اعتماد ${it.failed} عملية")
-                        if (it.reviewRequired > 0) Text("تحتاج ${it.reviewRequired} عملية إلى مراجعة إضافية")
-                    }
-                }
+                items(visible, key = { it.id }) { tx -> ReviewCard(tx, accounts, categories, showAdvanced) }
             }
         }
     }
-    if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { state.snapshot(); showFilters = false })
-    if (showImportScreen) com.baraa.masroof.ui.senders.ImportMessagesScreen(onClose = { showImportScreen = false })
+    if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { showFilters = false })
+    if (showImportScreen) com.baraa.masroof.ui.senders.ImportMessagesScreen(
+        onClose = { showImportScreen = false },
+        onShowImportedTransactions = { showImportScreen = false },
+        onNavigateToAccounts = { showImportScreen = false },
+    )
 }
 
 @Composable
@@ -124,13 +95,12 @@ private fun ReviewCard(transaction: TransactionEntity, accounts: List<FinancialA
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(transaction.merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: transaction.transactionType.name, fontWeight = FontWeight.SemiBold)
+            Text(transaction.merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: transaction.transactionType.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text("${transaction.amount?.toPlainString().orEmpty()} ${transaction.currency.name}")
             Text(transaction.transactionDate?.toString().orEmpty())
             if (accountName != null) Text("الحساب: $accountName")
             if (categoryName != null) Text("التصنيف: $categoryName")
             Text("الثقة: ${transaction.accountLinkConfidence}% • $reviewReason")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = {}) { Text("تأكيد") }; OutlinedButton(onClick = {}) { Text("تعديل") }; TextButton(onClick = {}) { Text("تجاهل") } }
             if (showAdvanced) {
                 Text("تفاصيل فنية: parser=${transaction.transactionType} • link=${transaction.accountLinkSource.name} • status=${transaction.postingStatus.name} • tx#${transaction.id}")
                 Text("journalId=${transaction.linkedJournalEntryId ?: "-"}")

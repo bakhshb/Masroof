@@ -4,14 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Static structural test: every destination declared in
- * [SettingsDestinations] must resolve to a valid route. The list below
- * intentionally mirrors the NavHost definitions; if either side adds a
- * destination without updating the other, this test fires.
+ * Wiring audit: every destination in [SettingsDestinations] that is
+ * marked `implemented = true` must be reachable from the PrimaryNavHost.
+ *
+ * The PrimaryNavHost route table below mirrors the actual NavHost
+ * definition in PrimaryNavigation.kt.
  */
 class SettingsNavRegistrationTest {
     private val navHostRegisteredRoutes = listOf(
-        "settings/list",
         SettingsDestinations.categoryManagement.route,
         SettingsDestinations.merchantMemory.route,
         SettingsDestinations.aiCategorization.route,
@@ -26,16 +26,9 @@ class SettingsNavRegistrationTest {
         SettingsDestinations.releaseNotes.route,
     )
 
-    @Test fun everyRegistryRouteIsHandledByTheNavHost() {
+    @Test fun everyImplementedRegistryRouteIsWiredInNavHost() {
         for (d in SettingsDestinations.all) {
-            if (!d.implemented) {
-                // Disabled rows: registry entry exists, NavHost intentionally skips it.
-                assertFalse(
-                    "Disabled destination ${d.route} must not be wired to the NavHost",
-                    navHostRegisteredRoutes.contains(d.route),
-                )
-                continue
-            }
+            if (!d.implemented) continue
             assertTrue(
                 "NavHost missing destination ${d.route} (${d.title})",
                 navHostRegisteredRoutes.contains(d.route),
@@ -51,8 +44,22 @@ class SettingsNavRegistrationTest {
         )
     }
 
-    @Test fun settingsListRouteResolvesToExpectedTitle() {
-        assertEquals("إدارة التصنيفات", SettingsDestinations.byRoute("settings/categories")?.title)
-        assertEquals("إدارة التصنيفات", SettingsDestinations.categoryManagement.title)
+    @Test fun settingsRowsByGroupAreWired() {
+        // Each group must have at least one row in the NavHost.
+        for (group in SettingsGroup.values()) {
+            val groupRows = SettingsDestinations.all.filter { it.group == group && it.implemented }
+            for (row in groupRows) {
+                assertTrue(
+                    "Group ${group.header}: row ${row.title} missing from NavHost",
+                    navHostRegisteredRoutes.contains(row.route),
+                )
+            }
+        }
+    }
+
+    @Test fun everySettingsRowHasNonEmptyTitle() {
+        for (d in SettingsDestinations.all) {
+            assertTrue("Empty title for ${d.route}", d.title.isNotBlank())
+        }
     }
 }

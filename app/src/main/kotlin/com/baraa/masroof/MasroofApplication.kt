@@ -23,7 +23,6 @@ import com.baraa.masroof.data.repository.RoomCategoryRepository
 import com.baraa.masroof.data.repository.RoomFinancialAccountRepository
 import com.baraa.masroof.data.repository.RoomMerchantMemoryRepository
 import com.baraa.masroof.data.repository.RoomTransactionRepository
-import com.baraa.masroof.data.repository.TransactionImportService
 import com.baraa.masroof.data.repository.TransactionRepository
 import com.baraa.masroof.sms.SmsRepository
 import com.baraa.masroof.ledger.SystemAccountSeeder
@@ -70,24 +69,25 @@ class MasroofApplication : Application() {
 
     val smsRepository: SmsRepository by lazy { SmsRepository(this) }
 
-    val importService: TransactionImportService by lazy {
-        TransactionImportService(
-            transactionRepository = transactionRepository,
-            categoryRepository = categoryRepository,
-            merchantMemoryRepository = merchantMemoryRepository,
-            financialAccountRepository = financialAccountRepository,
-            onScanned = { diagnosticCollector.metrics.scannedCount++ },
-            onFinancialDetected = { diagnosticCollector.metrics.financialDetectedCount++ },
-            onParsed = { diagnosticCollector.metrics.parsedCount++ },
-            onParseFailure = { diagnosticCollector.metrics.parseFailureCount++ },
-            onExactDuplicate = { diagnosticCollector.metrics.exactDuplicatesCount++ },
-            onPossibleDuplicate = { diagnosticCollector.metrics.possibleDuplicatesCount++ },
-            onCommitted = { ids ->
-                val accounts = financialAccountRepository.getOwnedActive()
-                val setup = runCatching { kotlinx.coroutines.runBlocking { financialSetupRepository.load() } }.getOrNull()
-                ids.forEach { id -> transactionRepository.getById(id)?.let { transactionLinkingService.linkAndGenerate(it, accounts, setup?.trackingStartDate) } }
-            },
+    /**
+     * Onboarding persistence: single source of truth for
+     * `onboardingCompleted`, `onboardingVersion`, `lastCompletedStep`,
+     * and `completedAt`. UI consumers subscribe to its Flow rather than
+     * guessing from `FinancialSetup.setupCompleted`.
+     */
+    val onboardingRepository: com.baraa.masroof.ui.onboarding.OnboardingRepository by lazy {
+        com.baraa.masroof.ui.onboarding.SharedPreferencesOnboardingRepository(
+            context = this,
+            permissionStore = smsPermissionStore,
         )
+    }
+
+    /**
+     * Tracks the OS-level READ_SMS state. Decoupled from onboarding so
+     * revoking the permission never re-opens onboarding.
+     */
+    val smsPermissionStore: com.baraa.masroof.ui.onboarding.SmsPermissionStore by lazy {
+        com.baraa.masroof.ui.onboarding.SmsPermissionStore(this)
     }
 
     // -- AI ----------------------------------------------------------------

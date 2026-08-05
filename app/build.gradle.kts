@@ -84,4 +84,10 @@ dependencies {
     testImplementation(libs.junit)
     implementation(libs.androidx.security.crypto)
     implementation(libs.kotlinx.serialization.json)
+
+    // androidTest: instrumentation tests for the onboarding flow. These
+    // run on a real device — the headless build does not execute them.
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
 }

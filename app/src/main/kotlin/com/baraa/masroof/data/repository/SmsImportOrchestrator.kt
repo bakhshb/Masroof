@@ -282,12 +282,6 @@ class SmsImportOrchestrator(
         val previewBySms = scanPreview.perTransaction.associateBy { it.smsId }
 
         database.withTransaction {
-            // Mark SMS rows as scanned (no-op if not used) so the diagnostics
-            // collector can see the latest "imported at" timestamps.
-            try {
-                database.smsRepository().recordImportScan(nowProvider(), importedSms.size)
-            } catch (_: Throwable) { /* diagnostics-only, ignore */ }
-
             for (sms in importedSms) {
                 val previewItem = previewBySms[sms.id]
                 if (previewItem == null || previewItem.isDuplicate) {
@@ -526,24 +520,5 @@ class SmsImportOrchestrator(
             userConfirmed = false,
             exclusionReason = if (verdict.excludeFromSpending) verdict.reason else null,
         )
-    }
-}
-
-/**
- * Extension used only for diagnostics. The orchestrator records the
- * import-scan timestamp into a separate row so the dashboard can show
- * "آخر فحص" without writing anything to the transactions table.
- */
-private fun com.baraa.masroof.data.db.MasroofDatabase.smsRepository(): SmsRepositoryShim = SmsRepositoryShim(this)
-
-/**
- * Diagnostic-only shim around the DB; lives in this file to avoid
- * adding a new module.
- */
-class SmsRepositoryShim(private val database: com.baraa.masroof.data.db.MasroofDatabase) {
-    suspend fun recordImportScan(timestamp: Long, count: Int) {
-        // Best-effort; the room db itself doesn't carry a "lastScan" table.
-        // Hook reserved for the diagnostics collector to consume via
-        // SharedPreferences (handled outside this module).
     }
 }
