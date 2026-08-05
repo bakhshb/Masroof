@@ -31,7 +31,7 @@ import java.time.LocalDate
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransactionOperationsScreen() {
+fun TransactionOperationsScreen(onOpenImport: () -> Unit = {}) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
@@ -41,7 +41,7 @@ fun TransactionOperationsScreen() {
     val state = rememberSaveable(saver = TransactionOpsStateSaver) { TransactionOpsState() }
     var debouncedQuery by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(state.query) { delay(250); debouncedQuery = state.query }
-    var showImportScreen by remember { mutableStateOf(false) }
+    
     val categoriesById = categories.associate { it.id to it.nameAr }
     val visible = remember(transactions, accounts, state, debouncedQuery) {
         TransactionSearchEngine.search(transactions, accounts, categoriesById, state.toFilter().copy(query = debouncedQuery))
@@ -57,10 +57,10 @@ fun TransactionOperationsScreen() {
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrimaryButton(label = "استيراد رسائل البنك", onClick = { showImportScreen = true }, modifier = Modifier.weight(1f))
+                PrimaryButton(label = "استيراد رسائل البنك", onClick = onOpenImport, modifier = Modifier.weight(1f))
                 SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
             }
-            SmsPermissionRequiredBanner(onImportClick = { showImportScreen = true }, modifier = Modifier.fillMaxWidth())
+            SmsPermissionRequiredBanner(onImportClick = onOpenImport, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(state.query, { state.query = it; if (it.isEmpty()) debouncedQuery = "" }, label = { Text("بحث") }, modifier = Modifier.fillMaxWidth(), trailingIcon = { if (state.query.isNotEmpty()) IconButton(onClick = { state.query = ""; debouncedQuery = "" }) { Icon(Icons.Filled.Close, "مسح") } })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = state.needsReview, onClick = { state.needsReview = !state.needsReview }, label = { Text("يحتاج مراجعة") })
@@ -77,11 +77,6 @@ fun TransactionOperationsScreen() {
         }
     }
     if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { showFilters = false })
-    if (showImportScreen) com.baraa.masroof.ui.senders.ImportMessagesScreen(
-        onClose = { showImportScreen = false },
-        onShowImportedTransactions = { showImportScreen = false },
-        onNavigateToAccounts = { showImportScreen = false },
-    )
 }
 
 @Composable

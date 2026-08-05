@@ -36,8 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.MasroofApplication
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.data.db.FinancialAccount
+import com.baraa.masroof.ledger.AccountBalanceService
 import com.baraa.masroof.transaction.AccountNature
+import java.math.BigDecimal
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -57,6 +60,14 @@ fun AccountListScreen(onClose: () -> Unit) {
     LaunchedEffect(repo) { repo.observeAll().collectLatest { accounts = it } }
 
     val visibleAccounts = accounts.filter { it.systemAccountKey == null }
+
+    // Compute balances reactively from posted journals. Observe the
+    // Flow so every import refreshes the row.
+    val postedJournals by app.database.journalDao().observePosted().collectAsStateWithLifecycle(initialValue = emptyList())
+    val balances: Map<Long, BigDecimal> = remember(visibleAccounts, postedJournals.size) {
+        val today = LocalDate.now()
+        AccountBalanceService.balances(visibleAccounts, emptyList(), today)
+    }
 
     Scaffold(
         topBar = {
@@ -86,9 +97,9 @@ fun AccountListScreen(onClose: () -> Unit) {
                     val assets = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.ASSET }
                     val liabilities = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.LIABILITY }
                     val inactive = visibleAccounts.filterNot { it.isActive }
-                    accountGroup("الأصول", assets) { editing = it }
-                    accountGroup("الالتزامات", liabilities) { editing = it }
-                    accountGroup("الحسابات غير النشطة", inactive) { editing = it }
+                    accountGroup("الأصول", assets, balances) { editing = it }
+                    accountGroup("الالتزامات", liabilities, balances) { editing = it }
+                    accountGroup("الحسابات غير النشطة", inactive, balances) { editing = it }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
             }
@@ -157,15 +168,16 @@ fun AccountListScreen(onClose: () -> Unit) {
 private fun androidx.compose.foundation.lazy.LazyListScope.accountGroup(
     title: String,
     accounts: List<FinancialAccount>,
+    balances: Map<Long, BigDecimal>,
     onClick: (FinancialAccount) -> Unit,
 ) {
     if (accounts.isEmpty()) return
     item { Text(title, style = MaterialTheme.typography.titleMedium) }
-    items(accounts, key = { it.id }) { AccountRow(it) { onClick(it) } }
+    items(accounts, key = { it.id }) { AccountRow(it, balances[it.id]) { onClick(it) } }
 }
 
 @Composable
-private fun AccountRow(account: FinancialAccount, onClick: () -> Unit) {
+private fun AccountRow(account: FinancialAccount, calculatedBalance: BigDecimal?, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -177,7 +189,9 @@ private fun AccountRow(account: FinancialAccount, onClick: () -> Unit) {
                 account.lastFourDigits?.let { Text("•••• $it", style = MaterialTheme.typography.labelSmall) }
             }
             Text("${accountTypeLabel(account.accountType)} • ${account.currency.name}")
-            Text("الرصيد الافتتاحي: ${account.openingBalance.toPlainString()}")
+            Text("الرصيد الافتتاحي: ${account.openingBalance.toPlainString()} ر.س")
+            val balanceLabel = calculatedBalance?.let { "الرصيد المحسوب اليوم: ${it.toPlainString()} ر.س" } ?: "الرصيد المحسوب: —"
+            Text(balanceLabel, style = MaterialTheme.typography.titleMedium)
             if (!account.isActive) Text("غير نشط", color = MaterialTheme.colorScheme.error)
         }
     }

@@ -7,9 +7,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,6 +37,10 @@ import java.util.Locale
 fun MasroofTopAppBar(
     title: String,
     onBack: (() -> Unit)? = null,
+    onHome: (() -> Unit)? = null,
+    onTransactions: (() -> Unit)? = null,
+    onAccounts: (() -> Unit)? = null,
+    onMore: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     CenterAlignedTopAppBar(
@@ -44,7 +52,15 @@ fun MasroofTopAppBar(
                 }
             }
         },
-        actions = actions,
+        actions = {
+            Row {
+                onHome?.let { IconButton(onClick = it) { Icon(Icons.Filled.Home, contentDescription = "الرئيسية") } }
+                onTransactions?.let { IconButton(onClick = it) { Icon(Icons.Filled.Inbox, contentDescription = "العمليات") } }
+                onAccounts?.let { IconButton(onClick = it) { Icon(Icons.Filled.AccountBox, contentDescription = "الحسابات") } }
+                onMore?.let { IconButton(onClick = it) { Icon(Icons.Filled.MoreHoriz, contentDescription = "المزيد") } }
+                actions()
+            }
+        },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
             titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -275,7 +291,7 @@ fun PrimaryButton(label: String, onClick: () -> Unit, enabled: Boolean = true, m
 }
 
 @Composable
-fun SecondaryButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SecondaryButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = Spacing.touch),

@@ -21,6 +21,7 @@ enum class SettingsGroup(val header: String) {
     Categories("التصنيفات"),
     AccountsAndLinking("الحسابات والربط"),
     Diagnostics("الدعم والتشخيص"),
+    Messages("الرسائل الجديدة"),
 }
 
 object SettingsDestinations {
@@ -45,6 +46,10 @@ object SettingsDestinations {
     val testData = SettingsDestination("settings/test_data", "رسائل تجريبية", SettingsGroup.Diagnostics)
     val releaseNotes = SettingsDestination("settings/release_notes", "ملاحظات الإصدار", SettingsGroup.Diagnostics)
 
+    // Messages group
+    val autoSmsImport = SettingsDestination("settings/auto_sms_import", "استيراد رسائل البنك تلقائياً", SettingsGroup.Messages)
+    val transactionNotifications = SettingsDestination("settings/transaction_notifications", "إشعار عند تسجيل عملية جديدة", SettingsGroup.Messages)
+
     init {
         all = listOf(
             // Categories
@@ -53,6 +58,8 @@ object SettingsDestinations {
             accounts, linkTransactions, financialHistory, accountLinkRules, senderMappings,
             // Diagnostics
             diagnostics, testData, releaseNotes,
+            // Messages
+            autoSmsImport, transactionNotifications,
         )
     }
 

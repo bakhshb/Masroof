@@ -44,6 +44,7 @@ import java.time.ZoneId
 data class SmsImportResult(
     val scannedMessages: Int = 0,
     val recognizedTransactions: Int = 0,
+    val readyTransactions: Int = 0,
     val importedTransactions: Int = 0,
     val linkedTransactions: Int = 0,
     val postedTransactions: Int = 0,
@@ -64,9 +65,11 @@ data class SmsImportResult(
         val accountId: Long,
         val accountName: String,
         val openingBalance: BigDecimal,
+        val openingBalanceDate: java.time.LocalDate?,
         val totalCredits: BigDecimal,
         val totalDebits: BigDecimal,
         val calculatedBalance: BigDecimal,
+        val lastUpdatedAt: Long = 0L,
     )
 
     data class TransactionImportLog(
@@ -105,6 +108,15 @@ data class ScanPreview(
     val institutionGroups: List<InstitutionGroup> = emptyList(),
     val perTransaction: List<PreviewItem> = emptyList(),
 ) {
+    /**
+     * Recognized transactions that the user can commit now. This is the
+     * exclusive subset — recognized − (needsReview ∪ duplicate ∪
+     * beforeTrackingStart) — and never double-counts.
+     */
+    val readyCount: Int
+        get() = (recognizedTransactions - needsReviewTransactions - duplicateTransactions - beforeTrackingStartCount)
+            .coerceAtLeast(0)
+
     data class InstitutionGroup(
         val institutionName: String,
         val totalRecognized: Int,
@@ -317,6 +329,7 @@ class SmsImportOrchestrator(
                     continue
                 }
                 val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository)
+                val hasLinkedAccount = match.account != null && !match.needsReview
                 val linked = entity.copy(
                     sourceAccountId = if (match.destinationAccountCandidate != null) null else match.account?.id,
                     destinationAccountId = match.destinationAccountCandidate?.id ?: match.account?.id,
@@ -324,6 +337,10 @@ class SmsImportOrchestrator(
                     accountLinkConfidence = match.confidence,
                     accountLinkNeedsReview = match.needsReview,
                     needsReview = match.account == null || match.needsReview,
+                    postingStatus = if (hasLinkedAccount)
+                        com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW
+                    else
+                        com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
                 )
                 val txId = transactionRepository.insert(linked)
                 if (txId <= 0L) {
@@ -331,6 +348,21 @@ class SmsImportOrchestrator(
                     continue
                 }
                 imported++
+
+                // Per spec: NEEDS_REVIEW transactions must NOT affect balance
+                // until the user confirms them. Skip journal creation entirely.
+                if (!hasLinkedAccount) {
+                    reviewCount++
+                    log += SmsImportResult.TransactionImportLog(
+                        smsId = sms.id, sender = sms.sender, amount = linked.amount,
+                        transactionType = linked.transactionType.name,
+                        linkedAccountId = null, journalEntryId = null,
+                        debitAccountId = null, creditAccountId = null,
+                        postingStatus = "NEEDS_REVIEW",
+                        includedInCalculatedBalance = false,
+                    )
+                    continue
+                }
 
                 val source = ownedAccounts.firstOrNull { it.id == linked.sourceAccountId }
                 val destination = ownedAccounts.firstOrNull { it.id == linked.destinationAccountId }
@@ -349,14 +381,10 @@ class SmsImportOrchestrator(
                             ),
                         )
                         val postings = database.journalDao().getPostingsFor(journalId)
-                        if (linked.accountLinkNeedsReview || match.account == null) {
-                            reviewCount++
-                        } else {
-                            linkedCount++
-                        }
+                        linkedCount++
                         // Count this transaction as POSTED only when the journal
-                            // has at least one DEBIT and one CREDIT posting in the
-                            // matching currencies, to keep the structural invariant.
+                        // has at least one DEBIT and one CREDIT posting in the
+                        // matching currencies, to keep the structural invariant.
                         val currencies = postings.map { it.currency }.toSet()
                         val currencyBalanced = currencies.all { cur ->
                             val debits = postings.filter { it.postingSide == PostingSide.DEBIT && it.currency == cur }.sumOf { it.amount }
@@ -412,9 +440,11 @@ class SmsImportOrchestrator(
                             accountId = s.accountId,
                             accountName = s.accountDisplayLabel,
                             openingBalance = s.openingBalance,
+                            openingBalanceDate = s.openingBalanceDate,
                             totalCredits = s.totalCredits,
                             totalDebits = s.totalDebits,
                             calculatedBalance = s.calculatedBalance,
+                            lastUpdatedAt = s.lastRecalculationAt,
                         )
                     }
                 }
@@ -424,7 +454,7 @@ class SmsImportOrchestrator(
         SmsImportResult(
             scannedMessages = scanPreview.scannedMessages,
             recognizedTransactions = scanPreview.recognizedTransactions,
-            importedTransactions = imported,
+            readyTransactions = imported,
             linkedTransactions = linkedCount,
             postedTransactions = postedCount,
             needsReviewTransactions = reviewCount,
@@ -444,6 +474,28 @@ class SmsImportOrchestrator(
         if (sender.isNullOrBlank()) return false
         val s = sender.lowercase()
         return s.contains("bank") || s.contains("بنك") || s.length <= 6
+    }
+
+    /**
+     * Single-message entry point used by the SMS_RECEIVED receiver. This
+     * MUST call the canonical [scan] + [commit] pipeline so the manual
+     * import flow and the automatic import flow share one code path.
+     */
+    suspend fun processIncoming(
+        messages: List<SmsMessage>,
+        trackingStartDate: LocalDate? = null,
+    ): SmsImportResult {
+        if (messages.isEmpty()) return SmsImportResult.Empty
+        val preview = scan(messages, trackingStartDate)
+        if (preview.recognizedTransactions == 0) return SmsImportResult(
+            scannedMessages = preview.scannedMessages,
+            recognizedTransactions = 0,
+            unparsedMessages = preview.unparsedMessages,
+            nonFinancialMessages = preview.nonFinancialMessages,
+            trackingStartDateHint = trackingStartDate,
+            importedAt = nowProvider(),
+        )
+        return commit(preview, trackingStartDate, messages)
     }
 
     private fun buildEntity(

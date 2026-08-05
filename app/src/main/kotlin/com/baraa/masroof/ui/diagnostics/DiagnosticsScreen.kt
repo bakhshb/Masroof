@@ -164,6 +164,26 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
                     "${it.category}: ${it.message}"
                 } ?: stringResource(R.string.diagnostics_no_errors),
             )
+            // --- Receiver diagnostics (section L) ---
+            Text("استقبال الرسائل", style = MaterialTheme.typography.titleMedium)
+            DiagnosticsCard(title = "READ_SMS", value = if (s.smsPermissionGranted) "ممنوح" else "غير ممنوح")
+            val receiveSms = android.content.pm.PackageManager.PERMISSION_GRANTED ==
+                context.checkSelfPermission(android.Manifest.permission.RECEIVE_SMS)
+            DiagnosticsCard(title = "RECEIVE_SMS", value = if (receiveSms) "ممنوح" else "غير ممنوح")
+            val postNotifs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                android.content.pm.PackageManager.PERMISSION_GRANTED ==
+                    context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else true
+            DiagnosticsCard(title = "POST_NOTIFICATIONS", value = if (postNotifs) "ممنوح" else "غير ممنوح")
+            DiagnosticsCard(title = "استيراد الرسائل تلقائياً", value = if (app.developerPreferences.automaticSmsImportEnabled) "مفعّل" else "متوقف")
+            DiagnosticsCard(title = "إشعارات المعاملات", value = if (app.developerPreferences.transactionNotificationsEnabled) "مفعّلة" else "متوقفة")
+            DiagnosticsCard(title = "آخر تشغيل للمستقبل", value = if (app.developerPreferences.lastReceiverTriggerAt == 0L) "—" else java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(app.developerPreferences.lastReceiverTriggerAt)))
+            DiagnosticsCard(title = "آخر مرسل", value = app.developerPreferences.lastReceiverSender ?: "—")
+            DiagnosticsCard(title = "آخر نتيجة استيراد تلقائي", value = app.developerPreferences.lastReceiverResult ?: "—")
+            DiagnosticsCard(title = "آخر نتيجة إشعار", value = app.developerPreferences.lastNotificationResult ?: "—")
+            DiagnosticsCard(title = "عدد العمليات المستوردة تلقائياً", value = app.developerPreferences.autoImportedCount.toString())
+            DiagnosticsCard(title = "عدد العمليات التي تحتاج مراجعة", value = app.developerPreferences.autoNeedsReviewCount.toString())
+            DiagnosticsCard(title = "عدد المكررات", value = app.developerPreferences.autoDuplicateCount.toString())
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -181,6 +201,35 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
                     },
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.diagnostics_export)) }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            runCatching {
+                                val sample = com.baraa.masroof.diagnostics.FakeSmsSamples.samples.firstOrNull()
+                                if (sample != null) {
+                                    val synth = com.baraa.masroof.sms.SmsMessage(
+                                        id = -System.currentTimeMillis(),
+                                        sender = sample.sender,
+                                        body = sample.body,
+                                        timestamp = System.currentTimeMillis(),
+                                    )
+                                    val tracking = app.financialSetupRepository.load().let {
+                                        java.time.Instant.ofEpochMilli(it.trackingStartDate)
+                                            .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                                    }
+                                    val result = app.importOrchestrator.processIncoming(listOf(synth), tracking)
+                                    app.developerPreferences.lastReceiverTriggerAt = System.currentTimeMillis()
+                                    app.developerPreferences.lastReceiverSender = sample.sender
+                                    app.developerPreferences.lastReceiverResult = "imported=${result.importedTransactions} linked=${result.linkedTransactions} review=${result.needsReviewTransactions}"
+                                    app.developerPreferences.autoImportedCount += result.importedTransactions
+                                    app.developerPreferences.autoNeedsReviewCount += result.needsReviewTransactions
+                                    app.developerPreferences.autoDuplicateCount += result.duplicateTransactions
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text("اختبار استقبال رسالة جديدة") }
             }
         }
     }

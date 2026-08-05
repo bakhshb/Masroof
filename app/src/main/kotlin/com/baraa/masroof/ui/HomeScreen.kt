@@ -186,11 +186,10 @@ private fun TrackingStartSummary(date: LocalDate) {
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Row(Modifier.padding(Spacing.x4), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("بداية المتابعة المالية", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("الرصيد الافتتاحي في تاريخ " + date.format(fmt), style = FinancialTypography.merchant)
-            }
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+            Text("تاريخ الرصيد الافتتاحي", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("الرصيد الافتتاحي في ${date.format(fmt)}", style = FinancialTypography.merchant)
+            Text("هو التاريخ الذي يمثّل الرصيد الذي أدخلته للحساب. تُحتسب العمليات اللاحقة له للوصول إلى رصيد اليوم.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -199,7 +198,10 @@ private fun TrackingStartSummary(date: LocalDate) {
 private fun produceJournalsForMonth(app: MasroofApplication, month: YearMonth): androidx.compose.runtime.State<List<com.baraa.masroof.ledger.HistoricalFinancialSummary>> {
     val state = remember { mutableStateOf(emptyList<com.baraa.masroof.ledger.HistoricalFinancialSummary>()) }
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
-    LaunchedEffect(accounts, month) {
+    // Observe posted-journal Flow so new imports trigger an immediate
+    // balance refresh without depending on account-table changes.
+    val journalVersion by app.database.journalDao().observePosted().collectAsStateWithLifecycle(initialValue = emptyList())
+    LaunchedEffect(accounts, month, journalVersion.size) {
         if (accounts.isEmpty()) {
             state.value = emptyList()
         } else {

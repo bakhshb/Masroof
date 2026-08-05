@@ -328,4 +328,15 @@ class DiagnosticsBehaviorTest {
 internal class NoopSharedPreferencesDeveloperPreferences : DeveloperPreferences {
     override var showDevDetails: Boolean = false
     override var testDataMode: Boolean = false
+    override var automaticSmsImportEnabled: Boolean = false
+    override var transactionNotificationsEnabled: Boolean = false
+    override var needsReviewNotificationsOnly: Boolean = false
+    override var balanceInNotifications: Boolean = true
+    override var lastReceiverTriggerAt: Long = 0L
+    override var lastReceiverSender: String? = null
+    override var lastReceiverResult: String? = null
+    override var lastNotificationResult: String? = null
+    override var autoImportedCount: Int = 0
+    override var autoNeedsReviewCount: Int = 0
+    override var autoDuplicateCount: Int = 0
 }

@@ -27,6 +27,9 @@ import com.baraa.masroof.ui.diagnostics.TestDataModeScreen
 import com.baraa.masroof.ui.history.FinancialHistoryScreen
 import com.baraa.masroof.ui.merchants.MerchantMemoryScreen
 import com.baraa.masroof.ui.senders.SenderMappingsScreen
+import com.baraa.masroof.ui.senders.ImportMessagesScreen
+import com.baraa.masroof.ui.settings.AutoSmsImportSettingsScreen
+import com.baraa.masroof.ui.settings.NotificationsSettingsScreen
 import com.baraa.masroof.ui.transactions.TransactionOperationsScreen
 import com.baraa.masroof.ui.settings.SettingsDestination
 import com.baraa.masroof.ui.settings.SettingsDestinations
@@ -51,23 +54,23 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
     val currentRoute = currentEntry?.destination?.route
 
     Scaffold(bottomBar = {
-        val onPrimaryTab = currentRoute?.startsWith("primary/") == true
-        if (onPrimaryTab) {
-            NavigationBar {
-                PrimaryTab.values().forEach { entry ->
-                    NavigationBarItem(
-                        selected = currentRoute == "primary/${entry.name}",
-                        onClick = {
-                            navController.navigate("primary/${entry.name}") {
-                                popUpTo("primary/HOME") { inclusive = false; saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(entry.icon, entry.title) },
-                        label = { Text(entry.title) },
-                    )
-                }
+        NavigationBar {
+            PrimaryTab.values().forEach { entry ->
+                val route = "primary/${entry.name}"
+                val selected = currentRoute == route
+                NavigationBarItem(
+                    selected = selected,
+                    onClick = {
+                        if (selected) return@NavigationBarItem
+                        navController.navigate(route) {
+                            popUpTo("primary/HOME") { inclusive = false; saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    icon = { Icon(entry.icon, entry.title) },
+                    label = { Text(entry.title) },
+                )
             }
         }
     }) { padding ->
@@ -83,7 +86,22 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onOpenReview = { navController.navigate("primary/TRANSACTIONS") },
                 )
             }
-            composable("primary/TRANSACTIONS") { TransactionOperationsScreen() }
+            composable("primary/TRANSACTIONS") {
+                TransactionOperationsScreen(
+                    onOpenImport = { navController.navigate(ImportMessagesRoute) },
+                )
+            }
+            composable(ImportMessagesRoute) {
+                ImportMessagesScreen(
+                    onClose = { navController.navigateUp() },
+                    onHome = { navigateToPrimaryTab(navController, PrimaryTab.HOME) },
+                    onTransactions = { navigateToPrimaryTab(navController, PrimaryTab.TRANSACTIONS) },
+                    onAccounts = { navigateToPrimaryTab(navController, PrimaryTab.ACCOUNTS) },
+                    onMore = { navigateToPrimaryTab(navController, PrimaryTab.MORE) },
+                    onShowImportedTransactions = { navigateToPrimaryTab(navController, PrimaryTab.TRANSACTIONS) },
+                    onNavigateToAccounts = { navigateToPrimaryTab(navController, PrimaryTab.ACCOUNTS) },
+                )
+            }
             composable("primary/ACCOUNTS") { com.baraa.masroof.ui.accounts.AccountListScreen(onClose = {}) }
             composable("primary/MORE") {
                 MoreMenu(onSettings = { navController.navigate("settings/list") })
@@ -131,6 +149,15 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
             composable(SettingsDestinations.releaseNotes.route) {
                 ReleaseNotesScreen(versionName = "0.1.0-test", onClose = { navController.popBackStack() })
             }
+            composable(SettingsDestinations.autoSmsImport.route) {
+                AutoSmsImportSettingsScreen(
+                    onClose = { navController.popBackStack() },
+                    onRequestReceiveSms = { /* handled inside the screen via the activity launcher */ },
+                )
+            }
+            composable(SettingsDestinations.transactionNotifications.route) {
+                NotificationsSettingsScreen(onClose = { navController.popBackStack() })
+            }
         }
     }
 }
@@ -140,3 +167,20 @@ enum class PrimaryTab(val title: String, val icon: androidx.compose.ui.graphics.
 }
 
 private fun SettingsDestination.routeKey(): String = route
+
+/** Stable top-level route for the SMS import flow. */
+const val ImportMessagesRoute: String = "route/import_messages"
+
+/**
+ * Navigate to a primary bottom-nav tab. Pops the import / settings stack
+ * first so back navigation from HOME closes the app instead of returning
+ * to the import screen. Uses [restoreState] so each tab keeps its scroll
+ * position and form state.
+ */
+private fun navigateToPrimaryTab(navController: NavHostController, tab: PrimaryTab) {
+    navController.navigate("primary/${tab.name}") {
+        popUpTo("primary/HOME") { inclusive = false; saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}

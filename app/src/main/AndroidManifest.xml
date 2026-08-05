@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Read and receive SMS so the inbox reader can display device messages. -->
+    <!-- Read and receive SMS so the inbox reader can display device messages.
+         RECEIVE_SMS is required for the SMS_RECEIVED receiver that triggers
+         automatic import of new bank notifications. -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!-- POST_NOTIFICATIONS is requested only at runtime on Android 13+
+         when the user enables notifications in Settings. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
         INTERNET is used ONLY when the user explicitly enables a remote AI
@@ -59,6 +65,22 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/diagnostic_file_paths" />
         </provider>
+
+        <!--
+            Receives android.provider.Telephony.SMS_RECEIVED broadcasts and
+            routes every financial message through the canonical
+            SmsImportOrchestrator.processIncoming() path. BROADCAST_SMS is
+            a system-only signature permission; declaring it here restricts
+            who can send the broadcast.
+        -->
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -2,6 +2,7 @@ package com.baraa.masroof.sms
 
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -29,6 +30,26 @@ data class SmsImportRange(
     fun startMillis(zone: ZoneId = ZoneId.systemDefault()): Long = start.atZone(zone).toInstant().toEpochMilli()
     /** Exclusive end millis (for queries). */
     fun endMillis(zone: ZoneId = ZoneId.systemDefault()): Long = endExclusive.atZone(zone).toInstant().toEpochMilli()
+    /**
+     * The last fully-included calendar day. Always returns a [LocalDate]
+     * that is on or before today for a valid import range.
+     *
+     * The display rule: if [endExclusive] lands at midnight (start of
+     * next day), the last included day is the day before; otherwise the
+     * last included day is the day on which [endExclusive] falls.
+     *
+     * Examples:
+     *  - endExclusive = today.plusDays(1).atStartOfDay() → returns today.
+     *  - endExclusive = LocalDateTime.now() (06:30) → returns today.
+     *  - endExclusive = today.atTime(23, 59) → returns today.
+     */
+    val displayEndDate: LocalDate
+        get() = if (endExclusive.toLocalTime() == LocalTime.MIDNIGHT) {
+            endExclusive.toLocalDate().minusDays(1)
+        } else {
+            endExclusive.toLocalDate()
+        }
+
 
     companion object {
         const val QUICK_MONTH_START = "month-start"

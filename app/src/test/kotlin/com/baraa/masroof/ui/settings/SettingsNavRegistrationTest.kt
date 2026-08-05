@@ -24,6 +24,8 @@ class SettingsNavRegistrationTest {
         SettingsDestinations.diagnostics.route,
         SettingsDestinations.testData.route,
         SettingsDestinations.releaseNotes.route,
+        SettingsDestinations.autoSmsImport.route,
+        SettingsDestinations.transactionNotifications.route,
     )
 
     @Test fun everyImplementedRegistryRouteIsWiredInNavHost() {

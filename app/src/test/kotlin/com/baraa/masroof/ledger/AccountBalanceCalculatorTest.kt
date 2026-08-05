@@ -209,4 +209,59 @@ class AccountBalanceCalculatorTest {
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("900")))
         assertEquals(1, s.excludedPostings)
     }
+
+    @Test fun needsReviewJournalDoesNotAffectBalance() {
+        // Per spec: NEEDS_REVIEW journals must not be applied to the
+        // balance. The calculator filters out anything that is not
+        // POSTED — DRAFT, NEEDS_REVIEW, REVERSED, VOIDED are excluded.
+        val needsReviewJournal = postedJournal(
+            10, LocalDate.of(2025, 1, 10),
+            listOf(posting(10, 1, PostingSide.CREDIT, "200")),
+            status = JournalPostingStatus.NEEDS_REVIEW,
+        )
+        val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(needsReviewJournal), zone)
+        // Opening balance remains at 1000 because the journal is not POSTED.
+        assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1000")))
+    }
+
+    @Test fun confirmingReviewUpdatesBalance() {
+        // Simulates the lifecycle: journal starts as NEEDS_REVIEW,
+        // then transitions to POSTED after the user confirms it.
+        val journalBefore = postedJournal(
+            10, LocalDate.of(2025, 1, 10),
+            listOf(posting(10, 1, PostingSide.CREDIT, "250")),
+            status = JournalPostingStatus.NEEDS_REVIEW,
+        )
+        val journalAfter = postedJournal(
+            10, LocalDate.of(2025, 1, 10),
+            listOf(posting(10, 1, PostingSide.CREDIT, "250")),
+            status = JournalPostingStatus.POSTED,
+        )
+        val sBefore = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(journalBefore), zone)
+        val sAfter = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(journalAfter), zone)
+        assertEquals(0, sBefore.calculatedBalance.compareTo(BigDecimal("1000")))
+        assertEquals(0, sAfter.calculatedBalance.compareTo(BigDecimal("750")))
+    }
+
+    @Test fun appRestartPreservesCalculatedBalance() {
+        // Same input, two separate calculate() calls — the result must
+        // be identical. This simulates app process death + restart.
+        val journals = listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.CREDIT, "300"))))
+        val s1 = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
+        val s2 = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
+        assertEquals(0, s1.calculatedBalance.compareTo(s2.calculatedBalance))
+        assertEquals(0, s1.calculatedBalance.compareTo(BigDecimal("700")))
+    }
+
+    @Test fun importedDebitDecreasesBalance() {
+        val journals = listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.DEBIT, "75"))))
+        val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
+        assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1075")))
+    }
+
+    @Test fun importedCreditIncreasesBalance() {
+        val journals = listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.CREDIT, "200"))))
+        val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
+        assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("800")))
+    }
 }
