@@ -39,6 +39,7 @@ fun TransactionOperationsScreen() {
     val selectedAccounts = remember { mutableStateListOf<Long>() }
     val selectedCategories = remember { mutableStateListOf<Long>() }
     val filter = state.toFilter()
+    var showImportScreen by remember { mutableStateOf(false) }
     val categoriesById = categories.associate { it.id to it.nameAr }
     val visible = remember(transactions, accounts, filter, debouncedQuery) { TransactionSearchEngine.search(transactions, accounts, categoriesById, filter.copy(query = debouncedQuery)) }
     val reviewQueue = visible.filter { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || it.accountLinkSource.name == "UNLINKED" }
@@ -50,11 +51,15 @@ fun TransactionOperationsScreen() {
     Scaffold(topBar = {
         CenterAlignedTopAppBar(title = { Text("العمليات") }, actions = {
             IconButton(onClick = { showFilters = true }) { Icon(Icons.Filled.Search, "فلترة") }
-            IconButton(onClick = { scope.launch { /* trigger import */ } }) { Icon(Icons.Filled.Add, "استيراد") }
+            IconButton(onClick = { showImportScreen = true }) { Icon(Icons.Filled.Add, "استيراد") }
             IconButton(onClick = { showAdvanced = !showAdvanced }) { Text(if (showAdvanced) "إخفاء التفاصيل الفنية" else "إظهار التفاصيل الفنية") }
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.baraa.masroof.ui.theme.PrimaryButton(label = "استيراد رسائل البنك", onClick = { showImportScreen = true }, modifier = Modifier.weight(1f))
+                com.baraa.masroof.ui.theme.SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
+            }
             OutlinedTextField(state.query, { state.query = it; if (it.isEmpty()) debouncedQuery = "" }, label = { Text("بحث") }, modifier = Modifier.fillMaxWidth(), trailingIcon = { if (state.query.isNotEmpty()) IconButton(onClick = { state.query = ""; debouncedQuery = "" }) { Icon(Icons.Filled.Close, "مسح") } })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = state.needsReview, onClick = { state.needsReview = !state.needsReview }, label = { Text("يحتاج مراجعة") })
@@ -105,6 +110,7 @@ fun TransactionOperationsScreen() {
         }
     }
     if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { state.snapshot(); showFilters = false })
+    if (showImportScreen) com.baraa.masroof.ui.senders.ImportMessagesScreen(onClose = { showImportScreen = false })
 }
 
 @Composable

@@ -74,6 +74,13 @@ data class ImportSummary(
     val exactDuplicatesSkipped: Int,
     val possibleDuplicatesSkipped: Int,
     val possibleDuplicatesInserted: Int,
+    /**
+     * Items the user wanted to import that are dated **before** the
+     * current financial tracking start date. They are surfaced to the UI
+     * (so the user can label them as "view only" or extend the tracking
+     * start date) but are NEVER auto-posted by the commit step.
+     */
+    val beforeTrackingStart: Int = 0,
 ) {
     companion object {
         fun fromCounts(
@@ -84,6 +91,7 @@ data class ImportSummary(
             exactDuplicatesSkipped: Int,
             possibleDuplicatesSkipped: Int,
             possibleDuplicatesInserted: Int,
+            beforeTrackingStart: Int = 0,
         ) = ImportSummary(
             messagesScanned = messagesScanned,
             parsedSuccessfully = parsedSuccessfully,
@@ -92,6 +100,7 @@ data class ImportSummary(
             exactDuplicatesSkipped = exactDuplicatesSkipped,
             possibleDuplicatesSkipped = possibleDuplicatesSkipped,
             possibleDuplicatesInserted = possibleDuplicatesInserted,
+            beforeTrackingStart = beforeTrackingStart,
         )
     }
 }

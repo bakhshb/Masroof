@@ -10,6 +10,7 @@ import com.baraa.masroof.data.repository.ImportPreview
 import com.baraa.masroof.data.repository.ImportSummary
 import com.baraa.masroof.data.repository.TransactionImportService
 import com.baraa.masroof.data.repository.TransactionRepository
+import com.baraa.masroof.sms.SmsImportRange
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.sms.SmsRepository
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +70,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         _importState.value = ImportState.Scanning
         viewModelScope.launch {
             try {
-                val messages = withContext(Dispatchers.IO) { smsRepo.loadInbox() }
+                val messages = withContext(Dispatchers.IO) { smsRepo.loadInbox(SmsImportRange.default(java.time.LocalDate.now())) }
                 val result = withContext(Dispatchers.Default) { importService.preview(messages) }
                 _importState.value = ImportState.PreviewReady(result)
             } catch (t: Throwable) {

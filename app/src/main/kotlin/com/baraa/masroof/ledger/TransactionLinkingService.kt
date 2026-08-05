@@ -76,8 +76,24 @@ class TransactionLinkingService(
         AccountIdentifierType.SENDER_ALIAS -> "مرسل"
     }
 
-    suspend fun linkAndGenerate(transaction: TransactionEntity, accounts: List<FinancialAccount>): TransactionEntity {
+    suspend fun linkAndGenerate(transaction: TransactionEntity, accounts: List<FinancialAccount>, trackingStartDate: Long? = null): TransactionEntity {
         if (transaction.postingStatus == TransactionPostingStatus.POSTED || transaction.linkedJournalEntryId != null) return transaction
+        // Pre-tracking-start transactions are preserved but never auto-posted.
+        val beforeStart = trackingStartDate
+            ?.let { start -> java.time.Instant.ofEpochMilli(start).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+            ?.let { tracking -> transaction.transactionDate != null && transaction.transactionDate.isBefore(tracking) }
+            ?: false
+        if (beforeStart) {
+            val kept = transaction.copy(
+                needsReview = true,
+                userConfirmed = false,
+                exclusionReason = transaction.exclusionReason ?: "عملية قبل تاريخ بداية المتابعة",
+                postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
+                updatedAt = now(),
+            )
+            transactions.update(kept)
+            return kept
+        }
         val direct = AccountMatcher.match(transaction, accounts, identifierRepository)
         val remembered = if (direct.level == AccountLinkConfidence.UNMATCHED) rules?.find(transaction, accounts) else null
         val match = if (remembered == null) direct else AccountMatcher.Match(

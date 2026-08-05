@@ -15,6 +15,7 @@ import com.baraa.masroof.transaction.MerchantNormalizer
 import com.baraa.masroof.transaction.ParsedTransaction
 import com.baraa.masroof.transaction.TransactionFingerprint
 import java.math.BigDecimal
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Two-phase SMS import with **two-level duplicate detection** and full
@@ -179,14 +180,40 @@ class TransactionImportService(
         return PreviewResult(preview, items)
     }
 
-    suspend fun commit(preview: PreviewResult): ImportSummary {
-        val toInsert = preview.items
+    suspend fun commit(preview: PreviewResult, trackingStartDate: Long? = null): ImportSummary {
+        val now = now()
+        val trackingStart = trackingStartDate?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+        val beforeTrackingCount = AtomicInteger()
+        val partitioned = preview.items
             .filter { it.decision == DuplicateDecision.INSERT_ANYWAY }
             .mapNotNull { it.preparedEntity }
-        val insertedIds = transactionRepository.insertAll(toInsert)
+            .partition { entity ->
+                val date = entity.transactionDate
+                trackingStart != null && date != null && date.isBefore(trackingStart)
+            }
+        val beforeTracking = partitioned.first
+        val autoInsert = partitioned.second
+        beforeTrackingCount.set(beforeTracking.size)
+        // Pre-tracking items are preserved with explicit user-visible
+        // flags so the UI can render them, but they will never be auto-posted
+        // into journals until the user either confirms the tracking-start
+        // extension or marks the item view-only.
+        val insertedIds = if (beforeTracking.isEmpty()) {
+            transactionRepository.insertAll(autoInsert)
+        } else {
+            val (autoPosted, kept) = autoInsert.partition { it.userConfirmed }
+            val markedBeforeTracking = kept.map { entity ->
+                entity.copy(
+                    needsReview = true,
+                    userConfirmed = false,
+                    exclusionReason = "عملية قبل تاريخ بداية المتابعة",
+                )
+            }
+            transactionRepository.insertAll(autoPosted + markedBeforeTracking)
+        }
         val inserted = insertedIds.count { it != -1L }
         onCommitted(insertedIds.filter { it > 0L })
-        val ignoredAtDb = toInsert.size - inserted
+        val ignoredAtDb = autoInsert.size - inserted
 
         val exactDupSkipped = preview.items.count { it.status == ImportItemStatus.EXACT_DUPLICATE }
         val possibleDupInserted = preview.items.count {
@@ -206,6 +233,7 @@ class TransactionImportService(
             exactDuplicatesSkipped = exactDupSkipped,
             possibleDuplicatesSkipped = possibleDupSkipped + ignoredAtDb,
             possibleDuplicatesInserted = possibleDupInserted,
+            beforeTrackingStart = beforeTrackingCount.get(),
         )
     }
 

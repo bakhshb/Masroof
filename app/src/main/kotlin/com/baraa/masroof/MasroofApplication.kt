@@ -84,7 +84,8 @@ class MasroofApplication : Application() {
             onPossibleDuplicate = { diagnosticCollector.metrics.possibleDuplicatesCount++ },
             onCommitted = { ids ->
                 val accounts = financialAccountRepository.getOwnedActive()
-                ids.forEach { id -> transactionRepository.getById(id)?.let { transactionLinkingService.linkAndGenerate(it, accounts) } }
+                val setup = runCatching { kotlinx.coroutines.runBlocking { financialSetupRepository.load() } }.getOrNull()
+                ids.forEach { id -> transactionRepository.getById(id)?.let { transactionLinkingService.linkAndGenerate(it, accounts, setup?.trackingStartDate) } }
             },
         )
     }
@@ -205,6 +206,15 @@ class MasroofApplication : Application() {
 
     val accountLinkRuleRepository: AccountLinkRuleRepository by lazy { AccountLinkRuleRepository(database.accountLinkRuleDao()) }
     val accountIdentifierRepository: com.baraa.masroof.data.repository.AccountIdentifierRepository by lazy { com.baraa.masroof.data.repository.AccountIdentifierRepository(database.accountIdentifierDao(), database.financialAccountDao()) }
+    val senderInstitutionMappingRepository: com.baraa.masroof.data.repository.SenderInstitutionMappingRepository by lazy {
+        com.baraa.masroof.data.repository.RoomSenderInstitutionMappingRepository(
+            dao = database.senderInstitutionMappingDao(),
+            senderNormalizer = { sender -> com.baraa.masroof.ledger.FinancialInstitutionResolver.senderKey(sender) },
+        )
+    }
+    val institutionResolver: com.baraa.masroof.ledger.FinancialInstitutionResolver by lazy {
+        com.baraa.masroof.ledger.FinancialInstitutionResolver(database.senderInstitutionMappingDao())
+    }
     val systemAccountSeeder: SystemAccountSeeder by lazy { SystemAccountSeeder(database.financialAccountDao()) }
     val ledgerRepository: LedgerRepository by lazy { LedgerRepository(database) }
     val journalGenerationService: JournalGenerationService by lazy {

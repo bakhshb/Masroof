@@ -23,16 +23,24 @@ class SmsRepository(private val context: Context) {
     private val tag = "SmsRepository"
 
     /**
-     * Load the most recent inbox messages (newest first), capped at [limit].
+     * Load inbox messages inside the given [range], capped at [limit].
      * Each row is annotated with the bank-filter result AND a parsed
      * transaction (when applicable). UI layers can decide whether to show
      * or hide non-financial messages, and whether to render the structured
      * card or the raw body.
      *
+     * Messages outside the selected range are never returned.
+     *
      * @return list of messages, empty if the provider is unavailable or no rows match
      */
-    suspend fun loadInbox(limit: Int = DEFAULT_LIMIT): List<SmsMessage> =
-        withContext(Dispatchers.IO) {
+    suspend fun loadInbox(
+        range: SmsImportRange,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<SmsMessage> = withContext(Dispatchers.IO) {
+        val startMillis = range.startMillis()
+        // endExclusive for the SQL query is end-of-last-day; if [endExclusive]
+        // lands at start of next day, that already represents end-of-day.
+        val endMillis = range.endMillis()
             val resolver: ContentResolver = context.contentResolver
             val uri: Uri = Telephony.Sms.Inbox.CONTENT_URI
 
@@ -43,11 +51,13 @@ class SmsRepository(private val context: Context) {
                 Telephony.Sms.DATE,
             )
             val sortOrder = "${Telephony.Sms.DATE} DESC LIMIT $limit"
+            val selection = "${Telephony.Sms.DATE} >= ? AND ${Telephony.Sms.DATE} < ?"
+            val args = arrayOf(startMillis.toString(), endMillis.toString())
 
             val result = ArrayList<SmsMessage>()
             var cursor: Cursor? = null
             try {
-                cursor = resolver.query(uri, projection, null, null, sortOrder)
+                cursor = resolver.query(uri, projection, selection, args, sortOrder)
                 if (cursor == null) {
                     Log.w(tag, "ContentResolver returned null cursor")
                     return@withContext emptyList()
@@ -62,6 +72,7 @@ class SmsRepository(private val context: Context) {
                     val sender = if (addrIdx >= 0 && !cursor.isNull(addrIdx)) cursor.getString(addrIdx) else null
                     val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
                     val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
+                    if (date < startMillis || date >= endMillis) continue
                     val match = BankSmsFilter.classifyMessage(sender, body)
                     val parsed = BankParserRegistry.parse(sender, body, date.takeIf { it > 0L })
                     result.add(
@@ -75,7 +86,7 @@ class SmsRepository(private val context: Context) {
                         )
                     )
                 }
-                Log.d(tag, "Loaded ${result.size} messages (limit=$limit)")
+                Log.d(tag, "Loaded ${result.size} messages (range=${range.label})")
             } catch (security: SecurityException) {
                 // Permission revoked between check and query — return empty so UI can recover.
                 Log.e(tag, "READ_SMS permission missing while reading inbox", security)
