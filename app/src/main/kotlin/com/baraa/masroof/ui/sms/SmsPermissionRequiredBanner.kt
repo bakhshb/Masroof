@@ -5,20 +5,20 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +36,13 @@ import com.baraa.masroof.ui.theme.SecondaryButton
 /**
  * Inline banner shown **only** when READ_SMS is not currently granted.
  *
- * Crucially, this banner is **not** part of the onboarding flow. Once
- * onboarding has completed, revoking or never granting READ_SMS does
- * NOT redirect the user to onboarding — the main UI renders, and this
- * banner explains that the user must grant permission to import SMS.
+ * The actual Android permission state ([ContextCompat.checkSelfPermission])
+ * is the single source of truth. We DO NOT cache a permission-granted
+ * Boolean in any SavedStateHandle / onboarding state — re-checking
+ * [checkSelfPermission] on every ON_RESUME guarantees the banner
+ * disappears the moment the user grants the permission from Settings.
+ *
+ * When permission is granted, a compact status row is shown instead.
  */
 @Composable
 fun SmsPermissionRequiredBanner(
@@ -54,28 +57,59 @@ fun SmsPermissionRequiredBanner(
     ) == PackageManager.PERMISSION_GRANTED
 
     var granted by remember { mutableStateOf(checkGranted()) }
+    var permanentlyDenied by remember {
+        mutableStateOf(
+            !checkGranted() &&
+                (context as? android.app.Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false,
+        )
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) granted = checkGranted()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                granted = checkGranted()
+                permanentlyDenied = !granted &&
+                    (context as? android.app.Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (granted) return
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        granted = isGranted
+        permanentlyDenied = !isGranted &&
+            (context as? android.app.Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false
+    }
+
+    if (granted) {
+        // Compact status row only — no large banner.
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+            Text(
+                "إذن قراءة الرسائل مفعّل ✓",
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        return
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.errorContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("تم إيقاف إذن قراءة الرسائل. يجب إعادة منحه لاستخدام استيراد الرسائل.", color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+            Text("مطلوب إذن قراءة الرسائل", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onErrorContainer)
+            Text("يحتاج التطبيق إلى إذن قراءة الرسائل للتعرف على العمليات البنكية.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrimaryButton(label = "منح الصلاحية", onClick = onImportClick)
-                SecondaryButton(label = "فتح إعدادات التطبيق", onClick = {
+                PrimaryButton(label = "منح الصلاحية", onClick = { launcher.launch(Manifest.permission.READ_SMS) })
+                if (permanentlyDenied) SecondaryButton(label = "فتح إعدادات التطبيق", onClick = {
                     context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                 })
             }

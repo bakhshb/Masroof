@@ -61,12 +61,19 @@ fun AccountListScreen(onClose: () -> Unit) {
 
     val visibleAccounts = accounts.filter { it.systemAccountKey == null }
 
-    // Compute balances reactively from posted journals. Observe the
-    // Flow so every import refreshes the row.
+    // Compute balances reactively from posted journals. We observe the
+    // JournalDao's posted Flow + reload the postings via the
+    // AccountBalanceCalculator so balance changes flow into the UI
+    // without any cache.
     val postedJournals by app.database.journalDao().observePosted().collectAsStateWithLifecycle(initialValue = emptyList())
+    val allJournals = remember(postedJournals.size) {
+        runCatching {
+            kotlinx.coroutines.runBlocking { app.database.journalDao().getAllForRecalculation() }
+        }.getOrElse { emptyList() }
+    }
     val balances: Map<Long, BigDecimal> = remember(visibleAccounts, postedJournals.size) {
         val today = LocalDate.now()
-        AccountBalanceService.balances(visibleAccounts, emptyList(), today)
+        AccountBalanceService.balances(visibleAccounts, allJournals, today)
     }
 
     Scaffold(

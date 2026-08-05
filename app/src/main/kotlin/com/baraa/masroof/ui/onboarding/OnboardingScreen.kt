@@ -169,13 +169,23 @@ fun OnboardingScreen(
                         uiState.step = OnboardingStep.COMPLETION
                     }
                 }
-                OnboardingStep.COMPLETION -> CompletionStep(app, uiState) {
+                OnboardingStep.COMPLETION -> CompletionStep(app, uiState, onFinish = {
                     scope.launch {
+                        val accountId = persistOnboardingAccount(app, uiState)
+                        if (accountId == null) {
+                            // Account insert failed; do NOT mark onboarding complete.
+                            return@launch
+                        }
+                        // Verify the account is actually in Room by re-loading it.
+                        val reloaded = app.financialAccountRepository.getById(accountId)
+                        if (reloaded == null) {
+                            return@launch
+                        }
                         app.financialSetupRepository.save(setupFrom(uiState, completed = true))
                         repository.markCompleted()
                         onFinished()
                     }
-                }
+                })
             }
         }
     }
@@ -336,3 +346,37 @@ internal fun setupFrom(state: UiOnboardingState, completed: Boolean = false) = c
     setupCompletedAt = if (completed) System.currentTimeMillis() else 0L,
     defaultCurrency = state.currency,
 )
+
+/**
+ * Persist the account fields gathered during onboarding into Room.
+ * Returns the auto-generated accountId, or null if validation / insert
+ * failed. Called by [CompletionStep] BEFORE [OnboardingRepository.markCompleted]
+ * so the onboarding completion flag is never saved without an account.
+ */
+private suspend fun persistOnboardingAccount(app: MasroofApplication, state: UiOnboardingState): Long? {
+    // 1. Validate account name and type.
+    if (state.displayName.isBlank()) return null
+    val accountType = state.accountType
+    // 2. Validate opening balance amount.
+    val openingBalance = runCatching { java.math.BigDecimal(state.openingBalance) }.getOrNull() ?: return null
+    if (openingBalance.signum() < 0) return null
+    // 3. Validate opening balance date.
+    val openingDate = state.trackingDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    // 4. Insert account via the repository.
+    val accountId = app.financialAccountRepository.add(
+        displayName = state.displayName.trim(),
+        accountType = accountType,
+        institutionName = state.institution.trim().takeIf { it.isNotBlank() },
+        lastFourDigits = state.lastFour.takeIf { it.length == 4 && it.all(Char::isDigit) },
+        accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(accountType),
+        currency = state.currency,
+        openingBalance = openingBalance,
+        openingBalanceDate = openingDate,
+        includeInNetWorth = state.includeNetWorth,
+        includeInLiquidity = state.includeLiquidity,
+    )
+    if (accountId <= 0L) return null
+    // 5. Reload to confirm the row is actually persisted.
+    val reloaded = app.financialAccountRepository.getById(accountId) ?: return null
+    return reloaded.id
+}

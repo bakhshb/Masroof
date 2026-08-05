@@ -224,7 +224,7 @@ fun ImportMessagesScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
                     PrimaryButton(
-                        label = if (readyCount > 0) "استيراد $readyCount عملية جاهزة" else "لا توجد عمليات جاهزة",
+                        label = if (readyCount > 0) "استيراد $readyCount عملية" else "لا توجد عمليات جاهزة",
                         enabled = readyCount > 0 && phase == ImportPhase.Idle,
                         onClick = {
                             phase = ImportPhase.Committing
@@ -511,24 +511,32 @@ private fun OpeningBalanceEditorDialog(initial: LocalDate, onDismiss: () -> Unit
 
 @Composable
 private fun PermissionStatePanel(granted: Boolean, permanentlyDenied: Boolean, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
+    if (granted) {
+        // Compact status row only — no large banner.
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = FinancialShapes.medium,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+            Text(
+                "إذن قراءة الرسائل مفعّل ✓",
+                modifier = Modifier.padding(Spacing.x4),
+                style = FinancialTypography.merchant,
+            )
+        }
+        return
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = FinancialShapes.medium,
-        color = if (granted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer,
+        color = MaterialTheme.colorScheme.errorContainer,
     ) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-            Text(
-                if (granted) "تم منح إذن قراءة الرسائل"
-                else if (permanentlyDenied) "تم رفض الإذن. يمكنك منحه من إعدادات التطبيق"
-                else "لم يتم منح إذن قراءة الرسائل",
-                style = FinancialTypography.merchant,
-            )
-            Text("يحتاج التطبيق إلى إذن قراءة الرسائل للتعرف على العمليات البنكية واستيرادها. التطبيق يقرأ الرسائل فقط، ولن يرسل أو يعدل أو يحذف أي رسالة.", style = FinancialTypography.metadata)
-            if (!granted) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                    PrimaryButton(label = "السماح بقراءة الرسائل", onClick = onRequest)
-                    if (permanentlyDenied) SecondaryButton(label = "فتح إعدادات التطبيق", onClick = onOpenSettings)
-                }
+            Text("مطلوب إذن قراءة الرسائل", style = FinancialTypography.merchant, color = MaterialTheme.colorScheme.onErrorContainer)
+            Text("يحتاج التطبيق إلى إذن قراءة الرسائل للتعرف على العمليات البنكية.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onErrorContainer)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                PrimaryButton(label = "منح الصلاحية", onClick = onRequest)
+                if (permanentlyDenied) SecondaryButton(label = "فتح إعدادات التطبيق", onClick = onOpenSettings)
             }
         }
     }
