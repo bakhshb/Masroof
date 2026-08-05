@@ -44,8 +44,9 @@ import com.baraa.masroof.ui.settings.SettingsScreen
  *  - the settings sub-graph, reachable via `nav_primary/settings`, where
  *    every Settings row is bound to a real destination.
  *
- * Back navigation works because each settings destination invokes
- * `navController.popBackStack()` when its `onClose` callback fires.
+ * The bottom NavigationBar is rendered on every route. The home tab is
+ * highlighted even when the user is on the import screen because the
+ * import screen is logically part of the "العمليات" tab flow.
  */
 @Composable
 fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
@@ -57,16 +58,22 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
         NavigationBar {
             PrimaryTab.values().forEach { entry ->
                 val route = "primary/${entry.name}"
-                val selected = currentRoute == route
+                val selected = when {
+                    currentRoute == route -> true
+                    // The import screen is logically part of the
+                    // TRANSACTIONS tab; keep it highlighted.
+                    currentRoute == ImportMessagesRoute && entry == PrimaryTab.TRANSACTIONS -> true
+                    else -> false
+                }
                 NavigationBarItem(
                     selected = selected,
                     onClick = {
+                        android.util.Log.i(
+                            "PrimaryNav",
+                            "HOME_NAVIGATION_CLICKED currentRoute=$currentRoute targetRoute=$route",
+                        )
                         if (selected) return@NavigationBarItem
-                        navController.navigate(route) {
-                            popUpTo("primary/HOME") { inclusive = false; saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navigateToPrimaryTab(navController, entry)
                     },
                     icon = { Icon(entry.icon, entry.title) },
                     label = { Text(entry.title) },
@@ -172,13 +179,13 @@ private fun SettingsDestination.routeKey(): String = route
 const val ImportMessagesRoute: String = "route/import_messages"
 
 /**
- * Navigate to a primary bottom-nav tab. Pops the import / settings stack
+ * Switch to a primary bottom-nav tab. Pops the import / settings stack
  * first so back navigation from HOME closes the app instead of returning
- * to the import screen. Uses [restoreState] so each tab keeps its scroll
- * position and form state.
+ * to the import screen.
  */
 private fun navigateToPrimaryTab(navController: NavHostController, tab: PrimaryTab) {
-    navController.navigate("primary/${tab.name}") {
+    val route = "primary/${tab.name}"
+    navController.navigate(route) {
         popUpTo("primary/HOME") { inclusive = false; saveState = true }
         launchSingleTop = true
         restoreState = true

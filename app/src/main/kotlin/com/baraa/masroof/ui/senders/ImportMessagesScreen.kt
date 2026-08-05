@@ -12,9 +12,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -50,30 +55,42 @@ import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/** Typed import execution state. Surfaced to the UI in place of the
+ *  raw `SmsImportResult` so the user always sees a clear
+ *  Idle / Loading / Success / Failure signal. */
+sealed interface ImportExecutionResult {
+    data object Idle : ImportExecutionResult
+    data object Loading : ImportExecutionResult
+    data class Success(
+        val importedCount: Int,
+        val linkedCount: Int,
+        val postedCount: Int,
+        val affectedAccountIds: List<Long>,
+        val raw: SmsImportResult,
+    ) : ImportExecutionResult
+    data class Failure(
+        val userMessage: String,
+        val technicalMessage: String?,
+    ) : ImportExecutionResult
+}
+
 /**
- * The SMS import flow follows a strict scan → review → commit pipeline:
+ * The SMS import flow follows a strict scan → review → commit pipeline.
  *
  *   STEP 1 (scan):  user picks a quick option or a custom calendar range
  *                   and presses "فحص الرسائل". The orchestrator parses
  *                   every SMS, classifies, but writes nothing to Room.
  *                   The result is a [ScanPreview] showing the breakdown.
  *
- *   STEP 2 (commit): user presses "استيراد N عملية جاهزة". The
- *                   orchestrator opens ONE Room `withTransaction` block,
- *                   inserts every transaction, links it, posts the
- *                   journal + its postings, recomputes affected account
- *                   summaries, and returns the structured [SmsImportResult].
+ *   STEP 2 (commit): user presses "استيراد N عملية". The orchestrator
+ *                   opens ONE Room `withTransaction` block, inserts
+ *                   every transaction, links it, posts the journal +
+ *                   its postings, recomputes affected account
+ *                   summaries, and returns [ImportExecutionResult].
  *
- * After commit the screen shows the affected accounts with their
- * calculated balances and offers three navigation exits:
- *   - "عرض العمليات المستوردة" → Transactions tab
- *   - "عرض الحسابات المحدّثة" → Accounts tab
- *   - "العودة إلى الرئيسية"     → Home tab
- *
- * Navigation is wired through 5 callbacks so every exit path returns to
- * the main NavHost. Top back arrow uses `navigateUp`. The bottom
- * navigation bar is always visible because this screen is mounted at the
- * top level of the primary NavHost.
+ * The whole screen is a single scrollable Column so the import button
+ * is always reachable. The shared NavController is the one passed by
+ * the parent NavHost — we never create a second one here.
  */
 @Composable
 fun ImportMessagesScreen(
@@ -106,7 +123,7 @@ fun ImportMessagesScreen(
 
     var phase by remember { mutableStateOf(ImportPhase.Idle) }
     var scanPreview by remember { mutableStateOf<ScanPreview?>(null) }
-    var commitResult by remember { mutableStateOf<SmsImportResult?>(null) }
+    var importResult by remember { mutableStateOf<ImportExecutionResult>(ImportExecutionResult.Idle) }
     var lastLoadedMessages by remember { mutableStateOf<List<SmsMessage>>(emptyList()) }
     var showTrackEditDialog by remember { mutableStateOf(false) }
     var showLogOnlyConfirmation by remember { mutableStateOf(false) }
@@ -131,133 +148,202 @@ fun ImportMessagesScreen(
         }
     }
 
-    androidx.compose.material3.Scaffold(topBar = {
-        MasroofTopAppBar(
-            title = "استيراد رسائل البنك",
-            onBack = onClose,
-            onHome = onHome,
-            onTransactions = onTransactions,
-            onAccounts = onAccounts,
-            onMore = onMore,
-        )
-    }) { padding ->
+    androidx.compose.material3.Scaffold(
+        topBar = {
+            MasroofTopAppBar(
+                title = "استيراد رسائل البنك",
+                onBack = onClose,
+                onHome = onHome,
+                onTransactions = onTransactions,
+                onAccounts = onAccounts,
+                onMore = onMore,
+            )
+        },
+    ) { padding ->
+        val navBarBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(Spacing.x4),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.x3),
         ) {
-            PermissionStatePanel(
-                granted = permissionGranted,
-                permanentlyDenied = permissionPermanentlyDenied,
-                onRequest = { launcher.launch(Manifest.permission.READ_SMS) },
-                onOpenSettings = {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
-                },
-            )
-
-            if (!permissionGranted) {
-                Text("تعذر فحص الرسائل لأن إذن قراءة الرسائل غير ممنوح.", color = MaterialTheme.colorScheme.error, style = FinancialTypography.merchant)
-                return@Column
-            }
-
-            OpeningBalanceDateCard(
-                openingBalanceDate = openingBalanceDate,
-                onEdit = { showTrackEditDialog = true },
-            )
-
-            ImportRangeSection(
-                quickId = quickId,
-                onQuickIdChange = { quickId = it },
-                customFrom = customFrom,
-                customTo = customTo,
-                onCustomFromChange = { customFrom = it },
-                onCustomToChange = { customTo = it },
-            )
-
-            when (val p = phase) {
-                ImportPhase.Scanning -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("جارٍ فحص الرسائل", style = FinancialTypography.merchant)
-                    SecondaryButton(label = "إلغاء", onClick = { phase = ImportPhase.Idle })
-                }
-                ImportPhase.Committing -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("جارٍ استيراد العمليات", style = FinancialTypography.merchant)
-                }
-                ImportPhase.Idle -> {
-                    val range = resolveRange(quickId, today, customFrom, customTo)
-                    PrimaryButton(
-                        label = "فحص الرسائل",
-                        enabled = range != null && permissionGranted,
-                        onClick = {
-                            val resolvedRange = range ?: return@PrimaryButton
-                            scanPreview = null
-                            commitResult = null
-                            phase = ImportPhase.Scanning
-                            scope.launch {
-                                runCatching {
-                                    val messages = app.smsRepository.loadInbox(resolvedRange)
-                                    lastLoadedMessages = messages
-                                    scanPreview = app.importOrchestrator.scan(messages, openingBalanceDate)
-                                }.onFailure {
-                                    scanPreview = ScanPreview()
-                                }
-                                phase = ImportPhase.Idle
-                            }
-                        },
-                    )
-                }
-            }
-
-            scanPreview?.let { preview ->
-                ScanResultsCard(preview)
-                val readyCount = preview.readyCount
-                val reviewCount = preview.needsReviewTransactions
-                val beforeTracker = preview.beforeTrackingStartCount > 0
-                if (beforeTracker) {
-                    TrackingStartWarningCard(
-                        onChangeTrackingStart = { showTrackEditDialog = true },
-                        onImportAsLogOnly = { showLogOnlyConfirmation = true },
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                    PrimaryButton(
-                        label = if (readyCount > 0) "استيراد $readyCount عملية" else "لا توجد عمليات جاهزة",
-                        enabled = readyCount > 0 && phase == ImportPhase.Idle,
-                        onClick = {
-                            phase = ImportPhase.Committing
-                            scope.launch {
-                                commitResult = runCatching {
-                                    app.importOrchestrator.commit(
-                                        scanPreview = preview,
-                                        trackingStartDate = openingBalanceDate,
-                                        importedSms = lastLoadedMessages,
-                                    )
-                                }.getOrElse { SmsImportResult.Empty }
-                                phase = ImportPhase.Idle
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    SecondaryButton(
-                        label = if (reviewCount > 0) "مراجعة $reviewCount عملية" else "مراجعة",
-                        enabled = reviewCount > 0,
-                        onClick = onShowImportedTransactions,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            commitResult?.let {
-                CommitResultCard(
-                    it,
-                    onShowImportedTransactions = onShowImportedTransactions,
-                    onNavigateToAccounts = onNavigateToAccounts,
-                    onHome = onHome,
+            Column(
+                modifier = Modifier.padding(horizontal = Spacing.x4, vertical = Spacing.x3),
+                verticalArrangement = Arrangement.spacedBy(Spacing.x3),
+            ) {
+                PermissionStatePanel(
+                    granted = permissionGranted,
+                    permanentlyDenied = permissionPermanentlyDenied,
+                    onRequest = { launcher.launch(Manifest.permission.READ_SMS) },
+                    onOpenSettings = {
+                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                    },
                 )
+
+                if (!permissionGranted) {
+                    Text("تعذر فحص الرسائل لأن إذن قراءة الرسائل غير ممنوح.", color = MaterialTheme.colorScheme.error, style = FinancialTypography.merchant)
+                    return@Column
+                }
+
+                OpeningBalanceDateCard(
+                    openingBalanceDate = openingBalanceDate,
+                    onEdit = { showTrackEditDialog = true },
+                )
+
+                ImportRangeSection(
+                    quickId = quickId,
+                    onQuickIdChange = { quickId = it },
+                    customFrom = customFrom,
+                    customTo = customTo,
+                    onCustomFromChange = { customFrom = it },
+                    onCustomToChange = { customTo = it },
+                )
+
+                when (val p = phase) {
+                    ImportPhase.Scanning -> {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text("جارٍ فحص الرسائل", style = FinancialTypography.merchant)
+                        SecondaryButton(label = "إلغاء", onClick = { phase = ImportPhase.Idle })
+                    }
+                    ImportPhase.Committing -> {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text("جارٍ استيراد العمليات", style = FinancialTypography.merchant)
+                    }
+                    ImportPhase.Idle -> {
+                        val range = resolveRange(quickId, today, customFrom, customTo)
+                        PrimaryButton(
+                            label = "فحص الرسائل",
+                            enabled = range != null && permissionGranted,
+                            onClick = {
+                                val resolvedRange = range ?: return@PrimaryButton
+                                scanPreview = null
+                                importResult = ImportExecutionResult.Idle
+                                phase = ImportPhase.Scanning
+                                scope.launch {
+                                    runCatching {
+                                        val messages = app.smsRepository.loadInbox(resolvedRange)
+                                        lastLoadedMessages = messages
+                                        scanPreview = app.importOrchestrator.scan(messages, openingBalanceDate)
+                                    }.onFailure {
+                                        scanPreview = ScanPreview()
+                                        android.util.Log.w("SmsImport", "scan failed", it)
+                                    }
+                                    phase = ImportPhase.Idle
+                                }
+                            },
+                        )
+                    }
+                }
+
+                scanPreview?.let { preview ->
+                    ScanResultsCard(preview)
+                    val readyCount = preview.readyCount
+                    val reviewCount = preview.needsReviewTransactions
+                    val beforeTracker = preview.beforeTrackingStartCount > 0
+                    if (beforeTracker) {
+                        TrackingStartWarningCard(
+                            onChangeTrackingStart = { showTrackEditDialog = true },
+                            onImportAsLogOnly = { showLogOnlyConfirmation = true },
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                        PrimaryButton(
+                            label = if (readyCount > 0) "استيراد $readyCount عملية" else "لا توجد عمليات جاهزة",
+                            enabled = readyCount > 0 && phase == ImportPhase.Idle && importResult !is ImportExecutionResult.Loading,
+                            onClick = {
+                                if (readyCount <= 0) return@PrimaryButton
+                                val snapshot = preview
+                                if (snapshot.recognizedTransactions == 0) return@PrimaryButton
+                                // Real import action — call the canonical
+                                // SmsImportOrchestrator.commit path. Never
+                                // re-scan or replace with a fake result.
+                                android.util.Log.i(
+                                    "SmsImport",
+                                    "SMS_IMPORT_BUTTON_CLICKED readyCount=$readyCount phase=$phase importResult=$importResult",
+                                )
+                                importResult = ImportExecutionResult.Loading
+                                phase = ImportPhase.Committing
+                                scope.launch {
+                                    val outcome = runCatching {
+                                        app.importOrchestrator.commit(
+                                            scanPreview = snapshot,
+                                            trackingStartDate = openingBalanceDate,
+                                            importedSms = lastLoadedMessages,
+                                        )
+                                    }
+                                    importResult = outcome.fold(
+                                        onSuccess = { result ->
+                                            if (result.importedTransactions > 0) {
+                                                android.util.Log.i(
+                                                    "SmsImport",
+                                                    "SMS_IMPORT_COMMIT_SUCCESS imported=${result.importedTransactions} linked=${result.linkedTransactions} posted=${result.postedTransactions} affected=${result.updatedAccountIds.size} accounts=${result.affectedAccounts.size}",
+                                                )
+                                                ImportExecutionResult.Success(
+                                                    importedCount = result.importedTransactions,
+                                                    linkedCount = result.linkedTransactions,
+                                                    postedCount = result.postedTransactions,
+                                                    affectedAccountIds = result.updatedAccountIds,
+                                                    raw = result,
+                                                )
+                                            } else {
+                                                ImportExecutionResult.Failure(
+                                                    userMessage = "لم يتم استيراد أي عملية. تحقق من البيانات وحاول مجدداً.",
+                                                    technicalMessage = "commit produced 0 imported transactions",
+                                                )
+                                            }
+                                        },
+                                        onFailure = { t ->
+                                            android.util.Log.e("SmsImport", "SMS_IMPORT_COMMIT_FAILED", t)
+                                            ImportExecutionResult.Failure(
+                                                userMessage = "تعذر استيراد العمليات. حاول مجدداً.",
+                                                technicalMessage = t.message ?: t.javaClass.simpleName,
+                                            )
+                                        },
+                                    )
+                                    phase = ImportPhase.Idle
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        SecondaryButton(
+                            label = if (reviewCount > 0) "مراجعة $reviewCount عملية" else "إلغاء نتائج الفحص",
+                            enabled = reviewCount > 0 || scanPreview != null,
+                            onClick = if (reviewCount > 0) onShowImportedTransactions else {
+                                {
+                                    scanPreview = null
+                                    importResult = ImportExecutionResult.Idle
+                                    phase = ImportPhase.Idle
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                when (val r = importResult) {
+                    is ImportExecutionResult.Success -> {
+                        CommitResultCard(
+                            result = r.raw,
+                            onShowImportedTransactions = onShowImportedTransactions,
+                            onNavigateToAccounts = onNavigateToAccounts,
+                            onHome = onHome,
+                        )
+                    }
+                    is ImportExecutionResult.Failure -> {
+                        FailureCard(r)
+                        PrimaryButton(label = "إعادة المحاولة", onClick = {
+                            importResult = ImportExecutionResult.Idle
+                        })
+                    }
+                    is ImportExecutionResult.Loading, ImportExecutionResult.Idle -> Unit
+                }
             }
+            // Bottom inset so the final buttons are never under the
+            // bottom navigation bar.
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.padding(bottom = navBarBottomInset + 24.dp),
+            )
         }
     }
 
@@ -357,7 +443,6 @@ private fun ImportRangeSection(
                 Text("تاريخ النهاية يجب أن يكون بعد البداية.", color = MaterialTheme.colorScheme.error)
             }
         }
-        // silence unused
         if (range == null) Text("حدد فترة صحيحة أولاً", color = MaterialTheme.colorScheme.error)
     }
 }
@@ -434,7 +519,7 @@ private fun TrackingStartWarningCard(onChangeTrackingStart: () -> Unit, onImport
 
 @Composable
 private fun CommitResultCard(
-    r: SmsImportResult,
+    result: SmsImportResult,
     onShowImportedTransactions: () -> Unit,
     onNavigateToAccounts: () -> Unit,
     onHome: () -> Unit,
@@ -442,25 +527,35 @@ private fun CommitResultCard(
     SectionHeader("اكتمل الاستيراد")
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
-            BulletRow("تم فحص", "${r.scannedMessages} رسالة")
-            BulletRow("تم التعرف على", "${r.recognizedTransactions} عملية")
-            BulletRow("تم استيراد", "${r.importedTransactions} عملية")
-            BulletRow("تم ربط", "${r.linkedTransactions} عملية")
-            BulletRow("تم إنشاء قيود مالية لـ", "${r.postedTransactions} عملية")
-            BulletRow("تحتاج مراجعة", "${r.needsReviewTransactions} عملية")
-            BulletRow("عمليات مكررة", "${r.duplicateTransactions}")
-            BulletRow("عمليات قبل تاريخ الرصيد الافتتاحي", "${r.beforeTrackingStartCount}")
-            BulletRow("تم تحديث", "${r.updatedAccountIds.size} حساب")
+            BulletRow("تم استيراد", "${result.importedTransactions} عملية")
+            BulletRow("تم ربط", "${result.linkedTransactions} عملية")
+            BulletRow("تم إنشاء قيود مالية لـ", "${result.postedTransactions} عملية")
+            BulletRow("تم تحديث", "${result.updatedAccountIds.size} حسابات")
+            BulletRow("تحتاج مراجعة", "${result.needsReviewTransactions} عملية")
         }
     }
-    if (r.affectedAccounts.isNotEmpty()) {
+    if (result.affectedAccounts.isNotEmpty()) {
         SectionHeader("الحسابات المحدّثة")
-        r.affectedAccounts.forEach { AffectedAccountCard(it) }
+        result.affectedAccounts.forEach { AffectedAccountCard(it) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2), modifier = Modifier.fillMaxWidth()) {
         SecondaryButton(label = "عرض العمليات المستوردة", onClick = onShowImportedTransactions, modifier = Modifier.weight(1f))
-        SecondaryButton(label = "عرض الحسابات المحدّثة", onClick = onNavigateToAccounts, modifier = Modifier.weight(1f))
-        PrimaryButton(label = "العودة إلى الرئيسية", onClick = onHome, modifier = Modifier.weight(1f))
+        SecondaryButton(label = "العودة إلى الرئيسية", onClick = onHome, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun FailureCard(failure: ImportExecutionResult.Failure) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text("تعذر استيراد العمليات", style = FinancialTypography.merchant, color = MaterialTheme.colorScheme.onErrorContainer)
+            Text(failure.userMessage, style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onErrorContainer)
+            failure.technicalMessage?.let { Text("السبب: $it", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onErrorContainer) }
+        }
     }
 }
 
@@ -474,7 +569,6 @@ private fun AffectedAccountCard(a: SmsImportResult.AffectedAccountSummary) {
             BulletRow("المبالغ الداخلة", "${a.totalCredits.toPlainString()} ر.س")
             BulletRow("المبالغ الخارجة", "${a.totalDebits.toPlainString()} ر.س")
             BulletRow("الرصيد المحسوب اليوم", "${a.calculatedBalance.toPlainString()} ر.س")
-            Text("آخر تحديث: ${java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT, java.util.Locale("ar")).format(java.util.Date(a.lastUpdatedAt))}", style = FinancialTypography.metadata)
         }
     }
 }
@@ -512,7 +606,6 @@ private fun OpeningBalanceEditorDialog(initial: LocalDate, onDismiss: () -> Unit
 @Composable
 private fun PermissionStatePanel(granted: Boolean, permanentlyDenied: Boolean, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
     if (granted) {
-        // Compact status row only — no large banner.
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = FinancialShapes.medium,
