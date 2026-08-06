@@ -9,7 +9,10 @@ enum class AccountIdentifierType { ACCOUNT_LAST4, CREDIT_CARD_LAST4, DEBIT_CARD_
 @Entity(
     tableName = "account_identifiers",
     indices = [
-        Index(value = ["normalizedValue"], unique = true),
+        // Sender aliases legitimately belong to several accounts at one bank.
+        // Uniqueness is per account/type/value; cross-account identifier
+        // ambiguity is handled as a reviewable domain condition.
+        Index(value = ["accountId", "identifierType", "normalizedValue"], unique = true),
         Index(value = ["accountId"]),
     ],
 )

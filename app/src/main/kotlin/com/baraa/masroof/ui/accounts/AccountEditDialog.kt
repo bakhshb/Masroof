@@ -222,6 +222,9 @@ fun AccountEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                existing?.let { account ->
+                    IdentifiersSection(accountId = account.id, accountType = account.accountType)
+                }
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },

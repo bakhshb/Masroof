@@ -120,7 +120,7 @@ fun AccountListScreen(onClose: () -> Unit) {
             onDismiss = { adding = false },
             onSave = { draft ->
                 scope.launch {
-                    repo.add(
+                    val id = repo.add(
                         displayName = draft.displayName,
                         accountType = draft.accountType,
                         institutionName = draft.institutionName,
@@ -135,6 +135,9 @@ fun AccountListScreen(onClose: () -> Unit) {
                         notes = draft.notes,
                     )
                     adding = false
+                    // Account IDs are generated only after persistence. Reopen
+                    // the active editor so the user can bind a real SMS now.
+                    editing = repo.getById(id)
                 }
             },
         )

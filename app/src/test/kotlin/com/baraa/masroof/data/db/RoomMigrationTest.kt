@@ -60,9 +60,19 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration13to14PreservesIdentifiersAndAllowsSharedSenderAliases() {
+        assertEquals(13, MasroofDatabase.MIGRATION_13_14.startVersion)
+        assertEquals(14, MasroofDatabase.MIGRATION_13_14.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("INSERT INTO `account_identifiers_new`"))
+        assertTrue(source.contains("`accountId`, `identifierType`, `normalizedValue`"))
+        assertFalse(source.contains("Index(value = [\"normalizedValue\"], unique = true)"))
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
-        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6")
+        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6", "13->14")
         val missing = expected - versions.toSet()
         assertTrue(
             "ALL_MIGRATIONS missing $missing (was: $versions)",

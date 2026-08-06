@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun IdentifiersSection(
     accountId: Long,
+    accountType: com.baraa.masroof.transaction.AccountType,
     onPossibleConflict: (IdentifierAddOutcome) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -36,14 +37,16 @@ fun IdentifiersSection(
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<AccountIdentifierEntity>>(emptyList()) }
     var showAdd by remember { mutableStateOf(false) }
+    var showSmsBinding by remember { mutableStateOf(false) }
     LaunchedEffect(accountId) {
         repo.observeByAccount(accountId).collectLatest { items = it }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("معرفات الحساب", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = { showAdd = true }) { Text("إضافة معرف") }
+            TextButton(onClick = { showAdd = true }) { Text("إدخال المعرفات يدويًا") }
         }
+        TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) { Text("ربط الحساب برسالة بنكية") }
         if (items.isEmpty()) Text("لا توجد معرفات بعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
         items.forEach { identifier ->
             IdentifierRow(identifier = identifier, onToggle = { active ->
@@ -52,6 +55,7 @@ fun IdentifiersSection(
                 scope.launch { repo.delete(identifier) }
             })
         }
+        if (showSmsBinding) AccountSmsBindingDialog(accountId, accountType) { showSmsBinding = false }
         if (showAdd) {
             AddIdentifierDialog(
                 accountId = accountId,

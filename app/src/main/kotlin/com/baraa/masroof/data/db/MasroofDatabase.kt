@@ -39,7 +39,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AccountIdentifierEntity::class,
         SenderInstitutionMappingEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -350,6 +350,36 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v13 → v14 permits one sender alias to belong to multiple accounts.
+         * The table rebuild is SQLite's safe way to replace the former global
+         * normalizedValue uniqueness constraint; every row is copied verbatim.
+         */
+        val MIGRATION_13_14: Migration = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `account_identifiers_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `accountId` INTEGER NOT NULL,
+                        `identifierType` TEXT NOT NULL,
+                        `normalizedValue` TEXT NOT NULL,
+                        `displayLabel` TEXT NOT NULL,
+                        `isActive` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""INSERT INTO `account_identifiers_new`
+                    (`id`,`accountId`,`identifierType`,`normalizedValue`,`displayLabel`,`isActive`,`createdAt`,`updatedAt`)
+                    SELECT `id`,`accountId`,`identifierType`,`normalizedValue`,`displayLabel`,`isActive`,`createdAt`,`updatedAt`
+                    FROM `account_identifiers`""".trimIndent())
+                db.execSQL("DROP TABLE `account_identifiers`")
+                db.execSQL("ALTER TABLE `account_identifiers_new` RENAME TO `account_identifiers`")
+                db.execSQL("CREATE UNIQUE INDEX `index_account_identifiers_accountId_identifierType_normalizedValue` ON `account_identifiers` (`accountId`, `identifierType`, `normalizedValue`)")
+                db.execSQL("CREATE INDEX `index_account_identifiers_accountId` ON `account_identifiers` (`accountId`)")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -364,6 +394,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_10_11,
             MIGRATION_11_12,
             MIGRATION_12_13,
+            MIGRATION_13_14,
         )
 
         fun build(context: Context): MasroofDatabase =
