@@ -26,6 +26,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
+import com.baraa.masroof.ui.accounts.AccountSmsBindingDialog
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
@@ -88,6 +89,7 @@ fun OnboardingScreen(
     val app = context.applicationContext as MasroofApplication
     val uiState = rememberSaveable(saver = OnboardingSaver) { UiOnboardingState() }
     val scope = rememberCoroutineScope()
+    var pendingSmsBindingAccount by remember { mutableStateOf<com.baraa.masroof.data.db.FinancialAccount?>(null) }
 
     // Resume at the previously persisted step rather than restarting
     // from WELCOME on every process recreation.
@@ -181,13 +183,28 @@ fun OnboardingScreen(
                         if (reloaded == null) {
                             return@launch
                         }
-                        app.financialSetupRepository.save(setupFrom(uiState, completed = true))
-                        repository.markCompleted()
-                        onFinished()
+                        // Offer selected-SMS binding. The account is already
+                        // persisted, so the user can confirm a typed identifier
+                        // or skip without losing the account.
+                        pendingSmsBindingAccount = reloaded
                     }
                 })
             }
         }
+    }
+    pendingSmsBindingAccount?.let { account ->
+        AccountSmsBindingDialog(
+            accountId = account.id,
+            accountType = account.accountType,
+            onDismiss = {
+                pendingSmsBindingAccount = null
+                scope.launch {
+                    app.financialSetupRepository.save(setupFrom(uiState, completed = true))
+                    repository.markCompleted()
+                    onFinished()
+                }
+            },
+        )
     }
 }
 
