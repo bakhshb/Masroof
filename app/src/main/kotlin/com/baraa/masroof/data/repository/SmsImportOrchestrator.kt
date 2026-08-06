@@ -239,7 +239,7 @@ class SmsImportOrchestrator(
             if (entity == null) { unparsed++; continue }
             recognized++
             val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
-            val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository)
+            val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
             val isReviewNow = match.account == null || match.needsReview
             val before = trackingStartDate != null && entity.transactionDate != null && entity.transactionDate.isBefore(trackingStartDate)
             if (isDup) duplicates++; if (isReviewNow) needsReview++; if (before) beforeTracking++
@@ -341,7 +341,7 @@ class SmsImportOrchestrator(
                     }
                     continue
                 }
-                val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository)
+                val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
                 val hasLinkedAccount = match.account != null && !match.needsReview
                 val linked = entity.withAccountMatch(match)
                 val txId = transactionRepository.insert(linked)

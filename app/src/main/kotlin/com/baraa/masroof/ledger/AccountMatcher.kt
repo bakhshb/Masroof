@@ -7,6 +7,7 @@ import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.rules.AccountMatching
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.TransactionType
+import com.baraa.masroof.transaction.ParsedIdentifierEvidence
 
 /** Deterministic account matching. Institution identifies a bank, never an account. */
 object AccountMatcher {
@@ -24,13 +25,17 @@ object AccountMatcher {
         transaction: TransactionEntity,
         accounts: List<FinancialAccount>,
         identifierRepository: AccountIdentifierRepository,
+        identifierEvidence: List<ParsedIdentifierEvidence> = emptyList(),
     ): Match {
         val eligible = accounts.filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
-        val lastFour = transaction.accountOrCardLastFourDigits?.let(AccountMatching::normalizeDigits)
-        if (!lastFour.isNullOrBlank()) {
+        val strictEvidence = identifierEvidence.filter { it.lastFour.length == 4 && identifierCompatibleType(it.type, transaction) }
+        val candidates = if (strictEvidence.isNotEmpty()) strictEvidence.map { it.type to it.lastFour }
+        else transaction.accountOrCardLastFourDigits?.let(AccountMatching::normalizeDigits)
+            ?.takeIf { it.isNotBlank() }?.let { value -> identifierTypesFor(transaction).map { it to value } }.orEmpty()
+        if (candidates.isNotEmpty()) {
             val typed = buildList {
-                for (type in identifierTypesFor(transaction)) {
-                    addAll(identifierRepository.findAccountsByIdentifier(type, lastFour).filter {
+                for ((type, value) in candidates) {
+                    addAll(identifierRepository.findAccountsByIdentifier(type, value).filter {
                         identifierCompatible(it.accountType, type, transaction)
                     })
                 }
@@ -67,6 +72,9 @@ object AccountMatcher {
         TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN, TransactionType.INTERNAL_TRANSFER -> listOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.IBAN_LAST4)
         else -> listOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.DEBIT_CARD_LAST4, AccountIdentifierType.CREDIT_CARD_LAST4, AccountIdentifierType.WALLET_LAST4)
     }
+
+    private fun identifierCompatibleType(identifier: AccountIdentifierType, transaction: TransactionEntity): Boolean =
+        identifier in identifierTypesFor(transaction) || transaction.transactionType == TransactionType.UNKNOWN
 
     private fun identifierCompatible(type: AccountType, identifier: AccountIdentifierType, transaction: TransactionEntity): Boolean = when (identifier) {
         AccountIdentifierType.CREDIT_CARD_LAST4 -> type == AccountType.CREDIT_CARD
