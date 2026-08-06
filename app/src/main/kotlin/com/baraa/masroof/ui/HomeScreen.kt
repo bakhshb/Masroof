@@ -219,8 +219,10 @@ private fun produceJournalsForMonth(app: MasroofApplication, month: YearMonth): 
 private fun resolveAccountId(tx: TransactionEntity, accounts: List<FinancialAccount>): Long? {
     if (tx.sourceAccountId != null) return tx.sourceAccountId
     if (tx.destinationAccountId != null) return tx.destinationAccountId
-    val lastFour = tx.accountOrCardLastFourDigits?.takeLast(4) ?: return null
-    return accounts.firstOrNull { it.lastFourDigits?.takeLast(4) == lastFour }?.id
+    // Presentation follows the persisted account link only. Legacy
+    // FinancialAccount.lastFourDigits is migration compatibility data, never
+    // account-matching evidence.
+    return null
 }
 
 private fun TransactionEntity.toPresentation(identifiers: List<AccountIdentifierEntity>): TransactionPresentation {

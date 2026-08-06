@@ -126,13 +126,13 @@ class FinancialSetupAndMigrationTest {
     }
 
     @Test
-    fun databaseVersionIsThirteen() {
+    fun databaseVersionIsFourteen() {
         val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt")
             .readText()
-        // The @Database annotation should declare version = 13.
-        val regex = Regex("""version\s*=\s*13""")
+        // The @Database annotation should declare version = 14.
+        val regex = Regex("""version\s*=\s*14""")
         assertTrue(
-            "database version must be 13",
+            "database version must be 14",
             regex.containsMatchIn(source),
         )
     }

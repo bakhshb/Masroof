@@ -20,6 +20,17 @@ data class AccountSmsAnalysis(
 )
 
 object AccountSmsAnalyzer {
+    /** A collapsed picker preview: masks digit sequences and omits OTP/balance lines. */
+    fun sanitizedPreview(body: String?): String {
+        val safe = body.orEmpty().lineSequence()
+            .filterNot { it.contains("otp", true) || it.contains("رمز التحقق") || it.contains("الرصيد") || it.contains("balance", true) }
+            .joinToString(" ")
+            .replace(Regex("\\d{4,}"), "••••")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        return safe.take(110)
+    }
+
     fun analyze(message: SmsMessage, accountType: AccountType): AccountSmsAnalysis? {
         val sender = message.sender?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val parsed = BankParserRegistry.parse(sender, message.body, message.timestamp.takeIf { it > 0L })

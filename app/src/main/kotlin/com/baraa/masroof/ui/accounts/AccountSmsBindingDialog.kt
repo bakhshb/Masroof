@@ -35,13 +35,17 @@ fun AccountSmsBindingDialog(accountId: Long, accountType: AccountType, onDismiss
     var error by remember { mutableStateOf<String?>(null) }
     var days by remember { mutableStateOf(30) }
     var senderQuery by remember { mutableStateOf("") }
+    var showAllMessages by remember { mutableStateOf(false) }
     LaunchedEffect(days) {
         loading = true
         messages = runCatching { app.smsRepository.loadInbox(SmsImportRange.lastDays(LocalDate.now(), days), 100) }.getOrDefault(emptyList())
             .sortedByDescending { BankSmsFilter.classifyMessage(it.sender, it.body).isMatch }
         loading = false
     }
-    val visibleMessages = messages.filter { it.sender.orEmpty().contains(senderQuery, ignoreCase = true) }
+    val visibleMessages = messages.filter { message ->
+        message.sender.orEmpty().contains(senderQuery, ignoreCase = true) &&
+            (showAllMessages || BankSmsFilter.classifyMessage(message.sender, message.body).isMatch)
+    }
     when {
         selected == null -> AlertDialog(onDismissRequest = onDismiss, title = { Text("اختر رسالة تخص هذا الحساب") }, text = {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -51,6 +55,7 @@ fun AccountSmsBindingDialog(accountId: Long, accountType: AccountType, onDismiss
                     FilterChip(selected = days == 30, onClick = { days = 30 }, label = { Text("آخر 30 يومًا") })
                 }
                 OutlinedTextField(senderQuery, { senderQuery = it }, label = { Text("البحث باسم المرسل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                FilterChip(selected = showAllMessages, onClick = { showAllMessages = !showAllMessages }, label = { Text(if (showAllMessages) "عرض الرسائل المالية فقط" else "عرض كل الرسائل") })
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 else if (visibleMessages.isEmpty()) Text("لم يتم العثور على رسائل مناسبة. جرّب توسيع الفترة أو اختر إدخال المعرفات يدويًا.")
                 else LazyColumn(Modifier.heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -61,6 +66,9 @@ fun AccountSmsBindingDialog(accountId: Long, accountType: AccountType, onDismiss
                                 Text(message.sender ?: "مرسل غير معروف", style = MaterialTheme.typography.titleSmall)
                                 Text(Instant.ofEpochMilli(message.timestamp).atZone(ZoneId.systemDefault()).toLocalDate().toString(), style = MaterialTheme.typography.labelSmall)
                                 Text(if (likely) "رسالة مالية محتملة" else "رسالة أخرى", style = MaterialTheme.typography.labelSmall)
+                                AccountSmsAnalyzer.sanitizedPreview(message.body).takeIf { it.isNotBlank() }?.let {
+                                    Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                                }
                             }
                         }
                     }
@@ -85,7 +93,9 @@ fun AccountSmsBindingDialog(accountId: Long, accountType: AccountType, onDismiss
                 scope.launch {
                     val sender = app.accountIdentifierRepository.addOrUpdate(accountId, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, value.senderDisplay, value.senderDisplay))
                     val identifier = value.identifierType?.let { type -> app.accountIdentifierRepository.addOrUpdate(accountId, IdentifierForm(type, identifierLabel(type), value.lastFour.orEmpty())) }
-                    if (sender.result == IdentifierAddResult.Rejected || (identifier != null && identifier.result == IdentifierAddResult.Rejected)) error = "تعذر حفظ الربط. راجع البيانات ثم حاول مرة أخرى."
+                    if (sender.result == IdentifierAddResult.Rejected || sender.identifier == null ||
+                        (identifier != null && (identifier.result == IdentifierAddResult.Rejected || identifier.identifier == null))
+                    ) error = "تعذر حفظ الربط. راجع البيانات ثم حاول مرة أخرى."
                     else onDismiss()
                 }
             }) { Text("ربط بالحساب") }

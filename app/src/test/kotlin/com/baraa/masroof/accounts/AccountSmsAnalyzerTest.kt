@@ -8,6 +8,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AccountSmsAnalyzerTest {
+    @Test fun pickerPreviewNeverExposesOtpBalanceOrLongNumbers() {
+        val preview = AccountSmsAnalyzer.sanitizedPreview("رمز التحقق 884422 الرصيد 12345 شراء بمبلغ 51.99 بطاقة 7271")
+        org.junit.Assert.assertFalse(preview.contains("884422"))
+        org.junit.Assert.assertFalse(preview.contains("12345"))
+        org.junit.Assert.assertFalse(preview.contains("7271"))
+    }
+
     @Test fun creditCardLabelProducesOnlyCreditCardIdentifierForCardAccount() {
         val result = AccountSmsAnalyzer.analyze(
             SmsMessage(1, "SNB", "شراء ببطاقة ائتمانية: 7271 بمبلغ: 51.99 SAR", 1L),
