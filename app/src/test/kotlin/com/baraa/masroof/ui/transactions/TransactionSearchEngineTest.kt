@@ -16,7 +16,10 @@ import java.time.LocalDate
 
 class TransactionSearchEngineTest {
     private fun tx(id: Long, merchant: String? = null, account: Long? = null, category: Long? = null, treatment: FinancialTreatment = FinancialTreatment.EXPENSE, status: TransactionPostingStatus = TransactionPostingStatus.NEEDS_REVIEW, rawSms: String? = null) = TransactionEntity(id = id, uniqueFingerprint = "u$id", smsTimestamp = 0, originalSender = rawSms, transactionType = TransactionType.PURCHASE, amount = BigDecimal.TEN, currency = Currency.SAR, merchantOrBeneficiary = merchant, accountOrCardLastFourDigits = null, transactionDate = LocalDate.now(), transactionTime = null, status = TransactionStatus.COMPLETED, confidence = 80, parsingNotes = emptyList(), dateSource = com.baraa.masroof.data.db.DateSource.FROM_BODY, createdAt = 0, updatedAt = 0, sourceAccountId = account, financialTreatment = treatment, categoryId = category, postingStatus = status)
-    private fun account(id: Long) = FinancialAccount(id, "حساب $id", null, AccountType.BANK_ACCOUNT, AccountNature.ASSET, null, emptyList(), Currency.SAR, BigDecimal.ZERO, 1, true, true, true, null, true, null)
+    private fun account(id: Long) = FinancialAccount(
+        id, "حساب $id", null, AccountType.BANK_ACCOUNT, AccountNature.ASSET, Currency.SAR,
+        BigDecimal.ZERO, 1, true, true, true, null, true, null,
+    )
     private val categories = mapOf(99L to "مطاعم")
     @Test fun merchantSearchMatches() {
         val list = listOf(tx(1, merchant = "STARBUCKS"), tx(2, merchant = "CARREFOUR"))

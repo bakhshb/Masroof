@@ -7,10 +7,15 @@ import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.outlined.AccountBox
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -78,7 +83,7 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                         if (currentRoute == route) return@NavigationBarItem
                         navigateToPrimaryTab(navController, entry)
                     },
-                    icon = { Icon(entry.icon, entry.title) },
+                    icon = { Icon(if (selected) entry.selectedIcon else entry.unselectedIcon, entry.title) },
                     label = { Text(entry.title) },
                 )
             }
@@ -91,14 +96,15 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
         ) {
             composable("primary/HOME") {
                 HomeScreen(
-                    onImportMessages = { navController.navigate("primary/TRANSACTIONS") },
+                    onImportMessages = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
                     onShowAllTransactions = { navController.navigate("primary/TRANSACTIONS") },
-                    onOpenReview = { navController.navigate("primary/TRANSACTIONS") },
+                    onOpenReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
                 )
             }
             composable("primary/TRANSACTIONS") {
                 TransactionOperationsScreen(
                     onOpenImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
+                    onOpenReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
                 )
             }
             composable(ImportMessagesRoute) {
@@ -115,17 +121,32 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
             }
             composable(ReviewQueueRoute) {
                 ReviewQueueScreen(
-                    onBack = { navController.popBackStack(ImportMessagesRoute, inclusive = false) },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navigateToPrimaryTab(navController, PrimaryTab.TRANSACTIONS)
+                        }
+                    },
                     onHome = { navigateToPrimaryTab(navController, PrimaryTab.HOME) },
                 )
             }
-            composable("primary/ACCOUNTS") { com.baraa.masroof.ui.accounts.AccountListScreen(onClose = {}) }
+            composable("primary/ACCOUNTS") {
+                com.baraa.masroof.ui.accounts.AccountListScreen(onClose = null)
+            }
             composable(AppRoutes.bindAccount(0L).substringBeforeLast("/") + "/{accountId}") { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("accountId")?.toLongOrNull() ?: 0L
                 com.baraa.masroof.ui.accounts.AccountBindRoute(accountId = id) { navController.popBackStack() }
             }
             composable("primary/MORE") {
-                MoreMenu(onSettings = { navController.navigate("settings/list") })
+                MoreMenu(
+                    onSettings = { navController.navigate("settings/list") },
+                    onCategories = { navController.navigate(SettingsDestinations.categoryManagement.route) },
+                    onAccounts = { navController.navigate(SettingsDestinations.accounts.route) },
+                    onSenderMappings = { navController.navigate(SettingsDestinations.senderMappings.route) },
+                    onLinkRules = { navController.navigate(SettingsDestinations.accountLinkRules.route) },
+                    onFinancialHistory = { navController.navigate(SettingsDestinations.financialHistory.route) },
+                    onPrivacyAndAi = { navController.navigate(SettingsDestinations.aiCategorization.route) },
+                    onDiagnostics = { navController.navigate(SettingsDestinations.diagnostics.route) },
+                )
             }
             // Settings sub-graph
             composable("settings/list") {
@@ -183,8 +204,18 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
     }
 }
 
-enum class PrimaryTab(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    HOME("الرئيسية", Icons.Filled.Home), TRANSACTIONS("العمليات", Icons.Filled.Inbox), ACCOUNTS("الحسابات", Icons.Filled.AccountBox), MORE("المزيد", Icons.Filled.MoreHoriz);
+enum class PrimaryTab(
+    val title: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+) {
+    HOME("الرئيسية", Icons.Filled.Home, Icons.Outlined.Home),
+    TRANSACTIONS("العمليات", Icons.Filled.Inbox, Icons.Outlined.Inbox),
+    ACCOUNTS("الحسابات", Icons.Filled.AccountBox, Icons.Outlined.AccountBox),
+    MORE("المزيد", Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz);
+
+    /** Backward-compatible alias used by older call sites / tests. */
+    val icon: ImageVector get() = selectedIcon
 }
 
 private fun SettingsDestination.routeKey(): String = route

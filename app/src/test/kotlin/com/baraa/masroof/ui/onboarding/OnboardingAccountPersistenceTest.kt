@@ -39,8 +39,6 @@ class OnboardingAccountPersistenceTest {
             displayName: String,
             accountType: AccountType,
             institutionName: String?,
-            lastFourDigits: String?,
-            senderAliases: List<String>,
             accountNature: AccountNature,
             currency: Currency,
             openingBalance: BigDecimal,
@@ -57,11 +55,10 @@ class OnboardingAccountPersistenceTest {
             accounts += FinancialAccount(
                 id = id, displayName = displayName, institutionName = institutionName,
                 accountType = accountType, accountNature = accountNature,
-                lastFourDigits = lastFourDigits, senderAliases = senderAliases,
                 currency = currency, openingBalance = openingBalance,
                 openingBalanceDate = openingBalanceDate, includeInNetWorth = includeInNetWorth,
                 includeInLiquidity = includeInLiquidity, isOwnedByUser = true,
-                systemAccountKey = null, isActive = true, notes = notes,
+                systemAccountKey = null, isActive = true, notes = notes
             )
             return id
         }
@@ -95,14 +92,12 @@ class OnboardingAccountPersistenceTest {
             displayName = "حساب الراتب",
             accountType = AccountType.BANK_ACCOUNT,
             institutionName = "D360",
-            lastFourDigits = "1234",
-            senderAliases = emptyList(),
             accountNature = AccountNature.ASSET,
             currency = Currency.SAR,
             openingBalance = BigDecimal("5000"),
             openingBalanceDate = System.currentTimeMillis(),
             includeInNetWorth = true,
-            includeInLiquidity = true,
+            includeInLiquidity = true
         )
         assertTrue("accountId must be positive", id > 0L)
         val reloaded = accountRepo.getById(id)
@@ -120,14 +115,12 @@ class OnboardingAccountPersistenceTest {
             displayName = "x",
             accountType = AccountType.BANK_ACCOUNT,
             institutionName = null,
-            lastFourDigits = null,
-            senderAliases = emptyList(),
             accountNature = AccountNature.ASSET,
             currency = Currency.SAR,
             openingBalance = BigDecimal("100"),
             openingBalanceDate = 0L,
             includeInNetWorth = true,
-            includeInLiquidity = true,
+            includeInLiquidity = true
         )
         assertTrue("Insertion failed; id should be negative", id <= 0L)
         // Onboarding completion should NOT be saved.
@@ -143,14 +136,12 @@ class OnboardingAccountPersistenceTest {
             displayName = "حساب 1",
             accountType = AccountType.BANK_ACCOUNT,
             institutionName = null,
-            lastFourDigits = null,
-            senderAliases = emptyList(),
             accountNature = AccountNature.ASSET,
             currency = Currency.SAR,
             openingBalance = BigDecimal("1000"),
             openingBalanceDate = 1L,
             includeInNetWorth = true,
-            includeInLiquidity = true,
+            includeInLiquidity = true
         )
         // Simulate process recreation by creating a NEW repository
         // instance that reads the same persisted state.
@@ -162,14 +153,12 @@ class OnboardingAccountPersistenceTest {
                 displayName = original.displayName,
                 accountType = original.accountType,
                 institutionName = original.institutionName,
-                lastFourDigits = original.lastFourDigits,
-                senderAliases = original.senderAliases,
                 accountNature = original.accountNature,
                 currency = original.currency,
                 openingBalance = original.openingBalance,
                 openingBalanceDate = original.openingBalanceDate,
                 includeInNetWorth = original.includeInNetWorth,
-                includeInLiquidity = original.includeInLiquidity,
+                includeInLiquidity = original.includeInLiquidity
             )
         }
         val found = recreated.getActive()
@@ -183,14 +172,12 @@ class OnboardingAccountPersistenceTest {
             displayName = "بعد إعادة التشغيل",
             accountType = AccountType.CREDIT_CARD,
             institutionName = null,
-            lastFourDigits = "5678",
-            senderAliases = emptyList(),
             accountNature = AccountNature.LIABILITY,
             currency = Currency.SAR,
             openingBalance = BigDecimal("250"),
             openingBalanceDate = System.currentTimeMillis(),
             includeInNetWorth = true,
-            includeInLiquidity = false,
+            includeInLiquidity = false
         )
         // Simulate app restart by re-reading the same account.
         val allBefore = accountRepo.getActive()
@@ -207,14 +194,12 @@ class OnboardingAccountPersistenceTest {
             displayName = "x",
             accountType = AccountType.BANK_ACCOUNT,
             institutionName = null,
-            lastFourDigits = null,
-            senderAliases = emptyList(),
             accountNature = AccountNature.ASSET,
             currency = Currency.SAR,
             openingBalance = BigDecimal("1234.56"),
             openingBalanceDate = date,
             includeInNetWorth = true,
-            includeInLiquidity = true,
+            includeInLiquidity = true
         )
         val reloaded = accountRepo.getById(id)
         assertNotNull(reloaded)

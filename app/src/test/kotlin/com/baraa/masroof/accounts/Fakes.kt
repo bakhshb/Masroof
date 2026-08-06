@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
  * contract: a missing row yields the default.
  */
 class FakeFinancialSetupRepository(
-    initial: FinancialSetup = FinancialSetup.defaultFor(today = 1_700_000_000_000L),
+    initial: FinancialSetup = FinancialSetup.defaultFor(today = 1_700_000_000_000L)
 ) : FinancialSetupRepository {
 
     private val ref = AtomicReference(initial)

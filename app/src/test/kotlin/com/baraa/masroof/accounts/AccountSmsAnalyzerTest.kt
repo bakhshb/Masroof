@@ -18,7 +18,7 @@ class AccountSmsAnalyzerTest {
     @Test fun creditCardLabelProducesOnlyCreditCardIdentifierForCardAccount() {
         val result = AccountSmsAnalyzer.analyze(
             SmsMessage(1, "SNB", "شراء ببطاقة ائتمانية: 7271 بمبلغ: 51.99 SAR", 1L),
-            AccountType.CREDIT_CARD,
+            AccountType.CREDIT_CARD
         )
         assertEquals(result.toString(), AccountIdentifierType.CREDIT_CARD_LAST4, result?.identifierType)
         assertEquals("7271", result?.lastFour)
@@ -27,7 +27,7 @@ class AccountSmsAnalyzerTest {
     @Test fun creditCardEvidenceIsNotSavedOnBankAccount() {
         val result = AccountSmsAnalyzer.analyze(
             SmsMessage(1, "SNB", "شراء ببطاقة ائتمانية: 7271 بمبلغ: 51.99 SAR", 1L),
-            AccountType.BANK_ACCOUNT,
+            AccountType.BANK_ACCOUNT
         )
         assertNull(result?.identifierType)
     }

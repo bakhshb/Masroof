@@ -141,7 +141,8 @@ open class GenericBankSmsParser : BankSmsParser {
 
     protected open fun extractAmount(lines: List<ParsedLine>): BigDecimal? {
         val line = lines.firstOrNull { LineBasedFieldParser.containsAmountLabel(it.label) } ?: return null
-        val amount = Regex("""[-+]?\d+(?:\.\d+)?""").find(line.value.replace(",", ""))?.value ?: return null
+        val normalized = BankTextNormalizer.normalizeForParsing(line.value).replace(",", "")
+        val amount = Regex("""[-+]?\d+(?:\.\d+)?""").find(normalized)?.value ?: return null
         return runCatching { BigDecimal(amount) }.getOrNull()?.takeIf { it.signum() > 0 }
     }
 
@@ -155,18 +156,35 @@ open class GenericBankSmsParser : BankSmsParser {
     protected open fun extractIdentifiers(lines: List<ParsedLine>): List<ParsedIdentifierEvidence> = buildList {
         for (line in lines) {
             val label = line.label.lowercase(Locale.ROOT)
+            // Never treat amount / balance / reference / OTP labels as identifiers.
+            if (LineBasedFieldParser.containsAmountLabel(line.label)) continue
+            if (LineBasedFieldParser.balanceLabelRegex().matches(line.label)) continue
+            if (
+                "مرجع" in label ||
+                "reference" in label ||
+                "otp" in label ||
+                "رمز" in label ||
+                "معاملة" in label ||
+                "transaction" in label ||
+                "رقم العملية" in label
+            ) {
+                continue
+            }
             val type = when {
                 "مدى" in label || "debit" in label -> com.baraa.masroof.data.db.AccountIdentifierType.DEBIT_CARD_LAST4
                 "ائتمان" in label || "credit" in label -> com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4
-                "iban" in label || "آيبان" in label || "الايبان" in label -> com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4
+                "iban" in label || "آيبان" in label || "ايبان" in label || "الايبان" in label ->
+                    com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4
                 "محفظ" in label || "wallet" in label -> com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4
-                LineBasedFieldParser.cardLabelRegex().matches(line.label) || LineBasedFieldParser.bankAccountLabelRegex().matches(line.label) -> com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4
+                LineBasedFieldParser.cardLabelRegex().matches(line.label) ||
+                    LineBasedFieldParser.bankAccountLabelRegex().matches(line.label) ->
+                    com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4
                 else -> null
             } ?: continue
             val digits = LineBasedFieldParser.lastFourFromValue(line.value) ?: continue
             val role = when {
-                "من" in label || "source" in label -> IdentifierRole.SOURCE
-                "إلى" in label || "to" in label || "destination" in label -> IdentifierRole.DESTINATION
+                "من" in label || "source" in label || "خصم" in label -> IdentifierRole.SOURCE
+                "إلى" in label || "الى" in label || "to" in label || "destination" in label -> IdentifierRole.DESTINATION
                 else -> IdentifierRole.UNSPECIFIED
             }
             add(ParsedIdentifierEvidence(type, digits, role, 90, "label:${type.name}"))

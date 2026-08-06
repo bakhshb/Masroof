@@ -2,7 +2,9 @@ package com.baraa.masroof.ledger
 
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.JournalWithPostings
+import com.baraa.masroof.data.db.OpeningBalanceKind
 import com.baraa.masroof.transaction.AccountNature
+import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
 import java.math.BigDecimal
 import java.time.Instant
@@ -25,7 +27,7 @@ object AccountBalanceService {
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): BigDecimal {
         val openingDate = account.openingBalanceDate.toLocalDate(zoneId)
-        var value = account.openingBalance
+        var value = effectiveOpening(account)
         journals.asSequence()
             .filter { it.journal.postingStatus == JournalPostingStatus.POSTED }
             .filter { it.journal.effectiveDate >= openingDate }
@@ -88,6 +90,19 @@ object AccountBalanceService {
 
     private fun Long.toLocalDate(zoneId: ZoneId): LocalDate =
         if (this <= 0L) LocalDate.MIN else Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
+
+    /** Matches [AccountBalanceCalculator] opening semantics for credit cards. */
+    private fun effectiveOpening(account: FinancialAccount): BigDecimal {
+        if (account.accountType != AccountType.CREDIT_CARD) return account.openingBalance
+        return when (account.openingBalanceKind) {
+            OpeningBalanceKind.OUTSTANDING -> account.openingBalance
+            OpeningBalanceKind.AVAILABLE -> {
+                val limit = account.creditLimit ?: BigDecimal.ZERO
+                if (limit.signum() <= 0) account.openingBalance
+                else limit.subtract(account.openingBalance).coerceAtLeast(BigDecimal.ZERO)
+            }
+        }
+    }
 }
 
 data class BalanceTotals(

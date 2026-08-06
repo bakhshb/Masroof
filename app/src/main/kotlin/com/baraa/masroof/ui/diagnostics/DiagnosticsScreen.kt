@@ -184,6 +184,47 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
             DiagnosticsCard(title = "عدد العمليات المستوردة تلقائياً", value = app.developerPreferences.autoImportedCount.toString())
             DiagnosticsCard(title = "عدد العمليات التي تحتاج مراجعة", value = app.developerPreferences.autoNeedsReviewCount.toString())
             DiagnosticsCard(title = "عدد المكررات", value = app.developerPreferences.autoDuplicateCount.toString())
+            var relinkSummary by remember { mutableStateOf<String?>(null) }
+            var relinkPreview by remember { mutableStateOf<com.baraa.masroof.ledger.HistoricalAccountRelinkService.Result?>(null) }
+            Button(
+                onClick = {
+                    scope.launch {
+                        val preview = withContext(Dispatchers.IO) {
+                            app.historicalAccountRelinkService.relinkUnposted(dryRun = true)
+                        }
+                        relinkPreview = preview
+                        relinkSummary =
+                            "معاينة: سيُحدَّث ${preview.updated} من ${preview.eligible} · مؤكد ${preview.linkedConfirmed} · مراجعة ${preview.linkedNeedsReview} · متخطى منشور ${preview.skippedPosted}"
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("معاينة إعادة ربط العمليات غير المنشورة")
+            }
+            if (relinkPreview != null && (relinkPreview?.updated ?: 0) > 0) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                app.historicalAccountRelinkService.relinkUnposted(dryRun = false)
+                            }
+                            relinkPreview = null
+                            relinkSummary =
+                                "تمت إعادة الربط: محدّث ${result.updated} من ${result.eligible} · مؤكد ${result.linkedConfirmed} · مراجعة ${result.linkedNeedsReview} · متخطى منشور ${result.skippedPosted}"
+                            snapshot = withContext(Dispatchers.IO) { app.diagnosticCollector.snapshot() }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("تطبيق إعادة الربط (${relinkPreview?.updated})")
+                }
+            }
+            Text(
+                "يملأ الفجوات فقط (عمليات غير مربوطة). لا يغيّر القيود المنشورة أو الأرصدة أو الروابط المقترحة القائمة.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            relinkSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -27,7 +27,7 @@ class OpenAiHttpBehaviorTest {
         baseUrl = "https://api.example.com",
         modelName = "test-model",
         apiKey = "sk-fake-not-real",
-        timeoutMillis = 5_000L,
+        timeoutMillis = 5_000L
     )
 
     private fun req() = AiCategorizationRequest(
@@ -37,7 +37,7 @@ class OpenAiHttpBehaviorTest {
         currency = com.baraa.masroof.transaction.Currency.SAR,
         allowedCategories = listOf(AllowedCategory(1, "x")),
         channel = Channel.POS,
-        language = "ar",
+        language = "ar"
     )
 
     private fun okResponse(content: String): AiHttpResponse {
@@ -55,7 +55,7 @@ class OpenAiHttpBehaviorTest {
         return AiHttpResponse(
             statusCode = 200,
             body = "{\"choices\":[{\"message\":{\"content\":\"" + escaped + "\"}}]}",
-            durationMs = 1L,
+            durationMs = 1L
         )
     }
 
@@ -105,7 +105,7 @@ class OpenAiHttpBehaviorTest {
         assertTrue("429 must trigger retries", fake.requests.size >= 2)
         assertTrue(
             "retries capped at MAX_ATTRIES",
-            fake.requests.size <= OpenAiCompatibleProvider.MAX_ATTRIES + 1,
+            fake.requests.size <= OpenAiCompatibleProvider.MAX_ATTRIES + 1
         )
     }
 
@@ -189,17 +189,17 @@ class OpenAiHttpBehaviorTest {
         val req = fake.requests.first()
         assertTrue(
             "Authorization header must include Bearer scheme",
-            req.headers["Authorization"]!!.startsWith("Bearer "),
+            req.headers["Authorization"]!!.startsWith("Bearer ")
         )
         assertTrue(
             "Authorization header must include the configured key",
-            req.headers["Authorization"]!!.endsWith("sk-fake-not-real"),
+            req.headers["Authorization"]!!.endsWith("sk-fake-not-real")
         )
         // Diagnostic / result do NOT include the Authorization header or
         // the API key.
         assertFalse(
             "request body must not include api key",
-            req.body.contains("sk-fake"),
+            req.body.contains("sk-fake")
         )
     }
 

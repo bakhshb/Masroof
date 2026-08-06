@@ -1,7 +1,9 @@
 package com.baraa.masroof.rules
 
+import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.Category
 import com.baraa.masroof.data.db.FinancialAccount
+import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
 import com.baraa.masroof.transaction.FinancialTreatment
@@ -33,7 +35,7 @@ class RuleEngineTest {
         nameAr: String,
         sortOrder: Int = 0,
         isSystem: Boolean = false,
-        enabled: Boolean = true,
+        enabled: Boolean = true
     ) = Category(
         id = id,
         parentId = null,
@@ -41,24 +43,23 @@ class RuleEngineTest {
         nameEn = null,
         sortOrder = sortOrder,
         enabled = enabled,
-        isSystem = isSystem,
+        isSystem = isSystem
     )
 
     private fun makeAccount(
         id: Long,
         displayName: String,
         institutionName: String? = null,
-        senderAliases: List<String> = emptyList(),
         type: com.baraa.masroof.transaction.AccountType =
             com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT,
+        aliases: List<String> = emptyList(),
+        lastFour: String? = null,
     ) = FinancialAccount(
         id = id,
         displayName = displayName,
         institutionName = institutionName,
         accountType = type,
         accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(type),
-        lastFourDigits = null,
-        senderAliases = senderAliases,
         currency = Currency.SAR,
         openingBalance = BigDecimal.ZERO,
         openingBalanceDate = 0L,
@@ -67,7 +68,27 @@ class RuleEngineTest {
         isOwnedByUser = true,
         isActive = true,
         notes = null,
-    )
+    ).also { account ->
+        // Stash typed identifier snapshots on a side map keyed by account id
+        // so emptyContext can build RuleContext without legacy columns.
+        pendingSnapshots[account.id] = buildList {
+            for (alias in aliases) {
+                val key = AccountIdentifierRepository.normalize(
+                    AccountIdentifierType.SENDER_ALIAS,
+                    alias,
+                )
+                if (key.isNotBlank()) {
+                    add(AccountIdentifierSnapshot(account.id, AccountIdentifierType.SENDER_ALIAS, key))
+                }
+            }
+            lastFour?.let { last ->
+                val idType = AccountIdentifierRepository.defaultIdentifierTypeFor(type) ?: return@let
+                add(AccountIdentifierSnapshot(account.id, idType, last))
+            }
+        }
+    }
+
+    private val pendingSnapshots = mutableMapOf<Long, List<AccountIdentifierSnapshot>>()
 
     private fun makeInput(
         type: TransactionType = TransactionType.PURCHASE,
@@ -109,6 +130,7 @@ class RuleEngineTest {
         ownedAccounts = accounts,
         merchantMemories = emptyList(),
         categories = categories,
+        accountIdentifiers = accounts.flatMap { pendingSnapshots[it.id].orEmpty() },
     )
 
     // -- Safety rules ------------------------------------------------------
@@ -119,7 +141,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = listOf(cat), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.PURCHASE, merchant = "Starbucks"),
-            emptyContext(categories = listOf(cat)),
+            emptyContext(categories = listOf(cat))
         )
         // The high-confidence merchant rule matches "starbucks" and assigns
         // the "مقاهي" category — the transaction is therefore an EXPENSE.
@@ -131,7 +153,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.CARD_PAYMENT, body = "سداد بطاقة ائتمانية بمبلغ 1500 ريال"),
-            emptyContext(),
+            emptyContext()
         )
         assertEquals(FinancialTreatment.CREDIT_CARD_PAYMENT, verdict.financialTreatment)
         assertTrue("card payment must be excluded from spending", verdict.excludeFromSpending)
@@ -143,7 +165,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.REFUND, amount = BigDecimal("50.00")),
-            emptyContext(),
+            emptyContext()
         )
         assertEquals(FinancialTreatment.REFUND, verdict.financialTreatment)
         assertTrue("refund must be excluded from new spending", verdict.excludeFromSpending)
@@ -154,7 +176,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.DECLINED, status = TransactionStatus.DECLINED),
-            emptyContext(),
+            emptyContext()
         )
         assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
         assertTrue("declined must be excluded", verdict.excludeFromSpending)
@@ -165,7 +187,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(status = TransactionStatus.PENDING),
-            emptyContext(),
+            emptyContext()
         )
         assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
         assertTrue("pending must be excluded from confirmed spending", verdict.excludeFromSpending)
@@ -177,7 +199,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = listOf(fee), feeCategoryId = 101L)
         val verdict = engine.classify(
             makeInput(type = TransactionType.BANK_FEE, amount = BigDecimal("25.00")),
-            emptyContext(categories = listOf(fee)),
+            emptyContext(categories = listOf(fee))
         )
         assertEquals(FinancialTreatment.BANK_FEE, verdict.financialTreatment)
         assertFalse("bank fee is a real expense", verdict.excludeFromSpending)
@@ -189,7 +211,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.SALARY, amount = BigDecimal("12000")),
-            emptyContext(),
+            emptyContext()
         )
         assertEquals(FinancialTreatment.INCOME, verdict.financialTreatment)
         assertTrue("income must be excluded from spending", verdict.excludeFromSpending)
@@ -200,14 +222,14 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.TRANSFER_OUT, merchant = null, sender = "UnknownBank"),
-            emptyContext(),
+            emptyContext()
         )
         // No owned accounts + no transfer destination → PENDING_REVIEW,
         // never EXPENSE. The user must confirm whether the transfer is
         // internal, to a person, or to an investment.
         assertFalse(
             "a transfer with no owned accounts must not be EXPENSE",
-            verdict.financialTreatment == FinancialTreatment.EXPENSE,
+            verdict.financialTreatment == FinancialTreatment.EXPENSE
         )
         assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
     }
@@ -216,17 +238,17 @@ class RuleEngineTest {
 
     @Test
     fun confirmedOwnedAccountTransferClassifiedAsInternal() {
-        val sourceAcc = makeAccount(1, "Al Rajhi", senderAliases = listOf("alrajhi"))
-        val destAcc = makeAccount(2, "Alinma", senderAliases = listOf("alinma"))
+        val sourceAcc = makeAccount(1, "Al Rajhi", aliases = listOf("alrajhi"))
+        val destAcc = makeAccount(2, "Alinma", aliases = listOf("alinma"))
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
                 type = TransactionType.TRANSFER_OUT,
                 sender = "alrajhi",
                 body = "Transfer from your Al Rajhi account to your Alinma account",
-                merchant = "alinma",
+                merchant = "alinma"
             ),
-            emptyContext(accounts = listOf(sourceAcc, destAcc)),
+            emptyContext(accounts = listOf(sourceAcc, destAcc))
         )
         assertEquals(FinancialTreatment.INTERNAL_TRANSFER, verdict.financialTreatment)
         assertTrue("internal transfer must be excluded from spending", verdict.excludeFromSpending)
@@ -234,16 +256,16 @@ class RuleEngineTest {
 
     @Test
     fun transferToUnknownRecipientRequiresReview() {
-        val sourceAcc = makeAccount(1, "Checking", senderAliases = listOf("alrajhi"))
+        val sourceAcc = makeAccount(1, "Checking")
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
                 type = TransactionType.TRANSFER_OUT,
                 sender = "alrajhi",
                 body = "تحويل صادر من حسابك في الراجحي إلى شخص",
-                merchant = null,
+                merchant = null
             ),
-            emptyContext(accounts = listOf(sourceAcc)),
+            emptyContext(accounts = listOf(sourceAcc))
         )
         assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
     }
@@ -254,17 +276,27 @@ class RuleEngineTest {
         // credit card. The sender is the wallet's own bank, and the body
         // mentions the credit card. Both source (credit card) and
         // destination (wallet) are owned.
-        val creditCard = makeAccount(1, "Visa", senderAliases = listOf("visa"))
-        val wallet = makeAccount(2, "STC Bank", senderAliases = listOf("stc pay", "stcbank"))
+        val creditCard = makeAccount(
+            1,
+            "Visa",
+            type = com.baraa.masroof.transaction.AccountType.CREDIT_CARD,
+            aliases = listOf("visa"),
+        )
+        val wallet = makeAccount(
+            2,
+            "STC Bank",
+            type = com.baraa.masroof.transaction.AccountType.DIGITAL_WALLET,
+            aliases = listOf("stc pay", "stcbank"),
+        )
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
                 type = TransactionType.TRANSFER_IN,
                 sender = "stc pay",
                 body = "Top-up received 100 SAR from your Visa card to your STC Bank wallet",
-                merchant = "Visa",
+                merchant = "Visa"
             ),
-            emptyContext(accounts = listOf(creditCard, wallet)),
+            emptyContext(accounts = listOf(creditCard, wallet))
         )
         assertEquals(FinancialTreatment.INTERNAL_TRANSFER, verdict.financialTreatment)
     }
@@ -277,9 +309,9 @@ class RuleEngineTest {
             makeInput(
                 type = TransactionType.BANK_FEE,
                 amount = BigDecimal("2.50"),
-                body = "رسوم تحويل محفظة 2.50 ريال",
+                body = "رسوم تحويل محفظة 2.50 ريال"
             ),
-            emptyContext(categories = listOf(fee)),
+            emptyContext(categories = listOf(fee))
         )
         assertEquals(FinancialTreatment.BANK_FEE, verdict.financialTreatment)
         assertEquals(101L, verdict.categoryId)
@@ -291,8 +323,8 @@ class RuleEngineTest {
             1,
             "Abyan",
             institutionName = "Abyan",
-            senderAliases = listOf("abyan"),
             type = com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT,
+            aliases = listOf("abyan"),
         )
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
@@ -300,9 +332,9 @@ class RuleEngineTest {
                 type = TransactionType.INVESTMENT_TRANSFER,
                 sender = "alrajhi",
                 body = "تحويل صادر إلى حسابك الاستثماري في Abyan",
-                merchant = "Abyan",
+                merchant = "Abyan"
             ),
-            emptyContext(accounts = listOf(inv)),
+            emptyContext(accounts = listOf(inv))
         )
         assertEquals(FinancialTreatment.INVESTMENT, verdict.financialTreatment)
         assertTrue("investment must be excluded from consumer spending", verdict.excludeFromSpending)
@@ -319,12 +351,12 @@ class RuleEngineTest {
             preferredCategoryId = 50L,
             preferredFinancialTreatment = FinancialTreatment.EXPENSE,
             confirmationCount = 3,
-            lastConfirmedAt = 1_700_000_000_000L,
+            lastConfirmedAt = 1_700_000_000_000L
         )
         val engine = RuleEngineFactory.build(categories = listOf(cat), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(merchant = "Starbucks"),
-            emptyContext(categories = listOf(cat)).copy(merchantMemories = listOf(memory)),
+            emptyContext(categories = listOf(cat)).copy(merchantMemories = listOf(memory))
         )
         // Memory wins over the generic "restaurants" rule because memory
         // sits at priority 4 and generic sits at 6.
@@ -344,12 +376,12 @@ class RuleEngineTest {
             preferredCategoryId = 50L,
             preferredFinancialTreatment = FinancialTreatment.EXPENSE,
             confirmationCount = 5,
-            lastConfirmedAt = 1_700_000_000_000L,
+            lastConfirmedAt = 1_700_000_000_000L
         )
         val engine = RuleEngineFactory.build(categories = listOf(cat), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(type = TransactionType.DECLINED, merchant = "Starbucks"),
-            emptyContext(categories = listOf(cat)).copy(merchantMemories = listOf(memory)),
+            emptyContext(categories = listOf(cat)).copy(merchantMemories = listOf(memory))
         )
         assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
         // The category is null because SAFETY doesn't set one.
@@ -362,7 +394,7 @@ class RuleEngineTest {
     fun merchantNormalizationIsCaseInsensitive() {
         assertEquals(
             com.baraa.masroof.transaction.MerchantNormalizer.normalize("STARBUCKS"),
-            com.baraa.masroof.transaction.MerchantNormalizer.normalize("starbucks"),
+            com.baraa.masroof.transaction.MerchantNormalizer.normalize("starbucks")
         )
     }
 
@@ -428,7 +460,7 @@ class RuleEngineTest {
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.REFUND),
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.BANK_FEE),
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.SALARY),
-            RulePriority.MERCHANT_RULE to makeInput(merchant = "Starbucks"),
+            RulePriority.MERCHANT_RULE to makeInput(merchant = "Starbucks")
         )
         for ((expectedPriority, input) in probeInputs) {
             val verdict = actual.classify(input, emptyContext())
@@ -441,7 +473,7 @@ class RuleEngineTest {
             // coverage here.
             assertTrue(
                 "verdict reason must be non-empty for $expectedPriority",
-                verdict.reason.isNotEmpty(),
+                verdict.reason.isNotEmpty()
             )
         }
     }
@@ -454,7 +486,7 @@ class RuleEngineTest {
             makeTxn(amount = BigDecimal("100"), treatment = FinancialTreatment.EXPENSE),
             makeTxn(amount = BigDecimal("200"), treatment = FinancialTreatment.EXPENSE),
             makeTxn(amount = BigDecimal("50"), treatment = FinancialTreatment.REFUND),
-            makeTxn(amount = BigDecimal("10"), treatment = FinancialTreatment.BANK_FEE),
+            makeTxn(amount = BigDecimal("10"), treatment = FinancialTreatment.BANK_FEE)
         )
         val b = SpendingCalculator.calculate(transactions)
         // gross = 300, refunds = 50, fees = 10, net = 300 + 10 - 50 = 260
@@ -470,7 +502,7 @@ class RuleEngineTest {
             makeTxn(amount = BigDecimal("100"), treatment = FinancialTreatment.EXPENSE),
             makeTxn(amount = BigDecimal("500"), treatment = FinancialTreatment.CREDIT_CARD_PAYMENT),
             makeTxn(amount = BigDecimal("300"), treatment = FinancialTreatment.INTERNAL_TRANSFER),
-            makeTxn(amount = BigDecimal("1000"), treatment = FinancialTreatment.INCOME),
+            makeTxn(amount = BigDecimal("1000"), treatment = FinancialTreatment.INCOME)
         )
         val b = SpendingCalculator.calculate(transactions)
         // 100 EXPENSE is the only thing that counts as spending; the
@@ -484,7 +516,7 @@ class RuleEngineTest {
     fun investmentsAreCountedSeparately() {
         val transactions = listOf(
             makeTxn(amount = BigDecimal("100"), treatment = FinancialTreatment.EXPENSE),
-            makeTxn(amount = BigDecimal("500"), treatment = FinancialTreatment.INVESTMENT),
+            makeTxn(amount = BigDecimal("500"), treatment = FinancialTreatment.INVESTMENT)
         )
         val b = SpendingCalculator.calculate(transactions)
         assertEquals(BigDecimal("100.00"), b.grossExpenses)
@@ -495,7 +527,7 @@ class RuleEngineTest {
     fun pendingTransactionsExcludedFromConfirmedSpending() {
         val transactions = listOf(
             makeTxn(amount = BigDecimal("100"), treatment = FinancialTreatment.PENDING_REVIEW),
-            makeTxn(amount = BigDecimal("50"), treatment = FinancialTreatment.EXPENSE),
+            makeTxn(amount = BigDecimal("50"), treatment = FinancialTreatment.EXPENSE)
         )
         val b = SpendingCalculator.calculate(transactions)
         assertEquals(BigDecimal("50.00"), b.grossExpenses)
@@ -507,7 +539,7 @@ class RuleEngineTest {
         val transactions = listOf(
             makeTxn(amount = BigDecimal("12.34"), treatment = FinancialTreatment.EXPENSE),
             makeTxn(amount = BigDecimal("56.78"), treatment = FinancialTreatment.EXPENSE),
-            makeTxn(amount = BigDecimal("9.99"), treatment = FinancialTreatment.EXPENSE),
+            makeTxn(amount = BigDecimal("9.99"), treatment = FinancialTreatment.EXPENSE)
         )
         val b = SpendingCalculator.calculate(transactions)
         // Sum: 12.34 + 56.78 + 9.99 = 79.11 (no floating-point loss).
@@ -523,7 +555,7 @@ class RuleEngineTest {
         // Verify the parent categories from the spec are present.
         val requiredParents = listOf(
             "المنزل", "المطاعم", "النقل", "التعليم", "الاتصالات", "الصحة",
-            "التسوق", "الترفيه", "الالتزامات", "الاستثمار", "التحويلات", "أخرى",
+            "التسوق", "الترفيه", "الالتزامات", "الاستثمار", "التحويلات", "أخرى"
         )
         for (p in requiredParents) {
             assertTrue("seed must contain $p", names.contains(p))
@@ -550,11 +582,11 @@ class RuleEngineTest {
         val catStarbucks = makeCategory(10, "مقاهي", sortOrder = 10)
         val engine = RuleEngineFactory.build(
             categories = listOf(catStarbucks),
-            feeCategoryId = null,
+            feeCategoryId = null
         )
         val english = engine.classify(
             makeInput(merchant = "STARBUCKS COFFEE"),
-            emptyContext(categories = listOf(catStarbucks)),
+            emptyContext(categories = listOf(catStarbucks))
         )
         // No Arabic token in the body / merchant → no match in our seed
         // list (the seed is English). That's fine — we just assert that
@@ -567,7 +599,7 @@ class RuleEngineTest {
     private fun makeTxn(
         id: Long = 0,
         amount: BigDecimal,
-        treatment: FinancialTreatment,
+        treatment: FinancialTreatment
     ): com.baraa.masroof.data.db.TransactionEntity =
         com.baraa.masroof.data.db.TransactionEntity(
             id = id,
@@ -594,6 +626,6 @@ class RuleEngineTest {
             categoryConfidence = 100,
             needsReview = false,
             userConfirmed = false,
-            exclusionReason = null,
+            exclusionReason = null
         )
 }

@@ -17,9 +17,14 @@ class LedgerMigrationTest {
     }
 
     @Test fun ledgerMigrationNeverDropsExistingData() {
-        listOf("transactions", "financial_accounts", "categories", "merchant_memory", "ai_cache", "ai_settings").forEach { table ->
+        listOf("transactions", "categories", "merchant_memory", "ai_cache", "ai_settings").forEach { table ->
             assertFalse(Regex("DROP\\s+TABLE\\s+[`\"]?${Regex.escape(table)}[`\"]?").containsMatchIn(source))
         }
+        assertTrue(
+            "financial_accounts rebuild must copy rows before drop",
+            source.contains("INSERT INTO `financial_accounts_new`") &&
+                source.contains("FROM `financial_accounts`"),
+        )
         assertFalse(Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source))
     }
 }

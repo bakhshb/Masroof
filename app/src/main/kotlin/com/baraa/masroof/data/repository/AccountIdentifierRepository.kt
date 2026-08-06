@@ -6,12 +6,20 @@ import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.FinancialAccountDao
 import com.baraa.masroof.data.db.FinancialAccountEntity
+import com.baraa.masroof.ledger.AccountIdentifierCompatibility
+import com.baraa.masroof.rules.AccountIdentifierSnapshot
 import com.baraa.masroof.transaction.AccountType
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import java.math.BigDecimal
 
-enum class IdentifierAddResult { Added, Updated, DisabledDuplicate, Rejected }
+enum class IdentifierAddResult {
+    Added,
+    Updated,
+    /** Inserted successfully, but the same type+value already exists on another account. */
+    AddedWithConflict,
+    @Deprecated("Use AddedWithConflict", ReplaceWith("AddedWithConflict"))
+    DisabledDuplicate,
+    Rejected,
+}
 
 data class IdentifierForm(
     val identifierType: AccountIdentifierType,
@@ -40,7 +48,13 @@ class AccountIdentifierRepository(
 
     suspend fun getForAccount(accountId: Long): List<AccountIdentifierEntity> = dao.getByAccount(accountId)
 
-    suspend fun getActiveForAccount(accountId: Long): List<AccountIdentifierEntity> = dao.getByAccount(accountId).filter { it.isActive }
+    suspend fun getActiveForAccount(accountId: Long): List<AccountIdentifierEntity> =
+        dao.getByAccount(accountId).filter { it.isActive }
+
+    suspend fun getActiveSnapshots(): List<AccountIdentifierSnapshot> =
+        dao.getActive().map {
+            AccountIdentifierSnapshot(it.accountId, it.identifierType, it.normalizedValue)
+        }
 
     suspend fun findByTypeAndValue(type: AccountIdentifierType, value: String): AccountIdentifierEntity? =
         dao.findByTypeAndValue(type, normalize(type, value))
@@ -63,48 +77,68 @@ class AccountIdentifierRepository(
             .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
     }
 
-    /** Sender keys explicitly attached to active, user-owned accounts. */
+    /** Sender keys explicitly attached to active, user-owned accounts (typed only). */
     suspend fun activeOwnedSenderAliases(): Set<String> {
+        ensureLegacyIdentifierBackfill()
         val ownedActiveIds = accountDao.getActive()
             .filter { it.isOwnedByUser && it.systemAccountKey == null }
             .map { it.id }
             .toSet()
-        val typed = dao.getByType(AccountIdentifierType.SENDER_ALIAS)
+        return dao.getByType(AccountIdentifierType.SENDER_ALIAS)
             .asSequence()
             .filter { it.isActive && it.accountId in ownedActiveIds }
             .map { normalize(AccountIdentifierType.SENDER_ALIAS, it.normalizedValue) }
-        // Existing users entered aliases through AccountEditDialog before typed
-        // identifiers were mounted. Those persisted aliases are authoritative too.
-        val legacy = accountDao.getActive().asSequence()
-            .filter { it.id in ownedActiveIds }
-            .flatMap { it.senderAliases.split(",").asSequence() }
-            .map { normalize(AccountIdentifierType.SENDER_ALIAS, it) }
-        return (typed + legacy).filter { it.isNotBlank() }.toSet()
+            .filter { it.isNotBlank() }
+            .toSet()
     }
+
+    /**
+     * Legacy column backfill is performed by [com.baraa.masroof.data.db.MasroofDatabase.MIGRATION_14_15].
+     * Kept as a no-op so older call sites remain safe and idempotent.
+     */
+    suspend fun ensureLegacyIdentifierBackfill() {
+        // no-op after schema v15
+    }
+
+    @Deprecated("Legacy columns removed in schema v15; migration performs backfill")
+    suspend fun backfillFromLegacyLastFour(): Int = 0
+
+    @Deprecated("Legacy columns removed in schema v15; migration performs backfill")
+    suspend fun backfillFromLegacySenderAliases(): Int = 0
 
     suspend fun addOrUpdate(accountId: Long, form: IdentifierForm): IdentifierAddOutcome {
         val account = accountDao.getById(accountId)?.toDomainRef()
             ?: return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), "حساب غير موجود")
-        val typeCompatible = isCompatible(account.accountType, form.identifierType)
-        if (!typeCompatible) return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), "نوع المعرف غير مناسب لنوع الحساب")
+        if (!isCompatible(account.accountType, form.identifierType)) {
+            return IdentifierAddOutcome(
+                IdentifierAddResult.Rejected,
+                null,
+                emptyList(),
+                "نوع المعرف غير مناسب لنوع الحساب",
+            )
+        }
         val normalized = normalize(form.identifierType, form.rawValue)
         val validation = validate(form.identifierType, normalized)
-        if (validation != null) return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), validation)
+        if (validation != null) {
+            return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), validation)
+        }
 
-        val existingForAccount = dao.getByAccount(accountId).firstOrNull { it.identifierType == form.identifierType && it.normalizedValue == normalized }
+        val existingForAccount = dao.getByAccount(accountId)
+            .firstOrNull { it.identifierType == form.identifierType && it.normalizedValue == normalized }
         if (existingForAccount != null) {
-            val updated = existingForAccount.copy(displayLabel = form.displayLabel, isActive = true, updatedAt = now())
+            val updated = existingForAccount.copy(
+                displayLabel = form.displayLabel,
+                isActive = true,
+                updatedAt = now(),
+            )
             dao.update(updated)
             return IdentifierAddOutcome(IdentifierAddResult.Updated, updated, emptyList(), null)
         }
-        val crossAccount = dao.findByValue(normalized)
-            ?.takeIf { it.accountId != accountId && it.identifierType == form.identifierType && it.isActive }
-            ?.let { accountDao.getById(it.accountId)?.toDomainRef() }
-            ?: run {
-                val anyOther = dao.getByType(form.identifierType)
-                    .firstOrNull { it.normalizedValue == normalized && it.accountId != accountId && it.isActive }
-                anyOther?.let { accountDao.getById(it.accountId)?.toDomainRef() }
-            }
+
+        val conflicts = dao.getByType(form.identifierType)
+            .filter { it.normalizedValue == normalized && it.accountId != accountId && it.isActive }
+            .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
+
         val newId = dao.insert(
             AccountIdentifierEntity(
                 accountId = accountId,
@@ -116,67 +150,64 @@ class AccountIdentifierRepository(
                 updatedAt = now(),
             ),
         )
-        val inserted = if (newId > 0L) dao.getByAccount(accountId).firstOrNull { it.id == newId } else null
-        val conflictList = if (crossAccount != null) listOf(crossAccount) else emptyList()
-        val message = if (conflictList.isNotEmpty()) "هذا المعرف مستخدم في حساب آخر، وقد تحتاج العمليات المرتبطة به إلى مراجعة يدوية." else null
+        val inserted = if (newId > 0L) dao.getById(newId) else null
+        val message = if (conflicts.isNotEmpty()) {
+            "هذا المعرف مستخدم في حساب آخر، وقد تحتاج العمليات المرتبطة به إلى مراجعة يدوية."
+        } else {
+            null
+        }
         return IdentifierAddOutcome(
-            result = if (conflictList.isNotEmpty()) IdentifierAddResult.DisabledDuplicate else IdentifierAddResult.Added,
+            result = if (conflicts.isNotEmpty()) IdentifierAddResult.AddedWithConflict else IdentifierAddResult.Added,
             identifier = inserted,
-            conflictingAccounts = conflictList,
+            conflictingAccounts = conflicts,
             message = message,
         )
     }
 
     suspend fun setActive(identifierId: Long, active: Boolean) {
-        val items = dao.observeAll().first()
-        val target = items.firstOrNull { it.id == identifierId } ?: return
+        val target = dao.getById(identifierId) ?: return
         dao.update(target.copy(isActive = active, updatedAt = now()))
     }
 
     suspend fun updateDisplayLabel(identifierId: Long, label: String) {
-        val items = dao.observeAll().first()
-        val target = items.firstOrNull { it.id == identifierId } ?: return
+        val target = dao.getById(identifierId) ?: return
         dao.update(target.copy(displayLabel = label, updatedAt = now()))
+    }
+
+    /**
+     * Replace the normalized value of an existing identifier. Validates type
+     * rules and reuses [addOrUpdate] conflict detection by deleting then
+     * re-inserting under the same account when the value changes.
+     */
+    suspend fun updateValue(identifierId: Long, rawValue: String, displayLabel: String? = null): IdentifierAddOutcome {
+        val existing = dao.getById(identifierId)
+            ?: return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), "المعرف غير موجود")
+        val form = IdentifierForm(
+            identifierType = existing.identifierType,
+            displayLabel = displayLabel ?: existing.displayLabel,
+            rawValue = rawValue,
+        )
+        val normalized = normalize(form.identifierType, form.rawValue)
+        if (normalized == existing.normalizedValue) {
+            displayLabel?.let { updateDisplayLabel(identifierId, it) }
+            return IdentifierAddOutcome(IdentifierAddResult.Updated, dao.getById(identifierId), emptyList(), null)
+        }
+        dao.delete(existing)
+        return addOrUpdate(existing.accountId, form)
     }
 
     suspend fun delete(identifier: AccountIdentifierEntity) = dao.delete(identifier)
 
     suspend fun detectConflicts(): Map<String, List<FinancialAccount>> {
-        val all = dao.observeAll().first()
+        val all = dao.getActive()
         val grouped = all.groupBy { it.identifierType to it.normalizedValue }
         val result = mutableMapOf<String, List<FinancialAccount>>()
         for ((key, entries) in grouped) {
-            if (entries.size <= 1) continue
+            if (entries.map { it.accountId }.distinct().size <= 1) continue
             val accounts = entries.mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
             result["${key.first}:${key.second}"] = accounts
         }
         return result
-    }
-
-    /** Idempotent backfill: convert legacy lastFourDigits values to typed AccountIdentifier rows. */
-    suspend fun backfillFromLegacyLastFour(): Int {
-        var inserted = 0
-        for (account in accountDao.getActive()) {
-            val legacy = account.lastFourDigits ?: continue
-            if (legacy.isBlank()) continue
-            val type = defaultIdentifierTypeFor(account.accountType) ?: continue
-            val normalized = normalize(type, legacy)
-            if (normalized.length != 4) continue
-            if (dao.findByTypeAndValue(type, normalized) != null) continue
-            val id = dao.insert(
-                AccountIdentifierEntity(
-                    accountId = account.id,
-                    identifierType = type,
-                    normalizedValue = normalized,
-                    displayLabel = legacy,
-                    isActive = true,
-                    createdAt = now(),
-                    updatedAt = now(),
-                ),
-            )
-            if (id > 0L) inserted += 1
-        }
-        return inserted
     }
 
     companion object {
@@ -189,7 +220,8 @@ class AccountIdentifierRepository(
             }
             val ascii = trimmed.toCharArray().map { c ->
                 when (c) {
-                    '٠' -> '0'; '١' -> '1'; '٢' -> '2'; '٣' -> '3'; '٤' -> '4'; '٥' -> '5'; '٦' -> '6'; '٧' -> '7'; '٨' -> '8'; '٩' -> '9'
+                    '٠' -> '0'; '١' -> '1'; '٢' -> '2'; '٣' -> '3'; '٤' -> '4'
+                    '٥' -> '5'; '٦' -> '6'; '٧' -> '7'; '٨' -> '8'; '٩' -> '9'
                     else -> c
                 }
             }.joinToString("")
@@ -200,28 +232,21 @@ class AccountIdentifierRepository(
         fun validate(type: AccountIdentifierType, normalized: String): String? {
             if (normalized.isEmpty()) return "قيمة المعرف مطلوبة"
             return when (type) {
-                AccountIdentifierType.SENDER_ALIAS -> if (normalized.length < 2) "اسم المرسل قصير جدًا" else null
+                AccountIdentifierType.SENDER_ALIAS ->
+                    if (normalized.length < 2) "اسم المرسل قصير جدًا" else null
                 AccountIdentifierType.ACCOUNT_LAST4,
                 AccountIdentifierType.CREDIT_CARD_LAST4,
                 AccountIdentifierType.DEBIT_CARD_LAST4,
                 AccountIdentifierType.IBAN_LAST4,
-                AccountIdentifierType.WALLET_LAST4 -> if (normalized.length != 4) "يجب أن يحتوي المعرف على أربعة أرقام بالضبط" else null
+                AccountIdentifierType.WALLET_LAST4 ->
+                    if (normalized.length != 4) "يجب أن يحتوي المعرف على أربعة أرقام بالضبط" else null
             }
         }
 
-        fun isCompatible(accountType: AccountType, type: AccountIdentifierType): Boolean = when (accountType) {
-            AccountType.BANK_ACCOUNT -> type in setOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.DEBIT_CARD_LAST4, AccountIdentifierType.IBAN_LAST4, AccountIdentifierType.SENDER_ALIAS)
-            AccountType.CREDIT_CARD -> type in setOf(AccountIdentifierType.CREDIT_CARD_LAST4, AccountIdentifierType.SENDER_ALIAS)
-            AccountType.DIGITAL_WALLET, AccountType.WALLET -> type in setOf(AccountIdentifierType.WALLET_LAST4, AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.SENDER_ALIAS)
-            AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT -> type in setOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.IBAN_LAST4, AccountIdentifierType.SENDER_ALIAS)
-            else -> type == AccountIdentifierType.SENDER_ALIAS
-        }
+        fun isCompatible(accountType: AccountType, type: AccountIdentifierType): Boolean =
+            AccountIdentifierCompatibility.isCompatibleWithAccount(accountType, type)
 
-        fun defaultIdentifierTypeFor(accountType: AccountType): AccountIdentifierType? = when (accountType) {
-            AccountType.BANK_ACCOUNT, AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT -> AccountIdentifierType.ACCOUNT_LAST4
-            AccountType.CREDIT_CARD -> AccountIdentifierType.CREDIT_CARD_LAST4
-            AccountType.DIGITAL_WALLET, AccountType.WALLET -> AccountIdentifierType.WALLET_LAST4
-            else -> null
-        }
+        fun defaultIdentifierTypeFor(accountType: AccountType): AccountIdentifierType? =
+            AccountIdentifierCompatibility.defaultIdentifierTypeFor(accountType)
     }
 }

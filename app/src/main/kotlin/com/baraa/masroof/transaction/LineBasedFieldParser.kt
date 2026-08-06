@@ -44,9 +44,15 @@ object LineBasedFieldParser {
     }
 
     fun lastFourFromValue(value: String): String? {
-        val digits = value.replace("*", "").trim()
-        return digits.lastOrNull { it.isDigit() }?.let { digits.takeLastWhile { it.isDigit() || it == '-' } }?.let { it.replace("-", "").takeLast(4) }
-            ?: digits.takeLast(4).takeIf { it.length == 4 && it.all(Char::isDigit) }
+        val trimmed = BankTextNormalizer.normalizeForParsing(value).trim()
+        if (trimmed.isEmpty()) return null
+        // Masked card/account forms: ****1234, ••••1234, XXXX1234
+        Regex("""(?i)^(?:\*+|•+|x+)[- ]?(\d{4})$""").find(trimmed)?.groupValues?.getOrNull(1)?.let { return it }
+        // Exact four digits only — never scrape arbitrary trailing digits from amounts/refs.
+        if (trimmed.length == 4 && trimmed.all { it.isDigit() }) return trimmed
+        // Labeled values that end with a masked last-four, e.g. "حساب ****7271"
+        Regex("""(?i)(?:\*+|•+|x+)[- ]?(\d{4})\s*$""").find(trimmed)?.groupValues?.getOrNull(1)?.let { return it }
+        return null
     }
 
     fun parseLabeledMoneyField(lines: List<ParsedLine>, labels: List<Regex>): BigDecimal? {
@@ -133,7 +139,8 @@ fun containsAmountLabel(label: String): Boolean {
 
     /** Parses a money literal; returns the BigDecimal plus any captured currency code. */
     private fun parseMoney(value: String): Pair<BigDecimal, String>? {
-        val trimmed = value.trim(); if (trimmed.isEmpty()) return null
+        val trimmed = BankTextNormalizer.normalizeForParsing(value).trim()
+        if (trimmed.isEmpty()) return null
         val match = MONEY_REGEX.find(trimmed) ?: return null
         val prefix = match.groupValues[1].takeIf { it.isNotEmpty() } ?: ""
         val amountText = match.groupValues[2].replace(",", "")

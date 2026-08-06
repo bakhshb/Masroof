@@ -28,7 +28,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "Type: شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال\nالتاجر: Starbucks",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
         assertEquals(BigDecimal("250"), r.amount)
@@ -43,7 +43,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Visa",
             body = "Type: Purchase\nAmount: 50.00 SAR\nMerchant: Starbucks\nAvailable balance: 1000 SAR",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
         assertEquals(0, BigDecimal("50.00").compareTo(r.amount))
@@ -56,7 +56,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Alinma",
             body = "Type: شراء عبر الإنترنت\nبمبلغ: 199.99 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.ONLINE_PURCHASE, r.transactionType)
         assertEquals(0, BigDecimal("199.99").compareTo(r.amount))
@@ -68,7 +68,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "SNB",
             body = "Type: سحب نقدي\nبمبلغ: 500 ريال\nمن: الصراف الآلي\nالرصيد: 1200 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.CASH_WITHDRAWAL, r.transactionType)
         assertEquals(0, BigDecimal("500").compareTo(r.amount))
@@ -80,7 +80,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "RiyadBank",
             body = "Type: تحويل صادر\nبمبلغ: 1500 ريال\nالمستفيد: أحمد",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.TRANSFER_OUT, r.transactionType)
         assertEquals(0, BigDecimal("1500").compareTo(r.amount))
@@ -92,7 +92,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "Type: تحويل وارد\nبمبلغ: 2000 ريال\nمن: John Doe\nالرصيد: 5000 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.TRANSFER_IN, r.transactionType)
         assertEquals(0, BigDecimal("2000").compareTo(r.amount))
@@ -104,7 +104,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "BankAlbilad",
             body = "Type: سداد\nبطاقة ائتمانية: 1234\nبمبلغ: 1250 ر.س",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.CARD_PAYMENT, r.transactionType)
         assertEquals(0, BigDecimal("1250").compareTo(r.amount))
@@ -116,7 +116,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Visa",
             body = "Type: Refund\nAmount: 75.00 SAR\nTo: your card",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.REFUND, r.transactionType)
         assertEquals(0, BigDecimal("75.00").compareTo(r.amount))
@@ -128,7 +128,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "Type: راتب\nبمبلغ: 12000 ريال\nالرصيد: 15000 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.SALARY, r.transactionType)
         assertEquals(0, BigDecimal("12000").compareTo(r.amount))
@@ -140,7 +140,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "SNB",
             body = "Type: رسوم\nبمبلغ: 25 ريال\nالرصيد: 1200 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.BANK_FEE, r.transactionType)
         assertEquals(0, BigDecimal("25").compareTo(r.amount))
@@ -152,7 +152,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlJazira",
             body = "شراء\nبمبلغ: 300 ريال\nالحالة: مرفوضة",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.DECLINED, r.transactionType)
         assertEquals(TransactionStatus.DECLINED, r.status)
@@ -166,7 +166,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "Type: شراء\nبمبلغ: 125.50 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(0, BigDecimal("125.50").compareTo(r.amount))
         assertEquals(Currency.SAR, r.currency)
@@ -174,11 +174,21 @@ class GenericBankSmsParserTest {
     }
 
     @Test
+    fun parsesArabicIndicDigitsInAmount() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "شراء\nبمبلغ: ١٢٥٫٥٠ ريال",
+            smsTimestampMillis = null,
+        )
+        assertEquals(0, BigDecimal("125.50").compareTo(r.amount))
+    }
+
+    @Test
     fun parsesDecimalAmount() {
         val r = parser.parse(
             sender = "Visa",
             body = "Amount: 89.00 SAR was charged",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(0, BigDecimal("89.00").compareTo(r.amount))
         assertEquals(Currency.SAR, r.currency)
@@ -189,7 +199,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "STCBank",
             body = "Purchase Amount: 2350.75 SAR",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(0, BigDecimal("2350.75").compareTo(r.amount))
         assertEquals(Currency.SAR, r.currency)
@@ -202,7 +212,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Unknown",
             body = "Purchase of 50 at TestMerchant",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(Currency.UNKNOWN, r.currency)
     }
@@ -212,7 +222,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 100 ريال\nالرصيد: 1000 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertNull(r.merchant)
     }
@@ -222,7 +232,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 100 ريال\nالتاجر: Starbucks",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertNull(r.accountOrCardLastFourDigits)
     }
@@ -234,7 +244,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Bank",
             body = "####@@@@\n\n$$$",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertNotNull(r)
         assertTrue(r.confidence <= 20)
@@ -245,7 +255,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Verify",
             body = "Your OTP code is 123456. Do not share.",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertTrue("OTP should not parse to a transaction", r.confidence < PARSE_FAIL_THRESHOLD)
         assertNull(r.amount)
@@ -256,7 +266,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "ShoesStore",
             body = "50% off all shoes today only! Subscribe now for more deals.",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertTrue("ad should not parse to a transaction", r.confidence < PARSE_FAIL_THRESHOLD)
         assertNull(r.amount)
@@ -269,7 +279,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "Type: Purchase\nAmount: 50 SAR\nتم خصم: 50 ريال\nBalance: 1000 SAR",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(TransactionType.PURCHASE, r.transactionType)
         assertEquals(0, BigDecimal("50").compareTo(r.amount))
@@ -281,7 +291,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(0, BigDecimal("250").compareTo(r.amount))
     }
@@ -292,12 +302,12 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 250 ريال\nالرصيد المتاح: 4500 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertNotNull(r.amount)
         assertFalse(
             "balance figure should never be picked as the transaction amount",
-            r.amount == BigDecimal("4500") || r.amount == BigDecimal("4500.00"),
+            r.amount == BigDecimal("4500") || r.amount == BigDecimal("4500.00")
         )
     }
 
@@ -308,7 +318,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "Visa",
             body = "Card: 1234\nAmount: 50.00 SAR\nMerchant: Starbucks",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals("1234", r.accountOrCardLastFourDigits)
     }
@@ -318,7 +328,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "بطاقة: 5678\nبمبلغ: 100 ريال\nالتاجر: Starbucks",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals("5678", r.accountOrCardLastFourDigits)
     }
@@ -328,13 +338,13 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 100 ريال\nالتاريخ: 15/01/2024 14:30",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(LocalDate.of(2024, 1, 15), r.transactionDate)
         assertEquals(LocalTime.of(14, 30), r.transactionTime)
         assertTrue(
             "should note that date came from body",
-            r.parsingNotes.any { it.startsWith("date from message body") || it == "date and time from message body" },
+            r.parsingNotes.any { it.startsWith("date from message body") || it == "date and time from message body" }
         )
     }
 
@@ -343,7 +353,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 100 ريال",
-            smsTimestampMillis = smsEpoch,
+            smsTimestampMillis = smsEpoch
         )
         assertNotNull(r.transactionDate)
         assertNotNull(r.transactionTime)
@@ -354,7 +364,7 @@ class GenericBankSmsParserTest {
         assertEquals(expectedDate, r.transactionDate)
         assertTrue(
             "should note that date came from SMS metadata",
-            r.parsingNotes.any { it.startsWith("date from SMS metadata") },
+            r.parsingNotes.any { it.startsWith("date from SMS metadata") }
         )
     }
 
@@ -365,7 +375,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi Bank",
             body = "شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals("AlRajhi Bank", r.originalSender)
         assertEquals("شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks", r.originalMessage)
@@ -386,7 +396,7 @@ class GenericBankSmsParserTest {
         val r = parser.parse(
             sender = "AlRajhi",
             body = "بمبلغ: 123.45 ريال",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertEquals(0, BigDecimal("123.45").compareTo(r.amount))
     }

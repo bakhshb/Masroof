@@ -39,6 +39,7 @@ class TransactionLinkingService(
             accountLinkConfidence = 100,
             accountLinkNeedsReview = false,
             postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
+            exclusionReason = if (transaction.exclusionReason?.contains("محتمل تكرار") == true) null else transaction.exclusionReason,
             updatedAt = now(),
         )
         transactions.update(linked)
@@ -49,11 +50,18 @@ class TransactionLinkingService(
         // journal. We must keep the draft until the caller explicitly
         // requests POSTING; preserving the previous draft-only behavior
         // here would silently mark the row as reviewed but never balance it.
+        if (transaction.financialTreatment.requiresTwoAccounts) {
+            require(sourceAccountId != null && destinationAccountId != null) {
+                "two_sided_link_requires_source_and_destination"
+            }
+            require(sourceAccountId != destinationAccountId) { "two_sided_accounts_must_differ" }
+        }
         val draft = generator.generate(linked, source, destination)
         val resolvedId = if (draft != null && transaction.linkedJournalEntryId == null) ledger.create(draft)
         else transaction.linkedJournalEntryId
-        if (rememberForFuture && preferred != null) {
-            runCatching { rules?.remember(linked, preferred, if (preferred == source) "source" else "destination") }
+        if (rememberForFuture) {
+            source?.let { runCatching { rules?.remember(linked, it, "source") } }
+            destination?.let { runCatching { rules?.remember(linked, it, "destination") } }
         }
         identifierToAdd?.let { candidate ->
             val accountId = preferred?.id ?: sourceAccountId ?: destinationAccountId ?: return@let
@@ -84,6 +92,31 @@ class TransactionLinkingService(
         return posted
     }
 
+    /** User chooses to ignore an unresolved transaction without posting a journal. */
+    suspend fun ignoreTransaction(transaction: TransactionEntity): TransactionEntity {
+        require(transaction.postingStatus != TransactionPostingStatus.POSTED) { "posted_transaction_requires_correction" }
+        val ignored = transaction.copy(
+            needsReview = false,
+            accountLinkNeedsReview = false,
+            userConfirmed = true,
+            postingStatus = TransactionPostingStatus.VOIDED,
+            exclusionReason = transaction.exclusionReason ?: "تجاهلها المستخدم",
+            updatedAt = now(),
+        )
+        transactions.update(ignored)
+        return ignored
+    }
+
+    /** Re-run automatic matching without creating identifiers. */
+    suspend fun reanalyze(
+        transaction: TransactionEntity,
+        accounts: List<FinancialAccount>,
+        identifierEvidence: List<com.baraa.masroof.transaction.ParsedIdentifierEvidence> = emptyList(),
+    ): TransactionEntity {
+        require(transaction.postingStatus != TransactionPostingStatus.POSTED) { "posted_transaction_requires_correction" }
+        return linkAndGenerate(transaction, accounts, identifierEvidence = identifierEvidence)
+    }
+
     private fun displayLabelFor(candidate: IdentifierCandidate): String = when (candidate.identifierType) {
         AccountIdentifierType.ACCOUNT_LAST4 -> "حساب"
         AccountIdentifierType.CREDIT_CARD_LAST4 -> "بطاقة ائتمانية"
@@ -93,7 +126,12 @@ class TransactionLinkingService(
         AccountIdentifierType.SENDER_ALIAS -> "مرسل"
     }
 
-    suspend fun linkAndGenerate(transaction: TransactionEntity, accounts: List<FinancialAccount>, trackingStartDate: Long? = null): TransactionEntity {
+    suspend fun linkAndGenerate(
+        transaction: TransactionEntity,
+        accounts: List<FinancialAccount>,
+        trackingStartDate: Long? = null,
+        identifierEvidence: List<com.baraa.masroof.transaction.ParsedIdentifierEvidence> = emptyList(),
+    ): TransactionEntity {
         if (transaction.postingStatus == TransactionPostingStatus.POSTED || transaction.linkedJournalEntryId != null) return transaction
         // Pre-tracking-start transactions are preserved but never auto-posted.
         val beforeStart = trackingStartDate
@@ -111,7 +149,7 @@ class TransactionLinkingService(
             transactions.update(kept)
             return kept
         }
-        val direct = AccountMatcher.match(transaction, accounts, identifierRepository)
+        val direct = AccountMatcher.match(transaction, accounts, identifierRepository, identifierEvidence)
         val remembered = if (direct.level == AccountLinkConfidence.UNMATCHED) rules?.find(transaction, accounts) else null
         val match = if (remembered == null) direct else AccountMatcher.Match(
             account = remembered,

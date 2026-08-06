@@ -36,7 +36,7 @@ class AutoImportRoutingTest {
             importedTransactions = 5,
             linkedTransactions = 3, // 2 were NEEDS_REVIEW
             postedTransactions = 3, // only the 3 linked ones are POSTED
-            needsReviewTransactions = 2,
+            needsReviewTransactions = 2
         )
         assertEquals(r.linkedTransactions, r.postedTransactions)
         assertTrue(r.linkedTransactions + r.needsReviewTransactions <= r.importedTransactions)
@@ -51,7 +51,7 @@ class AutoImportRoutingTest {
             linkedTransactions = 4,
             postedTransactions = 4,
             needsReviewTransactions = 1,
-            beforeTrackingStartCount = 1,
+            beforeTrackingStartCount = 1
         )
         assertTrue(r.beforeTrackingStartCount > 0)
         assertTrue(r.postedTransactions < r.importedTransactions)
@@ -66,7 +66,7 @@ class AutoImportRoutingTest {
             recognizedTransactions = 42,
             needsReviewTransactions = 30,
             duplicateTransactions = 0,
-            beforeTrackingStartCount = 0,
+            beforeTrackingStartCount = 0
         )
         assertEquals(12, preview.readyCount)
     }

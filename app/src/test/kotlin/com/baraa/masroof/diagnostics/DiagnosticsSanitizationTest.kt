@@ -192,7 +192,7 @@ class DiagnosticsSanitizationTest {
         for (i in 1..10) {
             log.record(
                 category = DiagnosticError.ErrorCategory.SMS_PERMISSION_DENIED,
-                message = "Error #$i",
+                message = "Error #$i"
             )
         }
         assertEquals(3, log.snapshot().size)
@@ -249,6 +249,6 @@ class DiagnosticsSanitizationTest {
             ruleNames = listOf("SAFETY", "CATEGORY_RULE"),
             recentErrors = emptyList(),
             buildTimestamp = "2024-01-01T00:00:00Z",
-            diagnosticReportVersion = "v1",
+            diagnosticReportVersion = "v1"
         )
 }

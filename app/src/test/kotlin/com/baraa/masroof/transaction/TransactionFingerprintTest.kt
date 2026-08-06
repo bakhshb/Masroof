@@ -18,7 +18,7 @@ class TransactionFingerprintTest {
         currency = Currency.SAR,
         type = TransactionType.PURCHASE,
         merchant = "Starbucks",
-        lastFour = "1234",
+        lastFour = "1234"
     )
 
     private data class BaseInputs(
@@ -28,7 +28,7 @@ class TransactionFingerprintTest {
         val currency: Currency,
         val type: TransactionType,
         val merchant: String?,
-        val lastFour: String?,
+        val lastFour: String?
     )
 
     private fun fp(b: BaseInputs) = TransactionFingerprint.compute(
@@ -38,7 +38,7 @@ class TransactionFingerprintTest {
         currency = b.currency,
         type = b.type,
         merchant = b.merchant,
-        lastFour = b.lastFour,
+        lastFour = b.lastFour
     )
 
     // -- Determinism ---------------------------------------------------------

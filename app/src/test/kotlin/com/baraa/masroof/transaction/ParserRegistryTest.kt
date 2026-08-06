@@ -23,7 +23,7 @@ class ParserRegistryTest {
         val r = BankParserRegistry.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 250 ريال",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         assertEquals("AlRajhi", r.parserName)
         assertEquals(0, java.math.BigDecimal("250").compareTo(r.amount))
@@ -34,7 +34,7 @@ class ParserRegistryTest {
         val r = BankParserRegistry.parse(
             sender = "Unknown Sender 1234",
             body = "Purchase of SAR 50 at TestMerchant",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         assertEquals("Generic", r.parserName)
     }
@@ -46,7 +46,7 @@ class ParserRegistryTest {
         val r = BankParserRegistry.parse(
             sender = "ALRAJHI",
             body = "شراء\nبمبلغ: 100 ريال",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         assertEquals("AlRajhi", r.parserName)
     }

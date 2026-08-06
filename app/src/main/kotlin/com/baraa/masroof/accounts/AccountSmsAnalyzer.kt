@@ -1,6 +1,7 @@
 package com.baraa.masroof.accounts
 
 import com.baraa.masroof.data.db.AccountIdentifierType
+import com.baraa.masroof.ledger.AccountIdentifierCompatibility
 import com.baraa.masroof.sms.SenderNormalizer
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.transaction.AccountType
@@ -23,7 +24,12 @@ object AccountSmsAnalyzer {
     /** A collapsed picker preview: masks digit sequences and omits OTP/balance lines. */
     fun sanitizedPreview(body: String?): String {
         val safe = body.orEmpty().lineSequence()
-            .filterNot { it.contains("otp", true) || it.contains("رمز التحقق") || it.contains("الرصيد") || it.contains("balance", true) }
+            .filterNot {
+                it.contains("otp", true) ||
+                    it.contains("رمز التحقق") ||
+                    it.contains("الرصيد") ||
+                    it.contains("balance", true)
+            }
             .joinToString(" ")
             .replace(Regex("\\d{4,}"), "••••")
             .replace(Regex("\\s+"), " ")
@@ -34,12 +40,14 @@ object AccountSmsAnalyzer {
     fun analyze(message: SmsMessage, accountType: AccountType): AccountSmsAnalysis? {
         val sender = message.sender?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val parsed = BankParserRegistry.parse(sender, message.body, message.timestamp.takeIf { it > 0L })
-        val evidence = parsed.identifierEvidence.firstOrNull { compatible(accountType, it.type) }
+        val evidence = parsed.identifierEvidence.firstOrNull {
+            AccountIdentifierCompatibility.isCompatibleTyped(accountType, it.type)
+        }
         val identifier = evidence?.lastFour?.takeIf { it.length == 4 && it.all(Char::isDigit) }
             ?: labeledLastFour(message.body)
             ?: parsed.accountOrCardLastFourDigits?.takeIf { it.length == 4 && it.all(Char::isDigit) }
         val type = evidence?.type ?: identifier?.let { identifierType(message.body, accountType) }
-        val incompatible = type != null && !compatible(accountType, type)
+        val incompatible = type != null && !AccountIdentifierCompatibility.isCompatibleTyped(accountType, type)
         return AccountSmsAnalysis(
             senderDisplay = sender,
             senderKey = SenderNormalizer.normalize(sender) ?: return null,
@@ -57,24 +65,20 @@ object AccountSmsAnalyzer {
     }
 
     private fun labeledLastFour(body: String?): String? = body?.let {
-        Regex("(?:ب?بطاقة\\s+(?:ائتمانية|مدى)|حساب|الآيبان|آيبان|iban)\\s*(?:رقم)?\\s*[:：]?\\s*([0-9٠-٩]{4})", RegexOption.IGNORE_CASE)
-            .find(it)?.groupValues?.getOrNull(1)?.map { c -> if (c in '٠'..'٩') ('0' + (c - '٠')) else c }?.joinToString("")
+        Regex(
+            "(?:ب?بطاقة\\s+(?:ائتمانية|مدى)|حساب|الآيبان|آيبان|iban)\\s*(?:رقم)?\\s*[:：]?\\s*([0-9٠-٩]{4})",
+            RegexOption.IGNORE_CASE,
+        ).find(it)?.groupValues?.getOrNull(1)
+            ?.map { c -> if (c in '٠'..'٩') ('0' + (c - '٠')) else c }
+            ?.joinToString("")
     }
 
     private fun identifierType(body: String?, accountType: AccountType): AccountIdentifierType = when {
         body.orEmpty().contains("مدى") -> AccountIdentifierType.DEBIT_CARD_LAST4
-        body.orEmpty().contains("ائتمان") || body.orEmpty().contains("credit", true) -> AccountIdentifierType.CREDIT_CARD_LAST4
-        accountType == AccountType.CREDIT_CARD -> AccountIdentifierType.CREDIT_CARD_LAST4
-        accountType in setOf(AccountType.DIGITAL_WALLET, AccountType.WALLET) -> AccountIdentifierType.WALLET_LAST4
-        else -> AccountIdentifierType.ACCOUNT_LAST4
-    }
-
-    private fun compatible(accountType: AccountType, type: AccountIdentifierType): Boolean = when (accountType) {
-        AccountType.BANK_ACCOUNT -> type in setOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.DEBIT_CARD_LAST4, AccountIdentifierType.IBAN_LAST4)
-        AccountType.CREDIT_CARD -> type == AccountIdentifierType.CREDIT_CARD_LAST4
-        AccountType.DIGITAL_WALLET, AccountType.WALLET -> type in setOf(AccountIdentifierType.WALLET_LAST4, AccountIdentifierType.ACCOUNT_LAST4)
-        AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT -> type in setOf(AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.IBAN_LAST4)
-        else -> false
+        body.orEmpty().contains("ائتمان") || body.orEmpty().contains("credit", true) ->
+            AccountIdentifierType.CREDIT_CARD_LAST4
+        else -> AccountIdentifierCompatibility.defaultIdentifierTypeFor(accountType)
+            ?: AccountIdentifierType.ACCOUNT_LAST4
     }
 
     private fun transactionLabel(parsed: ParsedTransaction): String = when (parsed.transactionType) {

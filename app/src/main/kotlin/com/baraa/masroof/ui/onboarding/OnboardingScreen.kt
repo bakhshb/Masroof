@@ -13,9 +13,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +32,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.ui.accounts.AccountSmsBindingDialog
+import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
@@ -230,6 +236,14 @@ private fun nextStep(completed: OnboardingStep): OnboardingStep = when (complete
 @Composable
 private fun WelcomeStep(onContinue: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+        Surface(shape = FinancialShapes.pill, color = MaterialTheme.colorScheme.primaryContainer) {
+            Icon(
+                Icons.Filled.AccountBalanceWallet,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(16.dp).size(36.dp),
+            )
+        }
         Text("مرحبًا بك في مصروف", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("مصروف يساعدك على فهم أموالك تلقائيًا من رسائل البنك، دون الحاجة إلى إدخال كل عملية يدويًا.", style = MaterialTheme.typography.bodyLarge)
         PrimaryButton(label = "ابدأ الإعداد", onClick = onContinue)
@@ -317,7 +331,10 @@ private fun OpeningBalanceStep(state: UiOnboardingState, onNext: () -> Unit) {
 private fun PermissionStep(granted: Boolean, permanentlyDenied: Boolean, onRequest: () -> Unit, onContinue: () -> Unit, onOpenSettings: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
         Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-            Text("السماح بقراءة الرسائل البنكية", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Filled.Sms, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("السماح بقراءة الرسائل البنكية", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
         }
         Text("يحتاج التطبيق إلى إذن قراءة الرسائل للتعرف على العمليات البنكية واستيرادها. التطبيق يقرأ الرسائل فقط، ولن يرسل أو يعدل أو يحذف أي رسالة.", style = MaterialTheme.typography.bodyLarge)
         Surface(
@@ -351,6 +368,14 @@ private fun PermissionStep(granted: Boolean, permanentlyDenied: Boolean, onReque
 @Composable
 private fun CompletionStep(app: MasroofApplication, state: UiOnboardingState, onFinish: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+        Surface(shape = FinancialShapes.pill, color = MaterialTheme.colorScheme.secondaryContainer) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(16.dp).size(36.dp),
+            )
+        }
         Text("جاهز للبدء", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text("تم إعداد التطبيق بنجاح. اضغط للبدء في استخدام مصروف.", style = MaterialTheme.typography.bodyLarge)
         PrimaryButton(label = "بدء استخدام التطبيق", onClick = onFinish)
@@ -384,7 +409,6 @@ private suspend fun persistOnboardingAccount(app: MasroofApplication, state: UiO
         displayName = state.displayName.trim(),
         accountType = accountType,
         institutionName = state.institution.trim().takeIf { it.isNotBlank() },
-        lastFourDigits = state.lastFour.takeIf { it.length == 4 && it.all(Char::isDigit) },
         accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(accountType),
         currency = state.currency,
         openingBalance = openingBalance,
@@ -393,6 +417,16 @@ private suspend fun persistOnboardingAccount(app: MasroofApplication, state: UiO
         includeInLiquidity = state.includeLiquidity,
     )
     if (accountId <= 0L) return null
+    val lastFour = state.lastFour.takeIf { it.length == 4 && it.all(Char::isDigit) }
+    if (lastFour != null) {
+        val type = com.baraa.masroof.data.repository.AccountIdentifierRepository.defaultIdentifierTypeFor(accountType)
+        if (type != null) {
+            app.accountIdentifierRepository.addOrUpdate(
+                accountId,
+                com.baraa.masroof.data.repository.IdentifierForm(type, "معرف الحساب", lastFour),
+            )
+        }
+    }
     // 5. Reload to confirm the row is actually persisted.
     val reloaded = app.financialAccountRepository.getById(accountId) ?: return null
     return reloaded.id

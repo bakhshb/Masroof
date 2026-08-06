@@ -51,7 +51,7 @@ class AiBatchAndSuggestionsTest {
 
     private fun makeCategory(id: Long, name: String, enabled: Boolean = true) = Category(
         id = id, parentId = null, nameAr = name, nameEn = null,
-        sortOrder = id.toInt(), enabled = enabled, isSystem = false,
+        sortOrder = id.toInt(), enabled = enabled, isSystem = false
     )
 
     private fun makeTxn(
@@ -63,7 +63,7 @@ class AiBatchAndSuggestionsTest {
         treatment: FinancialTreatment = FinancialTreatment.EXPENSE,
         categoryId: Long? = null,
         userConfirmed: Boolean = false,
-        needsReview: Boolean = true,
+        needsReview: Boolean = true
     ) = TransactionEntity(
         id = id,
         uniqueFingerprint = "fp-$id",
@@ -88,7 +88,7 @@ class AiBatchAndSuggestionsTest {
         categoryConfidence = 0,
         needsReview = needsReview,
         userConfirmed = userConfirmed,
-        exclusionReason = null,
+        exclusionReason = null
     )
 
     private fun buildBatchService(
@@ -96,14 +96,14 @@ class AiBatchAndSuggestionsTest {
         catRepo: FakeCategoryRepository,
         memRepo: FakeMerchantMemoryRepository,
         provider: AiCategorizationProvider,
-        cfg: AiProviderConfig = AiProviderConfig(enabled = true),
+        cfg: AiProviderConfig = AiProviderConfig(enabled = true)
     ): Pair<AiBatchCategorizationService, AiCategorizationService> {
         val cacheDao = TestAiCacheDao()
         val cacheRepo = AiCacheRepository(cacheDao)
         val svc = AiCategorizationService(
             configProvider = { cfg },
             provider = provider,
-            cache = cacheRepo,
+            cache = cacheRepo
         )
         val sugRepo = FakeAiSuggestionRepository()
         val batch = AiBatchCategorizationService(
@@ -111,7 +111,7 @@ class AiBatchAndSuggestionsTest {
             categoryRepository = catRepo,
             merchantMemoryRepository = memRepo,
             aiService = svc,
-            suggestionRepository = sugRepo,
+            suggestionRepository = sugRepo
         )
         return batch to svc
     }
@@ -165,14 +165,14 @@ class AiBatchAndSuggestionsTest {
         val (batch, _) = buildBatchService(
             txnRepo, catRepo, memRepo,
             MockAiCategorizationProvider(),
-            cfg = AiProviderConfig(enabled = false),
+            cfg = AiProviderConfig(enabled = false)
         )
         val svc = batch
         // The batch service doesn't gate on enabled itself — the UI does.
         // But the per-item eligibility check does.
         val eligible = com.baraa.masroof.ai.AiBatchCategorizationService.isEligible(
             kotlinx.coroutines.runBlocking { txnRepo.getAllNewestFirst() }.first(),
-            emptyList(),
+            emptyList()
         )
         assertTrue("eligible should still work at the service level", eligible)
     }
@@ -235,12 +235,12 @@ class AiBatchAndSuggestionsTest {
         val state = batch.state.value
         assertTrue(
             "state must be Done, not still running: $state",
-            state is BatchState.Done,
+            state is BatchState.Done
         )
         // invocations must equal 2 (one per txn), not 6.
         assertTrue(
             "provider should have been called exactly twice (was ${slowProvider.invocations})",
-            slowProvider.invocations == 2,
+            slowProvider.invocations == 2
         )
         batch.cancel()
     }
@@ -272,14 +272,14 @@ class AiBatchAndSuggestionsTest {
         val state = batch.state.value
         assertTrue(
             "state must be Running (canceled) or Done, was $state",
-            (state is BatchState.Running && state.canceled) || state is BatchState.Done,
+            (state is BatchState.Running && state.canceled) || state is BatchState.Done
         )
         if (state is BatchState.Done) {
             assertTrue("summary must be marked canceled", state.summary.canceled)
             // We should NOT have processed all 10 transactions.
             assertTrue(
                 "should have processed fewer than 10 (was ${state.summary.processed})",
-                state.summary.processed < 10,
+                state.summary.processed < 10
             )
         } else if (state is BatchState.Running) {
             assertTrue("running state must be marked canceled", state.canceled)
@@ -347,7 +347,7 @@ class AiBatchAndSuggestionsTest {
                     resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
                     createdAt = 0L,
-                    updatedAt = 0L,
+                    updatedAt = 0L
                 )
             )
             val ok = svc.accept(sugId)
@@ -392,7 +392,7 @@ class AiBatchAndSuggestionsTest {
                     resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
                     createdAt = 0L,
-                    updatedAt = 0L,
+                    updatedAt = 0L
                 )
             )
             val ok = svc.modify(sugId, newCategoryId = 2L, newCategoryName = "مطاعم")
@@ -438,7 +438,7 @@ class AiBatchAndSuggestionsTest {
                     resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
                     createdAt = 0L,
-                    updatedAt = 0L,
+                    updatedAt = 0L
                 )
             )
             svc.reject(sugId)
@@ -484,7 +484,7 @@ class AiBatchAndSuggestionsTest {
                     resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
                     createdAt = 0L,
-                    updatedAt = 0L,
+                    updatedAt = 0L
                 )
             )
             val ok = svc.accept(sugId)
@@ -503,7 +503,7 @@ class AiBatchAndSuggestionsTest {
             categoryId = 1L, categoryName = "x",
             normalizedMerchantName = "m", confidence = 40,
             explanation = "low",
-            providerName = "p", modelName = "m", responseVersion = "v1",
+            providerName = "p", modelName = "m", responseVersion = "v1"
         )
         assertTrue("low confidence must be flagged", result.confidence < 80)
     }
@@ -515,7 +515,7 @@ class AiBatchAndSuggestionsTest {
             categoryId = 1L, categoryName = "x",
             normalizedMerchantName = "m", confidence = 95,
             explanation = "high",
-            providerName = "p", modelName = "m", responseVersion = "v1",
+            providerName = "p", modelName = "m", responseVersion = "v1"
         )
         assertTrue("high confidence must still surface to user", result.confidence >= 80)
         // The repository's accept() returns true only after the user
@@ -538,7 +538,7 @@ class AiBatchAndSuggestionsTest {
                     providerName = "p", modelName = "m",
                     promptVersion = "v1", resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
-                    createdAt = 100L, updatedAt = 100L,
+                    createdAt = 100L, updatedAt = 100L
                 )
             )
             sugRepo.dao.insert(
@@ -550,7 +550,7 @@ class AiBatchAndSuggestionsTest {
                     providerName = "p", modelName = "m",
                     promptVersion = "v1", resultVersion = "v1",
                     status = AiSuggestionEntity.STATUS_PENDING,
-                    createdAt = 200L, updatedAt = 200L,
+                    createdAt = 200L, updatedAt = 200L
                 )
             )
             val pending = sugRepo.dao.observePending()
@@ -583,7 +583,7 @@ class AiBatchAndSuggestionsTest {
         assertTrue(
             "empty base URL must produce EMPTY_BASE_URL error",
             errors.any { it.field == AiSettingsValidator.Field.BASE_URL &&
-                it.errorKey == AiSettingsValidator.ErrorKey.EMPTY_BASE_URL },
+                it.errorKey == AiSettingsValidator.ErrorKey.EMPTY_BASE_URL }
         )
     }
 
@@ -593,7 +593,7 @@ class AiBatchAndSuggestionsTest {
         val errors = AiSettingsValidator.validate(cfg, hasApiKey = true)
         assertTrue(
             "invalid URL must produce INVALID_BASE_URL error",
-            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.INVALID_BASE_URL },
+            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.INVALID_BASE_URL }
         )
     }
 
@@ -603,7 +603,7 @@ class AiBatchAndSuggestionsTest {
         val errors = AiSettingsValidator.validate(cfg, hasApiKey = true)
         assertTrue(
             "HTTP must produce HTTP_NOT_ALLOWED error",
-            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.HTTP_NOT_ALLOWED },
+            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.HTTP_NOT_ALLOWED }
         )
     }
 
@@ -613,7 +613,7 @@ class AiBatchAndSuggestionsTest {
         val errors = AiSettingsValidator.validate(cfg, hasApiKey = true)
         assertTrue(
             "empty model must produce EMPTY_MODEL_NAME error",
-            errors.any { it.field == AiSettingsValidator.Field.MODEL_NAME },
+            errors.any { it.field == AiSettingsValidator.Field.MODEL_NAME }
         )
     }
 
@@ -623,7 +623,7 @@ class AiBatchAndSuggestionsTest {
         val errors = AiSettingsValidator.validate(cfg, hasApiKey = false)
         assertTrue(
             "missing key must produce MISSING_API_KEY error",
-            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.MISSING_API_KEY },
+            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.MISSING_API_KEY }
         )
     }
 
@@ -633,7 +633,7 @@ class AiBatchAndSuggestionsTest {
         val errors = AiSettingsValidator.validate(cfg, hasApiKey = true)
         assertTrue(
             "out-of-range confidence must produce CONFIDENCE_OUT_OF_RANGE error",
-            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.CONFIDENCE_OUT_OF_RANGE },
+            errors.any { it.errorKey == AiSettingsValidator.ErrorKey.CONFIDENCE_OUT_OF_RANGE }
         )
     }
 }

@@ -18,6 +18,12 @@ import kotlinx.coroutines.flow.Flow
     @Query("SELECT * FROM account_identifiers WHERE accountId = :accountId")
     suspend fun getByAccount(accountId: Long): List<AccountIdentifierEntity>
 
+    @Query("SELECT * FROM account_identifiers WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): AccountIdentifierEntity?
+
+    @Query("SELECT * FROM account_identifiers WHERE isActive = 1")
+    suspend fun getActive(): List<AccountIdentifierEntity>
+
     @Query("SELECT * FROM account_identifiers WHERE normalizedValue = :value AND isActive = 1")
     suspend fun findByValue(value: String): AccountIdentifierEntity?
 

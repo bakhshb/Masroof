@@ -38,6 +38,7 @@ fun IdentifiersSection(
     var items by remember { mutableStateOf<List<AccountIdentifierEntity>>(emptyList()) }
     var showAdd by remember { mutableStateOf(false) }
     var showSmsBinding by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<AccountIdentifierEntity?>(null) }
     LaunchedEffect(accountId) {
         repo.observeByAccount(accountId).collectLatest { items = it }
     }
@@ -49,11 +50,12 @@ fun IdentifiersSection(
         TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) { Text("ربط الحساب برسالة بنكية") }
         if (items.isEmpty()) Text("لا توجد معرفات بعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
         items.forEach { identifier ->
-            IdentifierRow(identifier = identifier, onToggle = { active ->
-                scope.launch { repo.setActive(identifier.id, active) }
-            }, onDelete = {
-                scope.launch { repo.delete(identifier) }
-            })
+            IdentifierRow(
+                identifier = identifier,
+                onToggle = { active -> scope.launch { repo.setActive(identifier.id, active) } },
+                onEdit = { editing = identifier },
+                onDelete = { scope.launch { repo.delete(identifier) } },
+            )
         }
         if (showSmsBinding) AccountSmsBindingDialog(accountId, accountType) { showSmsBinding = false }
         if (showAdd) {
@@ -67,18 +69,39 @@ fun IdentifiersSection(
                 },
             )
         }
+        editing?.let { target ->
+            EditIdentifierDialog(
+                identifier = target,
+                repository = repo,
+                onDismiss = { editing = null },
+                onSaved = {
+                    editing = null
+                    onPossibleConflict(it)
+                },
+            )
+        }
     }
 }
 
 @Composable
-private fun IdentifierRow(identifier: AccountIdentifierEntity, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun IdentifierRow(
+    identifier: AccountIdentifierEntity,
+    onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(typeLabel(identifier.identifierType), style = MaterialTheme.typography.bodyMedium)
                 Text(maskedValue(identifier), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if (identifier.isActive) "نشط" else "معطل", style = MaterialTheme.typography.labelSmall, color = if (identifier.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                Text(
+                    if (identifier.isActive) "نشط" else "معطل",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (identifier.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
             }
+            TextButton(onClick = onEdit) { Text("تعديل") }
             TextButton(onClick = { onToggle(!identifier.isActive) }) { Text(if (identifier.isActive) "تعطيل" else "تفعيل") }
             TextButton(onClick = onDelete) { Text("حذف") }
         }
@@ -122,6 +145,63 @@ private fun AddIdentifierDialog(
                     else onSaved(outcome)
                 }
             }) { Text("إضافة") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+@Composable
+private fun EditIdentifierDialog(
+    identifier: AccountIdentifierEntity,
+    repository: AccountIdentifierRepository,
+    onDismiss: () -> Unit,
+    onSaved: (IdentifierAddOutcome) -> Unit,
+) {
+    var value by remember {
+        mutableStateOf(
+            if (identifier.identifierType == AccountIdentifierType.SENDER_ALIAS) {
+                identifier.displayLabel
+            } else {
+                identifier.normalizedValue
+            },
+        )
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل المعرف") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(typeLabel(identifier.identifierType))
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it.filter { ch -> ch != ' ' } },
+                    label = {
+                        Text(
+                            if (identifier.identifierType == AccountIdentifierType.SENDER_ALIAS) {
+                                "اسم المرسل"
+                            } else {
+                                "آخر 4 أرقام"
+                            },
+                        )
+                    },
+                    isError = error != null,
+                    supportingText = { error?.let { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        val outcome = repository.updateValue(identifier.id, value)
+                        if (outcome.result == IdentifierAddResult.Rejected) error = outcome.message
+                        else onSaved(outcome)
+                    }
+                },
+            ) { Text("حفظ") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
     )

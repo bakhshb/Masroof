@@ -23,9 +23,9 @@ class AccountInputValidatorTest {
     fun blankAccountNameFails() {
         val errors = AccountInputValidator.validate(
             name = "  ",
-            lastFourDigits = "1234",
             openingBalance = BigDecimal("1000"),
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertTrue(
             "blank name must produce BLANK_NAME error",
@@ -37,9 +37,9 @@ class AccountInputValidatorTest {
     fun emptyNameFails() {
         val errors = AccountInputValidator.validate(
             name = "",
-            lastFourDigits = null,
             openingBalance = BigDecimal.ZERO,
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertEquals(1, errors.size)
         assertEquals(AccountInputValidator.ErrorKey.BLANK_NAME, errors.first().key)
@@ -49,43 +49,11 @@ class AccountInputValidatorTest {
     fun validNamePasses() {
         val errors = AccountInputValidator.validate(
             name = "Al Rajhi Checking",
-            lastFourDigits = "1234",
             openingBalance = BigDecimal("1000"),
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertTrue("valid input should produce no errors", errors.isEmpty())
-    }
-
-    @Test
-    fun lastFourDigitsMustBeExactlyFourDigitsWhenProvided() {
-        val tooShort = AccountInputValidator.validate(
-            name = "X", lastFourDigits = "12",
-            openingBalance = BigDecimal.ZERO, openingBalanceDate = today(), today = today(),
-        )
-        assertTrue(tooShort.any { it.key == AccountInputValidator.ErrorKey.INVALID_LAST_FOUR })
-
-        val tooLong = AccountInputValidator.validate(
-            name = "X", lastFourDigits = "12345",
-            openingBalance = BigDecimal.ZERO, openingBalanceDate = today(), today = today(),
-        )
-        assertTrue(tooLong.any { it.key == AccountInputValidator.ErrorKey.INVALID_LAST_FOUR })
-
-        val letters = AccountInputValidator.validate(
-            name = "X", lastFourDigits = "abcd",
-            openingBalance = BigDecimal.ZERO, openingBalanceDate = today(), today = today(),
-        )
-        assertTrue(letters.any { it.key == AccountInputValidator.ErrorKey.INVALID_LAST_FOUR })
-    }
-
-    @Test
-    fun nullLastFourDigitsIsValid() {
-        val errors = AccountInputValidator.validate(
-            name = "Cash",
-            lastFourDigits = null,
-            openingBalance = BigDecimal("100"),
-            openingBalanceDate = today(), today = today(),
-        )
-        assertTrue(errors.isEmpty())
     }
 
     @Test
@@ -94,7 +62,6 @@ class AccountInputValidatorTest {
         val future = fixedToday.plusDays(1)
         val errors = AccountInputValidator.validate(
             name = "X",
-            lastFourDigits = null,
             openingBalance = BigDecimal.ZERO,
             openingBalanceDate = future,
             today = fixedToday,
@@ -106,9 +73,9 @@ class AccountInputValidatorTest {
     fun todayOpeningDatePasses() {
         val errors = AccountInputValidator.validate(
             name = "X",
-            lastFourDigits = null,
             openingBalance = BigDecimal.ZERO,
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertTrue(errors.isEmpty())
     }
@@ -117,9 +84,9 @@ class AccountInputValidatorTest {
     fun negativeOpeningBalanceFails() {
         val errors = AccountInputValidator.validate(
             name = "X",
-            lastFourDigits = null,
             openingBalance = BigDecimal("-100"),
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertTrue(
             errors.any { it.key == AccountInputValidator.ErrorKey.NEGATIVE_OPENING_BALANCE },
@@ -130,9 +97,9 @@ class AccountInputValidatorTest {
     fun zeroOpeningBalanceIsValid() {
         val errors = AccountInputValidator.validate(
             name = "X",
-            lastFourDigits = null,
             openingBalance = BigDecimal.ZERO,
-            openingBalanceDate = today(), today = today(),
+            openingBalanceDate = today(),
+            today = today(),
         )
         assertTrue(errors.isEmpty())
     }
@@ -143,15 +110,12 @@ class AccountInputValidatorTest {
         institution: String? = "Al Rajhi",
         type: AccountType = AccountType.BANK_ACCOUNT,
         nature: AccountNature = AccountNature.ASSET,
-        lastFourDigits: String? = "1234",
     ) = FinancialAccount(
         id = 1,
         displayName = "Al Rajhi",
         institutionName = institution,
         accountType = type,
         accountNature = nature,
-        lastFourDigits = lastFourDigits,
-        senderAliases = emptyList(),
         currency = Currency.SAR,
         openingBalance = BigDecimal.ZERO,
         openingBalanceDate = 0L,
@@ -170,7 +134,6 @@ class AccountInputValidatorTest {
                 institutionName = "Al Rajhi",
                 accountType = AccountType.BANK_ACCOUNT,
                 accountNature = AccountNature.ASSET,
-                lastFourDigits = "1234",
             ),
             existing = existing,
         )
@@ -185,7 +148,6 @@ class AccountInputValidatorTest {
                 institutionName = "al rajhi",
                 accountType = AccountType.BANK_ACCOUNT,
                 accountNature = AccountNature.ASSET,
-                lastFourDigits = "1234",
             ),
             existing = existing,
         )
@@ -193,27 +155,21 @@ class AccountInputValidatorTest {
     }
 
     @Test
-    fun duplicateDetectionAllowsIntentionallyDifferentAccounts() {
-        // Same bank, different last four → not duplicate.
-        val existing = listOf(existingAccount(lastFourDigits = "1234"))
+    fun duplicateDetectionAllowsDifferentInstitution() {
+        val existing = listOf(existingAccount(institution = "Al Rajhi"))
         val noMatch = DuplicateAccountDetector.isDuplicate(
             candidate = DuplicateAccountDetector.AccountToCheck(
-                institutionName = "Al Rajhi",
+                institutionName = "Alinma",
                 accountType = AccountType.BANK_ACCOUNT,
                 accountNature = AccountNature.ASSET,
-                lastFourDigits = "5678",
             ),
             existing = existing,
         )
-        assertFalse("different last four must not be flagged", noMatch)
+        assertFalse("different institution must not be flagged", noMatch)
     }
 
     @Test
     fun duplicateDetectionDoesNotBlockAccountCreation() {
-        // The spec requires that duplicates warn but do NOT block. The
-        // detector returns a boolean; the UI can choose to show a
-        // warning. The test asserts that the boolean is just a flag,
-        // not an exception.
         val existing = listOf(existingAccount())
         try {
             DuplicateAccountDetector.isDuplicate(
@@ -221,7 +177,6 @@ class AccountInputValidatorTest {
                     institutionName = "Al Rajhi",
                     accountType = AccountType.BANK_ACCOUNT,
                     accountNature = AccountNature.ASSET,
-                    lastFourDigits = "1234",
                 ),
                 existing = existing,
             )
@@ -231,23 +186,18 @@ class AccountInputValidatorTest {
     }
 
     @Test
-    fun duplicateDetectionDistinguishesPersonalVsJoint() {
-        // Two accounts at the same bank with the same last 4 digits but
-        // one PERSONAL one JOINT — the spec says "duplicates do not
-        // completely block intentional duplicates". Nature is not part
-        // of the duplicate tuple, so this is flagged but never blocked.
+    fun duplicateDetectionIgnoresNatureDifference() {
         val existing = listOf(existingAccount())
         val isDuplicate = DuplicateAccountDetector.isDuplicate(
             DuplicateAccountDetector.AccountToCheck(
                 institutionName = "Al Rajhi",
                 accountType = AccountType.BANK_ACCOUNT,
-                accountNature = AccountNature.LIABILITY, // different nature
-                lastFourDigits = "1234",
+                accountNature = AccountNature.LIABILITY,
             ),
             existing = existing,
         )
         assertTrue(
-            "same institution, type, and last four must be flagged",
+            "same institution and type must be flagged regardless of nature",
             isDuplicate,
         )
     }

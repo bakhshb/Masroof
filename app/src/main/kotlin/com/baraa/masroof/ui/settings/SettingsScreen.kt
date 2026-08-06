@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Info
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,10 +42,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.R
 import com.baraa.masroof.diagnostics.DeveloperPreferences
 import com.baraa.masroof.ui.theme.FinancialShapes
+import com.baraa.masroof.ui.theme.ThemePreference
 
 /**
  * Settings landing screen.
@@ -70,6 +74,8 @@ fun SettingsScreen(
     var showDevDetails by remember { mutableStateOf(devPrefs.showDevDetails) }
     var testDataMode by remember { mutableStateOf(devPrefs.testDataMode) }
     val futureNotice = remember { mutableStateOf<SettingsDestination?>(null) }
+    val themePreference by app.themePreferenceRepository.observe()
+        .collectAsStateWithLifecycle(initialValue = app.themePreferenceRepository.snapshot())
 
     androidx.compose.material3.Scaffold(
         topBar = {
@@ -90,6 +96,11 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            AppearanceSection(
+                preference = themePreference,
+                onPreferenceChange = { app.themePreferenceRepository.set(it) },
+            )
+
             SettingsDestinations.all
                 .groupBy { it.group }
                 .forEach { (group, dests) ->
@@ -125,6 +136,74 @@ fun SettingsScreen(
             confirmButton = { androidx.compose.material3.TextButton(onClick = { futureNotice.value = null }) { Text("حسناً") } },
         )
     }
+}
+
+@Composable
+private fun AppearanceSection(
+    preference: ThemePreference,
+    onPreferenceChange: (ThemePreference) -> Unit,
+) {
+    GroupHeader("المظهر")
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.DarkMode,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "وضع العرض",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ThemeOptionChip(
+                    label = "تلقائي",
+                    selected = preference == ThemePreference.SYSTEM,
+                    onClick = { onPreferenceChange(ThemePreference.SYSTEM) },
+                    modifier = Modifier.weight(1f),
+                )
+                ThemeOptionChip(
+                    label = "فاتح",
+                    selected = preference == ThemePreference.LIGHT,
+                    onClick = { onPreferenceChange(ThemePreference.LIGHT) },
+                    modifier = Modifier.weight(1f),
+                )
+                ThemeOptionChip(
+                    label = "داكن",
+                    selected = preference == ThemePreference.DARK,
+                    onClick = { onPreferenceChange(ThemePreference.DARK) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeOptionChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        modifier = modifier,
+    )
 }
 
 @Composable

@@ -33,7 +33,7 @@ class SmsImportResultTest {
             linkedTransactions = 41,
             postedTransactions = 41,
             updatedAccountIds = listOf(1L, 2L, 3L, 1L),
-            affectedAccounts = emptyList(),
+            affectedAccounts = emptyList()
         )
         assertEquals(41, r.linkedTransactions)
         assertEquals(3, r.updatedAccountIds.toSet().size)

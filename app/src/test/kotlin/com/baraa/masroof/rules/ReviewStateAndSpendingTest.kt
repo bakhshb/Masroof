@@ -27,7 +27,7 @@ class ReviewStateAndSpendingTest {
         treatment: FinancialTreatment = FinancialTreatment.EXPENSE,
         amount: BigDecimal = BigDecimal("100.00"),
         needsReview: Boolean = true,
-        userConfirmed: Boolean = false,
+        userConfirmed: Boolean = false
     ): TransactionEntity = TransactionEntity(
         id = id,
         uniqueFingerprint = "fp-$id",
@@ -53,7 +53,7 @@ class ReviewStateAndSpendingTest {
         categoryConfidence = 80,
         needsReview = needsReview,
         userConfirmed = userConfirmed,
-        exclusionReason = null,
+        exclusionReason = null
     )
 
     @Test
@@ -90,7 +90,7 @@ class ReviewStateAndSpendingTest {
         // must include it.
         val txns = listOf(
             makeTxn(id = 1, treatment = FinancialTreatment.EXPENSE, amount = BigDecimal("100"), needsReview = true, userConfirmed = true),
-            makeTxn(id = 2, treatment = FinancialTreatment.EXPENSE, amount = BigDecimal("50"), needsReview = true, userConfirmed = false),
+            makeTxn(id = 2, treatment = FinancialTreatment.EXPENSE, amount = BigDecimal("50"), needsReview = true, userConfirmed = false)
         )
         val b = SpendingCalculator.calculate(txns)
         // 100 (confirmed) is included; 50 (not confirmed) is excluded.
@@ -100,7 +100,7 @@ class ReviewStateAndSpendingTest {
     @Test
     fun pendingTransactionDoesNotInflateConfirmedSpending() {
         val txns = listOf(
-            makeTxn(id = 1, treatment = FinancialTreatment.EXPENSE, amount = BigDecimal("100"), needsReview = true, userConfirmed = false),
+            makeTxn(id = 1, treatment = FinancialTreatment.EXPENSE, amount = BigDecimal("100"), needsReview = true, userConfirmed = false)
         )
         val b = SpendingCalculator.calculate(txns)
         assertEquals(BigDecimal("0.00"), b.grossExpenses)

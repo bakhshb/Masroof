@@ -15,11 +15,11 @@ import java.math.BigDecimal
 class AccountIdentifierRepositoryTest {
     private fun bank(id: Long, type: AccountType = AccountType.BANK_ACCOUNT, institution: String? = "Bank") = FinancialAccountEntity(
         id = id, displayName = "A$id", institutionName = institution, accountType = type,
-        accountNature = AccountNature.ASSET, lastFourDigits = null, senderAliases = "",
+        accountNature = AccountNature.ASSET,
         currency = Currency.SAR, openingBalance = BigDecimal.ZERO, openingBalanceDate = 0L,
         includeInNetWorth = true, includeInLiquidity = type == AccountType.BANK_ACCOUNT,
         isOwnedByUser = true, systemAccountKey = null, isActive = true, notes = null,
-        createdAt = 0L, updatedAt = 0L,
+        createdAt = 0L, updatedAt = 0L
     )
 
     private fun newRepo(vararg entities: FinancialAccountEntity): AccountIdentifierRepository {
@@ -49,7 +49,7 @@ class AccountIdentifierRepositoryTest {
         val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD), bank(2, type = AccountType.CREDIT_CARD))
         repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "A1", "7271"))
         val outcome = repo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "A2", "7271"))
-        assertEquals(IdentifierAddResult.DisabledDuplicate, outcome.result)
+        assertEquals(IdentifierAddResult.AddedWithConflict, outcome.result)
         assertNotNull(outcome.message)
         assertEquals(1, outcome.conflictingAccounts.size)
     }
@@ -77,46 +77,28 @@ class AccountIdentifierRepositoryTest {
         assertEquals(IdentifierAddResult.Rejected, outcome.result)
     }
 
-    @Test fun backfillFromLegacyLastFourIsIdempotent() = runBlocking {
-        val repo = newRepo(
-            bank(1).copy(lastFourDigits = "1234"),
-            bank(2, type = AccountType.CREDIT_CARD).copy(lastFourDigits = "9999"),
-        )
-        val first = repo.backfillFromLegacyLastFour()
-        val second = repo.backfillFromLegacyLastFour()
-        assertTrue(first >= 2)
-        assertEquals("Backfill must be idempotent", 0, second)
+    @Test fun legacyColumnBackfillIsNoOpAfterSchemaRetirement() = runBlocking {
+        val repo = newRepo(bank(1), bank(2, type = AccountType.CREDIT_CARD))
+        assertEquals(0, repo.backfillFromLegacyLastFour())
+        assertEquals(0, repo.backfillFromLegacySenderAliases())
+        assertTrue(repo.getForAccount(1).isEmpty())
+        assertTrue(repo.getForAccount(2).isEmpty())
     }
 
-    @Test fun backfillMapsCreditCardLastFourToCreditCardIdentifier() = runBlocking {
-        val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD).copy(lastFourDigits = "7777"))
-        repo.backfillFromLegacyLastFour()
-        val stored = repo.findByTypeAndValue(AccountIdentifierType.CREDIT_CARD_LAST4, "7777")
-        assertNotNull(stored)
-        assertEquals(1L, stored!!.accountId)
+    @Test fun ensureLegacyIdentifierBackfillIsIdempotentNoOp() = runBlocking {
+        val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD))
+        repo.ensureLegacyIdentifierBackfill()
+        repo.ensureLegacyIdentifierBackfill()
+        assertTrue(repo.getForAccount(1).isEmpty())
     }
 
-    @Test fun existingUserIdentifierIsNotOverwrittenByBackfill() = runBlocking {
-        val repo = newRepo(bank(1).copy(lastFourDigits = "7777"))
-        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "Keep", "7777"))
-        repo.backfillFromLegacyLastFour()
-        val all = repo.getForAccount(1)
-        assertEquals(1, all.size)
-        assertEquals("Keep", all.single().displayLabel)
-    }
-
-    @Test fun walletLastFourBackfilledForDigitalWallet() = runBlocking {
-        val repo = newRepo(bank(1, type = AccountType.DIGITAL_WALLET).copy(lastFourDigits = "4321"))
-        repo.backfillFromLegacyLastFour()
-        val stored = repo.findByTypeAndValue(AccountIdentifierType.WALLET_LAST4, "4321")
-        assertNotNull(stored)
-    }
-
-    @Test fun bankAccountLastFourBackfilledForBankAccount() = runBlocking {
-        val repo = newRepo(bank(1).copy(lastFourDigits = "1111"))
-        repo.backfillFromLegacyLastFour()
-        val stored = repo.findByTypeAndValue(AccountIdentifierType.ACCOUNT_LAST4, "1111")
-        assertNotNull(stored)
+    @Test fun updateValueChangesNormalizedDigits() = runBlocking {
+        val repo = newRepo(bank(1))
+        val added = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "Old", "1234"))
+        val outcome = repo.updateValue(added.identifier!!.id, "5678", "New")
+        assertEquals(IdentifierAddResult.Added, outcome.result)
+        assertEquals("5678", outcome.identifier?.normalizedValue)
+        assertEquals(1, repo.getForAccount(1).size)
     }
 
     @Test fun senderAliasRejectsBlank() = runBlocking {

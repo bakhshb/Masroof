@@ -14,6 +14,8 @@ class FakeIdentifierDao : AccountIdentifierDao {
     override fun observeByAccount(accountId: Long): Flow<List<AccountIdentifierEntity>> = rows.map { it.filter { r -> r.accountId == accountId } }
     override fun observeAll(): Flow<List<AccountIdentifierEntity>> = rows
     override suspend fun getByAccount(accountId: Long): List<AccountIdentifierEntity> = rows.value.filter { it.accountId == accountId }
+    override suspend fun getById(id: Long): AccountIdentifierEntity? = rows.value.firstOrNull { it.id == id }
+    override suspend fun getActive(): List<AccountIdentifierEntity> = rows.value.filter { it.isActive }
     override suspend fun findByValue(value: String): AccountIdentifierEntity? = rows.value.firstOrNull { it.normalizedValue == value && it.isActive }
     override suspend fun findByTypeAndValue(type: AccountIdentifierType, value: String): AccountIdentifierEntity? =
         rows.value.firstOrNull { it.identifierType == type && it.normalizedValue == value && it.isActive }

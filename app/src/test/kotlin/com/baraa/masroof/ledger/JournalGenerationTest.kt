@@ -22,10 +22,10 @@ class JournalGenerationTest {
     private val day = LocalDate.of(2025, 1, 1)
     private fun account(id: Long, type: AccountType, nature: AccountNature) = FinancialAccount(
         id = id, displayName = "A$id", institutionName = null, accountType = type,
-        accountNature = nature, lastFourDigits = null, senderAliases = emptyList(), currency = Currency.SAR,
+        accountNature = nature, currency = Currency.SAR,
         openingBalance = BigDecimal.ZERO, openingBalanceDate = 0, includeInNetWorth = true,
         includeInLiquidity = type == AccountType.BANK_ACCOUNT, isOwnedByUser = true,
-        isActive = true, notes = null,
+        isActive = true, notes = null
     )
     private fun tx(treatment: FinancialTreatment, status: TransactionStatus = TransactionStatus.COMPLETED) = TransactionEntity(
         id = 1, uniqueFingerprint = "x", smsTimestamp = 0, originalSender = null,
@@ -33,7 +33,7 @@ class JournalGenerationTest {
         merchantOrBeneficiary = null, accountOrCardLastFourDigits = null, transactionDate = day,
         transactionTime = null, status = status, confidence = 100, parsingNotes = emptyList(),
         dateSource = DateSource.FROM_BODY, createdAt = 0, updatedAt = 0,
-        financialTreatment = treatment, categorySource = CategorySource.UNCLASSIFIED,
+        financialTreatment = treatment, categorySource = CategorySource.UNCLASSIFIED
     )
     private val generator = JournalGenerationService(systemAccounts = { 99L })
 
@@ -41,7 +41,7 @@ class JournalGenerationTest {
         val draft = generator.generate(
             tx(FinancialTreatment.CREDIT_CARD_PAYMENT),
             account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET),
-            account(2, AccountType.CREDIT_CARD, AccountNature.LIABILITY),
+            account(2, AccountType.CREDIT_CARD, AccountNature.LIABILITY)
         )!!
         assertEquals(JournalType.CREDIT_CARD_PAYMENT, draft.journalType)
         assertEquals(listOf(2L, 1L), draft.postings.map { it.accountId })
@@ -51,7 +51,7 @@ class JournalGenerationTest {
     @Test fun investmentTransferPreservesNetWorthAndFeeUsesExpenseClearing() = runBlocking {
         val transfer = generator.generate(
             tx(FinancialTreatment.INVESTMENT), account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET),
-            account(2, AccountType.INVESTMENT_ACCOUNT, AccountNature.ASSET),
+            account(2, AccountType.INVESTMENT_ACCOUNT, AccountNature.ASSET)
         )!!
         val fee = generator.generate(tx(FinancialTreatment.BANK_FEE), account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET), null)!!
         assertEquals(JournalType.INVESTMENT_TRANSFER, transfer.journalType)

@@ -48,7 +48,7 @@ class CategoryManagementTest {
                     nameAr = c.nameAr,
                     parentId = null,
                     nameEn = c.nameEn,
-                    sortOrder = c.sortOrder,
+                    sortOrder = c.sortOrder
                 )
                 parentIdMap[c.id] = fakeId
             }
@@ -61,7 +61,7 @@ class CategoryManagementTest {
                     nameAr = c.nameAr,
                     parentId = mappedParent,
                     nameEn = c.nameEn,
-                    sortOrder = c.sortOrder,
+                    sortOrder = c.sortOrder
                 )
             }
         }
@@ -69,7 +69,7 @@ class CategoryManagementTest {
 
     private fun makeTxn(
         id: Long = 1L,
-        categoryId: Long? = null,
+        categoryId: Long? = null
     ): TransactionEntity = TransactionEntity(
         id = id,
         uniqueFingerprint = "fp-$id",
@@ -95,7 +95,7 @@ class CategoryManagementTest {
         categoryConfidence = 80,
         needsReview = true,
         userConfirmed = false,
-        exclusionReason = null,
+        exclusionReason = null
     )
 
     // -- seed --------------------------------------------------------------
@@ -124,11 +124,11 @@ class CategoryManagementTest {
         assertEquals(
             "seed must include 12 parents (was: ${parents.size}: $parents)",
             12,
-            parents.size,
+            parents.size
         )
         val required = listOf(
             "المنزل", "المطاعم", "النقل", "التعليم", "الاتصالات", "الصحة",
-            "التسوق", "الترفيه", "الالتزامات", "الاستثمار", "التحويلات", "أخرى",
+            "التسوق", "الترفيه", "الالتزامات", "الاستثمار", "التحويلات", "أخرى"
         )
         for (p in required) {
             assertTrue("seed must include parent $p", parents.contains(p))
@@ -234,12 +234,12 @@ class CategoryManagementTest {
             // The failure must mention "subcategories" or similar.
             assertTrue(
                 "deleting parent with children must return Failure",
-                r is DeleteResult.Failure,
+                r is DeleteResult.Failure
             )
             val reason = (r as DeleteResult.Failure).reason
             assertTrue(
                 "failure reason must mention children (was: $reason)",
-                reason.contains("فرعية") || reason.contains("children"),
+                reason.contains("فرعية") || reason.contains("children")
             )
         }
     }

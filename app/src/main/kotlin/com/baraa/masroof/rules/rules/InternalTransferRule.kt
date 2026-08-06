@@ -1,24 +1,26 @@
 package com.baraa.masroof.rules.rules
 
+import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
+import com.baraa.masroof.ledger.AccountIdentifierCompatibility
+import com.baraa.masroof.ledger.FinancialInstitutionResolver
 import com.baraa.masroof.rules.AccountMatching
 import com.baraa.masroof.rules.RuleContext
 import com.baraa.masroof.rules.RuleInput
 import com.baraa.masroof.rules.RulePriority
 import com.baraa.masroof.rules.RuleResult
 import com.baraa.masroof.rules.TransactionRule
-import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.FinancialTreatment
+import com.baraa.masroof.transaction.IdentifierRole
+import com.baraa.masroof.transaction.ParsedIdentifierEvidence
 import com.baraa.masroof.transaction.TransactionType
 
 /**
  * Classifies a transfer as INTERNAL_TRANSFER when the SMS can be
  * confidently matched to two of the user's owned accounts (one as source,
- * one as destination). Uses [AccountMatching] for sender alias, last-four
- * and name matching. If only one side is confidently matched — or the
- * match is ambiguous — the rule returns null and the engine falls through
- * to PENDING_REVIEW.
+ * one as destination). Typed identifier evidence is matched by type+value
+ * against [RuleContext.accountIdentifiers]. Ambiguous matches return null.
  */
 class InternalTransferRule : TransactionRule {
     override val name: String = "InternalTransferRule"
@@ -30,11 +32,8 @@ class InternalTransferRule : TransactionRule {
         val owned = context.ownedAccounts.filter { it.isOwnedByUser && it.isActive }
         if (owned.size < 2) return null
 
-        val source = AccountMatching.match(input.sender, input.body, input.parsed.merchant, owned)
-        if (source == null) return null
-
-        val destination = matchDestination(owned, source, input)
-        if (destination == null) return null
+        val source = matchSource(owned, input, context) ?: return null
+        val destination = matchDestination(owned, source, input, context) ?: return null
 
         return RuleResult(
             financialTreatment = FinancialTreatment.INTERNAL_TRANSFER,
@@ -46,31 +45,79 @@ class InternalTransferRule : TransactionRule {
         )
     }
 
+    private fun matchSource(
+        owned: List<FinancialAccount>,
+        input: RuleInput,
+        context: RuleContext,
+    ): FinancialAccount? {
+        val sourceEvidence = input.parsed.identifierEvidence.firstOrNull {
+            it.role == IdentifierRole.SOURCE
+        } ?: input.parsed.identifierEvidence.firstOrNull {
+            it.role == IdentifierRole.UNSPECIFIED
+        }
+        if (sourceEvidence != null) {
+            findByEvidence(owned, sourceEvidence, context)?.let { return it }
+        }
+        matchByTypedSender(owned, input.sender, context)?.let { return it }
+        return AccountMatching.matchByName(input.body, input.parsed.merchant, owned)
+    }
+
     private fun matchDestination(
         owned: List<FinancialAccount>,
         source: FinancialAccount,
         input: RuleInput,
+        context: RuleContext,
     ): FinancialAccount? {
         val remaining = owned.filter { it.id != source.id }
-        // Typed identifiers (when provided by the parser) are the only
-        // evidence used for selecting the destination account.
-        val evidence = input.parsed.identifierEvidence.firstOrNull { it.role == com.baraa.masroof.transaction.IdentifierRole.DESTINATION || it.role == com.baraa.masroof.transaction.IdentifierRole.UNSPECIFIED }
-        if (evidence != null) {
-            val typed = remaining.firstOrNull { it.institutionName != null && it.id != source.id && compatible(it.accountType, evidence.type) }
-            if (typed != null) return typed
+        val evidence = input.parsed.identifierEvidence.firstOrNull {
+            it.role == IdentifierRole.DESTINATION
+        } ?: input.parsed.identifierEvidence.firstOrNull {
+            it.role == IdentifierRole.UNSPECIFIED &&
+                findByEvidence(remaining, it, context) != null
         }
-        // Fall back to name / institution match.
-        val byName = AccountMatching.matchByName(input.body, input.parsed.merchant, remaining)
-        if (byName != null) return byName
-        return null
+        if (evidence != null) {
+            findByEvidence(remaining, evidence, context)?.let { return it }
+            return null
+        }
+        return AccountMatching.matchByName(input.body, input.parsed.merchant, remaining)
     }
 
-    private fun compatible(type: com.baraa.masroof.transaction.AccountType, idType: com.baraa.masroof.data.db.AccountIdentifierType): Boolean = when (idType) {
-        com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4, com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4 -> type in setOf(com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT, com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT, com.baraa.masroof.transaction.AccountType.SUKUK_ACCOUNT)
-        com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 -> type == com.baraa.masroof.transaction.AccountType.CREDIT_CARD
-        com.baraa.masroof.data.db.AccountIdentifierType.DEBIT_CARD_LAST4 -> type == com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT
-        com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4 -> type in setOf(com.baraa.masroof.transaction.AccountType.DIGITAL_WALLET, com.baraa.masroof.transaction.AccountType.WALLET)
-        com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS -> false
+    private fun matchByTypedSender(
+        accounts: List<FinancialAccount>,
+        sender: String?,
+        context: RuleContext,
+    ): FinancialAccount? {
+        val key = FinancialInstitutionResolver.senderKey(sender) ?: return null
+        val ids = context.accountIdentifiers
+            .asSequence()
+            .filter {
+                it.identifierType == AccountIdentifierType.SENDER_ALIAS &&
+                    it.normalizedValue == key
+            }
+            .map { it.accountId }
+            .toSet()
+        return accounts.filter { it.id in ids }.singleOrNull()
+    }
+
+    private fun findByEvidence(
+        accounts: List<FinancialAccount>,
+        evidence: ParsedIdentifierEvidence,
+        context: RuleContext,
+    ): FinancialAccount? {
+        if (evidence.lastFour.length != 4) return null
+        val accountIds = context.accountIdentifiers
+            .asSequence()
+            .filter {
+                it.identifierType == evidence.type &&
+                    it.normalizedValue == evidence.lastFour
+            }
+            .map { it.accountId }
+            .toSet()
+        val matches = accounts.filter { account ->
+            account.id in accountIds &&
+                AccountIdentifierCompatibility.isCompatibleTyped(account.accountType, evidence.type)
+        }
+        return matches.singleOrNull()
     }
 
     private companion object {

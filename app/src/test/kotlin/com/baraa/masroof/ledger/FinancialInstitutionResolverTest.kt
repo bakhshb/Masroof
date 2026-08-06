@@ -7,7 +7,7 @@ import org.junit.Test
 
 class FinancialInstitutionResolverTest {
     private fun resolver(
-        vararg seeded: SenderInstitutionMappingEntity,
+        vararg seeded: SenderInstitutionMappingEntity
     ): FinancialInstitutionResolver = FinancialInstitutionResolver(FakeSenderInstitutionMappingDao().also { dao ->
         for (m in seeded) {
             kotlinx.coroutines.runBlocking { dao.insert(m.copy(id = 0)) }

@@ -29,7 +29,7 @@ class DiagnosticsBehaviorTest {
         val result = BankParserRegistry.parse(
             sender = "TestBank",
             body = "Purchase at TestMerchant for 100 SAR",
-            smsTimestampMillis = null,
+            smsTimestampMillis = null
         )
         assertNotNull(result)
         FakeTransactionStore.addFromParse(
@@ -42,7 +42,7 @@ class DiagnosticsBehaviorTest {
             type = result.transactionType,
             status = result.status,
             date = result.transactionDate,
-            time = result.transactionTime,
+            time = result.transactionTime
         )
         assertEquals(1, FakeTransactionStore.count())
         // Critical guarantee: FakeTransactionStore.snapshot() returns
@@ -53,7 +53,7 @@ class DiagnosticsBehaviorTest {
             // No public method named "insert", "save", or "commit".
             assertTrue(
                 "FakeTransactionStore must not expose a write-to-DB method (found ${m.name})",
-                m.name !in setOf("insert", "save", "commit", "writeToDb"),
+                m.name !in setOf("insert", "save", "commit", "writeToDb")
             )
         }
     }
@@ -71,7 +71,7 @@ class DiagnosticsBehaviorTest {
             type = TransactionType.PURCHASE,
             status = TransactionStatus.COMPLETED,
             date = null,
-            time = null,
+            time = null
         )
         assertEquals(1, FakeTransactionStore.count())
         FakeTransactionStore.clear()
@@ -91,7 +91,7 @@ class DiagnosticsBehaviorTest {
             type = TransactionType.PURCHASE,
             status = TransactionStatus.COMPLETED,
             date = null,
-            time = null,
+            time = null
         )
         val row = FakeTransactionStore.snapshot().last()
         // Sanitization may use the [CARD_LAST4 XXXX] form (4 digits) or
@@ -102,7 +102,7 @@ class DiagnosticsBehaviorTest {
         assertEquals(
             "raw PAN digits must not survive",
             false,
-            row.rawSanitizedBody.contains("4111 1111 1111 1111"),
+            row.rawSanitizedBody.contains("4111 1111 1111 1111")
         )
     }
 
@@ -115,7 +115,7 @@ class DiagnosticsBehaviorTest {
         val text = manifest.readText()
         assertTrue(
             "manifest must not request SEND_SMS",
-            !text.contains("android.permission.SEND_SMS"),
+            !text.contains("android.permission.SEND_SMS")
         )
     }
 
@@ -125,7 +125,7 @@ class DiagnosticsBehaviorTest {
         val text = manifest.readText()
         assertTrue(
             "android:allowBackup must be false on <application>",
-            text.contains("android:allowBackup=\"false\""),
+            text.contains("android:allowBackup=\"false\"")
         )
     }
 
@@ -141,12 +141,12 @@ class DiagnosticsBehaviorTest {
         // though we write `cloudBackup` in the Kotlin DSL).
         assertTrue(
             "data_extraction_rules should declare a <cloud-backup> block",
-            text.contains("cloud-backup") || text.contains("cloudBackup"),
+            text.contains("cloud-backup") || text.contains("cloudBackup")
         )
         // It must contain at least one <exclude> entry.
         assertTrue(
             "data_extraction_rules should contain an <exclude> entry",
-            text.contains("<exclude"),
+            text.contains("<exclude")
         )
     }
 
@@ -156,11 +156,11 @@ class DiagnosticsBehaviorTest {
         val text = dbSource.readText()
         assertTrue(
             "Database source must not call fallbackToDestructiveMigration",
-            !Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(text),
+            !Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(text)
         )
         assertTrue(
             "Database source must call addMigrations",
-            text.contains("addMigrations"),
+            text.contains("addMigrations")
         )
     }
 
@@ -199,7 +199,7 @@ class DiagnosticsBehaviorTest {
             "AI_MALFORMED_RESPONSE",
             "NETWORK_UNAVAILABLE",
             "KEYSTORE_FAILURE",
-            "UNKNOWN",
+            "UNKNOWN"
         )
         val actual = DiagnosticError.ErrorCategory.values().map { it.name }.toSet()
         assertEquals(expected, actual)
@@ -215,7 +215,7 @@ class DiagnosticsBehaviorTest {
             "smsFinancialDetectedCount",
             "smsParsedCount",
             "smsParseFailureCount",
-            "smsPermissionGranted",
+            "smsPermissionGranted"
         )
         for (field in DiagnosticSnapshot::class.java.declaredFields) {
             if (field.name.startsWith("sms", ignoreCase = true)) {
@@ -228,7 +228,7 @@ class DiagnosticsBehaviorTest {
     fun versionMetadataSurfacesInDiagnostics() {
         val snap = makeEmptySnapshot().copy(
             appVersionName = "0.1.0-test",
-            appVersionCode = 2L,
+            appVersionCode = 2L
         )
         assertEquals("0.1.0-test", snap.appVersionName)
         assertEquals(2L, snap.appVersionCode)
@@ -242,13 +242,13 @@ class DiagnosticsBehaviorTest {
             "لم يتم اختبار جميع صيغ رسائل البنوك",
             "راجع العمليات قبل اعتمادها",
             "التصنيف الذكي يقدم اقتراحات ولا يستبدل مراجعة المستخدم",
-            "لا يتم إرسال نص الرسالة البنكية إلى مزود الذكاء الاصطناعي",
+            "لا يتم إرسال نص الرسالة البنكية إلى مزود الذكاء الاصطناعي"
         )
         // Each note must contain at least one Arabic character.
         for (n in notes) {
             assertTrue(
                 "release note must be in Arabic: $n",
-                n.any { it.code in 0x0600..0x06FF },
+                n.any { it.code in 0x0600..0x06FF }
             )
         }
     }
@@ -279,11 +279,11 @@ class DiagnosticsBehaviorTest {
             // No real-looking PAN or phone.
             assertTrue(
                 "sample body must not contain raw PAN: ${'$'}{s.id}",
-                !Regex("""\b\d{13,19}\b""").containsMatchIn(s.body),
+                !Regex("""\b\d{13,19}\b""").containsMatchIn(s.body)
             )
             assertTrue(
                 "sample body must not contain raw 10-digit phone: ${'$'}{s.id}",
-                !Regex("""\b05\d{8}\b""").containsMatchIn(s.body),
+                !Regex("""\b05\d{8}\b""").containsMatchIn(s.body)
             )
         }
     }
@@ -316,7 +316,7 @@ class DiagnosticsBehaviorTest {
         ruleNames = emptyList(),
         recentErrors = emptyList(),
         buildTimestamp = "2024-01-01T00:00:00Z",
-        diagnosticReportVersion = "v1",
+        diagnosticReportVersion = "v1"
     )
 }
 

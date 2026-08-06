@@ -18,7 +18,7 @@ class SmsReceiverRoutingTest {
         // uses; routing tests verify the join is deterministic.
         val parts = listOf(
             sms("D360-BANK", "تم خصم 50 ريال من حسابك ", 1_000L),
-            sms("D360-BANK", "بقيمة شراء من المتجر رقم 1234", 1_500L),
+            sms("D360-BANK", "بقيمة شراء من المتجر رقم 1234", 1_500L)
         )
         val joined = parts.joinToString(separator = "") { it.body.orEmpty() }
         assertEquals("تم خصم 50 ريال من حسابك بقيمة شراء من المتجر رقم 1234", joined)

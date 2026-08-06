@@ -116,7 +116,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "شراء\nبمبلغ: 50 ريال\nمن حسابك\nالرصيد المتبقي: 1000 ريال",
+                body = "شراء\nبمبلغ: 50 ريال\nمن حسابك\nالرصيد المتبقي: 1000 ريال"
             )
         )
     }
@@ -126,7 +126,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "تم سحب مبلغ 200 ريال من حسابك في البنك",
+                body = "تم سحب مبلغ 200 ريال من حسابك في البنك"
             )
         )
     }
@@ -136,7 +136,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "تم تحويل مبلغ 500 ريال إلى حساب آخر بنجاح",
+                body = "تم تحويل مبلغ 500 ريال إلى حساب آخر بنجاح"
             )
         )
     }
@@ -146,7 +146,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "تم إيداع مبلغ 1500 ريال في حسابك. الرصيد الجديد 3000 ريال.",
+                body = "تم إيداع مبلغ 1500 ريال في حسابك. الرصيد الجديد 3000 ريال."
             )
         )
     }
@@ -157,7 +157,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "افتح حساب جديد اليوم عبر موقعنا",
+                body = "افتح حساب جديد اليوم عبر موقعنا"
             )
         )
     }
@@ -168,7 +168,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "تم شِراءٍ بمبلغ 50 رِيالٍ من حِسابك",
+                body = "تم شِراءٍ بمبلغ 50 رِيالٍ من حِسابك"
             )
         )
     }
@@ -180,7 +180,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "Purchase of SAR 50 at Merchant. Balance 1000 SAR.",
+                body = "Purchase of SAR 50 at Merchant. Balance 1000 SAR."
             )
         )
     }
@@ -190,7 +190,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "Transfer of amount 100 SAR completed. Account balance updated.",
+                body = "Transfer of amount 100 SAR completed. Account balance updated."
             )
         )
     }
@@ -200,7 +200,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "A deposit of amount 200 SAR has been credited. Your balance is 1500.",
+                body = "A deposit of amount 200 SAR has been credited. Your balance is 1500."
             )
         )
     }
@@ -210,7 +210,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "A refund of amount 35 SAR has been issued to your card.",
+                body = "A refund of amount 35 SAR has been issued to your card."
             )
         )
     }
@@ -221,7 +221,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
-                body = "Please bring your card to the next visit.",
+                body = "Please bring your card to the next visit."
             )
         )
     }
@@ -234,7 +234,7 @@ class BankSmsFilterTest {
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Unknown",
                 body = "Purchase at STORE_X: amount 50 SAR. " +
-                    "تم خصم 50 ريال من حسابك. Balance: 1000 SAR.",
+                    "تم خصم 50 ريال من حسابك. Balance: 1000 SAR."
             )
         )
     }
@@ -246,7 +246,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Al Rajhi",
-                body = "تم تنفيذ العملية بنجاح",
+                body = "تم تنفيذ العملية بنجاح"
             )
         )
     }
@@ -258,7 +258,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Verify",
-                body = "Your OTP code is 123456. Do not share it with anyone.",
+                body = "Your OTP code is 123456. Do not share it with anyone."
             )
         )
     }
@@ -268,7 +268,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "خدمة",
-                body = "رمز التحقق الخاص بك هو 123456. لا تشاركه مع أحد.",
+                body = "رمز التحقق الخاص بك هو 123456. لا تشاركه مع أحد."
             )
         )
     }
@@ -278,7 +278,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "ShoesStore",
-                body = "50% off all shoes today only! Subscribe now for more deals.",
+                body = "50% off all shoes today only! Subscribe now for more deals."
             )
         )
     }
@@ -288,7 +288,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "متجر",
-                body = "خصومات كبيرة اليوم فقط على جميع الأحذية! اشترك الآن",
+                body = "خصومات كبيرة اليوم فقط على جميع الأحذية! اشترك الآن"
             )
         )
     }
@@ -298,7 +298,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "CargoCo",
-                body = "Your package has been shipped and will arrive tomorrow.",
+                body = "Your package has been shipped and will arrive tomorrow."
             )
         )
     }
@@ -308,7 +308,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Friend",
-                body = "Hey, can you call me back when you can? Thanks!",
+                body = "Hey, can you call me back when you can? Thanks!"
             )
         )
     }
@@ -318,7 +318,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "صديق",
-                body = "صباح الخير، اتصل بي عندما تستطيع",
+                body = "صباح الخير، اتصل بي عندما تستطيع"
             )
         )
     }
@@ -362,7 +362,7 @@ class BankSmsFilterTest {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = null,
-                body = "Hey, are you free this weekend?",
+                body = "Hey, are you free this weekend?"
             )
         )
     }
@@ -373,7 +373,7 @@ class BankSmsFilterTest {
         assertTrue(
             BankSmsFilter.isLikelyFinancialMessage(
                 sender = "Al Rajhi",
-                body = null,
+                body = null
             )
         )
     }

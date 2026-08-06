@@ -24,8 +24,8 @@ class ImportScanVsCommitSemanticsTest {
             institutionGroups = listOf(
                 ScanPreview.InstitutionGroup("D360 Bank", 12, 12, 0, 0),
                 ScanPreview.InstitutionGroup("Jazira Bank", 24, 24, 0, 0),
-                ScanPreview.InstitutionGroup("STC Bank", 5, 5, 0, 0),
-            ),
+                ScanPreview.InstitutionGroup("STC Bank", 5, 5, 0, 0)
+            )
         )
         assertEquals(3, p.institutionGroups.size)
         assertEquals(41, p.institutionGroups.sumOf { it.totalRecognized })

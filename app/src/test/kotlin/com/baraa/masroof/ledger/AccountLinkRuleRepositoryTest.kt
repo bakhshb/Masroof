@@ -25,7 +25,10 @@ class AccountLinkRuleRepositoryTest {
         override suspend fun update(rule: AccountLinkRuleEntity): Int { val i = rules.indexOfFirst { it.id == rule.id }; if (i >= 0) { rules[i] = rule; return 1 }; return 0 }
         override suspend fun delete(rule: AccountLinkRuleEntity): Int { val i = rules.indexOfFirst { it.id == rule.id }; if (i >= 0) { rules.removeAt(i); return 1 }; return 0 }
     }
-    private fun account(id: Long, type: AccountType = AccountType.BANK_ACCOUNT) = FinancialAccount(id, "A$id", "Bank", type, AccountNature.defaultNatureFor(type), null, emptyList(), Currency.SAR, BigDecimal.ZERO, 1, true, true, true, null, true, null)
+    private fun account(id: Long, type: AccountType = AccountType.BANK_ACCOUNT) = FinancialAccount(
+        id, "A$id", "Bank", type, AccountNature.defaultNatureFor(type), Currency.SAR,
+        BigDecimal.ZERO, 1, true, true, true, null, true, null,
+    )
     private fun tx(type: TransactionType = TransactionType.PURCHASE, treatment: FinancialTreatment = FinancialTreatment.EXPENSE) = TransactionEntity(id = 1, uniqueFingerprint = "u1", smsTimestamp = 0, originalSender = "bank", transactionType = type, amount = BigDecimal("100"), currency = Currency.SAR, merchantOrBeneficiary = null, accountOrCardLastFourDigits = null, transactionDate = LocalDate.now(), transactionTime = null, status = TransactionStatus.COMPLETED, confidence = 80, parsingNotes = emptyList(), dateSource = com.baraa.masroof.data.db.DateSource.FROM_BODY, createdAt = 0, updatedAt = 0, financialTreatment = treatment, postingStatus = TransactionPostingStatus.NEEDS_REVIEW)
     @Test fun rememberIsNoopWhenUncheckedByDefault() = runBlocking {
         val dao = FakeDao(); val repo = AccountLinkRuleRepository(dao); val list = dao.rules; assertEquals(0, list.size)

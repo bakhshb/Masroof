@@ -200,6 +200,10 @@ class MasroofApplication : Application() {
         SharedPreferencesDeveloperPreferences(this)
     }
 
+    val themePreferenceRepository: com.baraa.masroof.ui.theme.ThemePreferenceRepository by lazy {
+        com.baraa.masroof.ui.theme.SharedPreferencesThemePreferenceRepository(this)
+    }
+
     val financialSetupRepository: com.baraa.masroof.data.repository.FinancialSetupRepository by lazy {
         com.baraa.masroof.data.repository.RoomFinancialSetupRepository(database.financialSetupDao())
     }
@@ -222,6 +226,14 @@ class MasroofApplication : Application() {
     }
     val transactionLinkingService: TransactionLinkingService by lazy {
         TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountIdentifierRepository, accountLinkRuleRepository)
+    }
+
+    val historicalAccountRelinkService: com.baraa.masroof.ledger.HistoricalAccountRelinkService by lazy {
+        com.baraa.masroof.ledger.HistoricalAccountRelinkService(
+            transactionRepository = transactionRepository,
+            financialAccountRepository = financialAccountRepository,
+            identifierRepository = accountIdentifierRepository,
+        )
     }
 
     /**
@@ -254,7 +266,7 @@ class MasroofApplication : Application() {
         appScope.launch {
             runCatching { categoryRepository.seedIfEmpty() }
             runCatching { systemAccountSeeder.seed() }
-            runCatching { accountIdentifierRepository.backfillFromLegacyLastFour() }
+            runCatching { accountIdentifierRepository.ensureLegacyIdentifierBackfill() }
             // Pre-load the AI config so the first batch call doesn't
             // need to block on a DB read.
             runCatching { rebuildAiIfNeeded() }

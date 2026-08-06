@@ -21,7 +21,6 @@ import com.baraa.masroof.ui.sms.SmsPermissionRequiredBanner
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
@@ -31,10 +30,12 @@ import java.time.LocalDate
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransactionOperationsScreen(onOpenImport: () -> Unit = {}) {
+fun TransactionOperationsScreen(
+    onOpenImport: () -> Unit = {},
+    onOpenReview: () -> Unit = {},
+) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
-    val scope = rememberCoroutineScope()
     val transactions by app.transactionRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val categories by app.categoryRepository.observeAll().collectAsStateWithLifecycle(emptyList())
@@ -58,6 +59,7 @@ fun TransactionOperationsScreen(onOpenImport: () -> Unit = {}) {
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PrimaryButton(label = "استيراد رسائل البنك", onClick = onOpenImport, modifier = Modifier.weight(1f))
+                SecondaryButton(label = "المراجعة", onClick = onOpenReview, modifier = Modifier.weight(0.7f))
                 SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
             }
             SmsPermissionRequiredBanner(onImportClick = onOpenImport, modifier = Modifier.fillMaxWidth())
@@ -72,7 +74,15 @@ fun TransactionOperationsScreen(onOpenImport: () -> Unit = {}) {
             if (visible.isEmpty()) Text("لا توجد نتائج مطابقة", color = MaterialTheme.colorScheme.onSurfaceVariant)
             else Text("طابور المراجعة: ${visible.count { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW }}")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                items(visible, key = { it.id }) { tx -> ReviewCard(tx, accounts, categories, showAdvanced) }
+                items(visible, key = { it.id }) { tx ->
+                    ReviewCard(
+                        transaction = tx,
+                        accounts = accounts,
+                        categories = categories,
+                        showAdvanced = showAdvanced,
+                        onOpenReview = onOpenReview,
+                    )
+                }
             }
         }
     }
@@ -80,7 +90,13 @@ fun TransactionOperationsScreen(onOpenImport: () -> Unit = {}) {
 }
 
 @Composable
-private fun ReviewCard(transaction: TransactionEntity, accounts: List<FinancialAccount>, categories: List<com.baraa.masroof.data.db.Category>, showAdvanced: Boolean) {
+private fun ReviewCard(
+    transaction: TransactionEntity,
+    accounts: List<FinancialAccount>,
+    categories: List<com.baraa.masroof.data.db.Category>,
+    showAdvanced: Boolean,
+    onOpenReview: () -> Unit,
+) {
     val accountName = accounts.firstOrNull { it.id == transaction.sourceAccountId || it.id == transaction.destinationAccountId }?.displayName
     val categoryName = categories.firstOrNull { it.id == transaction.categoryId }?.nameAr
     val reviewReason = when {
@@ -88,7 +104,12 @@ private fun ReviewCard(transaction: TransactionEntity, accounts: List<FinancialA
         transaction.postingStatus == TransactionPostingStatus.NEEDS_REVIEW -> "تحتاج مراجعة"
         else -> "جاهزة للاعتماد"
     }
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    val needsAction = transaction.needsReview || transaction.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || transaction.accountLinkNeedsReview
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        onClick = { if (needsAction) onOpenReview() },
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(transaction.merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: transaction.transactionType.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -99,6 +120,9 @@ private fun ReviewCard(transaction: TransactionEntity, accounts: List<FinancialA
             transaction.accountOrCardLastFourDigits?.let { Text("المعرّف المنتهي بـ ••••$it") }
             if (categoryName != null) Text("التصنيف: $categoryName")
             Text(reviewReason, color = if (reviewReason == "جاهزة للاعتماد") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+            if (needsAction) {
+                TextButton(onClick = onOpenReview) { Text("فتح المراجعة") }
+            }
             if (showAdvanced) {
                 Text("تفاصيل فنية: parser=${transaction.transactionType} • link=${transaction.accountLinkSource.name} • status=${transaction.postingStatus.name} • tx#${transaction.id}")
                 Text("journalId=${transaction.linkedJournalEntryId ?: "-"}")

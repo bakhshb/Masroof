@@ -37,6 +37,61 @@ enum class ImportDisposition {
 }
 
 /**
+ * Assigns exactly one final disposition. Priority is exclusive — the first
+ * matching condition wins so counters never double-count the same message.
+ */
+object ImportDispositionClassifier {
+    fun classify(
+        isUnregisteredSender: Boolean = false,
+        isNonFinancial: Boolean = false,
+        isUnparsed: Boolean = false,
+        isExactDuplicate: Boolean = false,
+        isPossibleDuplicate: Boolean = false,
+        isBeforeTrackingStart: Boolean = false,
+        needsInstitution: Boolean = false,
+        accountMatched: Boolean = false,
+        needsConfirmation: Boolean = false,
+    ): ImportDisposition = when {
+        isUnregisteredSender -> ImportDisposition.UNREGISTERED_SENDER
+        isNonFinancial -> ImportDisposition.IGNORED
+        isUnparsed -> ImportDisposition.UNPARSED
+        isExactDuplicate -> ImportDisposition.EXACT_DUPLICATE
+        isPossibleDuplicate -> ImportDisposition.POSSIBLE_DUPLICATE
+        isBeforeTrackingStart -> ImportDisposition.BEFORE_TRACKING_START
+        needsInstitution -> ImportDisposition.NEEDS_INSTITUTION
+        !accountMatched -> ImportDisposition.NEEDS_ACCOUNT
+        needsConfirmation -> ImportDisposition.NEEDS_CONFIRMATION
+        else -> ImportDisposition.READY
+    }
+}
+
+/**
+ * Near-duplicate detection for separate SMS messages that describe the same
+ * purchase (push + digest). Exact fingerprint collisions remain EXACT_DUPLICATE.
+ */
+object NearDuplicateDetector {
+    /** ±2 hours around an existing similar transaction. */
+    const val DUPLICATE_WINDOW_MILLIS: Long = 2L * 60L * 60L * 1000L
+
+    fun isPossibleDuplicate(
+        candidateTimestamp: Long,
+        candidateSimilarityKey: String?,
+        existingByKey: List<TransactionEntity>,
+        batchTimestampsByKey: Map<String, List<Long>> = emptyMap(),
+    ): Boolean {
+        val key = candidateSimilarityKey?.takeIf { it.isNotBlank() } ?: return false
+        val inDb = existingByKey.any { existing ->
+            kotlin.math.abs(existing.smsTimestamp - candidateTimestamp) <= DUPLICATE_WINDOW_MILLIS
+        }
+        if (inDb) return true
+        val priorInBatch = batchTimestampsByKey[key].orEmpty()
+        return priorInBatch.any { prior ->
+            kotlin.math.abs(prior - candidateTimestamp) <= DUPLICATE_WINDOW_MILLIS
+        }
+    }
+}
+
+/**
  * Structured result of a single SMS import operation. Every count is
  * defined precisely:
  *  - [scannedMessages]        : raw SMS rows the user asked us to scan
@@ -123,14 +178,23 @@ data class ScanPreview(
     val discoveredSenders: List<DiscoveredSender> = emptyList(),
 ) {
     data class DiscoveredSender(val sender: String, val messageCount: Int, val latestTimestamp: Long, val likelyInstitution: String?)
-    /**
-     * Recognized transactions that the user can commit now. This is the
-     * exclusive subset — recognized − (needsReview ∪ duplicate ∪
-     * beforeTrackingStart) — and never double-counts.
-     */
+    /** Exclusive count of messages with [ImportDisposition.READY]. */
     val readyCount: Int
-        get() = (recognizedTransactions - needsReviewTransactions - duplicateTransactions - beforeTrackingStartCount)
-            .coerceAtLeast(0)
+        get() = if (perTransaction.isNotEmpty()) {
+            perTransaction.count { it.disposition == ImportDisposition.READY }
+        } else {
+            // Test / empty-item fallback when only aggregate counters are supplied.
+            (recognizedTransactions - needsReviewTransactions - duplicateTransactions - beforeTrackingStartCount)
+                .coerceAtLeast(0)
+        }
+
+    /** Exclusive count of messages that need user review after import. */
+    val reviewDispositionCount: Int
+        get() = perTransaction.count {
+            it.disposition == ImportDisposition.NEEDS_ACCOUNT ||
+                it.disposition == ImportDisposition.NEEDS_CONFIRMATION ||
+                it.disposition == ImportDisposition.NEEDS_INSTITUTION
+        }
 
     data class InstitutionGroup(
         val institutionName: String,
@@ -151,6 +215,7 @@ data class ScanPreview(
         val needsReview: Boolean,
         val isBeforeTrackingStart: Boolean,
         val date: LocalDate?,
+        val disposition: ImportDisposition,
     )
 }
 
@@ -219,11 +284,14 @@ class SmsImportOrchestrator(
         val categories = categoryRepository.getAll()
         val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
         val merchantMemory = merchantMemoryRepository.getAll()
+        val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
-        val context = RuleContext(ownedAccounts, merchantMemory, categories)
+        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots)
         var scanned = 0; var recognized = 0; var nonFinancial = 0; var unparsed = 0
         var unregistered = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
-        val groups = linkedMapOf<String, MutableList<String>>(); val items = ArrayList<ScanPreview.PreviewItem>()
+        val groups = linkedMapOf<String, MutableList<ScanPreview.PreviewItem>>()
+        val items = ArrayList<ScanPreview.PreviewItem>()
+        val batchTimestampsByKey = mutableMapOf<String, MutableList<Long>>()
 
         for (sms in messages) {
             scanned++
@@ -239,30 +307,72 @@ class SmsImportOrchestrator(
             if (entity == null) { unparsed++; continue }
             recognized++
             val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
+            val similarExisting = entity.transactionSimilarityKey
+                ?.let { transactionRepository.findBySimilarityKey(it) }
+                .orEmpty()
+            val isPossibleDup = !isDup && NearDuplicateDetector.isPossibleDuplicate(
+                candidateTimestamp = entity.smsTimestamp,
+                candidateSimilarityKey = entity.transactionSimilarityKey,
+                existingByKey = similarExisting,
+                batchTimestampsByKey = batchTimestampsByKey,
+            )
             val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
-            val isReviewNow = match.account == null || match.needsReview
             val before = trackingStartDate != null && entity.transactionDate != null && entity.transactionDate.isBefore(trackingStartDate)
-            if (isDup) duplicates++; if (isReviewNow) needsReview++; if (before) beforeTracking++
+            val incompleteTwoSided = entity.financialTreatment.requiresTwoAccounts &&
+                match.account != null &&
+                match.destinationAccountCandidate == null
+            val disposition = ImportDispositionClassifier.classify(
+                isExactDuplicate = isDup,
+                isPossibleDuplicate = isPossibleDup,
+                isBeforeTrackingStart = before && !isDup && !isPossibleDup,
+                accountMatched = match.account != null,
+                needsConfirmation = (match.account != null && match.needsReview) || incompleteTwoSided,
+            )
+            val isReviewNow = disposition == ImportDisposition.NEEDS_ACCOUNT ||
+                disposition == ImportDisposition.NEEDS_CONFIRMATION ||
+                disposition == ImportDisposition.NEEDS_INSTITUTION ||
+                disposition == ImportDisposition.POSSIBLE_DUPLICATE
+            when (disposition) {
+                ImportDisposition.EXACT_DUPLICATE -> duplicates++
+                ImportDisposition.POSSIBLE_DUPLICATE -> duplicates++ // surface in duplicate bucket for UI counts
+                ImportDisposition.BEFORE_TRACKING_START -> beforeTracking++
+                ImportDisposition.NEEDS_ACCOUNT,
+                ImportDisposition.NEEDS_CONFIRMATION,
+                ImportDisposition.NEEDS_INSTITUTION -> needsReview++
+                else -> Unit
+            }
+            entity.transactionSimilarityKey?.let { key ->
+                batchTimestampsByKey.getOrPut(key) { mutableListOf() }.add(entity.smsTimestamp)
+            }
             val institutionKey = institutionResolver.resolve(
                 sender = sms.sender, parsedInstitution = parserInstitution(parsed), parserIdentity = parsed.parserName,
                 knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
             ).institutionDisplayName
-            groups.getOrPut(institutionKey) { mutableListOf() }.add(entity.uniqueFingerprint)
-            items += ScanPreview.PreviewItem(sms.id, sms.sender, entity.amount, entity.transactionType, match.account?.id,
-                match.account?.displayName, isDup, isReviewNow, before, entity.transactionDate)
+            val item = ScanPreview.PreviewItem(
+                sms.id, sms.sender, entity.amount, entity.transactionType, match.account?.id,
+                match.account?.displayName, isDup || isPossibleDup, isReviewNow, before, entity.transactionDate, disposition,
+            )
+            groups.getOrPut(institutionKey) { mutableListOf() }.add(item)
+            items += item
         }
         ScanPreview(
             mode = mode, configuredSenderCount = registeredSenders.size, scannedMessages = scanned,
             recognizedTransactions = recognized, nonFinancialMessages = nonFinancial, unparsedMessages = unparsed,
             unregisteredSenderMessages = unregistered, duplicateTransactions = duplicates, needsReviewTransactions = needsReview,
             beforeTrackingStartCount = beforeTracking,
-            institutionGroups = groups.map { (institution, _) ->
-                val its = items.filter { it.sender?.let(SenderNormalizer::normalize) in registeredSenders &&
-                    institutionResolver.resolve(sender = it.sender).institutionDisplayName == institution }
-                ScanPreview.InstitutionGroup(institution, its.size,
-                    its.count { !it.isDuplicate && !it.isBeforeTrackingStart && !it.needsReview },
-                    its.count { !it.isDuplicate && !it.isBeforeTrackingStart && it.needsReview }, 0)
-            }, perTransaction = items,
+            institutionGroups = groups.map { (institution, its) ->
+                ScanPreview.InstitutionGroup(
+                    institution, its.size,
+                    its.count { it.disposition == ImportDisposition.READY },
+                    its.count {
+                        it.disposition == ImportDisposition.NEEDS_ACCOUNT ||
+                            it.disposition == ImportDisposition.NEEDS_CONFIRMATION ||
+                            it.disposition == ImportDisposition.NEEDS_INSTITUTION
+                    },
+                    0,
+                )
+            },
+            perTransaction = items,
         )
     }
 
@@ -290,8 +400,9 @@ class SmsImportOrchestrator(
         val categories = categoryRepository.getAll()
         val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
         val merchantMemory = merchantMemoryRepository.getAll()
+        val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
-        val context = RuleContext(ownedAccounts, merchantMemory, categories)
+        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots)
 
         var imported = 0
         var linkedCount = 0
@@ -309,13 +420,44 @@ class SmsImportOrchestrator(
             for (sms in importedSms) {
                 if (scanPreview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && SenderNormalizer.normalize(sms.sender) !in registeredSenders) continue
                 val previewItem = previewBySms[sms.id]
-                if (previewItem == null || previewItem.isDuplicate) {
-                    if (previewItem?.isDuplicate == true) duplicates++
-                    continue
+                if (previewItem == null) continue
+                when (previewItem.disposition) {
+                    ImportDisposition.EXACT_DUPLICATE -> {
+                        duplicates++
+                        continue
+                    }
+                    ImportDisposition.UNREGISTERED_SENDER, ImportDisposition.IGNORED, ImportDisposition.UNPARSED -> continue
+                    else -> Unit
                 }
                 val parsed: ParsedTransaction = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
                 if (parsed.amount == null || parsed.confidence < 30) continue
                 val entity = buildEntity(sms, parsed, engine, context) ?: continue
+                if (previewItem.disposition == ImportDisposition.POSSIBLE_DUPLICATE) {
+                    val marked = entity.copy(
+                        needsReview = true,
+                        userConfirmed = false,
+                        exclusionReason = "محتمل تكرار لعملية موجودة",
+                        postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
+                        accountLinkNeedsReview = true,
+                        updatedAt = nowProvider(),
+                    )
+                    val id = transactionRepository.insert(marked)
+                    if (id > 0L) {
+                        imported++
+                        reviewCount++
+                        log += SmsImportResult.TransactionImportLog(
+                            smsId = sms.id, sender = null, amount = entity.amount,
+                            transactionType = entity.transactionType.name,
+                            linkedAccountId = null, journalEntryId = null,
+                            debitAccountId = null, creditAccountId = null,
+                            postingStatus = "POSSIBLE_DUPLICATE",
+                            includedInCalculatedBalance = false,
+                        )
+                    } else {
+                        duplicates++
+                    }
+                    continue
+                }
                 if (previewItem.isBeforeTrackingStart) {
                     val marked = entity.copy(
                         needsReview = true, userConfirmed = false,
@@ -342,7 +484,9 @@ class SmsImportOrchestrator(
                     continue
                 }
                 val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
-                val hasLinkedAccount = match.account != null && !match.needsReview
+                val twoSidedOk = !entity.financialTreatment.requiresTwoAccounts ||
+                    match.destinationAccountCandidate != null
+                val hasLinkedAccount = match.account != null && !match.needsReview && twoSidedOk
                 val linked = entity.withAccountMatch(match)
                 val txId = transactionRepository.insert(linked)
                 if (txId <= 0L) {
@@ -458,7 +602,8 @@ class SmsImportOrchestrator(
         SmsImportResult(
             scannedMessages = scanPreview.scannedMessages,
             recognizedTransactions = scanPreview.recognizedTransactions,
-            readyTransactions = imported,
+            readyTransactions = scanPreview.readyCount,
+            importedTransactions = imported,
             linkedTransactions = linkedCount,
             postedTransactions = postedCount,
             needsReviewTransactions = reviewCount,

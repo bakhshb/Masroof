@@ -34,18 +34,18 @@ class RoomSchemaSafetyTest {
         val candidates = listOf(
             "src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
             "../src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
-            "app/src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
+            "app/src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt"
         )
         val sourceFile = candidates.map { File(it) }.firstOrNull { it.exists() }
             ?: error("Could not find MasroofDatabase.kt in any of: $candidates")
         val source = sourceFile.readText()
         assertFalse(
             "fallbackToDestructiveMigration() must not be called in MasroofDatabase.kt",
-            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source),
+            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source)
         )
         assertTrue(
             "addMigrations must be configured",
-            source.contains("addMigrations"),
+            source.contains("addMigrations")
         )
     }
 
@@ -68,13 +68,13 @@ class RoomSchemaSafetyTest {
         val source = sourceFile.readText()
         assertTrue(
             "MasroofDatabase must expose a MIGRATION_1_2 constant",
-            source.contains("MIGRATION_1_2"),
+            source.contains("MIGRATION_1_2")
         )
         // The migration must add the new column.
         assertTrue(
             "MIGRATION_1_2 must ADD COLUMN transactionSimilarityKey",
             source.contains("ADD COLUMN `transactionSimilarityKey`") ||
-                source.contains("ADD COLUMN transactionSimilarityKey"),
+                source.contains("ADD COLUMN transactionSimilarityKey")
         )
     }
 
@@ -100,23 +100,23 @@ class RoomSchemaSafetyTest {
         val v3Json = v3.readText()
         assertTrue(
             "v3 schema must contain financialTreatment",
-            v3Json.contains("financialTreatment"),
+            v3Json.contains("financialTreatment")
         )
         assertTrue(
             "v3 schema must contain categoryId",
-            v3Json.contains("categoryId"),
+            v3Json.contains("categoryId")
         )
         assertTrue(
             "v3 schema must contain the categories table",
-            v3Json.contains("\"categories\""),
+            v3Json.contains("\"categories\"")
         )
         assertTrue(
             "v3 schema must contain the merchant_memory table",
-            v3Json.contains("\"merchant_memory\""),
+            v3Json.contains("\"merchant_memory\"")
         )
         assertTrue(
             "v3 schema must contain the financial_accounts table",
-            v3Json.contains("\"financial_accounts\""),
+            v3Json.contains("\"financial_accounts\"")
         )
     }
 }

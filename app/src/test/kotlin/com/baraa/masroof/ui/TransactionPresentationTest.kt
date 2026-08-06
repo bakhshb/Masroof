@@ -34,11 +34,11 @@ class TransactionPresentationTest {
                 source = InstitutionIdentificationSource.USER_CONFIRMED_MAPPING,
                 confidence = 95,
                 requiresReview = false,
-                senderKey = "alrajhi",
+                senderKey = "alrajhi"
             ),
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 90,
+            confidence = 90
         )
         assertTrue(presentation.accountOrInstrumentLabel.contains("بطاقة ائتمانية"))
         assertTrue(presentation.accountOrInstrumentLabel.contains("7271"))
@@ -69,11 +69,11 @@ class TransactionPresentationTest {
                 source = InstitutionIdentificationSource.PARSED_INSTITUTION,
                 confidence = 80,
                 requiresReview = false,
-                senderKey = "alrajhi",
+                senderKey = "alrajhi"
             ),
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 80,
+            confidence = 80
         )
         assertEquals("نقاط البيع", presentation.channelLabel)
         // We don't surface Mada explicitly in the label (treat it as a debit instrument).
@@ -102,11 +102,11 @@ class TransactionPresentationTest {
                 source = InstitutionIdentificationSource.USER_CONFIRMED_MAPPING,
                 confidence = 95,
                 requiresReview = false,
-                senderKey = "jazira",
+                senderKey = "jazira"
             ),
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 90,
+            confidence = 90
         )
         assertTrue(presentation.isExpense == false)
         assertEquals("حوالة واردة", presentation.friendlyType)
@@ -133,7 +133,7 @@ class TransactionPresentationTest {
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 50,
+            confidence = 50
         )
         // Card payment must not present itself as a spending row.
         assertEquals("سداد بطاقة", presentation.friendlyType)
@@ -159,7 +159,7 @@ class TransactionPresentationTest {
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 50,
+            confidence = 50
         )
         assertNull(presentation.technicalDetails)
     }
@@ -183,7 +183,7 @@ class TransactionPresentationTest {
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = true,
             parserName = "GenericBankSmsParser",
-            confidence = 50,
+            confidence = 50
         )
         assertNotNull(presentation.technicalDetails)
         assertEquals("GenericBankSmsParser", presentation.technicalDetails!!.parserName)
@@ -208,7 +208,7 @@ class TransactionPresentationTest {
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
             parserName = "GenericBankSmsParser",
-            confidence = 50,
+            confidence = 50
         )
         assertEquals("مرسل مالي غير معروف", presentation.institutionDisplayName)
         assertEquals(InstitutionIdentificationSource.UNKNOWN, presentation.institutionSource)

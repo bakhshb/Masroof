@@ -81,6 +81,10 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
 
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m3)
+    implementation(libs.vico.core)
+
     testImplementation(libs.junit)
     implementation(libs.androidx.security.crypto)
     implementation(libs.kotlinx.serialization.json)

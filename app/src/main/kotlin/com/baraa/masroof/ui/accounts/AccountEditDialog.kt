@@ -37,14 +37,12 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Editable account values. Account numbers are deliberately limited to last four digits. */
+/** Editable account values. Identifiers are managed via IdentifiersSection. */
 data class AccountDraft(
     val displayName: String,
     val institutionName: String?,
     val accountType: AccountType,
     val accountNature: AccountNature,
-    val lastFourDigits: String?,
-    val senderAliases: List<String>,
     val currency: Currency,
     val openingBalance: BigDecimal,
     val openingBalanceDate: Long,
@@ -70,8 +68,6 @@ fun AccountEditDialog(
     var accountNature by remember(existing) {
         mutableStateOf(existing?.accountNature ?: AccountNature.defaultNatureFor(accountType))
     }
-    var lastFour by remember(existing) { mutableStateOf(existing?.lastFourDigits.orEmpty()) }
-    var aliasesText by remember(existing) { mutableStateOf(existing?.senderAliases?.joinToString(", ").orEmpty()) }
     var amountText by remember(existing) { mutableStateOf(existing?.openingBalance?.toPlainString().orEmpty()) }
     var dateText by remember(existing, defaultOpeningDate) {
         mutableStateOf(existing?.openingBalanceDate?.takeIf { it > 0L }?.toLocalDate()?.toString() ?: defaultOpeningDate.toString())
@@ -90,7 +86,7 @@ fun AccountEditDialog(
     val balance = amountText.toBigDecimalOrNull()
     val date = runCatching { LocalDate.parse(dateText) }.getOrNull()
     val errors = if (balance != null && date != null) {
-        AccountInputValidator.validate(displayName, lastFour, balance, date)
+        AccountInputValidator.validate(displayName, balance, date)
     } else {
         emptyList()
     }
@@ -100,7 +96,6 @@ fun AccountEditDialog(
             institutionName = institutionName,
             accountType = accountType,
             accountNature = accountNature,
-            lastFourDigits = lastFour.takeIf { it.length == 4 },
         ),
         existing = existingAccounts.filterNot { it.id == existing?.id },
     )
@@ -156,16 +151,6 @@ fun AccountEditDialog(
                 }
                 Text("طبيعة الحساب: ${accountNatureLabel(accountNature)}")
                 OutlinedTextField(
-                    value = lastFour,
-                    onValueChange = { lastFour = it.filter(Char::isDigit).take(4) },
-                    label = { Text("آخر 4 أرقام (اختياري)") },
-                    supportingText = { Text("لا تُخزّن أرقام الحساب أو البطاقة كاملة") },
-                    isError = errors.any { it.key == AccountInputValidator.ErrorKey.INVALID_LAST_FOUR },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
                     label = { Text("الرصيد الافتتاحي") },
@@ -215,13 +200,13 @@ fun AccountEditDialog(
                         color = androidx.compose.material3.MaterialTheme.colorScheme.error,
                     )
                 }
-                OutlinedTextField(
-                    value = aliasesText,
-                    onValueChange = { aliasesText = it },
-                    label = { Text("أسماء مرسلي الرسائل (اختياري)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (existing == null) {
+                    Text(
+                        "بعد الحفظ يمكنك إضافة معرفات الحساب (آخر 4 أرقام / اسم المرسل) من قسم معرفات الحساب.",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 existing?.let { account ->
                     IdentifiersSection(accountId = account.id, accountType = account.accountType)
                 }
@@ -246,8 +231,6 @@ fun AccountEditDialog(
                             institutionName = institutionName.trim().takeIf(String::isNotEmpty),
                             accountType = accountType,
                             accountNature = accountNature,
-                            lastFourDigits = lastFour.takeIf { it.length == 4 },
-                            senderAliases = aliasesText.split(",").map(String::trim).filter(String::isNotEmpty),
                             currency = currency,
                             openingBalance = balance!!,
                             openingBalanceDate = date!!.toEpochMillis(),

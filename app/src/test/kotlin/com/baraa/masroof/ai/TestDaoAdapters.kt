@@ -65,5 +65,5 @@ internal fun wrapCategoryDao(repo: FakeCategoryRepository): com.baraa.masroof.da
 private fun com.baraa.masroof.data.db.Category.toEntity(): CategoryEntity = CategoryEntity(
     id = id, parentId = parentId, nameAr = nameAr, nameEn = nameEn,
     sortOrder = sortOrder, enabled = enabled, isSystem = isSystem,
-    createdAt = 0L, updatedAt = 0L,
+    createdAt = 0L, updatedAt = 0L
 )

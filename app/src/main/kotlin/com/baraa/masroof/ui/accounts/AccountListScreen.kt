@@ -39,7 +39,6 @@ import com.baraa.masroof.MasroofApplication
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.ledger.AccountBalanceService
-import com.baraa.masroof.transaction.AccountNature
 import java.math.BigDecimal
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -48,7 +47,7 @@ import java.time.LocalDate
 /** Manage account setup data without calculating historical balances. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountListScreen(onClose: () -> Unit) {
+fun AccountListScreen(onClose: (() -> Unit)? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val repo = app.financialAccountRepository
@@ -56,6 +55,17 @@ fun AccountListScreen(onClose: () -> Unit) {
     var accounts by remember { mutableStateOf<List<FinancialAccount>>(emptyList()) }
     var editing by remember { mutableStateOf<FinancialAccount?>(null) }
     var adding by remember { mutableStateOf(false) }
+    val identifiers by app.accountIdentifierRepository.observeAll()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val identifierLabels = remember(identifiers) {
+        identifiers
+            .filter {
+                it.isActive &&
+                    it.identifierType != com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS
+            }
+            .groupBy { it.accountId }
+            .mapValues { (_, rows) -> rows.first().normalizedValue }
+    }
 
     LaunchedEffect(repo) { repo.observeAll().collectLatest { accounts = it } }
 
@@ -81,8 +91,10 @@ fun AccountListScreen(onClose: () -> Unit) {
             CenterAlignedTopAppBar(
                 title = { Text("إدارة الحسابات") },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                    if (onClose != null) {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                        }
                     }
                 },
             )
@@ -101,12 +113,50 @@ fun AccountListScreen(onClose: () -> Unit) {
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val assets = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.ASSET }
-                    val liabilities = visibleAccounts.filter { it.isActive && it.accountNature == AccountNature.LIABILITY }
+                    val active = visibleAccounts.filter { it.isActive }
                     val inactive = visibleAccounts.filterNot { it.isActive }
-                    accountGroup("الأصول", assets, balances) { editing = it }
-                    accountGroup("الالتزامات", liabilities, balances) { editing = it }
-                    accountGroup("الحسابات غير النشطة", inactive, balances) { editing = it }
+                    fun ofType(vararg types: com.baraa.masroof.transaction.AccountType) =
+                        active.filter { it.accountType in types }
+                    accountGroup("الحسابات البنكية", ofType(com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT), balances, identifierLabels) { editing = it }
+                    accountGroup("بطاقات الائتمان", ofType(com.baraa.masroof.transaction.AccountType.CREDIT_CARD), balances, identifierLabels) { editing = it }
+                    accountGroup(
+                        "المحافظ الرقمية",
+                        ofType(
+                            com.baraa.masroof.transaction.AccountType.DIGITAL_WALLET,
+                            com.baraa.masroof.transaction.AccountType.WALLET,
+                        ),
+                        balances,
+                        identifierLabels,
+                    ) { editing = it }
+                    accountGroup("النقد", ofType(com.baraa.masroof.transaction.AccountType.CASH), balances, identifierLabels) { editing = it }
+                    accountGroup(
+                        "الاستثمارات",
+                        ofType(
+                            com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT,
+                            com.baraa.masroof.transaction.AccountType.SUKUK_ACCOUNT,
+                        ),
+                        balances,
+                        identifierLabels,
+                    ) { editing = it }
+                    accountGroup(
+                        "الالتزامات الأخرى",
+                        ofType(
+                            com.baraa.masroof.transaction.AccountType.LOAN,
+                            com.baraa.masroof.transaction.AccountType.OTHER_LIABILITY,
+                        ),
+                        balances,
+                        identifierLabels,
+                    ) { editing = it }
+                    accountGroup(
+                        "أصول أخرى",
+                        ofType(
+                            com.baraa.masroof.transaction.AccountType.OTHER_ASSET,
+                            com.baraa.masroof.transaction.AccountType.OTHER,
+                        ),
+                        balances,
+                        identifierLabels,
+                    ) { editing = it }
+                    accountGroup("الحسابات غير النشطة", inactive, balances, identifierLabels) { editing = it }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
             }
@@ -124,8 +174,6 @@ fun AccountListScreen(onClose: () -> Unit) {
                         displayName = draft.displayName,
                         accountType = draft.accountType,
                         institutionName = draft.institutionName,
-                        lastFourDigits = draft.lastFourDigits,
-                        senderAliases = draft.senderAliases,
                         accountNature = draft.accountNature,
                         currency = draft.currency,
                         openingBalance = draft.openingBalance,
@@ -155,8 +203,6 @@ fun AccountListScreen(onClose: () -> Unit) {
                         institutionName = draft.institutionName,
                         accountType = draft.accountType,
                         accountNature = draft.accountNature,
-                        lastFourDigits = draft.lastFourDigits,
-                        senderAliases = draft.senderAliases,
                         currency = draft.currency,
                         openingBalance = draft.openingBalance,
                         openingBalanceDate = draft.openingBalanceDate,
@@ -179,15 +225,23 @@ private fun androidx.compose.foundation.lazy.LazyListScope.accountGroup(
     title: String,
     accounts: List<FinancialAccount>,
     balances: Map<Long, BigDecimal>,
+    identifierLabels: Map<Long, String>,
     onClick: (FinancialAccount) -> Unit,
 ) {
     if (accounts.isEmpty()) return
     item { Text(title, style = MaterialTheme.typography.titleMedium) }
-    items(accounts, key = { it.id }) { AccountRow(it, balances[it.id]) { onClick(it) } }
+    items(accounts, key = { it.id }) {
+        AccountRow(it, balances[it.id], identifierLabels[it.id]) { onClick(it) }
+    }
 }
 
 @Composable
-private fun AccountRow(account: FinancialAccount, calculatedBalance: BigDecimal?, onClick: () -> Unit) {
+private fun AccountRow(
+    account: FinancialAccount,
+    calculatedBalance: BigDecimal?,
+    identifierLastFour: String?,
+    onClick: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -196,7 +250,7 @@ private fun AccountRow(account: FinancialAccount, calculatedBalance: BigDecimal?
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(account.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                account.lastFourDigits?.let { Text("•••• $it", style = MaterialTheme.typography.labelSmall) }
+                identifierLastFour?.let { Text("•••• $it", style = MaterialTheme.typography.labelSmall) }
             }
             Text("${accountTypeLabel(account.accountType)} • ${account.currency.name}")
             Text("الرصيد الافتتاحي: ${account.openingBalance.toPlainString()} ر.س")

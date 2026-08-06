@@ -19,7 +19,7 @@ class MigrationPreservationTest {
         val candidates = listOf(
             "src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
             "../src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
-            "app/src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt",
+            "app/src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt"
         )
         candidates.map { File(it) }.firstOrNull { it.exists() }
             ?: error("Could not locate MasroffDatabase.kt")
@@ -29,17 +29,23 @@ class MigrationPreservationTest {
 
     @Test
     fun noDestructiveMigration() {
-        // The schema-safety test already asserts that
-        // `fallbackToDestructiveMigration()` is not called. Here we
-        // also assert that NO migration contains DROP TABLE for any of
-        // the four core tables.
-        for (table in listOf("transactions", "categories", "merchant_memory", "financial_accounts")) {
+        // Core tables must never be wiped. financial_accounts may be rebuilt
+        // (copy → drop → rename) only when retiring columns.
+        for (table in listOf("transactions", "categories", "merchant_memory")) {
             val regex = Regex("""DROP\s+TABLE\s+[`"]?\Q$table\E[`"]?""")
             assertFalse(
                 "no migration may drop $table (was found in source)",
                 regex.containsMatchIn(source),
             )
         }
+        assertTrue(
+            "financial_accounts rebuild must copy rows before drop",
+            source.contains("INSERT INTO `financial_accounts_new`") &&
+                source.contains("FROM `financial_accounts`"),
+        )
+        assertFalse(
+            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source),
+        )
     }
 
     @Test
@@ -51,7 +57,7 @@ class MigrationPreservationTest {
         // It must NOT contain ALTER TABLE … DROP COLUMN.
         assertFalse(
             "v4→v5 must not drop columns",
-            Regex("""ALTER\s+TABLE[^;]*DROP\s+COLUMN""").containsMatchIn(source),
+            Regex("""ALTER\s+TABLE[^;]*DROP\s+COLUMN""").containsMatchIn(source)
         )
     }
 
@@ -65,15 +71,15 @@ class MigrationPreservationTest {
             val json = schemaFile.readText()
             assertFalse(
                 "schema $v must not contain api_key column",
-                json.contains("api_key"),
+                json.contains("api_key")
             )
             assertFalse(
                 "schema $v must not contain apiKey column",
-                json.contains("apiKey"),
+                json.contains("apiKey")
             )
             assertFalse(
                 "schema $v must not contain password column",
-                json.contains("password"),
+                json.contains("password")
             )
         }
     }

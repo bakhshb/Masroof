@@ -39,7 +39,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AccountIdentifierEntity::class,
         SenderInstitutionMappingEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -380,6 +380,129 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v14 → v15 retires legacy `lastFourDigits` / `senderAliases` columns
+         * from `financial_accounts` after copying them into typed
+         * `account_identifiers` rows. Account rows, transactions, and journals
+         * are preserved; the table rebuild copies every non-legacy column.
+         */
+        val MIGRATION_14_15: Migration = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val now = System.currentTimeMillis()
+                // 1) Backfill typed identifiers from legacy columns (idempotent).
+                db.query(
+                    """
+                    SELECT `id`, `accountType`, `lastFourDigits`, `senderAliases`, `createdAt`, `updatedAt`, `systemAccountKey`
+                    FROM `financial_accounts`
+                    """.trimIndent(),
+                ).use { cursor ->
+                    val idIdx = cursor.getColumnIndex("id")
+                    val typeIdx = cursor.getColumnIndex("accountType")
+                    val lastIdx = cursor.getColumnIndex("lastFourDigits")
+                    val aliasIdx = cursor.getColumnIndex("senderAliases")
+                    val createdIdx = cursor.getColumnIndex("createdAt")
+                    val updatedIdx = cursor.getColumnIndex("updatedAt")
+                    val systemIdx = cursor.getColumnIndex("systemAccountKey")
+                    while (cursor.moveToNext()) {
+                        if (!cursor.isNull(systemIdx)) continue
+                        val accountId = cursor.getLong(idIdx)
+                        val accountType = cursor.getString(typeIdx)
+                        val createdAt = if (cursor.isNull(createdIdx)) now else cursor.getLong(createdIdx)
+                        val updatedAt = if (cursor.isNull(updatedIdx)) now else cursor.getLong(updatedIdx)
+                        val lastFour = cursor.getString(lastIdx)?.trim()
+                        if (!lastFour.isNullOrEmpty() && lastFour.length == 4 && lastFour.all { it.isDigit() }) {
+                            val idType = when (accountType) {
+                                "CREDIT_CARD" -> "CREDIT_CARD_LAST4"
+                                "DIGITAL_WALLET", "WALLET" -> "WALLET_LAST4"
+                                else -> "ACCOUNT_LAST4"
+                            }
+                            db.execSQL(
+                                """
+                                INSERT OR IGNORE INTO `account_identifiers`
+                                (`accountId`, `identifierType`, `normalizedValue`, `displayLabel`, `isActive`, `createdAt`, `updatedAt`)
+                                VALUES (?, ?, ?, ?, 1, ?, ?)
+                                """.trimIndent(),
+                                arrayOf(accountId, idType, lastFour, lastFour, createdAt, updatedAt),
+                            )
+                        }
+                        val aliases = cursor.getString(aliasIdx).orEmpty()
+                        for (raw in aliases.split(",")) {
+                            val alias = raw.trim()
+                            if (alias.length < 2) continue
+                            val key = alias.lowercase()
+                                .map { ch ->
+                                    when (ch) {
+                                        '٠' -> '0'; '١' -> '1'; '٢' -> '2'; '٣' -> '3'; '٤' -> '4'
+                                        '٥' -> '5'; '٦' -> '6'; '٧' -> '7'; '٨' -> '8'; '٩' -> '9'
+                                        else -> ch
+                                    }
+                                }
+                                .filter { it.isLetterOrDigit() }
+                                .joinToString("")
+                                .take(64)
+                            if (key.length < 2) continue
+                            db.execSQL(
+                                """
+                                INSERT OR IGNORE INTO `account_identifiers`
+                                (`accountId`, `identifierType`, `normalizedValue`, `displayLabel`, `isActive`, `createdAt`, `updatedAt`)
+                                VALUES (?, 'SENDER_ALIAS', ?, ?, 1, ?, ?)
+                                """.trimIndent(),
+                                arrayOf(accountId, key, alias, createdAt, updatedAt),
+                            )
+                        }
+                    }
+                }
+
+                // 2) Rebuild financial_accounts without legacy columns.
+                db.execSQL(
+                    """
+                    CREATE TABLE `financial_accounts_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `displayName` TEXT NOT NULL,
+                        `institutionName` TEXT,
+                        `accountType` TEXT NOT NULL,
+                        `accountNature` TEXT NOT NULL,
+                        `currency` TEXT NOT NULL,
+                        `openingBalance` TEXT NOT NULL,
+                        `openingBalanceDate` INTEGER NOT NULL,
+                        `includeInNetWorth` INTEGER NOT NULL,
+                        `includeInLiquidity` INTEGER NOT NULL,
+                        `isOwnedByUser` INTEGER NOT NULL,
+                        `systemAccountKey` TEXT,
+                        `isActive` INTEGER NOT NULL,
+                        `notes` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `creditLimit` TEXT,
+                        `openingBalanceKind` TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `financial_accounts_new` (
+                        `id`, `displayName`, `institutionName`, `accountType`, `accountNature`,
+                        `currency`, `openingBalance`, `openingBalanceDate`, `includeInNetWorth`,
+                        `includeInLiquidity`, `isOwnedByUser`, `systemAccountKey`, `isActive`,
+                        `notes`, `createdAt`, `updatedAt`, `creditLimit`, `openingBalanceKind`
+                    )
+                    SELECT
+                        `id`, `displayName`, `institutionName`, `accountType`, `accountNature`,
+                        `currency`, `openingBalance`, `openingBalanceDate`, `includeInNetWorth`,
+                        `includeInLiquidity`, `isOwnedByUser`, `systemAccountKey`, `isActive`,
+                        `notes`, `createdAt`, `updatedAt`, `creditLimit`, `openingBalanceKind`
+                    FROM `financial_accounts`
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE `financial_accounts`")
+                db.execSQL("ALTER TABLE `financial_accounts_new` RENAME TO `financial_accounts`")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_accounts_systemAccountKey` " +
+                        "ON `financial_accounts` (`systemAccountKey`)",
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -395,6 +518,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_11_12,
             MIGRATION_12_13,
             MIGRATION_13_14,
+            MIGRATION_14_15,
         )
 
         fun build(context: Context): MasroofDatabase =

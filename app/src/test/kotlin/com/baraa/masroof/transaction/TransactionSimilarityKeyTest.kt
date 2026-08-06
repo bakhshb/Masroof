@@ -29,7 +29,7 @@ class TransactionSimilarityKeyTest {
         lastFour: String? = "1234",
         date: LocalDate? = LocalDate.of(2024, 1, 15),
         time: LocalTime? = LocalTime.of(14, 30),
-        windowMin: Int = 10,
+        windowMin: Int = 10
     ) = TransactionFingerprint.generateSimilarityKey(
         sender = sender,
         amount = amount,
@@ -39,7 +39,7 @@ class TransactionSimilarityKeyTest {
         lastFour = lastFour,
         date = date,
         time = time,
-        timeWindowMinutes = windowMin,
+        timeWindowMinutes = windowMin
     )
 
     @Test
@@ -61,7 +61,7 @@ class TransactionSimilarityKeyTest {
             merchant = "Starbucks",
             lastFour = "1234",
             date = LocalDate.of(2024, 1, 15),
-            time = LocalTime.of(14, 30),
+            time = LocalTime.of(14, 30)
         )
         val k2 = TransactionFingerprint.generateSimilarityKey(
             sender = "AlRajhi",
@@ -71,7 +71,7 @@ class TransactionSimilarityKeyTest {
             merchant = "Starbucks",
             lastFour = "1234",
             date = LocalDate.of(2024, 1, 15),
-            time = LocalTime.of(14, 30),
+            time = LocalTime.of(14, 30)
         )
         assertEquals("similarity key must not depend on smsTimestamp", k1, k2)
     }
@@ -153,7 +153,7 @@ class TransactionSimilarityKeyTest {
             merchant = null,
             lastFour = null,
             date = null,
-            time = null,
+            time = null
         )
         val b = TransactionFingerprint.generateSimilarityKey(
             sender = "AlRajhi",
@@ -163,7 +163,7 @@ class TransactionSimilarityKeyTest {
             merchant = null,
             lastFour = null,
             date = null,
-            time = null,
+            time = null
         )
         assertEquals(a, b)
         assertTrue(a.length == 64)
@@ -184,7 +184,7 @@ class TransactionSimilarityKeyTest {
             currency = Currency.SAR,
             type = TransactionType.PURCHASE,
             merchant = "Starbucks",
-            lastFour = "1234",
+            lastFour = "1234"
         )
         val sk = TransactionFingerprint.generateSimilarityKey(
             sender = sender,
@@ -194,7 +194,7 @@ class TransactionSimilarityKeyTest {
             merchant = "Starbucks",
             lastFour = "1234",
             date = date,
-            time = time,
+            time = time
         )
         assertNotEquals("exact and similarity keys must differ", fp, sk)
     }

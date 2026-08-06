@@ -25,7 +25,7 @@ class SettingsNavRegistrationTest {
         SettingsDestinations.testData.route,
         SettingsDestinations.releaseNotes.route,
         SettingsDestinations.autoSmsImport.route,
-        SettingsDestinations.transactionNotifications.route,
+        SettingsDestinations.transactionNotifications.route
     )
 
     @Test fun everyImplementedRegistryRouteIsWiredInNavHost() {
@@ -33,7 +33,7 @@ class SettingsNavRegistrationTest {
             if (!d.implemented) continue
             assertTrue(
                 "NavHost missing destination ${d.route} (${d.title})",
-                navHostRegisteredRoutes.contains(d.route),
+                navHostRegisteredRoutes.contains(d.route)
             )
         }
     }
@@ -42,7 +42,7 @@ class SettingsNavRegistrationTest {
         assertEquals(
             "Two destinations are sharing the same route — would break back nav",
             navHostRegisteredRoutes.size,
-            navHostRegisteredRoutes.toSet().size,
+            navHostRegisteredRoutes.toSet().size
         )
     }
 
@@ -53,7 +53,7 @@ class SettingsNavRegistrationTest {
             for (row in groupRows) {
                 assertTrue(
                     "Group ${group.header}: row ${row.title} missing from NavHost",
-                    navHostRegisteredRoutes.contains(row.route),
+                    navHostRegisteredRoutes.contains(row.route)
                 )
             }
         }

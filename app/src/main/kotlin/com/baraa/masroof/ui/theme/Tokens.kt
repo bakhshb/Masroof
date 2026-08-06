@@ -68,6 +68,25 @@ object FinancialPalette {
     val DarkInformational = Color(0xFF93C5FD)
 }
 
+/** Distinct series colors for dashboard charts (light theme). */
+object ChartSeriesColors {
+    val Income = FinancialPalette.Positive
+    val Expenses = FinancialPalette.Expense
+    val BankFees = Color(0xFFB7791F)
+    val Refunds = FinancialPalette.Informational
+    val Investments = FinancialPalette.EmeraldSecondary
+    val Transfers = FinancialPalette.NavyPrimary
+    val Liquidity = FinancialPalette.EmeraldSecondary
+
+    val DarkIncome = FinancialPalette.DarkPositive
+    val DarkExpenses = FinancialPalette.DarkExpense
+    val DarkBankFees = FinancialPalette.DarkWarning
+    val DarkRefunds = FinancialPalette.DarkInformational
+    val DarkInvestments = Color(0xFF5EEAD4)
+    val DarkTransfers = Color(0xFF93C5FD)
+    val DarkLiquidity = Color(0xFF5EEAD4)
+}
+
 /** Spacing tokens. Use these instead of arbitrary dp values. */
 object Spacing {
     val x1 = 4.dp

@@ -259,6 +259,7 @@ fun ImportMessagesScreen(
                     ScanResultsCard(preview)
                     val readyCount = preview.readyCount
                     val reviewCount = preview.needsReviewTransactions
+                    val importable = readyCount + reviewCount + preview.beforeTrackingStartCount
                     val beforeTracker = preview.beforeTrackingStartCount > 0
                     if (beforeTracker) {
                         TrackingStartWarningCard(
@@ -268,10 +269,16 @@ fun ImportMessagesScreen(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
                         PrimaryButton(
-                            label = if (readyCount > 0) "استيراد $readyCount عملية" else "لا توجد عمليات جاهزة",
-                            enabled = readyCount > 0 && phase == ImportPhase.Idle && importResult !is ImportExecutionResult.Loading,
+                            label = when {
+                                readyCount > 0 && reviewCount > 0 ->
+                                    "استيراد $readyCount جاهزة و$reviewCount للمراجعة"
+                                readyCount > 0 -> "استيراد $readyCount عملية"
+                                reviewCount > 0 -> "استيراد $reviewCount للمراجعة"
+                                else -> "لا توجد عمليات جاهزة"
+                            },
+                            enabled = importable > 0 && phase == ImportPhase.Idle && importResult !is ImportExecutionResult.Loading,
                             onClick = {
-                                if (readyCount <= 0) return@PrimaryButton
+                                if (importable <= 0) return@PrimaryButton
                                 val snapshot = preview
                                 if (snapshot.recognizedTransactions == 0) return@PrimaryButton
                                 // Real import action — call the canonical

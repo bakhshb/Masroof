@@ -22,7 +22,7 @@ class SettingsDestinationsTest {
             "مرسلو الرسائل والمؤسسات",
             "تشخيص التطبيق",
             "رسائل تجريبية",
-            "ملاحظات الإصدار",
+            "ملاحظات الإصدار"
         )
         val titles = SettingsDestinations.all.map { it.title }
         for (e in expected) assertTrue("missing row: $e", titles.contains(e))

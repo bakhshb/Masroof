@@ -1,5 +1,6 @@
 package com.baraa.masroof.rules
 
+import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.Category
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.MerchantMemory
@@ -9,6 +10,16 @@ import com.baraa.masroof.transaction.TransactionType
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalTime
+
+/**
+ * Pure snapshot of an active typed identifier for rule evaluation.
+ * Populated by the import/orchestrator layer; rules stay Room-free.
+ */
+data class AccountIdentifierSnapshot(
+    val accountId: Long,
+    val identifierType: AccountIdentifierType,
+    val normalizedValue: String,
+)
 
 /**
  * Priority order for rule evaluation. Lower `order` = higher priority = evaluated
@@ -61,12 +72,14 @@ data class RuleInput(
 
 /**
  * Read-only context passed to every rule. Holds the user's owned accounts,
- * merchant memory entries, and the current category list. Pure JVM data.
+ * merchant memory entries, the current category list, and optional typed
+ * identifier snapshots for value-based account matching. Pure JVM data.
  */
 data class RuleContext(
     val ownedAccounts: List<FinancialAccount>,
     val merchantMemories: List<MerchantMemory>,
     val categories: List<Category>,
+    val accountIdentifiers: List<AccountIdentifierSnapshot> = emptyList(),
 )
 
 /** Output of a single rule. Null means "this rule does not match". */

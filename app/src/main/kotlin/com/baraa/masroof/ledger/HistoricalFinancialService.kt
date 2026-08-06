@@ -41,7 +41,43 @@ data class HistoricalFinancialSummary(
     val endOfDayNetWorth: BigDecimal, val movement: DailyFinancialMovement, val postedJournalCount: Int,
     val unpostedTransactionCount: Int, val completeness: HistoricalDataCompleteness, val accounts: List<HistoricalAccountBalance>,
 )
-data class MonthlyFinancialHistory(val month: YearMonth, val daily: Map<LocalDate, HistoricalFinancialSummary>)
+data class MonthlyFinancialHistory(val month: YearMonth, val daily: Map<LocalDate, HistoricalFinancialSummary>) {
+    /** Sum of daily movement buckets for the month (not the last day's movement). */
+    fun monthMovement(): DailyFinancialMovement {
+        var income = BigDecimal.ZERO
+        var expenses = BigDecimal.ZERO
+        var refunds = BigDecimal.ZERO
+        var bankFees = BigDecimal.ZERO
+        var investments = BigDecimal.ZERO
+        var internalTransfers = BigDecimal.ZERO
+        var creditCardPayments = BigDecimal.ZERO
+        var cashWithdrawals = BigDecimal.ZERO
+        var manualAdjustments = BigDecimal.ZERO
+        var reversals = BigDecimal.ZERO
+        daily.values.forEach { day ->
+            val m = day.movement
+            income += m.income
+            expenses += m.expenses
+            refunds += m.refunds
+            bankFees += m.bankFees
+            investments += m.investments
+            internalTransfers += m.internalTransfers
+            creditCardPayments += m.creditCardPayments
+            cashWithdrawals += m.cashWithdrawals
+            manualAdjustments += m.manualAdjustments
+            reversals += m.reversals
+        }
+        val first = daily.values.firstOrNull()
+        val last = daily.values.lastOrNull()
+        val netCash = (last?.endOfDayLiquidity ?: BigDecimal.ZERO) - (first?.startOfDayLiquidity ?: BigDecimal.ZERO)
+        return DailyFinancialMovement(
+            income = income, expenses = expenses, refunds = refunds, bankFees = bankFees,
+            investments = investments, internalTransfers = internalTransfers,
+            creditCardPayments = creditCardPayments, cashWithdrawals = cashWithdrawals,
+            manualAdjustments = manualAdjustments, reversals = reversals, netCashMovement = netCash,
+        )
+    }
+}
 
 /** Pure, in-memory historical calculation. Only opening balances and POSTED journals are inputs. */
 object HistoricalFinancialService {

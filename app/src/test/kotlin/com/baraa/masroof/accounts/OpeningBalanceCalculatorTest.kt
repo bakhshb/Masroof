@@ -28,15 +28,13 @@ class OpeningBalanceCalculatorTest {
         includeInNetWorth: Boolean = true,
         includeInLiquidity: Boolean = AccountLiquidityDefaults.defaultFor(type),
         active: Boolean = true,
-        currency: Currency = Currency.SAR,
+        currency: Currency = Currency.SAR
     ) = FinancialAccount(
         id = id,
         displayName = name,
         institutionName = null,
         accountType = type,
         accountNature = nature,
-        lastFourDigits = null,
-        senderAliases = emptyList(),
         currency = currency,
         openingBalance = balance,
         openingBalanceDate = 0L,
@@ -44,7 +42,7 @@ class OpeningBalanceCalculatorTest {
         includeInLiquidity = includeInLiquidity,
         isOwnedByUser = true,
         isActive = active,
-        notes = null,
+        notes = null
     )
 
     // -- Asset / liability totals ---------------------------------------
@@ -66,7 +64,7 @@ class OpeningBalanceCalculatorTest {
             "Visa",
             AccountType.CREDIT_CARD,
             nature = AccountNature.LIABILITY,
-            balance = BigDecimal("8700"),
+            balance = BigDecimal("8700")
         )
         val t = OpeningBalanceCalculator.compute(listOf(a))
         val sar = t.perCurrency[Currency.SAR]!!
@@ -84,7 +82,7 @@ class OpeningBalanceCalculatorTest {
             "Visa",
             AccountType.CREDIT_CARD,
             nature = AccountNature.LIABILITY,
-            balance = BigDecimal("8700"),
+            balance = BigDecimal("8700")
         )
         val t = OpeningBalanceCalculator.compute(listOf(a))
         val sar = t.perCurrency[Currency.SAR]!!
@@ -97,12 +95,12 @@ class OpeningBalanceCalculatorTest {
         val accs = listOf(
             account(1, "Bank", AccountType.BANK_ACCOUNT, balance = BigDecimal("18000")),
             account(2, "Wallet", AccountType.DIGITAL_WALLET, balance = BigDecimal("2500")),
-            account(3, "Investment", AccountType.INVESTMENT_ACCOUNT, balance = BigDecimal("45000")),
+            account(3, "Investment", AccountType.INVESTMENT_ACCOUNT, balance = BigDecimal("45000"))
         )
         val t = OpeningBalanceCalculator.compute(accs)
         assertEquals(
             BigDecimal("65500.00"),
-            t.perCurrency[Currency.SAR]!!.assets,
+            t.perCurrency[Currency.SAR]!!.assets
         )
     }
 
@@ -111,17 +109,17 @@ class OpeningBalanceCalculatorTest {
         val accs = listOf(
             account(
                 1, "Visa", AccountType.CREDIT_CARD,
-                nature = AccountNature.LIABILITY, balance = BigDecimal("8700"),
+                nature = AccountNature.LIABILITY, balance = BigDecimal("8700")
             ),
             account(
                 2, "Loan", AccountType.LOAN,
-                nature = AccountNature.LIABILITY, balance = BigDecimal("36433"),
-            ),
+                nature = AccountNature.LIABILITY, balance = BigDecimal("36433")
+            )
         )
         val t = OpeningBalanceCalculator.compute(accs)
         assertEquals(
             BigDecimal("45133.00"),
-            t.perCurrency[Currency.SAR]!!.liabilities,
+            t.perCurrency[Currency.SAR]!!.liabilities
         )
     }
 
@@ -134,8 +132,8 @@ class OpeningBalanceCalculatorTest {
             account(4, "Sukuk", AccountType.SUKUK_ACCOUNT, balance = BigDecimal("12000")),
             account(
                 5, "Visa", AccountType.CREDIT_CARD,
-                nature = AccountNature.LIABILITY, balance = BigDecimal("8700"),
-            ),
+                nature = AccountNature.LIABILITY, balance = BigDecimal("8700")
+            )
         )
         val t = OpeningBalanceCalculator.compute(accs)
         // Only the bank + wallet (includeInLiquidity=true by default).
@@ -149,8 +147,8 @@ class OpeningBalanceCalculatorTest {
             account(2, "Wallet", AccountType.DIGITAL_WALLET, balance = BigDecimal("2500")),
             account(
                 3, "Visa", AccountType.CREDIT_CARD,
-                nature = AccountNature.LIABILITY, balance = BigDecimal("8700"),
-            ),
+                nature = AccountNature.LIABILITY, balance = BigDecimal("8700")
+            )
         )
         val t = OpeningBalanceCalculator.compute(accs)
         // 18000 + 2500 = 20500 assets; 8700 liabilities; net = 20500 - 8700 = 11800.
@@ -167,13 +165,13 @@ class OpeningBalanceCalculatorTest {
             listOf(
                 account(
                     1, "Visa", AccountType.CREDIT_CARD,
-                    nature = AccountNature.LIABILITY, balance = BigDecimal("0"),
-                ),
+                    nature = AccountNature.LIABILITY, balance = BigDecimal("0")
+                )
             )
         )
         assertEquals(
             BigDecimal.ZERO.setScale(2),
-            t.perCurrency[Currency.SAR]!!.liquidity,
+            t.perCurrency[Currency.SAR]!!.liquidity
         )
     }
 
@@ -184,7 +182,7 @@ class OpeningBalanceCalculatorTest {
         )
         assertEquals(
             BigDecimal("100.00"),
-            t.perCurrency[Currency.SAR]!!.liquidity,
+            t.perCurrency[Currency.SAR]!!.liquidity
         )
     }
 
@@ -206,7 +204,7 @@ class OpeningBalanceCalculatorTest {
         val t = OpeningBalanceCalculator.compute(
             listOf(
                 account(1, "Bank", AccountType.BANK_ACCOUNT, balance = BigDecimal("18000"), active = true),
-                account(2, "Old", AccountType.BANK_ACCOUNT, balance = BigDecimal("9999"), active = false),
+                account(2, "Old", AccountType.BANK_ACCOUNT, balance = BigDecimal("9999"), active = false)
             )
         )
         assertEquals(BigDecimal("18000.00"), t.perCurrency[Currency.SAR]!!.assets)
@@ -217,7 +215,7 @@ class OpeningBalanceCalculatorTest {
         val t = OpeningBalanceCalculator.compute(
             listOf(
                 account(1, "Bank", AccountType.BANK_ACCOUNT, balance = BigDecimal("18000"), includeInNetWorth = true),
-                account(2, "Hidden", AccountType.OTHER_ASSET, balance = BigDecimal("9999"), includeInNetWorth = false),
+                account(2, "Hidden", AccountType.OTHER_ASSET, balance = BigDecimal("9999"), includeInNetWorth = false)
             )
         )
         assertEquals(BigDecimal("18000.00"), t.perCurrency[Currency.SAR]!!.assets)
@@ -232,7 +230,7 @@ class OpeningBalanceCalculatorTest {
         val accs = listOf(
             account(1, "A", AccountType.BANK_ACCOUNT, balance = BigDecimal("12.34")),
             account(2, "B", AccountType.BANK_ACCOUNT, balance = BigDecimal("56.78")),
-            account(3, "C", AccountType.BANK_ACCOUNT, balance = BigDecimal("9.99")),
+            account(3, "C", AccountType.BANK_ACCOUNT, balance = BigDecimal("9.99"))
         )
         val t = OpeningBalanceCalculator.compute(accs)
         assertEquals(BigDecimal("79.11"), t.perCurrency[Currency.SAR]!!.assets)
@@ -266,7 +264,7 @@ class OpeningBalanceCalculatorTest {
                 name.contains("derivedtotal")
             assertFalse(
                 "FinancialAccountEntity must not store derived totals (field: ${f.name})",
-                isDerived,
+                isDerived
             )
         }
     }

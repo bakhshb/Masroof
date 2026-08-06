@@ -1,7 +1,7 @@
 package com.baraa.masroof.rules.rules
 
+import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
-import com.baraa.masroof.rules.AccountMatching
 import com.baraa.masroof.rules.RuleContext
 import com.baraa.masroof.rules.RuleInput
 import com.baraa.masroof.rules.RulePriority
@@ -12,15 +12,9 @@ import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.FinancialTreatment
 
 /**
- * Detects "wallet top-up" messages — funding a digital wallet from a
- * credit card. Classifies as INTERNAL_TRANSFER only when BOTH the wallet
- * and the source card correspond to owned accounts. Otherwise the rule
- * returns null and the engine falls through to PENDING_REVIEW.
- *
- * This rule does NOT create a second expense for the funding side — the
- * paired credit-card transaction is the actual spend (handled by
- * CardPaymentRule) and the wallet credit is a movement between the user's
- * own accounts.
+ * Detects wallet top-up messages. Requires exactly one owned wallet and
+ * exactly one owned credit card that are both evidenced in the message
+ * (typed identifiers / names). Never silently picks the first of many.
  */
 class WalletTopUpRule : TransactionRule {
     override val name: String = "WalletTopUpRule"
@@ -32,23 +26,19 @@ class WalletTopUpRule : TransactionRule {
         val owned = context.ownedAccounts.filter { it.isOwnedByUser && it.isActive }
         if (owned.size < 2) return null
 
-        // Identify the wallet (the destination of the top-up).
-        val wallet = owned.firstOrNull { it.accountType == AccountType.WALLET }
-            ?: return null
-        // Identify the source — must be a CREDIT_CARD owned by the user.
-        val card = owned.firstOrNull {
-            it.id != wallet.id && it.accountType == AccountType.CREDIT_CARD &&
-                (it.displayName.isNotBlank() || it.institutionName != null)
-        } ?: return null
+        val wallets = owned.filter { it.accountType == AccountType.WALLET || it.accountType == AccountType.DIGITAL_WALLET }
+        val cards = owned.filter { it.accountType == AccountType.CREDIT_CARD }
+        val wallet = wallets.singleOrNull() ?: return null
+        val card = cards.singleOrNull() ?: return null
 
-        // The body should mention BOTH the wallet name (or a wallet alias)
-        // and the card (sender alias or last four).
-        val mentionsWallet = wallet.displayName.lowercase() in input.body.orEmpty().lowercase() ||
-            wallet.institutionName?.lowercase()?.let { it in input.body.orEmpty().lowercase() } == true
-        val mentionsCard = card.senderAliases.any { it.lowercase() in input.body.orEmpty().lowercase() } ||
-            input.parsed.identifierEvidence.any { it.type == com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 }
+        val bodyText = (input.body.orEmpty() + " " + input.parsed.merchant.orEmpty()).lowercase()
+        // Unique wallet + top-up phrasing already identifies the destination.
+        // The funding card must still appear in the message (name, typed id, or evidence).
+        val mentionsCard = card.displayName.lowercase() in bodyText ||
+            typedMentions(context, card, input) ||
+            input.parsed.identifierEvidence.any { it.type == AccountIdentifierType.CREDIT_CARD_LAST4 }
 
-        if (!mentionsWallet || !mentionsCard) return null
+        if (!mentionsCard) return null
 
         return RuleResult(
             financialTreatment = FinancialTreatment.INTERNAL_TRANSFER,
@@ -60,6 +50,21 @@ class WalletTopUpRule : TransactionRule {
         )
     }
 
+    private fun typedMentions(context: RuleContext, account: FinancialAccount, input: RuleInput): Boolean {
+        val ids = context.accountIdentifiers.filter { it.accountId == account.id }
+        val body = (input.body.orEmpty() + " " + input.parsed.merchant.orEmpty()).lowercase()
+        if (ids.any { it.identifierType == AccountIdentifierType.SENDER_ALIAS && it.normalizedValue in body }) {
+            return true
+        }
+        val lastFours = ids.map { it.normalizedValue }.filter { it.length == 4 }
+        return lastFours.any { it in body } ||
+            input.parsed.identifierEvidence.any { evidence ->
+                evidence.lastFour in lastFours && evidence.type == ids.firstOrNull {
+                    it.normalizedValue == evidence.lastFour
+                }?.identifierType
+            }
+    }
+
     private fun looksLikeWalletTopUp(body: String?, merchant: String?): Boolean {
         val text = (body.orEmpty() + " " + merchant.orEmpty()).lowercase()
         if (text.isBlank()) return false
@@ -67,7 +72,6 @@ class WalletTopUpRule : TransactionRule {
     }
 
     private companion object {
-        // Arabic + English phrases that indicate a wallet top-up / funding.
         val WALLET_TOPUP_PATTERNS: List<Regex> = listOf(
             Regex("""\b(شحن\s*المحفظة|إضافة\s*رصيد\s*للمحفظة|تمويل\s*المحفظة|شحن\s*الحساب\s*بالبطاقة|شحن\s*المحفظة\s*من\s*البطاقة|wallet\s*top[-\s]*up|top[-\s]*up\s*wallet|card\s*funding|add\s*money|cash\s*in|شحن\s*رصيد|تمويل\s*البطاقة\s*للمحفظة)\b"""),
         )

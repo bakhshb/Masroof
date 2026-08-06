@@ -58,7 +58,7 @@ class AlRajhiParserTest {
         val result = p.parse(
             sender = "AlRajhi",
             body = "Type: شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         assertEquals(TransactionType.PURCHASE, result.transactionType)
         assertEquals(0, BigDecimal("250").compareTo(result.amount))
@@ -73,7 +73,7 @@ class AlRajhiParserTest {
         val r = BankParserRegistry.parse(
             sender = "AlRajhi",
             body = "شراء\nبمبلغ: 100 ريال",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         assertEquals("AlRajhi", r.parserName)
     }
@@ -86,7 +86,7 @@ class AlRajhiParserTest {
         val result = p.parse(
             sender = "AlRajhi",
             body = "your balance is fine, no transactions today",
-            smsTimestampMillis = 1_700_000_000_000L,
+            smsTimestampMillis = 1_700_000_000_000L
         )
         // No amount / type / merchant / date / time → low confidence.
         assertTrue("low-confidence result expected", result.confidence < 30)
@@ -95,19 +95,19 @@ class AlRajhiParserTest {
     }
 
     @Test
-    fun parserDiagnosticsIncludeParserNameAndMatchedRules() {
-        val p = GenericBankSmsParser()
-        val result: ParsedTransaction = p.parse(
-            sender = "AlRajhi",
-            body = "Type: Purchase\nAmount: 100 SAR\nMerchant: Starbucks",
-            smsTimestampMillis = 1_700_000_000_000L,
-        )
-        assertEquals("Generic", result.parserName)
-        assertNotNull(result.parserVersion)
-        // The shared parser records which rules fired.
-        assertTrue(
-            "matchedRules should contain a currency rule: ${result.matchedRules}",
-            result.matchedRules.any { it.startsWith("currency:") },
-        )
+    fun alRajhiCreditCardPurchaseDoesNotUseBalanceAsAmount() {
+        val body = """
+            شراء عبر الانترنت
+            بطاقة ائتمانية: 7271
+            بمبلغ: 51.99 SAR
+            لدى: Keeta
+            في: 22:50 03-08-2026
+            الرصيد المتاح: SAR 17230.03
+            إجمالي المبلغ المستحق: 2380.88 SAR
+        """.trimIndent()
+        val result = BankParserRegistry.parse("alrajhi", body, 1_725_000_000_000L)
+        assertEquals("AlRajhi", result.parserName)
+        assertEquals(0, BigDecimal("51.99").compareTo(result.amount))
+        assertEquals("7271", result.accountOrCardLastFourDigits)
     }
 }

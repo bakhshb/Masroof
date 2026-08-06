@@ -39,17 +39,17 @@ class FinancialSetupAndMigrationTest {
         // The migration must declare a v6 → v7 step.
         assertTrue(
             "MasroofDatabase must declare MIGRATION_6_7",
-            source.contains("MIGRATION_6_7"),
+            source.contains("MIGRATION_6_7")
         )
         // The migration must be registered in ALL_MIGRATIONS.
         assertTrue(
             "MIGRATION_6_7 must be added to ALL_MIGRATIONS",
-            source.contains("MIGRATION_6_7,") || source.contains("MIGRATION_6_7\n"),
+            source.contains("MIGRATION_6_7,") || source.contains("MIGRATION_6_7\n")
         )
         // The migration must create the financial_setup table.
         assertTrue(
             "v6 → v7 migration must create the financial_setup table",
-            source.contains("CREATE TABLE IF NOT EXISTS `financial_setup`"),
+            source.contains("CREATE TABLE IF NOT EXISTS `financial_setup`")
         )
         // Account columns added.
         for (col in listOf(
@@ -59,11 +59,11 @@ class FinancialSetupAndMigrationTest {
             "openingBalanceDate",
             "includeInNetWorth",
             "includeInLiquidity",
-            "notes",
+            "notes"
         )) {
             assertTrue(
                 "v6 → v7 migration must add `$col` to financial_accounts",
-                source.contains("ADD COLUMN `$col`"),
+                source.contains("ADD COLUMN `$col`")
             )
         }
     }
@@ -76,11 +76,11 @@ class FinancialSetupAndMigrationTest {
         // others → ASSET).
         assertTrue(
             "migration must set accountNature = 'LIABILITY' for credit cards",
-            source.contains("'LIABILITY'") && source.contains("CREDIT_CARD"),
+            source.contains("'LIABILITY'") && source.contains("CREDIT_CARD")
         )
         assertTrue(
             "migration must set accountNature = 'ASSET' for non-liabilities",
-            source.contains("'ASSET'"),
+            source.contains("'ASSET'")
         )
     }
 
@@ -91,7 +91,7 @@ class FinancialSetupAndMigrationTest {
         // accountType.
         assertTrue(
             "migration must set includeInLiquidity = 1 for banks/wallets/cash",
-            source.contains("BANK_ACCOUNT") && source.contains("includeInLiquidity"),
+            source.contains("BANK_ACCOUNT") && source.contains("includeInLiquidity")
         )
     }
 
@@ -100,7 +100,7 @@ class FinancialSetupAndMigrationTest {
         val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
         assertFalse(
             "Database source must not call fallbackToDestructiveMigration",
-            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source),
+            Regex("""\.fallbackToDestructiveMigration\s*\(""").containsMatchIn(source)
         )
     }
 
@@ -112,7 +112,6 @@ class FinancialSetupAndMigrationTest {
             "transactions",
             "categories",
             "merchant_memory",
-            "financial_accounts",
             "ai_cache",
             "ai_settings",
             "ai_suggestions",
@@ -123,16 +122,22 @@ class FinancialSetupAndMigrationTest {
                     .containsMatchIn(source),
             )
         }
+        // financial_accounts may be rebuilt (copy → drop → rename) to retire
+        // columns; never wiped without a preceding INSERT…SELECT copy.
+        assertTrue(
+            "financial_accounts rebuild must copy rows before drop",
+            source.contains("INSERT INTO `financial_accounts_new`") &&
+                source.contains("FROM `financial_accounts`"),
+        )
     }
 
     @Test
-    fun databaseVersionIsFourteen() {
+    fun databaseVersionIsFifteen() {
         val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt")
             .readText()
-        // The @Database annotation should declare version = 14.
-        val regex = Regex("""version\s*=\s*14""")
+        val regex = Regex("""version\s*=\s*15""")
         assertTrue(
-            "database version must be 14",
+            "database version must be 15",
             regex.containsMatchIn(source),
         )
     }
@@ -149,13 +154,12 @@ class FinancialSetupAndMigrationTest {
                 displayName = "Legacy",
                 accountType = AccountType.BANK_ACCOUNT,
                 institutionName = "Al Rajhi",
-                lastFourDigits = "1234",
                 accountNature = AccountNature.ASSET,
                 currency = Currency.SAR,
                 openingBalance = BigDecimal("100"),
                 openingBalanceDate = 1_700_000_000_000L,
                 includeInNetWorth = true,
-                includeInLiquidity = true,
+                includeInLiquidity = true
             )
             val fetched = repo.getById(id)
             assertNotNull(fetched)
@@ -173,7 +177,6 @@ class FinancialSetupAndMigrationTest {
             "id" to 1L,
             "displayName" to "Old",
             "accountType" to AccountType.BANK_ACCOUNT,
-            "lastFourDigits" to "1234",
             "openingBalance" to BigDecimal.ZERO,
             "accountNature" to AccountNature.ASSET, // default for BANK_ACCOUNT
             "includeInNetWorth" to true,
@@ -209,15 +212,14 @@ class FinancialSetupAndMigrationTest {
     // -- Full-account-number safety ------------------------------------
 
     @Test
-    fun fullAccountNumbersNeverStored() {
-        // The repo API must NOT accept a full account number. The only
-        // numeric identifier is lastFourDigits (4 chars).
+    fun fullAccountNumbersNeverStoredOnAccountEntity() {
+        // Account identity lives in typed AccountIdentifierEntity rows.
+        // FinancialAccount must not expose last-four / full-number fields.
         val repo = FakeFinancialAccountRepository()
         runBlocking {
             val id = repo.add(
                 displayName = "X",
                 accountType = AccountType.BANK_ACCOUNT,
-                lastFourDigits = "1234", // only 4 digits allowed
                 accountNature = AccountNature.ASSET,
                 currency = Currency.SAR,
                 openingBalance = BigDecimal.ZERO,
@@ -226,8 +228,9 @@ class FinancialSetupAndMigrationTest {
                 includeInLiquidity = true,
             )
             val fetched = repo.getById(id)!!
-            assertEquals("1234", fetched.lastFourDigits)
-            assertEquals("lastFourDigits must be ≤ 4 chars", 4, fetched.lastFourDigits!!.length)
+            assertEquals("X", fetched.displayName)
+            val fields = FinancialAccount::class.java.declaredFields.map { it.name.lowercase() }
+            assertFalse(fields.any { it.contains("lastfour") || it.contains("accountnumber") })
         }
     }
 
@@ -244,7 +247,7 @@ class FinancialSetupAndMigrationTest {
                     name.contains("accountnumber") ||
                     name.contains("cardnumber") ||
                     name.contains("iban") ||
-                    name.contains("cvv"),
+                    name.contains("cvv")
             )
         }
     }
@@ -257,7 +260,7 @@ class FinancialSetupAndMigrationTest {
             trackingStartDate = 1_700_000_000_000L,
             setupCompleted = true,
             setupCompletedAt = 1_700_000_001_000L,
-            defaultCurrency = Currency.SAR,
+            defaultCurrency = Currency.SAR
         )
         assertTrue(setup.setupCompleted)
         assertEquals(1_700_000_001_000L, setup.setupCompletedAt)
@@ -279,7 +282,7 @@ class FinancialSetupAndMigrationTest {
                 openingBalance = BigDecimal("18000"),
                 openingBalanceDate = 0L,
                 includeInNetWorth = true,
-                includeInLiquidity = true,
+                includeInLiquidity = true
             )
         }
         val accounts: List<FinancialAccount> = runBlocking { repo.observeAll().first() }

@@ -5,10 +5,8 @@ sealed interface NavigationCommand {
     data object OpenHome : NavigationCommand
     data object OpenOperations : NavigationCommand
     data object OpenImport : NavigationCommand
-    data class OpenImportResults(val importSessionId: Long) : NavigationCommand
     data class OpenReviewQueue(val importSessionId: Long? = null, val reviewFilter: String = "actionable") : NavigationCommand
     data class OpenInstitutionMapping(val senderKey: String? = null) : NavigationCommand
-    data class OpenAccountChooser(val transactionId: Long) : NavigationCommand
     data class BindAccountFromSms(val accountId: Long) : NavigationCommand
     data object BackToOperations : NavigationCommand
 }
@@ -18,8 +16,7 @@ object AppRoutes {
     const val OPERATIONS = "primary/TRANSACTIONS"
     const val IMPORT = "route/import_messages"
     const val REVIEW = "operations/review"
-    fun importResults(sessionId: Long) = "operations/import-results/$sessionId"
-    fun review(sessionId: Long?) = "$REVIEW?sessionId=${sessionId ?: "current"}"
+    fun review(sessionId: Long?) = if (sessionId == null) REVIEW else "$REVIEW?sessionId=$sessionId"
     fun bindAccount(accountId: Long) = "operations/account-bind/$accountId"
 }
 
@@ -28,9 +25,7 @@ fun NavigationCommand.destinationRoute(): String = when (this) {
     NavigationCommand.OpenHome -> AppRoutes.HOME
     NavigationCommand.OpenOperations, NavigationCommand.BackToOperations -> AppRoutes.OPERATIONS
     NavigationCommand.OpenImport -> AppRoutes.IMPORT
-    is NavigationCommand.OpenImportResults -> AppRoutes.importResults(importSessionId)
-    is NavigationCommand.OpenReviewQueue -> AppRoutes.review(importSessionId)
+    is NavigationCommand.OpenReviewQueue -> AppRoutes.REVIEW
     is NavigationCommand.OpenInstitutionMapping -> "settings/sender_mappings"
-    is NavigationCommand.OpenAccountChooser -> "operations/account-chooser/$transactionId"
     is NavigationCommand.BindAccountFromSms -> AppRoutes.bindAccount(accountId)
 }

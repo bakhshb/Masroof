@@ -10,17 +10,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +35,10 @@ import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.ledger.HistoricalFinancialService
 import com.baraa.masroof.transaction.TransactionType
+import com.baraa.masroof.ui.charts.ChartCard
+import com.baraa.masroof.ui.charts.ChartMappers
+import com.baraa.masroof.ui.charts.DailyTrendColumnChart
+import com.baraa.masroof.ui.charts.DonutChart
 import com.baraa.masroof.ui.theme.AttentionBanner
 import com.baraa.masroof.ui.theme.EmptyState
 import com.baraa.masroof.ui.theme.FinancialMetric
@@ -37,10 +46,10 @@ import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.FinancialTypography
 import com.baraa.masroof.ui.theme.HeroBalanceCard
 import com.baraa.masroof.ui.theme.LoadingSkeleton
-import com.baraa.masroof.ui.theme.MonthlySummaryRow
 import com.baraa.masroof.ui.theme.MonthSelector
 import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.SectionHeader
+import com.baraa.masroof.ui.theme.SemanticColors
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,18 +58,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 /**
- * Monthly-first home dashboard.
- *
- * Reactive sources (each is a Room-backed Flow):
- *  - financialAccountRepository.observeAll()
- *  - accountIdentifierRepository.observeAll()
- *  - transactionRepository.observeAll()
- *  - financialSetupRepository.observe()  → controls `trackingStartDate` display
- *  - journalDao.observePosted()         → triggers balance recompute on import
- *
- * Note: NO `remember { mutableStateOf(BigDecimal.ZERO) }` cached values for
- * money. Each visible number is derived live from Room via
- * [derivedStateOf]; when a posting lands, recomposition is automatic.
+ * Monthly-first home dashboard with composition donut and daily spend columns.
  */
 @Composable
 fun HomeScreen(
@@ -83,10 +81,8 @@ fun HomeScreen(
         java.time.Instant.ofEpochMilli(s.trackingStartDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
     }
 
-    // The dashboard listens for new posted journals. When at least one
-    // posted journal exists that affects the selected month, we
-    // recompute balances against the live journal list.
-    val journals by produceJournalsForMonth(app, month)
+    val monthHistory by produceMonthHistory(app, month)
+    val journals = remember(monthHistory) { monthHistory?.daily?.values?.toList().orEmpty() }
 
     val identifiersByAccount = remember(identifiers) { identifiers.groupBy { it.accountId } }
     val recent = remember(transactions) { transactions.sortedByDescending { it.smsTimestamp }.take(5) }
@@ -94,50 +90,101 @@ fun HomeScreen(
     val reviewCount = remember(transactions) { transactions.count { it.needsReview } }
     val beforeTrackingCount = remember(transactions) { transactions.count { it.exclusionReason?.contains("بداية المتابعة") == true } }
 
-    val todaySummary = if (accounts.isNotEmpty()) {
-        val daily = journals.lastOrNull()
-        com.baraa.masroof.ledger.DailyFinancialMovement(
-            income = daily?.movement?.income ?: BigDecimal.ZERO,
-            expenses = daily?.movement?.expenses ?: BigDecimal.ZERO,
-            refunds = daily?.movement?.refunds ?: BigDecimal.ZERO,
-            bankFees = daily?.movement?.bankFees ?: BigDecimal.ZERO,
-            investments = daily?.movement?.investments ?: BigDecimal.ZERO,
-            netCashMovement = daily?.movement?.netCashMovement ?: BigDecimal.ZERO,
-        )
-    } else null
+    val monthSummary = if (accounts.isNotEmpty()) monthHistory?.monthMovement() else null
 
     val endLiquidity = remember(journals) { journals.lastOrNull()?.endOfDayLiquidity }
-    val startLiquidity = remember(journals) { journals.lastOrNull()?.startOfDayLiquidity ?: BigDecimal.ZERO }
+    val startLiquidity = remember(journals) { journals.firstOrNull()?.startOfDayLiquidity ?: BigDecimal.ZERO }
     val endNetWorth = remember(journals) { journals.lastOrNull()?.endOfDayNetWorth }
-    val endLiabilities = remember(journals) { journals.lastOrNull()?.endOfDayLiabilities ?: BigDecimal.ZERO }
+    val endLiabilities = remember(journals) {
+        journals.lastOrNull()?.accounts
+            ?.filter {
+                it.trackingStatus == com.baraa.masroof.ledger.HistoricalTrackingStatus.TRACKED &&
+                    it.accountNature == com.baraa.masroof.transaction.AccountNature.LIABILITY &&
+                    it.accountType == com.baraa.masroof.transaction.AccountType.CREDIT_CARD &&
+                    it.includedInNetWorth
+            }
+            ?.fold(BigDecimal.ZERO) { acc, row -> acc + row.endOfDayBalance }
+            ?: BigDecimal.ZERO
+    }
     val monthChange = (endLiquidity ?: BigDecimal.ZERO) - startLiquidity
     val isCurrentMonth = month == YearMonth.now()
 
+    val isDark = MaterialTheme.colorScheme.background.let {
+        0.2126f * it.red + 0.7152f * it.green + 0.0722f * it.blue < 0.5f
+    }
+    val palette = if (isDark) ChartMappers.SeriesPalette.Dark else ChartMappers.SeriesPalette.Light
+    val donutSlices = remember(monthSummary, palette) {
+        monthSummary?.let { ChartMappers.monthMovementSlices(it, palette) }.orEmpty()
+    }
+    val expenseSeries = remember(monthHistory) {
+        monthHistory?.let { ChartMappers.dailyExpenseSeries(it) }.orEmpty()
+    }
+    val expenseSeriesHasData = ChartMappers.hasNonZero(expenseSeries)
+
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
-        item { MonthSelector(current = month, isCurrentMonth = isCurrentMonth, onPrev = { month = month.minusMonths(1) }, onCurrent = { month = YearMonth.now() }, onNext = { }) }
+        item {
+            MonthSelector(
+                current = month,
+                isCurrentMonth = isCurrentMonth,
+                onPrev = { month = month.minusMonths(1) },
+                onCurrent = { month = YearMonth.now() },
+                onNext = {
+                    val next = month.plusMonths(1)
+                    if (!next.isAfter(YearMonth.now())) month = next
+                },
+            )
+        }
         item {
             if (endLiquidity == null) LoadingSkeleton(Modifier.height(160.dp))
-            else HeroBalanceCard(label = "السيولة المتاحة", amount = endLiquidity ?: BigDecimal.ZERO, monthChange = monthChange)
+            else HeroBalanceCard(
+                label = "السيولة المتاحة",
+                amount = endLiquidity,
+                monthChange = monthChange,
+                icon = Icons.Filled.AccountBalanceWallet,
+            )
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                FinancialMetric(label = "صافي الثروة", amount = endNetWorth ?: BigDecimal.ZERO, modifier = Modifier.weight(1f))
-                FinancialMetric(label = "إجمالي التزامات البطاقات", amount = endLiabilities, modifier = Modifier.weight(1f))
+                FinancialMetric(
+                    label = "صافي الثروة",
+                    amount = endNetWorth ?: BigDecimal.ZERO,
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Filled.TrendingUp,
+                )
+                FinancialMetric(
+                    label = "التزامات البطاقات",
+                    amount = endLiabilities,
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Filled.CreditCard,
+                )
             }
         }
-        val m = todaySummary
-        if (m != null && listOf(m.income, m.expenses, m.refunds, m.bankFees, m.investments).any { row -> row.signum() != 0 }) {
-            item { SectionHeader("ملخص الشهر") }
+        if (donutSlices.isNotEmpty()) {
             item {
-                Surface(Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                    Column(Modifier.padding(Spacing.x4)) {
-                        if (m.income.signum() > 0) MonthlySummaryRow("الدخل", m.income, isExpense = false)
-                        if (m.expenses.signum() > 0) MonthlySummaryRow("المصروفات", m.expenses, isExpense = true)
-                        if (m.refunds.signum() > 0) MonthlySummaryRow("الاستردادات", m.refunds, isExpense = false)
-                        if (m.bankFees.signum() > 0) MonthlySummaryRow("الرسوم البنكية", m.bankFees, isExpense = true)
-                        if (m.investments.signum() > 0) MonthlySummaryRow("الاستثمارات", m.investments, isExpense = true)
-                        MonthlySummaryRow("صافي التغير", m.netCashMovement, isExpense = m.netCashMovement.signum() < 0)
-                    }
+                ChartCard(
+                    title = "توزيع حركة الشهر",
+                    subtitle = "ملخص الدخل والمصروفات لهذا الشهر",
+                ) {
+                    DonutChart(
+                        slices = donutSlices,
+                        centerLabel = "صافي التغير",
+                        centerValue = monthSummary?.netCashMovement,
+                    )
+                }
+            }
+        }
+        if (monthHistory != null) {
+            item {
+                ChartCard(
+                    title = "المصروفات اليومية",
+                    subtitle = "اتجاه الإنفاق خلال أيام الشهر",
+                    isEmpty = !expenseSeriesHasData,
+                    emptyMessage = "لا توجد مصروفات مسجّلة في هذا الشهر",
+                ) {
+                    DailyTrendColumnChart(
+                        points = expenseSeries,
+                        columnColorArgb = SemanticColors.expense().toArgb(),
+                    )
                 }
             }
         }
@@ -159,6 +206,7 @@ fun HomeScreen(
                     body = "استورد رسائل البنك لبدء متابعة مصروفاتك تلقائيًا.",
                     actionLabel = "استيراد الرسائل",
                     onAction = onImportMessages,
+                    icon = Icons.Filled.CloudDownload,
                 )
             }
         } else {
@@ -195,21 +243,22 @@ private fun TrackingStartSummary(date: LocalDate) {
 }
 
 @Composable
-private fun produceJournalsForMonth(app: MasroofApplication, month: YearMonth): androidx.compose.runtime.State<List<com.baraa.masroof.ledger.HistoricalFinancialSummary>> {
-    val state = remember { mutableStateOf(emptyList<com.baraa.masroof.ledger.HistoricalFinancialSummary>()) }
+private fun produceMonthHistory(
+    app: MasroofApplication,
+    month: YearMonth,
+): androidx.compose.runtime.State<com.baraa.masroof.ledger.MonthlyFinancialHistory?> {
+    val state = remember { mutableStateOf<com.baraa.masroof.ledger.MonthlyFinancialHistory?>(null) }
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
-    // Observe posted-journal Flow so new imports trigger an immediate
-    // balance refresh without depending on account-table changes.
     val journalVersion by app.database.journalDao().observePosted().collectAsStateWithLifecycle(initialValue = emptyList())
     LaunchedEffect(accounts, month, journalVersion.size) {
         if (accounts.isEmpty()) {
-            state.value = emptyList()
+            state.value = null
         } else {
             runCatching {
                 val journals = withContext(Dispatchers.IO) { app.database.journalDao().getPostedThrough(month.atEndOfMonth()) }
-                state.value = HistoricalFinancialService.calculateMonth(month, accounts, journals).daily.values.toList()
+                state.value = HistoricalFinancialService.calculateMonth(month, accounts, journals)
             }.onFailure {
-                state.value = emptyList()
+                state.value = null
             }
         }
     }
@@ -219,9 +268,6 @@ private fun produceJournalsForMonth(app: MasroofApplication, month: YearMonth): 
 private fun resolveAccountId(tx: TransactionEntity, accounts: List<FinancialAccount>): Long? {
     if (tx.sourceAccountId != null) return tx.sourceAccountId
     if (tx.destinationAccountId != null) return tx.destinationAccountId
-    // Presentation follows the persisted account link only. Legacy
-    // FinancialAccount.lastFourDigits is migration compatibility data, never
-    // account-matching evidence.
     return null
 }
 

@@ -35,8 +35,6 @@ class SystemAccountSeeder(
             institutionName = null,
             accountType = AccountType.OTHER,
             accountNature = nature,
-            lastFourDigits = null,
-            senderAliases = "",
             currency = Currency.SAR,
             openingBalance = java.math.BigDecimal.ZERO,
             openingBalanceDate = 0L,

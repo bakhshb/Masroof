@@ -25,7 +25,7 @@ class ImportExecutionResultTest {
             recognizedTransactions = 42,
             needsReviewTransactions = 30,
             duplicateTransactions = 0,
-            beforeTrackingStartCount = 0,
+            beforeTrackingStartCount = 0
         )
         val readyCount = preview.readyCount
         assertEquals(12, readyCount)
@@ -65,16 +65,18 @@ class ImportExecutionResultTest {
      */
     @Test fun importButtonEnabledWhenReadyCountPositive() {
         val preview = ScanPreview(recognizedTransactions = 42, needsReviewTransactions = 30)
-        val enabled = preview.readyCount > 0
+        val importable = preview.readyCount + preview.needsReviewTransactions + preview.beforeTrackingStartCount
+        val enabled = importable > 0
         assertTrue(enabled)
     }
 
     /**
-     * Spec L.6 — When readyCount == 0, the import button is disabled.
+     * Spec L.6 — When nothing is importable, the import button is disabled.
      */
     @Test fun importButtonDisabledWhenReadyCountZero() {
-        val preview = ScanPreview(recognizedTransactions = 30, needsReviewTransactions = 30)
-        val enabled = preview.readyCount > 0
+        val preview = ScanPreview(recognizedTransactions = 0, needsReviewTransactions = 0)
+        val importable = preview.readyCount + preview.needsReviewTransactions + preview.beforeTrackingStartCount
+        val enabled = importable > 0
         assertFalse(enabled)
     }
 
@@ -109,7 +111,7 @@ class ImportExecutionResultTest {
     @Test fun failureCarriesUserAndTechnicalMessage() {
         val failure = ImportExecutionResult.Failure(
             userMessage = "تعذر استيراد العمليات. حاول مجدداً.",
-            technicalMessage = "commit produced 0 imported transactions",
+            technicalMessage = "commit produced 0 imported transactions"
         )
         assertTrue("userMessage must be set", failure.userMessage.isNotBlank())
         assertNotNull("technicalMessage must be set", failure.technicalMessage)
@@ -168,9 +170,9 @@ class ImportExecutionResultTest {
         // not call .scan() inside the same body.
         val lines = source.lines()
         // Find the import button onClick lambda.
-        val importOnClickStart = lines.indexOfFirst { it.contains("label = if (readyCount > 0)") }
-        assertTrue("import button label must be present", importOnClickStart >= 0)
-        val body = lines.subList(importOnClickStart, importOnClickStart + 30).joinToString("\n")
+        val importOnClickStart = lines.indexOfFirst { it.contains("SMS_IMPORT_BUTTON_CLICKED") }
+        assertTrue("import button click log must be present", importOnClickStart >= 0)
+        val body = lines.subList((importOnClickStart - 15).coerceAtLeast(0), (importOnClickStart + 25).coerceAtMost(lines.size)).joinToString("\n")
         assertTrue("Import button must call .commit(", body.contains(".commit("))
         assertFalse("Import button must not call .scan(", body.contains(".scan("))
     }
@@ -209,7 +211,7 @@ class ImportExecutionResultTest {
         val candidates = listOf(
             "app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
             "src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
-            "/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
+            "/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt"
         )
         for (path in candidates) {
             val f = java.io.File(path)

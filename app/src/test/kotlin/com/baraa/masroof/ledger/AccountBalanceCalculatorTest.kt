@@ -28,8 +28,6 @@ class AccountBalanceCalculatorTest {
         institutionName = "Bank",
         accountType = type,
         accountNature = nature,
-        lastFourDigits = null,
-        senderAliases = "",
         currency = Currency.SAR,
         openingBalance = opening,
         openingBalanceDate = openingMillis,
@@ -41,7 +39,7 @@ class AccountBalanceCalculatorTest {
         notes = null,
         createdAt = 0L,
         updatedAt = 0L,
-        creditLimit = creditLimit,
+        creditLimit = creditLimit
     )
 
     private fun postedJournal(id: Long, date: LocalDate, postings: List<LedgerPostingEntity>, status: JournalPostingStatus = JournalPostingStatus.POSTED): JournalWithPostings = JournalWithPostings(
@@ -53,9 +51,9 @@ class AccountBalanceCalculatorTest {
             descriptionCode = "x",
             createdAt = 0L, updatedAt = 0L,
             reversalOfJournalId = null, notes = null,
-            generatedBy = JournalGeneratedBy.IMPORT_RULE, generationVersion = 1,
+            generatedBy = JournalGeneratedBy.IMPORT_RULE, generationVersion = 1
         ),
-        postings = postings,
+        postings = postings
     )
 
     private fun posting(journalId: Long, accountId: Long, side: PostingSide, amount: String, currency: Currency = Currency.SAR) = LedgerPostingEntity(journalEntryId = journalId, accountId = accountId, postingSide = side, amount = BigDecimal(amount), currency = currency, memoCode = null, createdAt = 0L)
@@ -64,7 +62,7 @@ class AccountBalanceCalculatorTest {
         val s = AccountBalanceCalculator.calculate(
             bank(1, BigDecimal("1000")),
             listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.DEBIT, "300")))),
-            zone,
+            zone
         )
         assertEquals(0, s.totalDebits.compareTo(BigDecimal("300")))
         assertEquals(0, s.totalCredits.compareTo(BigDecimal.ZERO))
@@ -75,7 +73,7 @@ class AccountBalanceCalculatorTest {
         val s = AccountBalanceCalculator.calculate(
             bank(1, BigDecimal("1000")),
             listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.CREDIT, "200")))),
-            zone,
+            zone
         )
         assertEquals(0, s.totalCredits.compareTo(BigDecimal("200")))
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("800")))
@@ -86,7 +84,7 @@ class AccountBalanceCalculatorTest {
         val s = AccountBalanceCalculator.calculate(
             bank(1, BigDecimal("1000")),
             listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.DEBIT, "150")))),
-            zone,
+            zone
         )
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1150")))
     }
@@ -95,7 +93,7 @@ class AccountBalanceCalculatorTest {
         val drafts = postedJournal(
             99, LocalDate.of(2025, 1, 10),
             listOf(posting(99, 1, PostingSide.CREDIT, "999")),
-            status = JournalPostingStatus.DRAFT,
+            status = JournalPostingStatus.DRAFT
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(drafts), zone)
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1000")))
@@ -105,7 +103,7 @@ class AccountBalanceCalculatorTest {
         val reversed = postedJournal(
             10, LocalDate.of(2025, 1, 10),
             listOf(posting(10, 1, PostingSide.CREDIT, "200")),
-            status = JournalPostingStatus.REVERSED,
+            status = JournalPostingStatus.REVERSED
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(reversed), zone)
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1000")))
@@ -115,7 +113,7 @@ class AccountBalanceCalculatorTest {
         val voided = postedJournal(
             10, LocalDate.of(2025, 1, 10),
             listOf(posting(10, 1, PostingSide.CREDIT, "200")),
-            status = JournalPostingStatus.VOIDED,
+            status = JournalPostingStatus.VOIDED
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(voided), zone)
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("1000")))
@@ -124,7 +122,7 @@ class AccountBalanceCalculatorTest {
     @Test fun preOpeningDatePostingsAreExcluded() {
         val journals = listOf(
             postedJournal(10, LocalDate.of(2024, 12, 30), listOf(posting(10, 1, PostingSide.CREDIT, "500"))),
-            postedJournal(11, LocalDate.of(2025, 1, 10), listOf(posting(11, 1, PostingSide.CREDIT, "100"))),
+            postedJournal(11, LocalDate.of(2025, 1, 10), listOf(posting(11, 1, PostingSide.CREDIT, "100")))
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
         assertEquals(0, s.calculatedBalance.compareTo(BigDecimal("900")))
@@ -141,7 +139,7 @@ class AccountBalanceCalculatorTest {
         // Source (1) is credited 500; Destination (2) is debited 500.
         val journals = listOf(postedJournal(
             100, LocalDate.of(2025, 1, 10),
-            listOf(posting(100, 2, PostingSide.DEBIT, "500"), posting(100, 1, PostingSide.CREDIT, "500")),
+            listOf(posting(100, 2, PostingSide.DEBIT, "500"), posting(100, 1, PostingSide.CREDIT, "500"))
         ))
         val s1 = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
         val s2 = AccountBalanceCalculator.calculate(bank(2, BigDecimal("2000")), journals, zone)
@@ -192,7 +190,7 @@ class AccountBalanceCalculatorTest {
         val journals = listOf(postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.CREDIT, "100"))))
         val map = AccountBalanceCalculator.calculateMany(
             listOf(bank(1, BigDecimal("1000")), bank(2, BigDecimal("500"))),
-            journals, zone,
+            journals, zone
         )
         assertEquals(2, map.size)
         assertEquals(0, map[1]!!.calculatedBalance.compareTo(BigDecimal("900")))
@@ -202,7 +200,7 @@ class AccountBalanceCalculatorTest {
     @Test fun bankingChargesInDifferentCurrenciesSumSeparately() {
         val journals = listOf(
             postedJournal(10, LocalDate.of(2025, 1, 10), listOf(posting(10, 1, PostingSide.CREDIT, "100"))),
-            postedJournal(11, LocalDate.of(2025, 1, 10), listOf(posting(11, 1, PostingSide.DEBIT, "50", Currency.USD))),
+            postedJournal(11, LocalDate.of(2025, 1, 10), listOf(posting(11, 1, PostingSide.DEBIT, "50", Currency.USD)))
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), journals, zone)
         // SAR postings only — USD excluded.
@@ -217,7 +215,7 @@ class AccountBalanceCalculatorTest {
         val needsReviewJournal = postedJournal(
             10, LocalDate.of(2025, 1, 10),
             listOf(posting(10, 1, PostingSide.CREDIT, "200")),
-            status = JournalPostingStatus.NEEDS_REVIEW,
+            status = JournalPostingStatus.NEEDS_REVIEW
         )
         val s = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(needsReviewJournal), zone)
         // Opening balance remains at 1000 because the journal is not POSTED.
@@ -230,12 +228,12 @@ class AccountBalanceCalculatorTest {
         val journalBefore = postedJournal(
             10, LocalDate.of(2025, 1, 10),
             listOf(posting(10, 1, PostingSide.CREDIT, "250")),
-            status = JournalPostingStatus.NEEDS_REVIEW,
+            status = JournalPostingStatus.NEEDS_REVIEW
         )
         val journalAfter = postedJournal(
             10, LocalDate.of(2025, 1, 10),
             listOf(posting(10, 1, PostingSide.CREDIT, "250")),
-            status = JournalPostingStatus.POSTED,
+            status = JournalPostingStatus.POSTED
         )
         val sBefore = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(journalBefore), zone)
         val sAfter = AccountBalanceCalculator.calculate(bank(1, BigDecimal("1000")), listOf(journalAfter), zone)

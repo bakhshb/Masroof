@@ -36,4 +36,12 @@ enum class FinancialTreatment {
 
     /** Declined, advertisement, OTP, or otherwise irrelevant. */
     IGNORED,
+    ;
+
+    /** True when a balanced journal needs both a source and a destination account. */
+    val requiresTwoAccounts: Boolean
+        get() = this == INTERNAL_TRANSFER ||
+            this == CREDIT_CARD_PAYMENT ||
+            this == INVESTMENT ||
+            this == CASH_WITHDRAWAL
 }

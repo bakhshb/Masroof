@@ -37,8 +37,6 @@ class SmsImportOrchestratorSemanticsTest {
         institutionName = when (id) { 1L -> "D360 Bank"; 2L -> "Jazira Bank"; 3L -> "STC Bank"; else -> "Bank" },
         accountType = AccountType.BANK_ACCOUNT,
         accountNature = AccountNature.ASSET,
-        lastFourDigits = null,
-        senderAliases = "",
         currency = Currency.SAR,
         openingBalance = opening,
         openingBalanceDate = openingDate.atStartOfDay(zone).toInstant().toEpochMilli(),
@@ -49,7 +47,7 @@ class SmsImportOrchestratorSemanticsTest {
         isActive = true,
         notes = null,
         createdAt = 0L,
-        updatedAt = 0L,
+        updatedAt = 0L
     )
 
     private fun postedJournal(id: Long, accountId: Long, side: PostingSide, amount: String, date: LocalDate) = JournalWithPostings(
@@ -61,11 +59,11 @@ class SmsImportOrchestratorSemanticsTest {
             descriptionCode = "x",
             createdAt = 0L, updatedAt = 0L,
             reversalOfJournalId = null, notes = null,
-            generatedBy = com.baraa.masroof.ledger.JournalGeneratedBy.IMPORT_RULE, generationVersion = 1,
+            generatedBy = com.baraa.masroof.ledger.JournalGeneratedBy.IMPORT_RULE, generationVersion = 1
         ),
         postings = listOf(
-            LedgerPostingEntity(journalEntryId = id, accountId = accountId, postingSide = side, amount = BigDecimal(amount), currency = Currency.SAR, memoCode = null, createdAt = 0L),
-        ),
+            LedgerPostingEntity(journalEntryId = id, accountId = accountId, postingSide = side, amount = BigDecimal(amount), currency = Currency.SAR, memoCode = null, createdAt = 0L)
+        )
     )
 
     @Test fun twelvePlusTwentyFourPlusFiveEqualsFortyOne() {
@@ -85,7 +83,7 @@ class SmsImportOrchestratorSemanticsTest {
             postedJournal(201, 2, PostingSide.DEBIT, "200.00", LocalDate.of(2026, 8, 2)),
             postedJournal(202, 2, PostingSide.CREDIT, "150.00", LocalDate.of(2026, 8, 4)),
             // STC Bank: 5 transactions
-            postedJournal(301, 3, PostingSide.DEBIT, "30.00", LocalDate.of(2026, 8, 5)),
+            postedJournal(301, 3, PostingSide.DEBIT, "30.00", LocalDate.of(2026, 8, 5))
         )
         val summary = AccountBalanceCalculator.calculateMany(accounts, events, zone)
         val d360 = summary[1L]!!
@@ -105,7 +103,7 @@ class SmsImportOrchestratorSemanticsTest {
         val card = bank(7, BigDecimal.ZERO, opening).copy(
             accountType = AccountType.CREDIT_CARD,
             accountNature = AccountNature.LIABILITY,
-            creditLimit = BigDecimal("5000"),
+            creditLimit = BigDecimal("5000")
         )
         // 12+24+5 = 41 transactions on this card.
         val events = ((1L..12L)).map { postedJournal(it, 7, PostingSide.CREDIT, "100.00", LocalDate.of(2026, 8, 3)) } +

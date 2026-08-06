@@ -19,10 +19,10 @@ class AiResponseParserTest {
         currency = com.baraa.masroof.transaction.Currency.SAR,
         allowedCategories = listOf(
             AllowedCategory(1, "مقاهي"),
-            AllowedCategory(2, "مطاعم"),
+            AllowedCategory(2, "مطاعم")
         ),
         channel = Channel.POS,
-        language = "ar",
+        language = "ar"
     )
 
     private fun ok(content: String): String {
@@ -90,7 +90,7 @@ class AiResponseParserTest {
             rawBody = """{"choices":[]}""",
             request = req,
             providerName = "x",
-            modelName = "y",
+            modelName = "y"
         ))
     }
 

@@ -21,7 +21,7 @@ class ImportFlowAndHomeNavigationTest {
             recognizedTransactions = 42,
             needsReviewTransactions = 30,
             duplicateTransactions = 0,
-            beforeTrackingStartCount = 0,
+            beforeTrackingStartCount = 0
         )
         assertEquals(100, preview.scannedMessages)
         assertEquals(42, preview.recognizedTransactions)
@@ -34,7 +34,7 @@ class ImportFlowAndHomeNavigationTest {
         val preview = com.baraa.masroof.data.repository.ScanPreview(
             scannedMessages = 100,
             recognizedTransactions = 42,
-            needsReviewTransactions = 30,
+            needsReviewTransactions = 30
         )
         // ScanPreview has no importedTransactions / linkedTransactions / postedTransactions field.
         // Confirming structurally:
@@ -47,7 +47,7 @@ class ImportFlowAndHomeNavigationTest {
     @Test fun importedDebitDecreasesBalance() {
         val opening = 1000L
         val postings = listOf(
-            TestPosting(side = "DEBIT", amount = 75L),
+            TestPosting(side = "DEBIT", amount = 75L)
         )
         val balance = balanceFromPostings(opening, postings, asset = true)
         assertEquals(1075L, balance)
@@ -91,7 +91,7 @@ class ImportFlowAndHomeNavigationTest {
             postedTransactions = 12,
             needsReviewTransactions = 30,
             duplicateTransactions = 0,
-            updatedAccountIds = listOf(1L, 2L, 3L),
+            updatedAccountIds = listOf(1L, 2L, 3L)
         )
         assertEquals(12, result.importedTransactions)
         assertEquals(12, result.linkedTransactions)

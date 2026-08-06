@@ -33,7 +33,7 @@ class CategoryMerchantRuleTest {
         type: TransactionType = TransactionType.PURCHASE,
         body: String? = null,
         merchant: String? = null,
-        sender: String? = null,
+        sender: String? = null
     ): RuleInput = RuleInput(
         sender = sender,
         body = body,
@@ -56,8 +56,8 @@ class CategoryMerchantRuleTest {
             transactionTime = LocalTime.of(14, 30),
             status = TransactionStatus.COMPLETED,
             confidence = 90,
-            parsingNotes = emptyList(),
-        ),
+            parsingNotes = emptyList()
+        )
     )
 
     private fun makeCategory(id: Long, name: String) = Category(
@@ -67,7 +67,7 @@ class CategoryMerchantRuleTest {
         nameEn = null,
         sortOrder = id.toInt(),
         enabled = true,
-        isSystem = true,
+        isSystem = true
     )
 
     private fun makeAccount(
@@ -75,15 +75,13 @@ class CategoryMerchantRuleTest {
         displayName: String,
         type: AccountType = AccountType.BANK_ACCOUNT,
         lastFour: String? = null,
-        aliases: List<String> = emptyList(),
+        aliases: List<String> = emptyList()
     ) = FinancialAccount(
         id = id,
         displayName = displayName,
         institutionName = null,
         accountType = type,
         accountNature = com.baraa.masroof.transaction.AccountNature.defaultNatureFor(type),
-        lastFourDigits = lastFour,
-        senderAliases = aliases,
         currency = com.baraa.masroof.transaction.Currency.SAR,
         openingBalance = java.math.BigDecimal.ZERO,
         openingBalanceDate = 0L,
@@ -91,7 +89,7 @@ class CategoryMerchantRuleTest {
         includeInLiquidity = com.baraa.masroof.transaction.AccountLiquidityDefaults.defaultFor(type),
         isOwnedByUser = true,
         isActive = true,
-        notes = null,
+        notes = null
     )
 
     // -- merchant memory behavior ------------------------------------------
@@ -113,7 +111,7 @@ class CategoryMerchantRuleTest {
                 rawMerchant = "Starbucks",
                 displayName = "Starbucks",
                 categoryId = 1L,
-                treatment = FinancialTreatment.EXPENSE,
+                treatment = FinancialTreatment.EXPENSE
             )
             assertEquals(1, repo.getAll().size)
             assertEquals("Starbucks", repo.getByKey("starbucks")?.displayName)
@@ -162,7 +160,7 @@ class CategoryMerchantRuleTest {
                 RuleContext(
                     ownedAccounts = emptyList(),
                     merchantMemories = repo.getAll(),
-                    categories = emptyList(),
+                    categories = emptyList()
                 )
             )
             assertNull("disabled memory must not match", verdict)
@@ -177,7 +175,7 @@ class CategoryMerchantRuleTest {
         val engine = RuleEngineFactory.build(categories = listOf(groceries), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "تم الشراء من سوبرماركت بندة", merchant = "بندة"),
-            RuleContext(emptyList(), emptyList(), listOf(groceries)),
+            RuleContext(emptyList(), emptyList(), listOf(groceries))
         )
         assertEquals(FinancialTreatment.EXPENSE, v.financialTreatment)
         assertEquals(1L, v.categoryId)
@@ -189,7 +187,7 @@ class CategoryMerchantRuleTest {
         val engine = RuleEngineFactory.build(categories = listOf(restaurants), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "تم الشراء من مطعم البيك"),
-            RuleContext(emptyList(), emptyList(), listOf(restaurants)),
+            RuleContext(emptyList(), emptyList(), listOf(restaurants))
         )
         assertEquals(1L, v.categoryId)
     }
@@ -200,7 +198,7 @@ class CategoryMerchantRuleTest {
         val engine = RuleEngineFactory.build(categories = listOf(fuel), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "تم تعبئة وقود في محطة أرامكس"),
-            RuleContext(emptyList(), emptyList(), listOf(fuel)),
+            RuleContext(emptyList(), emptyList(), listOf(fuel))
         )
         assertEquals(1L, v.categoryId)
     }
@@ -211,7 +209,7 @@ class CategoryMerchantRuleTest {
         val engine = RuleEngineFactory.build(categories = listOf(pharmacy), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "تم الشراء من صيدلية الدواء"),
-            RuleContext(emptyList(), emptyList(), listOf(pharmacy)),
+            RuleContext(emptyList(), emptyList(), listOf(pharmacy))
         )
         assertEquals(1L, v.categoryId)
     }
@@ -222,7 +220,7 @@ class CategoryMerchantRuleTest {
         val engine = RuleEngineFactory.build(categories = listOf(other), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "شركة المؤسسة اشترت منتجا", merchant = "شركة"),
-            RuleContext(emptyList(), emptyList(), listOf(other)),
+            RuleContext(emptyList(), emptyList(), listOf(other))
         )
         // "شركة" + "المؤسسة" are both in the vague blacklist; the body
         // contains no other rule match → engine falls through to
@@ -260,9 +258,28 @@ class CategoryMerchantRuleTest {
             makeInput(
                 type = TransactionType.TRANSFER_IN,
                 sender = "stc pay",
-                body = "شحن المحفظة من بطاقتك Visa ****1234 بمبلغ 100 ريال",
+                body = "شحن المحفظة من بطاقتك Visa ****1234 بمبلغ 100 ريال"
             ),
-            RuleContext(listOf(card, wallet), emptyList(), emptyList()),
+            RuleContext(
+                listOf(card, wallet),
+                emptyList(),
+                emptyList(),
+                accountIdentifiers = listOf(
+                    com.baraa.masroof.rules.AccountIdentifierSnapshot(
+                        2,
+                        com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS,
+                        com.baraa.masroof.data.repository.AccountIdentifierRepository.normalize(
+                            com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS,
+                            "stc pay"
+                        )
+                    ),
+                    com.baraa.masroof.rules.AccountIdentifierSnapshot(
+                        1,
+                        com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4,
+                        "1234"
+                    )
+                )
+            )
         )
         assertEquals(FinancialTreatment.INTERNAL_TRANSFER, v.financialTreatment)
     }
@@ -275,9 +292,9 @@ class CategoryMerchantRuleTest {
             makeInput(
                 type = TransactionType.TRANSFER_IN,
                 sender = "Unknown Wallet",
-                body = "شحن المحفظة من بطاقتك Visa ****1234",
+                body = "شحن المحفظة من بطاقتك Visa ****1234"
             ),
-            RuleContext(listOf(card), emptyList(), emptyList()),
+            RuleContext(listOf(card), emptyList(), emptyList())
         )
         // No owned wallet → WalletTopUpRule returns null; falls through.
         assertEquals(FinancialTreatment.PENDING_REVIEW, v.financialTreatment)

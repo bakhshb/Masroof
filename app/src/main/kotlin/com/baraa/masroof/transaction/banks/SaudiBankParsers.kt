@@ -21,11 +21,11 @@ import com.baraa.masroof.transaction.GenericBankSmsParser
 
 // -- Priority 100 — dedicated bank parsers ---------------------------------
 
-/** Al Rajhi Bank. */
+/** Al Rajhi Bank — inherits label-aware generic extraction; sender routing is bank-specific. */
 class AlRajhiParser : GenericBankSmsParser() {
     override val name: String = "AlRajhi"
     override val priority: Int = 100
-    override val senderAliases: List<String> = listOf("alrajhi", "rajhi", "al rajhi bank", "مصرف الراجحي")
+    override val senderAliases: List<String> = listOf("alrajhi", "rajhi", "al rajhi bank", "مصرف الراجحي", "alrajhibank")
 }
 
 /** Alinma Bank. */
@@ -39,7 +39,13 @@ class AlinmaParser : GenericBankSmsParser() {
 class SNBParser : GenericBankSmsParser() {
     override val name: String = "SNB"
     override val priority: Int = 100
-    override val senderAliases: List<String> = listOf("snb", "saudi national bank", "البنك الأهلي السعودي")
+    override val senderAliases: List<String> = listOf(
+        "snb",
+        "saudi national bank",
+        "البنك الأهلي السعودي",
+        "alahli",
+        "al ahli",
+    )
 }
 
 /** Riyad Bank. */

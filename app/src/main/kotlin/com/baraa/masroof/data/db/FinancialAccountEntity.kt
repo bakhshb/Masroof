@@ -10,24 +10,11 @@ import com.baraa.masroof.transaction.Currency
 import java.math.BigDecimal
 
 /**
- * A financial account the user owns. Used by the [com.baraa.masroof.rules.InternalTransferRule]
- * to detect transfers between two of the user's own accounts (e.g. from
- * their checking account to their savings), and by the liquidity /
- * net-worth calculation services.
+ * A financial account the user owns.
  *
- * **No full numbers are stored.** Only the last 4 digits + a list of
- * normalized sender aliases that identify incoming SMS for this account.
- *
- * Opening-balance fields:
- *  - [openingBalance] is a [BigDecimal] (never Float / Double). For
- *    assets this represents the amount owned; for liabilities it
- *    represents the amount owed (entered as a positive number).
- *  - [openingBalanceDate] is the date the opening balance was recorded.
- *  - [includeInNetWorth] / [includeInLiquidity] are user-tunable
- *    toggles with sensible defaults per account type.
- *
- * The opening balance is **not** auto-updated from transactions in this
- * task. Future tasks will reconcile transactions against these balances.
+ * Account identity for SMS linking lives in [AccountIdentifierEntity]
+ * (typed last-four / sender alias rows). This table stores account setup
+ * and opening-balance metadata only.
  */
 @Entity(
     tableName = "financial_accounts",
@@ -40,9 +27,6 @@ data class FinancialAccountEntity(
     val institutionName: String?,
     val accountType: AccountType,
     val accountNature: AccountNature,
-    val lastFourDigits: String?,
-    /** Comma-separated normalized sender identifiers. */
-    val senderAliases: String = "",
     val currency: Currency = Currency.SAR,
     /**
      * Opening balance. For assets = amount owned; for liabilities =
@@ -88,8 +72,6 @@ data class FinancialAccount(
     val institutionName: String?,
     val accountType: AccountType,
     val accountNature: AccountNature,
-    val lastFourDigits: String?,
-    val senderAliases: List<String>,
     val currency: Currency,
     val openingBalance: BigDecimal,
     val openingBalanceDate: Long,

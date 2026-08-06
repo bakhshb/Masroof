@@ -21,7 +21,7 @@ class OpenAiCompatibleProviderTest {
         baseUrl = "https://api.example.com",
         modelName = "test-model",
         apiKey = "sk-fake-not-real",
-        timeoutMillis = 5_000L,
+        timeoutMillis = 5_000L
     )
 
     private fun okResponse(content: String): AiHttpResponse {
@@ -38,7 +38,7 @@ class OpenAiCompatibleProviderTest {
         return AiHttpResponse(
             statusCode = 200,
             body = "{\"choices\":[{\"message\":{\"content\":\"$escaped\"}}]}",
-            durationMs = 42,
+            durationMs = 42
         )
     }
 
@@ -55,7 +55,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "مقاضي")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             // Verify the request reached the fake client.
             val recorded = (provider.let { /* no-op */ })
@@ -75,13 +75,13 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "x")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue("malformed must yield Failed", out is AiCategorizationOutcome.Failed)
             val r = (out as AiCategorizationOutcome.Failed).reason
             assertTrue(
                 "malformed must be MALFORMED or INVALID_CATEGORY (was $r)",
-                r == FailureReason.MALFORMED || r == FailureReason.INVALID_CATEGORY,
+                r == FailureReason.MALFORMED || r == FailureReason.INVALID_CATEGORY
             )
         }
     }
@@ -98,7 +98,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "x")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue(out is AiCategorizationOutcome.Failed)
             assertEquals(FailureReason.AUTH, (out as AiCategorizationOutcome.Failed).reason)
@@ -118,7 +118,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "x")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue(out is AiCategorizationOutcome.Failed)
             // Multiple attempts (backoff).
@@ -138,7 +138,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "x")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue(out is AiCategorizationOutcome.Failed)
             assertEquals(FailureReason.TIMEOUT, (out as AiCategorizationOutcome.Failed).reason)
@@ -158,7 +158,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "مقاضي")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue("expected Success, was $out", out is AiCategorizationOutcome.Success)
             val r = (out as AiCategorizationOutcome.Success).result
@@ -180,7 +180,7 @@ class OpenAiCompatibleProviderTest {
                 currency = com.baraa.masroof.transaction.Currency.SAR,
                 allowedCategories = listOf(AllowedCategory(1, "x")),
                 channel = Channel.POS,
-                language = "ar",
+                language = "ar"
             ))
             assertTrue(out is AiCategorizationOutcome.Success)
             val r = (out as AiCategorizationOutcome.Success).result

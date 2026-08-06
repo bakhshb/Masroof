@@ -57,7 +57,7 @@ class AiCategorizationTest {
 
     private fun makeCategory(id: Long, name: String, enabled: Boolean = true) = Category(
         id = id, parentId = null, nameAr = name, nameEn = null,
-        sortOrder = id.toInt(), enabled = enabled, isSystem = false,
+        sortOrder = id.toInt(), enabled = enabled, isSystem = false
     )
 
     private fun makeTxn(
@@ -68,7 +68,7 @@ class AiCategorizationTest {
         status: TransactionStatus = TransactionStatus.COMPLETED,
         treatment: FinancialTreatment = FinancialTreatment.EXPENSE,
         categoryId: Long? = null,
-        userConfirmed: Boolean = false,
+        userConfirmed: Boolean = false
     ) = TransactionEntity(
         id = id,
         uniqueFingerprint = "fp-$id",
@@ -93,7 +93,7 @@ class AiCategorizationTest {
         categoryConfidence = 0,
         needsReview = categoryId == null,
         userConfirmed = userConfirmed,
-        exclusionReason = null,
+        exclusionReason = null
     )
 
     private fun makeService(
@@ -101,14 +101,14 @@ class AiCategorizationTest {
         enabled: Boolean = true,
         repo: FakeTransactionRepository = FakeTransactionRepository(),
         catRepo: FakeCategoryRepository = FakeCategoryRepository(),
-        memRepo: FakeMerchantMemoryRepository = FakeMerchantMemoryRepository(),
+        memRepo: FakeMerchantMemoryRepository = FakeMerchantMemoryRepository()
     ): Triple<AiCategorizationService, FakeTransactionRepository, FakeCategoryRepository> {
         val cacheRepo = AiCacheRepository(TestAiCacheDao())
         val cfg = AiProviderConfig(enabled = enabled, apiKey = "key-if-enabled")
         val svc = AiCategorizationService(
             configProvider = { cfg.copy(enabled = enabled, shareExactAmount = cfg.shareExactAmount) },
             provider = provider,
-            cache = cacheRepo,
+            cache = cacheRepo
         )
         return Triple(svc, repo, catRepo)
     }
@@ -188,7 +188,7 @@ class AiCategorizationTest {
         val svc = AiCategorizationService(
             configProvider = { cfg },
             provider = provider,
-            cache = AiCacheRepository(TestAiCacheDao()),
+            cache = AiCacheRepository(TestAiCacheDao())
         )
         assertFalse(svc.isEligible(TransactionType.PURCHASE, TransactionStatus.COMPLETED, FinancialTreatment.EXPENSE, "", null))
         assertFalse(svc.isEligible(TransactionType.PURCHASE, TransactionStatus.COMPLETED, FinancialTreatment.EXPENSE, null, ""))
@@ -213,7 +213,7 @@ class AiCategorizationTest {
             amount = BigDecimal("100"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         // No SMS body field exists — the request must not contain any
         // string that resembles a typical SMS body.
@@ -232,7 +232,7 @@ class AiCategorizationTest {
             amount = BigDecimal("100"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         // The request must not contain "1234" or any 4-digit run that
         // could represent a card fragment.
@@ -250,7 +250,7 @@ class AiCategorizationTest {
             amount = BigDecimal("100.00"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         assertFalse(req.includeExactAmount)
         assertNull(req.exactAmountBucketOnly)
@@ -273,7 +273,7 @@ class AiCategorizationTest {
         val svc = AiCategorizationService(
             configProvider = { cfg },
             provider = provider,
-            cache = AiCacheRepository(TestAiCacheDao()),
+            cache = AiCacheRepository(TestAiCacheDao())
         )
         val req = svc.buildRequest(
             merchant = "Test",
@@ -281,7 +281,7 @@ class AiCategorizationTest {
             amount = BigDecimal("123.45"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي")),
-            includeExactAmount = true,
+            includeExactAmount = true
         )
         assertTrue(req.includeExactAmount)
         assertEquals(123.45, req.exactAmountBucketOnly!!, 0.001)
@@ -301,7 +301,7 @@ class AiCategorizationTest {
                     explanation = "x",
                     providerName = "mock",
                     modelName = "mock",
-                    responseVersion = "v1",
+                    responseVersion = "v1"
                 )
             )
         }
@@ -313,7 +313,7 @@ class AiCategorizationTest {
                 amount = BigDecimal("100"),
                 currency = Currency.SAR,
                 categories = listOf(makeCategory(1, "مقاضي")),
-                includeExactAmount = false,
+                includeExactAmount = false
             )
             val outcome = svc.categorize("Test", req)
             // The provider returned a Success, but the result's category
@@ -326,7 +326,7 @@ class AiCategorizationTest {
                 rawBody = "{\"category_id\":999,\"category_name\":\"x\",\"normalized_merchant_name\":\"Test\",\"confidence\":90,\"explanation\":\"x\"}",
                 request = req,
                 providerName = "mock",
-                modelName = "mock",
+                modelName = "mock"
             )
             assertNull("parser must reject invented category id", validated)
         }
@@ -341,7 +341,7 @@ class AiCategorizationTest {
             currency = Currency.SAR,
             allowedCategories = listOf(AllowedCategory(1, "مقاضي")),
             channel = Channel.POS,
-            language = "ar",
+            language = "ar"
         )
         assertNull(AiResponseValidator.validate("not json", req, "mock", "mock"))
         assertNull(AiResponseValidator.validate("", req, "mock", "mock"))
@@ -358,7 +358,7 @@ class AiCategorizationTest {
             currency = Currency.SAR,
             allowedCategories = listOf(AllowedCategory(1, "مقاضي")),
             channel = Channel.POS,
-            language = "ar",
+            language = "ar"
         )
         assertNull(AiResponseValidator.validate(
             "{\"category_id\":1,\"category_name\":\"x\",\"normalized_merchant_name\":\"t\",\"confidence\":150,\"explanation\":\"x\"}",
@@ -380,7 +380,7 @@ class AiCategorizationTest {
             amount = BigDecimal("25"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(10, "مقاهي")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         kotlinx.coroutines.runBlocking {
             // First call: provider returns success.
@@ -388,7 +388,7 @@ class AiCategorizationTest {
                 categoryId = 10L, categoryName = "مقاهي",
                 normalizedMerchantName = "Starbucks", confidence = 95,
                 explanation = "cached",
-                providerName = "mock", modelName = "mock", responseVersion = "v1",
+                providerName = "mock", modelName = "mock", responseVersion = "v1"
             )
             val first = svc.categorize("Starbucks", req)
             assertTrue(first is AiCategorizationOutcome.Success)
@@ -413,7 +413,7 @@ class AiCategorizationTest {
             preferredFinancialTreatment = FinancialTreatment.EXPENSE,
             confirmationCount = 3,
             lastConfirmedAt = 0L,
-            enabled = true,
+            enabled = true
         )
         val memRepo = FakeMerchantMemoryRepository()
         kotlinx.coroutines.runBlocking {
@@ -432,7 +432,7 @@ class AiCategorizationTest {
                 categoryId = 1L, categoryName = "x",
                 normalizedMerchantName = "merchant", confidence = 90,
                 explanation = "test",
-                providerName = "mock", modelName = "mock", responseVersion = "v1",
+                providerName = "mock", modelName = "mock", responseVersion = "v1"
             )
             val req = svc.buildRequest(
                 merchant = "merchant",
@@ -440,7 +440,7 @@ class AiCategorizationTest {
                 amount = BigDecimal("100"),
                 currency = Currency.SAR,
                 categories = listOf(makeCategory(1, "x")),
-                includeExactAmount = false,
+                includeExactAmount = false
             )
             // First call: cached.
             svc.categorize("merchant", req)
@@ -466,9 +466,9 @@ class AiCategorizationTest {
                     categoryId = 7L, categoryName = "old",
                     normalizedMerchantName = "X", confidence = 90,
                     explanation = "x",
-                    providerName = "mock", modelName = "mock", responseVersion = "v1",
+                    providerName = "mock", modelName = "mock", responseVersion = "v1"
                 ),
-                normalizedMerchant = "X",
+                normalizedMerchant = "X"
             )
             // category 7 is DISABLED.
             val lookup = cacheRepo.lookup("X") { id -> id != 7L }
@@ -486,7 +486,7 @@ class AiCategorizationTest {
             categoryId = 1L, categoryName = "x",
             normalizedMerchantName = "m", confidence = 40, // below default 80
             explanation = "low",
-            providerName = "mock", modelName = "mock", responseVersion = "v1",
+            providerName = "mock", modelName = "mock", responseVersion = "v1"
         )
         kotlinx.coroutines.runBlocking {
             val req = svc.buildRequest(
@@ -495,7 +495,7 @@ class AiCategorizationTest {
                 amount = BigDecimal("100"),
                 currency = Currency.SAR,
                 categories = listOf(makeCategory(1, "x")),
-                includeExactAmount = false,
+                includeExactAmount = false
             )
             val out = svc.categorize("m", req)
             assertTrue(out is AiCategorizationOutcome.Success)
@@ -538,7 +538,7 @@ class AiCategorizationTest {
             normalizedMerchantName = "m", confidence = 90,
             explanation = "ok",
             providerName = "mock", modelName = "mock",
-            responseVersion = "v1",
+            responseVersion = "v1"
         )
         assertFalse("result must not contain api key", res.toString().contains("Bearer"))
         assertFalse("result must not contain 'key'", res.toString().lowercase().contains("api_key"))
@@ -565,8 +565,8 @@ class AiCategorizationTest {
                     providerName = "mock", modelName = "mock",
                     promptVersion = "v1", responseVersion = "v1",
                     durationMs = 100, success = false,
-                    httpStatusGroup = 0, cacheHit = false, responseValid = false,
-                ),
+                    httpStatusGroup = 0, cacheHit = false, responseValid = false
+                )
             )
         }
         val (svc, _, _) = makeService(provider)
@@ -577,7 +577,7 @@ class AiCategorizationTest {
                 amount = BigDecimal("100"),
                 currency = Currency.SAR,
                 categories = listOf(makeCategory(1, "x")),
-                includeExactAmount = false,
+                includeExactAmount = false
             )
             val out = svc.categorize("m", req)
             assertTrue(out is AiCategorizationOutcome.Failed)
@@ -598,7 +598,7 @@ class AiCategorizationTest {
             amount = BigDecimal("1234.56"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         // amountBucket present
         assertNotNull(req.amountBucket)
@@ -619,7 +619,7 @@ class AiCategorizationTest {
             amount = BigDecimal("100"),
             currency = Currency.SAR,
             categories = listOf(makeCategory(1, "مقاضي"), makeCategory(2, "مطاعم")),
-            includeExactAmount = false,
+            includeExactAmount = false
         )
         val prompt = AiPromptBuilder.userPrompt(req)
         assertTrue(prompt.contains("مقاضي"))
@@ -643,13 +643,13 @@ class AiCategorizationTest {
 /** Mirror of the private isEligible for testing. */
 private fun AiBatchCategorizationServiceTest_isEligible(
     t: com.baraa.masroof.data.db.TransactionEntity,
-    memories: List<com.baraa.masroof.data.db.MerchantMemory>,
+    memories: List<com.baraa.masroof.data.db.MerchantMemory>
 ): Boolean {
     return com.baraa.masroof.ai.AiBatchCategorizationService.isEligible(t, memories)
 }
 
 private fun AiBatchCategorizationServiceTest_buildBatch(
-    provider: AiCategorizationProvider,
+    provider: AiCategorizationProvider
 ): AiBatchCategorizationService {
     return AiBatchCategorizationService(
         transactionRepository = FakeTransactionRepository(),
@@ -658,9 +658,9 @@ private fun AiBatchCategorizationServiceTest_buildBatch(
         aiService = AiCategorizationService(
             configProvider = { AiProviderConfig(enabled = true) },
             provider = provider,
-            cache = AiCacheRepository(TestAiCacheDao()),
+            cache = AiCacheRepository(TestAiCacheDao())
         ),
-        suggestionRepository = FakeAiSuggestionRepository(),
+        suggestionRepository = FakeAiSuggestionRepository()
     )
 }
 
@@ -703,7 +703,7 @@ class TestAiCacheDao : com.baraa.masroof.data.db.AiCacheDao {
 class FakeAiSuggestionRepository : AiSuggestionRepository(
     dao = InMemoryAiSuggestionDao(),
     transactionDao = null,
-    categoryDao = null,
+    categoryDao = null
 ) {
     // Expose the dao for tests that need to inspect / seed rows directly.
     @Suppress("unused")

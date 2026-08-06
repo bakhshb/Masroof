@@ -20,8 +20,6 @@ interface FinancialAccountRepository {
         displayName: String,
         accountType: AccountType,
         institutionName: String? = null,
-        lastFourDigits: String? = null,
-        senderAliases: List<String> = emptyList(),
         accountNature: AccountNature = AccountNature.defaultNatureFor(accountType),
         currency: Currency = Currency.SAR,
         openingBalance: BigDecimal = BigDecimal.ZERO,
@@ -54,8 +52,6 @@ class RoomFinancialAccountRepository(
         displayName: String,
         accountType: AccountType,
         institutionName: String?,
-        lastFourDigits: String?,
-        senderAliases: List<String>,
         accountNature: AccountNature,
         currency: Currency,
         openingBalance: BigDecimal,
@@ -70,8 +66,6 @@ class RoomFinancialAccountRepository(
             institutionName = institutionName,
             accountType = accountType,
             accountNature = accountNature,
-            lastFourDigits = sanitizeLastFour(lastFourDigits),
-            senderAliases = senderAliases.joinToString(","),
             currency = currency,
             openingBalance = openingBalance,
             openingBalanceDate = openingBalanceDate,
@@ -97,8 +91,6 @@ class RoomFinancialAccountRepository(
                 institutionName = account.institutionName,
                 accountType = account.accountType,
                 accountNature = account.accountNature,
-                lastFourDigits = sanitizeLastFour(account.lastFourDigits),
-                senderAliases = account.senderAliases.joinToString(","),
                 currency = account.currency,
                 openingBalance = account.openingBalance,
                 openingBalanceDate = account.openingBalanceDate,
@@ -110,7 +102,9 @@ class RoomFinancialAccountRepository(
                 notes = account.notes,
                 createdAt = account.createdAt,
                 updatedAt = n,
-            )
+                creditLimit = account.creditLimit,
+                openingBalanceKind = account.openingBalanceKind,
+            ),
         )
     }
 
@@ -123,8 +117,6 @@ class RoomFinancialAccountRepository(
                 institutionName = account.institutionName,
                 accountType = account.accountType,
                 accountNature = account.accountNature,
-                lastFourDigits = sanitizeLastFour(account.lastFourDigits),
-                senderAliases = account.senderAliases.joinToString(","),
                 currency = account.currency,
                 openingBalance = account.openingBalance,
                 openingBalanceDate = account.openingBalanceDate,
@@ -136,13 +128,12 @@ class RoomFinancialAccountRepository(
                 notes = account.notes,
                 createdAt = account.createdAt,
                 updatedAt = now(),
-            )
+                creditLimit = account.creditLimit,
+                openingBalanceKind = account.openingBalanceKind,
+            ),
         )
     }
 }
-
-private fun sanitizeLastFour(value: String?): String? =
-    value?.trim()?.takeIf { it.length == 4 && it.all(Char::isDigit) }
 
 fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
     id = id,
@@ -150,9 +141,6 @@ fun FinancialAccountEntity.toDomain(): FinancialAccount = FinancialAccount(
     institutionName = institutionName,
     accountType = accountType,
     accountNature = accountNature,
-    lastFourDigits = lastFourDigits,
-    senderAliases = if (senderAliases.isBlank()) emptyList()
-                    else senderAliases.split(",").map { it.trim() }.filter { it.isNotEmpty() },
     currency = currency,
     openingBalance = openingBalance,
     openingBalanceDate = openingBalanceDate,

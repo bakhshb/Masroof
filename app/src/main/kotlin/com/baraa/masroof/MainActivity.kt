@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -13,8 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -25,11 +24,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.baraa.masroof.ui.MissingAccountRecoveryScreen
 import com.baraa.masroof.ui.PrimaryNavigation
-import com.baraa.masroof.ui.onboarding.OnboardingRepository
 import com.baraa.masroof.ui.onboarding.OnboardingScreen
 import com.baraa.masroof.ui.onboarding.OnboardingState
-import com.baraa.masroof.ui.onboarding.SmsPermissionStore
 import com.baraa.masroof.ui.theme.MasroofTheme
+import com.baraa.masroof.ui.theme.ThemePreference
 import kotlinx.coroutines.launch
 
 /**
@@ -54,7 +52,15 @@ class MainActivity : ComponentActivity() {
         // Android Settings immediately see the updated permission UI.
         app.smsPermissionStore.refresh()
         setContent {
-            MasroofTheme {
+            val themePreference by app.themePreferenceRepository.observe()
+                .collectAsState(initial = app.themePreferenceRepository.snapshot())
+            val systemDark = isSystemInDarkTheme()
+            val useDarkTheme = when (themePreference) {
+                ThemePreference.SYSTEM -> systemDark
+                ThemePreference.LIGHT -> false
+                ThemePreference.DARK -> true
+            }
+            MasroofTheme(darkTheme = useDarkTheme) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     val navController = rememberNavController()
                     val onboardingState by app.onboardingRepository.observe().collectAsState(initial = OnboardingState.Loading)

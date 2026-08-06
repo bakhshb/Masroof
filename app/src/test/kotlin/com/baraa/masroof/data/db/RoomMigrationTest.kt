@@ -70,9 +70,25 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration14to15BackfillsIdentifiersAndDropsLegacyColumns() {
+        assertEquals(14, MasroofDatabase.MIGRATION_14_15.startVersion)
+        assertEquals(15, MasroofDatabase.MIGRATION_14_15.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("INSERT OR IGNORE INTO `account_identifiers`"))
+        assertTrue(source.contains("CREATE TABLE `financial_accounts_new`"))
+        assertTrue(source.contains("DROP TABLE `financial_accounts`"))
+        assertTrue(source.contains("ALTER TABLE `financial_accounts_new` RENAME TO `financial_accounts`"))
+        // Rebuild must not reintroduce legacy columns.
+        val rebuildBlock = source.substringAfter("CREATE TABLE `financial_accounts_new`")
+            .substringBefore("INSERT INTO `financial_accounts_new`")
+        assertFalse(rebuildBlock.contains("lastFourDigits"))
+        assertFalse(rebuildBlock.contains("senderAliases"))
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
-        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6", "13->14")
+        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15")
         val missing = expected - versions.toSet()
         assertTrue(
             "ALL_MIGRATIONS missing $missing (was: $versions)",
@@ -90,27 +106,27 @@ class RoomMigrationTest {
         val source = sourceFile.readText()
         assertTrue(
             "v2 -> v3 migration must add the financialTreatment column",
-            source.contains("ADD COLUMN `financialTreatment`"),
+            source.contains("ADD COLUMN `financialTreatment`")
         )
         assertTrue(
             "v2 -> v3 migration must add the categoryId column",
-            source.contains("ADD COLUMN `categoryId`"),
+            source.contains("ADD COLUMN `categoryId`")
         )
         assertTrue(
             "v2 -> v3 migration must add the categorySource column",
-            source.contains("ADD COLUMN `categorySource`"),
+            source.contains("ADD COLUMN `categorySource`")
         )
         assertTrue(
             "v2 -> v3 migration must create the categories table",
-            source.contains("CREATE TABLE IF NOT EXISTS `categories`"),
+            source.contains("CREATE TABLE IF NOT EXISTS `categories`")
         )
         assertTrue(
             "v2 -> v3 migration must create the merchant_memory table",
-            source.contains("CREATE TABLE IF NOT EXISTS `merchant_memory`"),
+            source.contains("CREATE TABLE IF NOT EXISTS `merchant_memory`")
         )
         assertTrue(
             "v2 -> v3 migration must create the financial_accounts table",
-            source.contains("CREATE TABLE IF NOT EXISTS `financial_accounts`"),
+            source.contains("CREATE TABLE IF NOT EXISTS `financial_accounts`")
         )
     }
 
@@ -123,14 +139,15 @@ class RoomMigrationTest {
         val source = sourceFile.readText()
         assertTrue(
             "v5 -> v6 migration must create the ai_suggestions table",
-            source.contains("CREATE TABLE IF NOT EXISTS `ai_suggestions`"),
+            source.contains("CREATE TABLE IF NOT EXISTS `ai_suggestions`")
         )
         assertTrue(
             "v5 -> v6 migration must include a FK from ai_suggestions to transactions",
-            source.contains("FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`)"),
+            source.contains("FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`)")
         )
-        // No destructive operations.
-        val tables = listOf("transactions", "categories", "merchant_memory", "financial_accounts", "ai_cache", "ai_settings")
+        // No destructive wipe of core tables. financial_accounts may be
+        // rebuilt elsewhere to retire columns (copy → drop → rename).
+        val tables = listOf("transactions", "categories", "merchant_memory", "ai_cache", "ai_settings")
         for (table in tables) {
             val drop = Regex("""DROP\s+TABLE\s+[`"]?\Q$table\E[`"]?""")
             assertFalse(
@@ -146,12 +163,12 @@ class RoomMigrationTest {
         assertEquals(
             "MIGRATIONS must be sorted by startVersion",
             sorted.map { it.startVersion },
-            sorted.map { it.startVersion }.sorted(),
+            sorted.map { it.startVersion }.sorted()
         )
         for (i in 1 until sorted.size) {
             assertTrue(
                 "Migrations ${i - 1} and $i overlap (${sorted[i - 1].endVersion} vs ${sorted[i].startVersion})",
-                sorted[i - 1].endVersion <= sorted[i].startVersion,
+                sorted[i - 1].endVersion <= sorted[i].startVersion
             )
         }
     }
