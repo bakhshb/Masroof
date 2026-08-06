@@ -20,7 +20,7 @@ class AccountSmsAnalyzerTest {
             SmsMessage(1, "SNB", "شراء ببطاقة ائتمانية: 7271 بمبلغ: 51.99 SAR", 1L),
             AccountType.CREDIT_CARD,
         )
-        assertEquals(AccountIdentifierType.CREDIT_CARD_LAST4, result?.identifierType)
+        assertEquals(result.toString(), AccountIdentifierType.CREDIT_CARD_LAST4, result?.identifierType)
         assertEquals("7271", result?.lastFour)
     }
 

@@ -2,6 +2,7 @@ package com.baraa.masroof.transaction
 
 import java.math.BigDecimal
 import java.time.LocalDate
+import com.baraa.masroof.data.db.AccountIdentifierType
 import java.time.LocalTime
 
 /**
@@ -27,6 +28,16 @@ import java.time.LocalTime
  *                                        reached its verdict (origin of date, missing
  *                                        fields, etc.) — never include sensitive data
  */
+enum class IdentifierRole { SOURCE, DESTINATION, UNSPECIFIED }
+
+data class ParsedIdentifierEvidence(
+    val type: AccountIdentifierType,
+    val lastFour: String,
+    val role: IdentifierRole = IdentifierRole.UNSPECIFIED,
+    val confidence: Int,
+    val extractionRule: String,
+)
+
 data class ParsedTransaction(
     val originalSender: String?,
     val originalMessage: String?,
@@ -61,4 +72,6 @@ data class ParsedTransaction(
      * a "needs review" hint in the UI and to inform future parser work.
      */
     val missingFields: List<String> = emptyList(),
+    /** Strict label-qualified account evidence. No amount, balance, OTP, or reference values. */
+    val identifierEvidence: List<ParsedIdentifierEvidence> = emptyList(),
 )

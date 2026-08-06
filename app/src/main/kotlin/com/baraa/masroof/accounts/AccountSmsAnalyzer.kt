@@ -34,9 +34,11 @@ object AccountSmsAnalyzer {
     fun analyze(message: SmsMessage, accountType: AccountType): AccountSmsAnalysis? {
         val sender = message.sender?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val parsed = BankParserRegistry.parse(sender, message.body, message.timestamp.takeIf { it > 0L })
-        val identifier = (parsed.accountOrCardLastFourDigits ?: labeledLastFour(message.body))
-            ?.takeIf { it.length == 4 && it.all(Char::isDigit) }
-        val type = identifier?.let { identifierType(parsed, accountType) }
+        val evidence = parsed.identifierEvidence.firstOrNull { compatible(accountType, it.type) }
+        val identifier = evidence?.lastFour?.takeIf { it.length == 4 && it.all(Char::isDigit) }
+            ?: labeledLastFour(message.body)
+            ?: parsed.accountOrCardLastFourDigits?.takeIf { it.length == 4 && it.all(Char::isDigit) }
+        val type = evidence?.type ?: identifier?.let { identifierType(message.body, accountType) }
         val incompatible = type != null && !compatible(accountType, type)
         return AccountSmsAnalysis(
             senderDisplay = sender,
@@ -55,13 +57,13 @@ object AccountSmsAnalyzer {
     }
 
     private fun labeledLastFour(body: String?): String? = body?.let {
-        Regex("(?:بطاقة\\s+(?:ائتمانية|مدى)|حساب|الآيبان|آيبان|iban)\\s*(?:رقم)?\\s*[:：]?\\s*([0-9٠-٩]{4})", RegexOption.IGNORE_CASE)
+        Regex("(?:ب?بطاقة\\s+(?:ائتمانية|مدى)|حساب|الآيبان|آيبان|iban)\\s*(?:رقم)?\\s*[:：]?\\s*([0-9٠-٩]{4})", RegexOption.IGNORE_CASE)
             .find(it)?.groupValues?.getOrNull(1)?.map { c -> if (c in '٠'..'٩') ('0' + (c - '٠')) else c }?.joinToString("")
     }
 
-    private fun identifierType(parsed: ParsedTransaction, accountType: AccountType): AccountIdentifierType = when {
-        parsed.originalMessage.orEmpty().contains("مدى") -> AccountIdentifierType.DEBIT_CARD_LAST4
-        parsed.originalMessage.orEmpty().contains("ائتمان") || parsed.originalMessage.orEmpty().contains("credit", true) -> AccountIdentifierType.CREDIT_CARD_LAST4
+    private fun identifierType(body: String?, accountType: AccountType): AccountIdentifierType = when {
+        body.orEmpty().contains("مدى") -> AccountIdentifierType.DEBIT_CARD_LAST4
+        body.orEmpty().contains("ائتمان") || body.orEmpty().contains("credit", true) -> AccountIdentifierType.CREDIT_CARD_LAST4
         accountType == AccountType.CREDIT_CARD -> AccountIdentifierType.CREDIT_CARD_LAST4
         accountType in setOf(AccountType.DIGITAL_WALLET, AccountType.WALLET) -> AccountIdentifierType.WALLET_LAST4
         else -> AccountIdentifierType.ACCOUNT_LAST4
