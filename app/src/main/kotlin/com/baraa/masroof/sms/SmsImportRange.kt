@@ -73,10 +73,13 @@ data class SmsImportRange(
         fun sinceLastSalary(today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): SmsImportRange {
             val startDate = ExpectedSalaryDateService.mostRecentSalaryDate(today)
             val start = startDate.atStartOfDay()
-            val now = LocalDateTime.now(zone)
+            // `today` is the selected device day. Do not read a second wall
+            // clock here: at a timezone boundary it made the displayed range
+            // disagree with the actual query.
+            val end = today.plusDays(1).atStartOfDay()
             return SmsImportRange(
                 start = start,
-                endExclusive = now,
+                endExclusive = end,
                 label = "منذ آخر تاريخ راتب متوقع ($startDate) حتى اليوم",
                 quickId = QUICK_LAST_SALARY,
             )

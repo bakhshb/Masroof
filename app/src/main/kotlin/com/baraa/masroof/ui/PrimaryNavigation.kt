@@ -31,6 +31,7 @@ import com.baraa.masroof.ui.senders.ImportMessagesScreen
 import com.baraa.masroof.ui.settings.AutoSmsImportSettingsScreen
 import com.baraa.masroof.ui.settings.NotificationsSettingsScreen
 import com.baraa.masroof.ui.transactions.TransactionOperationsScreen
+import com.baraa.masroof.ui.transactions.ReviewQueueScreen
 import com.baraa.masroof.ui.settings.SettingsDestination
 import com.baraa.masroof.ui.settings.SettingsDestinations
 import com.baraa.masroof.ui.settings.SettingsScreen
@@ -62,7 +63,7 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     currentRoute == route -> true
                     // The import screen is logically part of the
                     // TRANSACTIONS tab; keep it highlighted.
-                    currentRoute == ImportMessagesRoute && entry == PrimaryTab.TRANSACTIONS -> true
+                    (currentRoute == ImportMessagesRoute || currentRoute == ReviewQueueRoute) && entry == PrimaryTab.TRANSACTIONS -> true
                     else -> false
                 }
                 NavigationBarItem(
@@ -72,7 +73,9 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                             "PrimaryNav",
                             "HOME_NAVIGATION_CLICKED currentRoute=$currentRoute targetRoute=$route",
                         )
-                        if (selected) return@NavigationBarItem
+                        // A child route (import/review) is highlighted as Operations
+                        // but tapping Operations must still return to its root.
+                        if (currentRoute == route) return@NavigationBarItem
                         navigateToPrimaryTab(navController, entry)
                     },
                     icon = { Icon(entry.icon, entry.title) },
@@ -95,7 +98,7 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
             }
             composable("primary/TRANSACTIONS") {
                 TransactionOperationsScreen(
-                    onOpenImport = { navController.navigate(ImportMessagesRoute) },
+                    onOpenImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
                 )
             }
             composable(ImportMessagesRoute) {
@@ -107,6 +110,13 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onMore = { navigateToPrimaryTab(navController, PrimaryTab.MORE) },
                     onShowImportedTransactions = { navigateToPrimaryTab(navController, PrimaryTab.TRANSACTIONS) },
                     onNavigateToAccounts = { navigateToPrimaryTab(navController, PrimaryTab.ACCOUNTS) },
+                    onReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
+                )
+            }
+            composable(ReviewQueueRoute) {
+                ReviewQueueScreen(
+                    onBack = { navController.popBackStack(ImportMessagesRoute, inclusive = false) },
+                    onHome = { navigateToPrimaryTab(navController, PrimaryTab.HOME) },
                 )
             }
             composable("primary/ACCOUNTS") { com.baraa.masroof.ui.accounts.AccountListScreen(onClose = {}) }
@@ -176,7 +186,8 @@ enum class PrimaryTab(val title: String, val icon: androidx.compose.ui.graphics.
 private fun SettingsDestination.routeKey(): String = route
 
 /** Stable top-level route for the SMS import flow. */
-const val ImportMessagesRoute: String = "route/import_messages"
+const val ImportMessagesRoute: String = AppRoutes.IMPORT
+const val ReviewQueueRoute: String = AppRoutes.REVIEW
 
 /**
  * Switch to a primary bottom-nav tab. Pops the import / settings stack

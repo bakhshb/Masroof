@@ -224,7 +224,12 @@ class SmsImportOrchestrator(
             if (isDup) duplicates++
             if (isReviewNow) needsReview++
             if (before) beforeTracking++
-            val institutionKey = institutionResolver.resolve(sender = sms.sender, parsedInstitution = null).institutionDisplayName
+            val institutionKey = institutionResolver.resolve(
+                sender = sms.sender,
+                parsedInstitution = parserInstitution(parsed),
+                parserIdentity = parsed.parserName,
+                knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
+            ).institutionDisplayName
             groups.getOrPut(institutionKey) { mutableListOf() }.add(fingerprint)
             items += ScanPreview.PreviewItem(
                 smsId = sms.id,
@@ -330,18 +335,7 @@ class SmsImportOrchestrator(
                 }
                 val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository)
                 val hasLinkedAccount = match.account != null && !match.needsReview
-                val linked = entity.copy(
-                    sourceAccountId = if (match.destinationAccountCandidate != null) null else match.account?.id,
-                    destinationAccountId = match.destinationAccountCandidate?.id ?: match.account?.id,
-                    accountLinkSource = match.source,
-                    accountLinkConfidence = match.confidence,
-                    accountLinkNeedsReview = match.needsReview,
-                    needsReview = match.account == null || match.needsReview,
-                    postingStatus = if (hasLinkedAccount)
-                        com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW
-                    else
-                        com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
-                )
+                val linked = entity.withAccountMatch(match)
                 val txId = transactionRepository.insert(linked)
                 if (txId <= 0L) {
                     duplicates++
@@ -364,17 +358,19 @@ class SmsImportOrchestrator(
                     continue
                 }
 
-                val source = ownedAccounts.firstOrNull { it.id == linked.sourceAccountId }
-                val destination = ownedAccounts.firstOrNull { it.id == linked.destinationAccountId }
-                val draft = journalGenerationService.generate(linked, source, destination)
+                // Room returns the generated identity separately. A journal
+                // references transactions by FK, so never generate from id=0.
+                val persistedLinked = linked.copy(id = txId)
+                val source = ownedAccounts.firstOrNull { it.id == persistedLinked.sourceAccountId }
+                val destination = ownedAccounts.firstOrNull { it.id == persistedLinked.destinationAccountId }
+                val draft = journalGenerationService.generate(persistedLinked, source, destination)
 
                 if (draft != null) {
                     val postedDraft = draft.copy(postingStatus = JournalPostingStatus.POSTED)
                     val journalId = ledgerRepository.create(postedDraft)
                     if (journalId > 0L) {
                         transactionRepository.update(
-                            linked.copy(
-                                id = txId,
+                            persistedLinked.copy(
                                 linkedJournalEntryId = journalId,
                                 postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.POSTED,
                                 updatedAt = nowProvider(),
@@ -467,6 +463,40 @@ class SmsImportOrchestrator(
             perTransactionLog = log,
             trackingStartDateHint = trackingStartDate,
             importedAt = nowProvider(),
+        )
+    }
+
+    /** Parser identity is an institution hint only; it never chooses an account. */
+    private fun parserInstitution(parsed: ParsedTransaction): String? = when (parsed.parserName.lowercase()) {
+        "alrajhi", "al rajhi" -> "مصرف الراجحي"
+        "aljazira", "al jazira" -> "بنك الجزيرة"
+        "alahli", "snb", "saudi national bank" -> "البنك الأهلي السعودي"
+        "d360" -> "D360"
+        "stc", "stc bank" -> "STC Bank"
+        else -> null
+    }
+
+    /** Account placement is treatment-specific; category is not account evidence. */
+    private fun TransactionEntity.withAccountMatch(match: AccountMatcher.Match): TransactionEntity {
+        val accountId = match.account?.id
+        val sourceId = when (financialTreatment) {
+            FinancialTreatment.EXPENSE, FinancialTreatment.BANK_FEE, FinancialTreatment.CASH_WITHDRAWAL,
+            FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT -> accountId
+            else -> null
+        }
+        val destinationId = when (financialTreatment) {
+            FinancialTreatment.INCOME, FinancialTreatment.REFUND -> accountId
+            FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT -> match.destinationAccountCandidate?.id
+            else -> null
+        }
+        return copy(
+            sourceAccountId = sourceId,
+            destinationAccountId = destinationId,
+            accountLinkSource = match.source,
+            accountLinkConfidence = match.confidence,
+            accountLinkNeedsReview = match.needsReview,
+            needsReview = needsReview || accountId == null || match.needsReview,
+            postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
         )
     }
 

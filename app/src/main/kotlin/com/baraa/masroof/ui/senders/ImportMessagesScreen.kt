@@ -101,6 +101,7 @@ fun ImportMessagesScreen(
     onMore: () -> Unit,
     onShowImportedTransactions: () -> Unit = onTransactions,
     onNavigateToAccounts: () -> Unit = onAccounts,
+    onReview: () -> Unit,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
@@ -153,10 +154,6 @@ fun ImportMessagesScreen(
             MasroofTopAppBar(
                 title = "استيراد رسائل البنك",
                 onBack = onClose,
-                onHome = onHome,
-                onTransactions = onTransactions,
-                onAccounts = onAccounts,
-                onMore = onMore,
             )
         },
     ) { padding ->
@@ -309,7 +306,27 @@ fun ImportMessagesScreen(
                         SecondaryButton(
                             label = if (reviewCount > 0) "مراجعة $reviewCount عملية" else "إلغاء نتائج الفحص",
                             enabled = reviewCount > 0 || scanPreview != null,
-                            onClick = if (reviewCount > 0) onShowImportedTransactions else {
+                            onClick = if (reviewCount > 0) {
+                                {
+                                    // Review candidates are persisted first. A scan preview is
+                                    // intentionally read-only, so routing before this commit
+                                    // used to open an empty queue.
+                                    val snapshot = preview
+                                    phase = ImportPhase.Committing
+                                    importResult = ImportExecutionResult.Loading
+                                    scope.launch {
+                                        val outcome = runCatching {
+                                            app.importOrchestrator.commit(snapshot, openingBalanceDate, lastLoadedMessages)
+                                        }
+                                        importResult = outcome.fold(
+                                            onSuccess = { result -> ImportExecutionResult.Success(result.importedTransactions, result.linkedTransactions, result.postedTransactions, result.updatedAccountIds, result) },
+                                            onFailure = { error -> ImportExecutionResult.Failure("تعذر تجهيز طابور المراجعة.", error.message) },
+                                        )
+                                        phase = ImportPhase.Idle
+                                        if (outcome.isSuccess) onReview()
+                                    }
+                                }
+                            } else {
                                 {
                                     scanPreview = null
                                     importResult = ImportExecutionResult.Idle

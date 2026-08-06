@@ -88,14 +88,17 @@ private fun ReviewCard(transaction: TransactionEntity, accounts: List<FinancialA
         transaction.postingStatus == TransactionPostingStatus.NEEDS_REVIEW -> "تحتاج مراجعة"
         else -> "جاهزة للاعتماد"
     }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(transaction.merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: transaction.transactionType.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text("${transaction.amount?.toPlainString().orEmpty()} ${transaction.currency.name}")
-            Text(transaction.transactionDate?.toString().orEmpty())
-            if (accountName != null) Text("الحساب: $accountName")
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(transaction.merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: transaction.transactionType.name, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("${transaction.amount?.toPlainString().orEmpty()} ${transaction.currency.name}")
+            }
+            Text(transaction.originalSender ?: "المؤسسة غير محددة", style = MaterialTheme.typography.bodyMedium)
+            Text(accountName?.let { "الحساب: $it" } ?: "الحساب غير محدد")
+            transaction.accountOrCardLastFourDigits?.let { Text("المعرّف المنتهي بـ ••••$it") }
             if (categoryName != null) Text("التصنيف: $categoryName")
-            Text("الثقة: ${transaction.accountLinkConfidence}% • $reviewReason")
+            Text(reviewReason, color = if (reviewReason == "جاهزة للاعتماد") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
             if (showAdvanced) {
                 Text("تفاصيل فنية: parser=${transaction.transactionType} • link=${transaction.accountLinkSource.name} • status=${transaction.postingStatus.name} • tx#${transaction.id}")
                 Text("journalId=${transaction.linkedJournalEntryId ?: "-"}")

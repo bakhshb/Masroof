@@ -166,9 +166,7 @@ class AccountIdentifierRepository(
             val trimmed = value.trim()
             if (trimmed.isEmpty()) return ""
             if (type == AccountIdentifierType.SENDER_ALIAS) {
-                return trimmed.lowercase()
-                    .replace("[\\s\\u00A0]+".toRegex(), "")
-                    .filter { it.isLetterOrDigit() }
+                return com.baraa.masroof.ledger.FinancialInstitutionResolver.senderKey(trimmed).orEmpty()
             }
             val ascii = trimmed.toCharArray().map { c ->
                 when (c) {

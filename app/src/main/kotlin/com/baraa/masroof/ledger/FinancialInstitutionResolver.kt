@@ -5,6 +5,7 @@ import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccountEntity
 import com.baraa.masroof.data.db.SenderInstitutionMappingDao
 import kotlinx.coroutines.runBlocking
+import java.text.Normalizer
 import java.util.Locale
 
 /** Where the institution display name ultimately came from. */
@@ -83,7 +84,10 @@ class FinancialInstitutionResolver(
             )
         }
         // 1. User-confirmed mapping wins.
+        // Old v12 rows may contain punctuation in senderKey. Keep this
+        // read fallback while all new writes use the canonical key.
         val saved = senderMappingDao.findByKey(key)
+            ?: sender?.trim()?.lowercase(Locale.ROOT)?.let { senderMappingDao.findByKey(it) }
         if (saved != null && saved.isActive) {
             return InstitutionResolution(
                 institutionId = saved.id,
@@ -153,20 +157,7 @@ class FinancialInstitutionResolver(
         return true
     }
 
-    private fun normalizeSender(sender: String?): String? {
-        if (sender.isNullOrBlank()) return null
-        val trimmed = sender.trim()
-        // Strip Arabic digit characters into ASCII for canonical form.
-        val sb = StringBuilder(trimmed.length)
-        for (ch in trimmed) {
-            sb.append(when (ch) {
-                '\u0660' -> '0'; '\u0661' -> '1'; '\u0662' -> '2'; '\u0663' -> '3'; '\u0664' -> '4'
-                '\u0665' -> '5'; '\u0666' -> '6'; '\u0667' -> '7'; '\u0668' -> '8'; '\u0669' -> '9'
-                else -> if (ch in 'a'..'z' || ch in 'A'..'Z') ch.lowercaseChar() else ch
-            })
-        }
-        return sb.toString().lowercase(Locale.ROOT).take(64)
-    }
+    private fun normalizeSender(sender: String?): String? = senderKey(sender)
 
     private fun SenderInstitutionMappingEntityStub(
         senderKey: String,
@@ -212,16 +203,16 @@ class FinancialInstitutionResolver(
         /** Stable sender key for identifier storage, mirrors [normalizeSender]. */
         fun senderKey(sender: String?): String? {
             if (sender.isNullOrBlank()) return null
-            val trimmed = sender.trim()
-            val sb = StringBuilder(trimmed.length)
-            for (ch in trimmed) {
-                sb.append(when (ch) {
+            val normalized = Normalizer.normalize(sender, Normalizer.Form.NFKC)
+                .lowercase(Locale.ROOT)
+                .map { ch -> when (ch) {
                     '\u0660' -> '0'; '\u0661' -> '1'; '\u0662' -> '2'; '\u0663' -> '3'; '\u0664' -> '4'
                     '\u0665' -> '5'; '\u0666' -> '6'; '\u0667' -> '7'; '\u0668' -> '8'; '\u0669' -> '9'
-                    else -> if (ch in 'a'..'z' || ch in 'A'..'Z') ch.lowercaseChar() else ch
-                })
-            }
-            return sb.toString().lowercase(Locale.ROOT).take(64)
+                    else -> ch
+                } }
+                .filter { it.isLetterOrDigit() }
+                .joinToString("")
+            return normalized.takeIf { it.isNotBlank() }?.take(64)
         }
     }
 }
