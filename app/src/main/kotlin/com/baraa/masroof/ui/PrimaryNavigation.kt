@@ -120,6 +120,10 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                 )
             }
             composable("primary/ACCOUNTS") { com.baraa.masroof.ui.accounts.AccountListScreen(onClose = {}) }
+            composable(AppRoutes.bindAccount(0L).substringBeforeLast("/") + "/{accountId}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("accountId")?.toLongOrNull() ?: 0L
+                com.baraa.masroof.ui.accounts.AccountBindRoute(accountId = id) { navController.popBackStack() }
+            }
             composable("primary/MORE") {
                 MoreMenu(onSettings = { navController.navigate("settings/list") })
             }

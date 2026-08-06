@@ -9,6 +9,7 @@ sealed interface NavigationCommand {
     data class OpenReviewQueue(val importSessionId: Long? = null, val reviewFilter: String = "actionable") : NavigationCommand
     data class OpenInstitutionMapping(val senderKey: String? = null) : NavigationCommand
     data class OpenAccountChooser(val transactionId: Long) : NavigationCommand
+    data class BindAccountFromSms(val accountId: Long) : NavigationCommand
     data object BackToOperations : NavigationCommand
 }
 
@@ -19,6 +20,7 @@ object AppRoutes {
     const val REVIEW = "operations/review"
     fun importResults(sessionId: Long) = "operations/import-results/$sessionId"
     fun review(sessionId: Long?) = "$REVIEW?sessionId=${sessionId ?: "current"}"
+    fun bindAccount(accountId: Long) = "operations/account-bind/$accountId"
 }
 
 /** Pure resolver keeps navigation behavior testable without Compose or a device. */
@@ -30,4 +32,5 @@ fun NavigationCommand.destinationRoute(): String = when (this) {
     is NavigationCommand.OpenReviewQueue -> AppRoutes.review(importSessionId)
     is NavigationCommand.OpenInstitutionMapping -> "settings/sender_mappings"
     is NavigationCommand.OpenAccountChooser -> "operations/account-chooser/$transactionId"
+    is NavigationCommand.BindAccountFromSms -> AppRoutes.bindAccount(accountId)
 }

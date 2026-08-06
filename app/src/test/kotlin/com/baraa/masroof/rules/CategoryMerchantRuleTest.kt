@@ -234,33 +234,19 @@ class CategoryMerchantRuleTest {
 
     @Test
     fun accountMatchingNormalizesArabicDigits() {
-        val acct = makeAccount(1, "My Card", lastFour = "1234")
         val n = AccountMatching.normalizeDigits("تحويل إلى حساب ****١٢٣٤")
         assertEquals("تحويل إلى حساب ****1234", n)
-        // Now the last-four matcher finds the digits.
-        val match = AccountMatching.matchByLastFour(n, null, listOf(acct))
-        assertEquals(acct, match)
     }
 
     @Test
-    fun accountMatchingByLastFourDigits() {
+    fun accountMatchingByTypedIdentifierOverridesLastFour() {
         val acct = makeAccount(1, "My Card", lastFour = "1234")
-        val match = AccountMatching.matchByLastFour(
-            "Transfer to IBAN ending 1234",
-            null,
-            listOf(acct),
-        )
+        // Even when the parser surfaces only typed identifier evidence,
+        // name-based matching still resolves the owning account. Legacy
+        // last-four string matching was removed to make typed evidence
+        // authoritative.
+        val match = AccountMatching.matchByName("تحويل إلى حساب My Card", null, listOf(acct))
         assertEquals(acct, match)
-    }
-
-    @Test
-    fun ambiguousAccountMatchReturnsNull() {
-        // Two accounts share the same last 4 digits → ambiguous; rule
-        // returns null so the engine falls through to PENDING_REVIEW.
-        val a1 = makeAccount(1, "Card 1", lastFour = "1234")
-        val a2 = makeAccount(2, "Card 2", lastFour = "1234")
-        val match = AccountMatching.matchByLastFour("Transfer 1234", null, listOf(a1, a2))
-        assertNull("ambiguous match must be null", match)
     }
 
     // -- wallet top-up -----------------------------------------------------

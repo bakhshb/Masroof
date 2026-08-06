@@ -52,14 +52,25 @@ class InternalTransferRule : TransactionRule {
         input: RuleInput,
     ): FinancialAccount? {
         val remaining = owned.filter { it.id != source.id }
-        // Prefer last-four match — most specific. If we find exactly one
-        // match among the remaining accounts, return it.
-        val byLastFour = AccountMatching.matchByLastFour(input.body, input.parsed.merchant, remaining)
-        if (byLastFour != null) return byLastFour
+        // Typed identifiers (when provided by the parser) are the only
+        // evidence used for selecting the destination account.
+        val evidence = input.parsed.identifierEvidence.firstOrNull { it.role == com.baraa.masroof.transaction.IdentifierRole.DESTINATION || it.role == com.baraa.masroof.transaction.IdentifierRole.UNSPECIFIED }
+        if (evidence != null) {
+            val typed = remaining.firstOrNull { it.institutionName != null && it.id != source.id && compatible(it.accountType, evidence.type) }
+            if (typed != null) return typed
+        }
         // Fall back to name / institution match.
         val byName = AccountMatching.matchByName(input.body, input.parsed.merchant, remaining)
         if (byName != null) return byName
         return null
+    }
+
+    private fun compatible(type: com.baraa.masroof.transaction.AccountType, idType: com.baraa.masroof.data.db.AccountIdentifierType): Boolean = when (idType) {
+        com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4, com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4 -> type in setOf(com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT, com.baraa.masroof.transaction.AccountType.INVESTMENT_ACCOUNT, com.baraa.masroof.transaction.AccountType.SUKUK_ACCOUNT)
+        com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 -> type == com.baraa.masroof.transaction.AccountType.CREDIT_CARD
+        com.baraa.masroof.data.db.AccountIdentifierType.DEBIT_CARD_LAST4 -> type == com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT
+        com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4 -> type in setOf(com.baraa.masroof.transaction.AccountType.DIGITAL_WALLET, com.baraa.masroof.transaction.AccountType.WALLET)
+        com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS -> false
     }
 
     private companion object {

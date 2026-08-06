@@ -85,35 +85,6 @@ object AccountMatching {
      * null if no 4-digit number is present or no account has that
      * lastFour.
      */
-    fun matchByLastFour(
-        body: String?,
-        merchant: String?,
-        accounts: List<FinancialAccount>,
-    ): FinancialAccount? {
-        if (body.isNullOrBlank() && merchant.isNullOrBlank()) return null
-        val text = normalizeDigits((body.orEmpty() + " " + merchant.orEmpty()))
-        val candidates = mutableSetOf<String>()
-        // Labeled 4-digit numbers get priority. Group 2 is the captured
-        // 4-digit number; group 1 is the optional account label.
-        for (m in LAST_FOUR_REGEX.findAll(text)) {
-            val digits = m.groupValues[2]
-            if (digits.isNotEmpty()) candidates.add(digits)
-        }
-        // Fallback: any 4-digit number.
-        for (m in ANY_FOUR_DIGITS_REGEX.findAll(text)) {
-            candidates.add(m.groupValues[1])
-        }
-        for (digits in candidates) {
-            val matchingAccounts = accounts.filter { it.lastFourDigits == digits }
-            // Ambiguous → return null so the rule falls through to
-            // PENDING_REVIEW.
-            return when (matchingAccounts.size) {
-                1 -> matchingAccounts.first()
-                else -> null
-            }
-        }
-        return null
-    }
 
     /**
      * Match an account by name token (institution or display name) in
@@ -160,9 +131,7 @@ object AccountMatching {
     ): FinancialAccount? {
         // 1. Sender alias — most reliable.
         matchBySender(sender, accounts)?.let { return it }
-        // 2. Last 4 digits — very specific when present.
-        matchByLastFour(body, merchant, accounts)?.let { return it }
-        // 3. Name (institution / display) — less specific.
+        // 2. Name (institution / display) — less specific.
         return matchByName(body, merchant, accounts)
     }
 }

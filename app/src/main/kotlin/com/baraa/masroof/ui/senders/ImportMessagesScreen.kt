@@ -736,6 +736,8 @@ private fun DiscoveryResultsCard(preview: ScanPreview, onAccounts: () -> Unit) {
                 Text("آخر رسالة: ${java.time.Instant.ofEpochMilli(sender.latestTimestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate()}", style = FinancialTypography.metadata)
                 SecondaryButton("ربط بحساب موجود", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
             }
+            // Intentionally no automatic import button — discovery must
+            // remain a separate, manual flow.
         }
     }
 }

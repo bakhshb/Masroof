@@ -45,9 +45,13 @@ class TransactionLinkingService(
         val source = accounts.firstOrNull { it.id == sourceAccountId }
         val destination = accounts.firstOrNull { it.id == destinationAccountId }
         val preferred = source ?: destination
-        val draft = generator.generate(linked, source, destination) ?: return linked
-        val journalId = if (transaction.linkedJournalEntryId == null) ledger.create(draft)
-        else ledger.regenerateDraft(transaction.id, draft)
+        // Review confirmation is the only path that may post a balanced
+        // journal. We must keep the draft until the caller explicitly
+        // requests POSTING; preserving the previous draft-only behavior
+        // here would silently mark the row as reviewed but never balance it.
+        val draft = generator.generate(linked, source, destination)
+        val resolvedId = if (draft != null && transaction.linkedJournalEntryId == null) ledger.create(draft)
+        else transaction.linkedJournalEntryId
         if (rememberForFuture && preferred != null) {
             runCatching { rules?.remember(linked, preferred, if (preferred == source) "source" else "destination") }
         }
@@ -64,7 +68,20 @@ class TransactionLinkingService(
                 )
             }
         }
-        return linked.copy(linkedJournalEntryId = journalId, updatedAt = now()).also { transactions.update(it) }
+        // A linked row with a posted journal is the canonical signal that
+        // the user has reviewed it and it has been taken into balances.
+        val posted = if (draft != null && resolvedId != null && resolvedId > 0L) {
+            val balanced = ledger.post(resolvedId).valid
+            if (balanced) linked.copy(
+                linkedJournalEntryId = resolvedId,
+                postingStatus = TransactionPostingStatus.POSTED,
+                needsReview = false,
+                userConfirmed = true,
+                updatedAt = now(),
+            ) else linked.copy(linkedJournalEntryId = resolvedId, updatedAt = now())
+        } else linked
+        transactions.update(posted)
+        return posted
     }
 
     private fun displayLabelFor(candidate: IdentifierCandidate): String = when (candidate.identifierType) {

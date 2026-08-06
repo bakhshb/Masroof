@@ -10,4 +10,5 @@ class UiNavigatorTest {
     @Test fun reviewCarriesSessionIdInRoute() = assertEquals("operations/review?sessionId=42", NavigationCommand.OpenReviewQueue(42).destinationRoute())
     @Test fun importUsesOperationsChildRoute() = assertEquals(AppRoutes.IMPORT, NavigationCommand.OpenImport.destinationRoute())
     @Test fun backFromImportReturnsOperations() = assertEquals(AppRoutes.OPERATIONS, NavigationCommand.BackToOperations.destinationRoute())
+    @Test fun bindAccountRouteProducesTypeSafePath() = assertEquals("operations/account-bind/9", NavigationCommand.BindAccountFromSms(9).destinationRoute())
 }

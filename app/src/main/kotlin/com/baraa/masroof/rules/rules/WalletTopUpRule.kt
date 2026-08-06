@@ -45,8 +45,8 @@ class WalletTopUpRule : TransactionRule {
         // and the card (sender alias or last four).
         val mentionsWallet = wallet.displayName.lowercase() in input.body.orEmpty().lowercase() ||
             wallet.institutionName?.lowercase()?.let { it in input.body.orEmpty().lowercase() } == true
-        val mentionsCard = AccountMatching.matchByLastFour(input.body, null, listOf(card)) != null ||
-            card.senderAliases.any { it.lowercase() in input.body.orEmpty().lowercase() }
+        val mentionsCard = card.senderAliases.any { it.lowercase() in input.body.orEmpty().lowercase() } ||
+            input.parsed.identifierEvidence.any { it.type == com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 }
 
         if (!mentionsWallet || !mentionsCard) return null
 
