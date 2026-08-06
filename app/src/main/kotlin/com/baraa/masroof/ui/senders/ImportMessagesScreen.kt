@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +45,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.data.repository.ScanPreview
+import com.baraa.masroof.data.repository.SmsImportMode
 import com.baraa.masroof.data.repository.SmsImportResult
 import com.baraa.masroof.sms.SmsImportRange
 import com.baraa.masroof.sms.SmsMessage
@@ -107,6 +111,9 @@ fun ImportMessagesScreen(
     val app = context.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
+    val registeredSenderCount by produceState(initialValue = 0) {
+        value = app.accountIdentifierRepository.activeOwnedSenderAliases().size
+    }
 
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
     val openingBalanceDate: LocalDate? = remember(setup) {
@@ -114,6 +121,7 @@ fun ImportMessagesScreen(
         java.time.Instant.ofEpochMilli(s.trackingStartDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
     }
 
+    var importMode by remember { mutableStateOf(SmsImportMode.REGISTERED_ACCOUNTS_ONLY) }
     var quickId by remember { mutableStateOf(SmsImportRange.QUICK_MONTH_START) }
     var customFrom by remember { mutableStateOf(today.withDayOfMonth(1)) }
     var customTo by remember { mutableStateOf(today) }
@@ -188,6 +196,12 @@ fun ImportMessagesScreen(
                     onEdit = { showTrackEditDialog = true },
                 )
 
+                ImportModeSection(
+                    selected = importMode,
+                    registeredSenderCount = registeredSenderCount,
+                    onSelected = { importMode = it },
+                )
+
                 ImportRangeSection(
                     quickId = quickId,
                     onQuickIdChange = { quickId = it },
@@ -221,7 +235,7 @@ fun ImportMessagesScreen(
                                     runCatching {
                                         val messages = app.smsRepository.loadInbox(resolvedRange)
                                         lastLoadedMessages = messages
-                                        scanPreview = app.importOrchestrator.scan(messages, openingBalanceDate)
+                                        scanPreview = app.importOrchestrator.scan(messages, openingBalanceDate, importMode)
                                     }.onFailure {
                                         scanPreview = ScanPreview()
                                         android.util.Log.w("SmsImport", "scan failed", it)
@@ -234,6 +248,14 @@ fun ImportMessagesScreen(
                 }
 
                 scanPreview?.let { preview ->
+                    if (!preview.hasRegisteredSenders && preview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY) {
+                        NoRegisteredSenderCard(onAccounts = onNavigateToAccounts, onDiscovery = { importMode = SmsImportMode.DISCOVER_NEW_SENDERS })
+                        return@let
+                    }
+                    if (preview.mode == SmsImportMode.DISCOVER_NEW_SENDERS) {
+                        DiscoveryResultsCard(preview, onAccounts = onNavigateToAccounts)
+                        return@let
+                    }
                     ScanResultsCard(preview)
                     val readyCount = preview.readyCount
                     val reviewCount = preview.needsReviewTransactions
@@ -482,7 +504,10 @@ private fun ScanResultsCard(preview: ScanPreview) {
     val ready = preview.readyCount
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
-            BulletRow("الرسائل المفحوصة", "${preview.scannedMessages}")
+            Text("تم فحص رسائل حساباتك المسجلة", style = FinancialTypography.merchant)
+            BulletRow("الرسائل ضمن الفترة", "${preview.scannedMessages}")
+            BulletRow("رسائل المرسلين المسجلين", "${preview.scannedMessages - preview.unregisteredSenderMessages}")
+            BulletRow("رسائل من مرسلين غير مسجلين تم تجاهلها", "${preview.unregisteredSenderMessages}")
             BulletRow("العمليات المالية المكتشفة", "${preview.recognizedTransactions}")
             BulletRow("جاهزة للاستيراد", "${ready}")
             BulletRow("تحتاج مراجعة", "${preview.needsReviewTransactions}")
@@ -675,4 +700,42 @@ private fun resolveRange(quickId: String, today: LocalDate, customFrom: LocalDat
 private fun humanDateRange(from: LocalDate, to: LocalDate): String {
     val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ar"))
     return "من ${from.format(fmt)} إلى ${to.format(fmt)}"
+}
+
+@Composable
+private fun ImportModeSection(selected: SmsImportMode, registeredSenderCount: Int, onSelected: (SmsImportMode) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+        Text("ما الرسائل التي تريد فحصها؟", style = FinancialTypography.merchant)
+        FilterChip(selected = selected == SmsImportMode.REGISTERED_ACCOUNTS_ONLY, onClick = { onSelected(SmsImportMode.REGISTERED_ACCOUNTS_ONLY) }, label = { Text("حساباتي المسجلة") })
+        Text("فحص رسائل المرسلين المرتبطين بالحسابات التي أضفتها فقط. سيتم فحص رسائل $registeredSenderCount مرسلين مسجلين.", style = FinancialTypography.metadata)
+        FilterChip(selected = selected == SmsImportMode.DISCOVER_NEW_SENDERS, onClick = { onSelected(SmsImportMode.DISCOVER_NEW_SENDERS) }, label = { Text("البحث عن مرسلين جدد") })
+        Text("العثور على مرسلين ماليين لم تضفهم بعد، دون استيراد عمليات.", style = FinancialTypography.metadata)
+    }
+}
+
+@Composable
+private fun NoRegisteredSenderCard(onAccounts: () -> Unit, onDiscovery: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text("لم يتم إضافة مرسلي رسائل للحسابات بعد", style = FinancialTypography.merchant)
+            Text("أضف اسم مرسل رسائل البنك إلى أحد حساباتك، أو استخدم البحث عن مرسلين جدد.")
+            PrimaryButton("إضافة مرسل إلى حساب", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
+            SecondaryButton("البحث عن مرسلين جدد", onClick = onDiscovery, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryResultsCard(preview: ScanPreview, onAccounts: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text("مرسلون ماليون غير مسجلين", style = FinancialTypography.merchant)
+            if (preview.discoveredSenders.isEmpty()) Text("لا توجد رسائل من مرسلين جدد ضمن الفترة.")
+            preview.discoveredSenders.forEach { sender ->
+                Text("${sender.sender} • ${sender.messageCount} رسالة")
+                Text("آخر رسالة: ${java.time.Instant.ofEpochMilli(sender.latestTimestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate()}", style = FinancialTypography.metadata)
+                SecondaryButton("ربط بحساب موجود", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
 }

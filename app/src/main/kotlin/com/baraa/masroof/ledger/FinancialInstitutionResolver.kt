@@ -5,7 +5,7 @@ import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccountEntity
 import com.baraa.masroof.data.db.SenderInstitutionMappingDao
 import kotlinx.coroutines.runBlocking
-import java.text.Normalizer
+import com.baraa.masroof.sms.SenderNormalizer
 import java.util.Locale
 
 /** Where the institution display name ultimately came from. */
@@ -201,18 +201,6 @@ class FinancialInstitutionResolver(
         }
 
         /** Stable sender key for identifier storage, mirrors [normalizeSender]. */
-        fun senderKey(sender: String?): String? {
-            if (sender.isNullOrBlank()) return null
-            val normalized = Normalizer.normalize(sender, Normalizer.Form.NFKC)
-                .lowercase(Locale.ROOT)
-                .map { ch -> when (ch) {
-                    '\u0660' -> '0'; '\u0661' -> '1'; '\u0662' -> '2'; '\u0663' -> '3'; '\u0664' -> '4'
-                    '\u0665' -> '5'; '\u0666' -> '6'; '\u0667' -> '7'; '\u0668' -> '8'; '\u0669' -> '9'
-                    else -> ch
-                } }
-                .filter { it.isLetterOrDigit() }
-                .joinToString("")
-            return normalized.takeIf { it.isNotBlank() }?.take(64)
-        }
+        fun senderKey(sender: String?): String? = SenderNormalizer.normalize(sender)
     }
 }

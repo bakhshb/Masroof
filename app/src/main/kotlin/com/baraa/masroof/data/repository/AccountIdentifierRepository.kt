@@ -63,6 +63,25 @@ class AccountIdentifierRepository(
             .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
     }
 
+    /** Sender keys explicitly attached to active, user-owned accounts. */
+    suspend fun activeOwnedSenderAliases(): Set<String> {
+        val ownedActiveIds = accountDao.getActive()
+            .filter { it.isOwnedByUser && it.systemAccountKey == null }
+            .map { it.id }
+            .toSet()
+        val typed = dao.getByType(AccountIdentifierType.SENDER_ALIAS)
+            .asSequence()
+            .filter { it.isActive && it.accountId in ownedActiveIds }
+            .map { normalize(AccountIdentifierType.SENDER_ALIAS, it.normalizedValue) }
+        // Existing users entered aliases through AccountEditDialog before typed
+        // identifiers were mounted. Those persisted aliases are authoritative too.
+        val legacy = accountDao.getActive().asSequence()
+            .filter { it.id in ownedActiveIds }
+            .flatMap { it.senderAliases.split(",").asSequence() }
+            .map { normalize(AccountIdentifierType.SENDER_ALIAS, it) }
+        return (typed + legacy).filter { it.isNotBlank() }.toSet()
+    }
+
     suspend fun addOrUpdate(accountId: Long, form: IdentifierForm): IdentifierAddOutcome {
         val account = accountDao.getById(accountId)?.toDomainRef()
             ?: return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), "حساب غير موجود")

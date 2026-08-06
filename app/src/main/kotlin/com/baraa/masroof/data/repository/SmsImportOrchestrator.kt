@@ -15,6 +15,7 @@ import com.baraa.masroof.rules.RuleContext
 import com.baraa.masroof.rules.RuleEngine
 import com.baraa.masroof.rules.RuleEngineFactory
 import com.baraa.masroof.sms.SmsMessage
+import com.baraa.masroof.sms.SenderNormalizer
 import com.baraa.masroof.transaction.BankParserRegistry
 import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.MerchantNormalizer
@@ -27,6 +28,13 @@ import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.ZoneId
+
+enum class SmsImportMode { REGISTERED_ACCOUNTS_ONLY, DISCOVER_NEW_SENDERS }
+
+enum class ImportDisposition {
+    READY, NEEDS_ACCOUNT, NEEDS_CONFIRMATION, NEEDS_INSTITUTION, UNPARSED,
+    EXACT_DUPLICATE, POSSIBLE_DUPLICATE, BEFORE_TRACKING_START, UNREGISTERED_SENDER, IGNORED,
+}
 
 /**
  * Structured result of a single SMS import operation. Every count is
@@ -52,6 +60,7 @@ data class SmsImportResult(
     val duplicateTransactions: Int = 0,
     val unparsedMessages: Int = 0,
     val nonFinancialMessages: Int = 0,
+    val unregisteredSenderMessages: Int = 0,
     val beforeTrackingStartCount: Int = 0,
     val updatedAccountIds: List<Long> = emptyList(),
     val affectedAccounts: List<AffectedAccountSummary> = emptyList(),
@@ -98,16 +107,22 @@ data class SmsImportResult(
  * computed candidate so the user can review before any data is persisted.
  */
 data class ScanPreview(
+    val mode: SmsImportMode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
+    val configuredSenderCount: Int = 0,
+    val hasRegisteredSenders: Boolean = true,
     val scannedMessages: Int = 0,
     val recognizedTransactions: Int = 0,
     val nonFinancialMessages: Int = 0,
     val unparsedMessages: Int = 0,
+    val unregisteredSenderMessages: Int = 0,
     val duplicateTransactions: Int = 0,
     val needsReviewTransactions: Int = 0,
     val beforeTrackingStartCount: Int = 0,
     val institutionGroups: List<InstitutionGroup> = emptyList(),
     val perTransaction: List<PreviewItem> = emptyList(),
+    val discoveredSenders: List<DiscoveredSender> = emptyList(),
 ) {
+    data class DiscoveredSender(val sender: String, val messageCount: Int, val latestTimestamp: Long, val likelyInstitution: String?)
     /**
      * Recognized transactions that the user can commit now. This is the
      * exclusive subset — recognized − (needsReview ∪ duplicate ∪
@@ -180,94 +195,85 @@ class SmsImportOrchestrator(
     suspend fun scan(
         messages: List<SmsMessage>,
         trackingStartDate: LocalDate?,
+        mode: SmsImportMode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
     ): ScanPreview = withContext(Dispatchers.IO) {
+        val registeredSenders = registeredSenderKeys()
+        if (mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && registeredSenders.isEmpty()) {
+            return@withContext ScanPreview(mode = mode, configuredSenderCount = 0, hasRegisteredSenders = false)
+        }
+        if (mode == SmsImportMode.DISCOVER_NEW_SENDERS) {
+            val discoveries = messages.asSequence()
+                .filter { sms -> SenderNormalizer.normalize(sms.sender) !in registeredSenders }
+                .filter { isLikelyFinancialSender(it.sender) || com.baraa.masroof.sms.BankSmsFilter.classifyMessage(it.sender, it.body).isMatch }
+                .groupBy { it.sender?.trim().orEmpty() }
+                .filterKeys { it.isNotBlank() }
+                .map { (sender, rows) -> ScanPreview.DiscoveredSender(sender, rows.size, rows.maxOf { it.timestamp }, null) }
+                .sortedByDescending { it.latestTimestamp }
+            return@withContext ScanPreview(
+                mode = mode, configuredSenderCount = registeredSenders.size, scannedMessages = messages.size,
+                unregisteredSenderMessages = messages.count { SenderNormalizer.normalize(it.sender) !in registeredSenders },
+                discoveredSenders = discoveries,
+            )
+        }
+
         val categories = categoryRepository.getAll()
         val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
         val merchantMemory = merchantMemoryRepository.getAll()
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
         val context = RuleContext(ownedAccounts, merchantMemory, categories)
-
-        var scanned = 0
-        var recognized = 0
-        var nonFinancial = 0
-        var unparsed = 0
-        var duplicates = 0
-        var needsReview = 0
-        var beforeTracking = 0
-        val groups = linkedMapOf<String, MutableList<String>>()
-        val items = ArrayList<ScanPreview.PreviewItem>()
+        var scanned = 0; var recognized = 0; var nonFinancial = 0; var unparsed = 0
+        var unregistered = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
+        val groups = linkedMapOf<String, MutableList<String>>(); val items = ArrayList<ScanPreview.PreviewItem>()
 
         for (sms in messages) {
             scanned++
-            val parsed: ParsedTransaction = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
+            // This is intentionally before BankParserRegistry: unrelated bank messages
+            // must not consume parsing work or become review/duplicate candidates.
+            if (SenderNormalizer.normalize(sms.sender) !in registeredSenders) { unregistered++; continue }
+            val parsed = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
             if (parsed.amount == null || parsed.confidence < 30) {
-                if (isLikelyFinancialSender(sms.sender)) {
-                    unparsed++
-                } else {
-                    nonFinancial++
-                }
+                if (isLikelyFinancialSender(sms.sender)) unparsed++ else nonFinancial++
                 continue
             }
             val entity = buildEntity(sms, parsed, engine, context)
-            if (entity == null) {
-                unparsed++
-                continue
-            }
+            if (entity == null) { unparsed++; continue }
             recognized++
-            val fingerprint = entity.uniqueFingerprint
-            val isDup = transactionRepository.existsByFingerprint(fingerprint)
+            val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
             val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository)
-            val proposedId = match.account?.id
-            val proposedName = match.account?.displayName
-            val isReviewNow = proposedId == null
+            val isReviewNow = match.account == null || match.needsReview
             val before = trackingStartDate != null && entity.transactionDate != null && entity.transactionDate.isBefore(trackingStartDate)
-            if (isDup) duplicates++
-            if (isReviewNow) needsReview++
-            if (before) beforeTracking++
+            if (isDup) duplicates++; if (isReviewNow) needsReview++; if (before) beforeTracking++
             val institutionKey = institutionResolver.resolve(
-                sender = sms.sender,
-                parsedInstitution = parserInstitution(parsed),
-                parserIdentity = parsed.parserName,
+                sender = sms.sender, parsedInstitution = parserInstitution(parsed), parserIdentity = parsed.parserName,
                 knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
             ).institutionDisplayName
-            groups.getOrPut(institutionKey) { mutableListOf() }.add(fingerprint)
-            items += ScanPreview.PreviewItem(
-                smsId = sms.id,
-                sender = sms.sender,
-                amount = entity.amount,
-                transactionType = entity.transactionType,
-                proposedAccountId = proposedId,
-                proposedAccountName = proposedName,
-                isDuplicate = isDup,
-                needsReview = isReviewNow,
-                isBeforeTrackingStart = before,
-                date = entity.transactionDate,
-            )
+            groups.getOrPut(institutionKey) { mutableListOf() }.add(entity.uniqueFingerprint)
+            items += ScanPreview.PreviewItem(sms.id, sms.sender, entity.amount, entity.transactionType, match.account?.id,
+                match.account?.displayName, isDup, isReviewNow, before, entity.transactionDate)
         }
-
         ScanPreview(
-            scannedMessages = scanned,
-            recognizedTransactions = recognized,
-            nonFinancialMessages = nonFinancial,
-            unparsedMessages = unparsed,
-            duplicateTransactions = duplicates,
-            needsReviewTransactions = needsReview,
+            mode = mode, configuredSenderCount = registeredSenders.size, scannedMessages = scanned,
+            recognizedTransactions = recognized, nonFinancialMessages = nonFinancial, unparsedMessages = unparsed,
+            unregisteredSenderMessages = unregistered, duplicateTransactions = duplicates, needsReviewTransactions = needsReview,
             beforeTrackingStartCount = beforeTracking,
             institutionGroups = groups.map { (institution, _) ->
-                val its = items.filter { (it.sender != null && institutionResolver.resolve(sender = it.sender).institutionDisplayName == institution) || (it.sender == null && institution == "مرسل غير معروف") }
-                val ready = its.count { !it.isDuplicate && !it.isBeforeTrackingStart && !it.needsReview }
-                val review = its.count { !it.isDuplicate && !it.isBeforeTrackingStart && it.needsReview }
-                val unparsedMsgs = if (institution == "مرسل غير معروف") unparsed else 0
-                ScanPreview.InstitutionGroup(
-                    institutionName = institution,
-                    totalRecognized = its.size,
-                    readyToImport = ready,
-                    needsReview = review,
-                    unparsed = unparsedMsgs,
-                )
-            },
-            perTransaction = items,
+                val its = items.filter { it.sender?.let(SenderNormalizer::normalize) in registeredSenders &&
+                    institutionResolver.resolve(sender = it.sender).institutionDisplayName == institution }
+                ScanPreview.InstitutionGroup(institution, its.size,
+                    its.count { !it.isDuplicate && !it.isBeforeTrackingStart && !it.needsReview },
+                    its.count { !it.isDuplicate && !it.isBeforeTrackingStart && it.needsReview }, 0)
+            }, perTransaction = items,
         )
+    }
+
+    private suspend fun registeredSenderKeys(): Set<String> {
+        val direct = accountIdentifierRepository.activeOwnedSenderAliases().toMutableSet()
+        val ownedInstitutions = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
+            .mapNotNull { it.institutionName?.trim()?.lowercase() }.toSet()
+        database.senderInstitutionMappingDao().getActive()
+            .filter { it.institutionName.trim().lowercase() in ownedInstitutions }
+            .mapTo(direct) { SenderNormalizer.normalize(it.senderKey).orEmpty() }
+        return direct.filter { it.isNotBlank() }.toSet()
     }
 
     /**
@@ -297,9 +303,11 @@ class SmsImportOrchestrator(
         val affectedSummaries = mutableMapOf<Long, SmsImportResult.AffectedAccountSummary>()
         val log = mutableListOf<SmsImportResult.TransactionImportLog>()
         val previewBySms = scanPreview.perTransaction.associateBy { it.smsId }
+        val registeredSenders = registeredSenderKeys()
 
         database.withTransaction {
             for (sms in importedSms) {
+                if (scanPreview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && SenderNormalizer.normalize(sms.sender) !in registeredSenders) continue
                 val previewItem = previewBySms[sms.id]
                 if (previewItem == null || previewItem.isDuplicate) {
                     if (previewItem?.isDuplicate == true) duplicates++
@@ -321,7 +329,7 @@ class SmsImportOrchestrator(
                         imported++
                         reviewCount++
                         log += SmsImportResult.TransactionImportLog(
-                            smsId = sms.id, sender = sms.sender, amount = entity.amount,
+                            smsId = sms.id, sender = null, amount = entity.amount,
                             transactionType = entity.transactionType.name,
                             linkedAccountId = null, journalEntryId = null,
                             debitAccountId = null, creditAccountId = null,
@@ -348,7 +356,7 @@ class SmsImportOrchestrator(
                 if (!hasLinkedAccount) {
                     reviewCount++
                     log += SmsImportResult.TransactionImportLog(
-                        smsId = sms.id, sender = sms.sender, amount = linked.amount,
+                        smsId = sms.id, sender = null, amount = linked.amount,
                         transactionType = linked.transactionType.name,
                         linkedAccountId = null, journalEntryId = null,
                         debitAccountId = null, creditAccountId = null,
@@ -392,7 +400,7 @@ class SmsImportOrchestrator(
                             affectedIds.addAll(listOfNotNull(linked.sourceAccountId, linked.destinationAccountId).distinct())
                         }
                         log += SmsImportResult.TransactionImportLog(
-                            smsId = sms.id, sender = sms.sender, amount = linked.amount,
+                            smsId = sms.id, sender = null, amount = linked.amount,
                             transactionType = linked.transactionType.name,
                             linkedAccountId = linked.sourceAccountId ?: linked.destinationAccountId,
                             journalEntryId = journalId,
@@ -404,7 +412,7 @@ class SmsImportOrchestrator(
                     } else {
                         reviewCount++
                         log += SmsImportResult.TransactionImportLog(
-                            smsId = sms.id, sender = sms.sender, amount = linked.amount,
+                            smsId = sms.id, sender = null, amount = linked.amount,
                             transactionType = linked.transactionType.name,
                             linkedAccountId = null, journalEntryId = null,
                             debitAccountId = null, creditAccountId = null,
@@ -415,7 +423,7 @@ class SmsImportOrchestrator(
                 } else {
                     reviewCount++
                     log += SmsImportResult.TransactionImportLog(
-                        smsId = sms.id, sender = sms.sender, amount = linked.amount,
+                        smsId = sms.id, sender = null, amount = linked.amount,
                         transactionType = linked.transactionType.name,
                         linkedAccountId = linked.sourceAccountId ?: linked.destinationAccountId,
                         journalEntryId = null,

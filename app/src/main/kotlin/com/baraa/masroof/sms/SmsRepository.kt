@@ -6,7 +6,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
-import com.baraa.masroof.transaction.BankParserRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -74,19 +73,11 @@ class SmsRepository(private val context: Context) {
                     val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
                     if (date < startMillis || date >= endMillis) continue
                     val match = BankSmsFilter.classifyMessage(sender, body)
-                    val parsed = BankParserRegistry.parse(sender, body, date.takeIf { it > 0L })
-                    result.add(
-                        SmsMessage(
-                            id = id,
-                            sender = sender,
-                            body = body,
-                            timestamp = date,
-                            matchReason = match.reason,
-                            parsed = parsed,
-                        )
-                    )
+                    // Parsing is intentionally deferred to SmsImportOrchestrator,
+                    // after the registered-sender authorization gate.
+                    result.add(SmsMessage(id = id, sender = sender, body = body, timestamp = date, matchReason = match.reason))
                 }
-                Log.d(tag, "Loaded ${result.size} messages (range=${range.label})")
+                Log.d(tag, "Loaded ${result.size} SMS rows in selected range")
             } catch (security: SecurityException) {
                 // Permission revoked between check and query — return empty so UI can recover.
                 Log.e(tag, "READ_SMS permission missing while reading inbox", security)
