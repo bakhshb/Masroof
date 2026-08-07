@@ -14,6 +14,12 @@ enum class TransactionType {
     BANK_FEE,
     INTERNAL_TRANSFER,
     INVESTMENT_TRANSFER,
+    /** Scheduled loan / financing installment debit from a bank account. */
+    LOAN_INSTALLMENT,
+    /** Utility / SADAD / bill payment debit. */
+    BILL_PAYMENT,
+    /** Bank notice that the credit-card limit changed — never a spend. */
+    CREDIT_LIMIT_CHANGE,
     DECLINED,
     UNKNOWN,
 }

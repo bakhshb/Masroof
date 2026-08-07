@@ -215,17 +215,18 @@ class CategoryMerchantRuleTest {
     }
 
     @Test
-    fun vagueArabicMerchantTextRemainsUnclassified() {
+    fun vagueArabicMerchantTextUsesPurchaseFallbackWithoutCategory() {
         val other = makeCategory(1, "أخرى")
         val engine = RuleEngineFactory.build(categories = listOf(other), feeCategoryId = null)
         val v = engine.classify(
             makeInput(body = "شركة المؤسسة اشترت منتجا", merchant = "شركة"),
             RuleContext(emptyList(), emptyList(), listOf(other))
         )
-        // "شركة" + "المؤسسة" are both in the vague blacklist; the body
-        // contains no other rule match → engine falls through to
-        // PENDING_REVIEW.
-        assertEquals(FinancialTreatment.PENDING_REVIEW, v.financialTreatment)
+        // Vague blacklist blocks category assignment; ParsedTypeFallbackRule
+        // still treats PURCHASE as EXPENSE so balances can auto-post.
+        assertEquals(FinancialTreatment.EXPENSE, v.financialTreatment)
+        assertNull(v.categoryId)
+        assertTrue(v.reason.contains("ParsedTypeFallbackRule"))
     }
 
     // -- owned-account matching --------------------------------------------
@@ -296,7 +297,8 @@ class CategoryMerchantRuleTest {
             ),
             RuleContext(listOf(card), emptyList(), emptyList())
         )
-        // No owned wallet → WalletTopUpRule returns null; falls through.
+        // No owned wallet → WalletTopUpRule returns null; auditor still sees
+        // شحن المحفظة and keeps PENDING_REVIEW (two-sided, not auto-applied).
         assertEquals(FinancialTreatment.PENDING_REVIEW, v.financialTreatment)
     }
 

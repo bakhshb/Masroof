@@ -6,24 +6,29 @@ import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.data.repository.FinancialAccountRepository
 import com.baraa.masroof.data.repository.TransactionRepository
 import com.baraa.masroof.transaction.FinancialTreatment
+import com.baraa.masroof.transaction.TransactionStatus
 
 /**
- * Opt-in gap-fill re-linking of historical transactions against the
+ * Gap-fill / rematch of historical unposted transactions against the
  * current typed identifier table.
  *
  * Safety guarantees:
  *  - Never modifies [TransactionPostingStatus.POSTED] rows
- *  - Never deletes or rewrites journal entries / postings
- *  - Never changes opening balances or calculated balances directly
- *  - Only gap-fills UNLINKED / both-account-null rows
- *  - Never overwrites USER links or existing proposed account IDs
- *  - Leaves rows in [TransactionPostingStatus.NEEDS_REVIEW] for user confirmation
- *  - Does not auto-create or auto-post journals
+ *  - Never deletes or rewrites existing journal entries / postings
+ *  - Never changes opening balances directly
+ *  - Never overwrites [AccountLinkSource.USER] links
+ *  - May create and post a **new** journal only when the rematch is
+ *    confirmed (`needsReview = false`) and no journal exists yet
+ *  - Reclassifies [FinancialTreatment.PENDING_REVIEW] via
+ *    [LocalTreatmentAuditor] before account placement / posting
  */
 class HistoricalAccountRelinkService(
     private val transactionRepository: TransactionRepository,
     private val financialAccountRepository: FinancialAccountRepository,
     private val identifierRepository: AccountIdentifierRepository,
+    private val journalGenerationService: JournalGenerationService? = null,
+    private val ledgerRepository: LedgerRepository? = null,
+    private val systemAccounts: (suspend (SystemAccountKey) -> Long)? = null,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     data class Result(
@@ -35,11 +40,13 @@ class HistoricalAccountRelinkService(
         val stillUnlinked: Int = 0,
         val skippedPosted: Int = 0,
         val unchanged: Int = 0,
+        val posted: Int = 0,
     )
 
     suspend fun relinkUnposted(dryRun: Boolean = false): Result {
         identifierRepository.ensureLegacyIdentifierBackfill()
         val accounts = financialAccountRepository.getOwnedActive()
+        val accountsById = accounts.associateBy { it.id }
         val all = transactionRepository.getAllNewestFirst()
         var scanned = 0
         var eligible = 0
@@ -49,6 +56,7 @@ class HistoricalAccountRelinkService(
         var stillUnlinked = 0
         var skippedPosted = 0
         var unchanged = 0
+        var posted = 0
 
         for (tx in all) {
             scanned++
@@ -63,15 +71,37 @@ class HistoricalAccountRelinkService(
             eligible++
             val match = AccountMatcher.match(tx, accounts, identifierRepository)
             val rewritten = applyMatch(tx, match)
-            if (rewritten == tx) {
+            val shouldWrite = rewritten != tx ||
+                (!match.needsReview && match.account != null &&
+                    rewritten.financialTreatment != FinancialTreatment.PENDING_REVIEW)
+            if (!shouldWrite && rewritten == tx) {
                 unchanged++
                 if (match.account == null) stillUnlinked++
                 continue
             }
+            var finalRow = rewritten
             if (!dryRun) {
-                transactionRepository.update(rewritten.copy(updatedAt = now()))
+                if (rewritten != tx) {
+                    transactionRepository.update(rewritten.copy(updatedAt = now()))
+                }
+                if (!match.needsReview &&
+                    match.account != null &&
+                    finalRow.linkedJournalEntryId == null &&
+                    finalRow.financialTreatment != FinancialTreatment.PENDING_REVIEW &&
+                    finalRow.financialTreatment != FinancialTreatment.IGNORED
+                ) {
+                    val postedRow = tryAutoPost(finalRow, accountsById, match)
+                    if (postedRow != null) {
+                        finalRow = postedRow
+                        posted++
+                    }
+                }
             }
-            updated++
+            if (rewritten != tx || finalRow.postingStatus == TransactionPostingStatus.POSTED) {
+                updated++
+            } else {
+                unchanged++
+            }
             when {
                 match.account == null -> stillUnlinked++
                 match.needsReview -> linkedNeedsReview++
@@ -87,53 +117,133 @@ class HistoricalAccountRelinkService(
             stillUnlinked = stillUnlinked,
             skippedPosted = skippedPosted,
             unchanged = unchanged,
+            posted = posted,
         )
     }
 
     /**
-     * Gap-fill only: rows with no account link yet. Existing proposals
-     * (including needsReview proposals) are left for the review queue.
+     * Unposted, non-user rows: unlinked, tentative links, or any stuck
+     * needs-review row so newly added last-fours can reclaim them.
      */
     private fun isRelinkCandidate(tx: TransactionEntity): Boolean {
         if (tx.accountLinkSource == AccountLinkSource.USER) return false
-        if (tx.sourceAccountId != null || tx.destinationAccountId != null) return false
-        return tx.accountLinkSource == AccountLinkSource.UNLINKED
+        if (tx.postingStatus == TransactionPostingStatus.POSTED || tx.linkedJournalEntryId != null) return false
+        if (tx.needsReview || tx.accountLinkNeedsReview) return true
+        return when (tx.accountLinkSource) {
+            AccountLinkSource.UNLINKED,
+            AccountLinkSource.OWNED_ACCOUNT_RULE,
+            AccountLinkSource.LAST_FOUR_MATCH,
+            AccountLinkSource.INSTITUTION_MATCH,
+            -> true
+            AccountLinkSource.USER -> false
+        }
     }
 
-    private fun applyMatch(tx: TransactionEntity, match: AccountMatcher.Match): TransactionEntity {
-        val accountId = match.account?.id
-        val sourceId = when (tx.financialTreatment) {
+    private suspend fun applyMatch(tx: TransactionEntity, match: AccountMatcher.Match): TransactionEntity {
+        if (match.needsReview || match.account == null) {
+            val cleared = tx.copy(
+                sourceAccountId = null,
+                destinationAccountId = null,
+                accountLinkSource = AccountLinkSource.UNLINKED,
+                accountLinkConfidence = match.confidence,
+                accountLinkNeedsReview = true,
+                needsReview = true,
+                postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
+                userConfirmed = false,
+            )
+            return if (sameLinkFields(cleared, tx)) tx else cleared
+        }
+
+        val treatment = resolveTreatment(tx)
+        val accountId = match.account.id
+        val sourceId = when (treatment) {
             FinancialTreatment.EXPENSE, FinancialTreatment.BANK_FEE, FinancialTreatment.CASH_WITHDRAWAL,
             FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT,
             -> accountId
             else -> null
         }
-        val destinationId = when (tx.financialTreatment) {
+        val destinationId = when (treatment) {
             FinancialTreatment.INCOME, FinancialTreatment.REFUND -> accountId
             FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT ->
                 match.destinationAccountCandidate?.id
             else -> null
         }
+        val stillNeedsReview = treatment == FinancialTreatment.PENDING_REVIEW ||
+            treatment == FinancialTreatment.IGNORED ||
+            (treatment.requiresTwoAccounts && (sourceId == null || destinationId == null))
         val next = tx.copy(
+            financialTreatment = treatment,
             sourceAccountId = sourceId,
             destinationAccountId = destinationId,
             accountLinkSource = match.source,
             accountLinkConfidence = match.confidence,
-            accountLinkNeedsReview = match.needsReview || match.account == null,
-            needsReview = true,
+            accountLinkNeedsReview = stillNeedsReview,
+            needsReview = stillNeedsReview,
             postingStatus = TransactionPostingStatus.NEEDS_REVIEW,
             userConfirmed = false,
+            exclusionReason = if (treatment != FinancialTreatment.PENDING_REVIEW &&
+                tx.exclusionReason?.contains("no rule matched") == true
+            ) {
+                null
+            } else {
+                tx.exclusionReason
+            },
         )
         return if (
-            next.sourceAccountId == tx.sourceAccountId &&
-            next.destinationAccountId == tx.destinationAccountId &&
-            next.accountLinkSource == tx.accountLinkSource &&
-            next.accountLinkConfidence == tx.accountLinkConfidence &&
-            next.accountLinkNeedsReview == tx.accountLinkNeedsReview
+            sameLinkFields(next, tx) &&
+            next.financialTreatment == tx.financialTreatment &&
+            next.needsReview == tx.needsReview
         ) {
             tx
         } else {
             next
+        }
+    }
+
+    private fun sameLinkFields(a: TransactionEntity, b: TransactionEntity): Boolean =
+        a.sourceAccountId == b.sourceAccountId &&
+            a.destinationAccountId == b.destinationAccountId &&
+            a.accountLinkSource == b.accountLinkSource &&
+            a.accountLinkNeedsReview == b.accountLinkNeedsReview &&
+            a.accountLinkConfidence == b.accountLinkConfidence
+
+    private suspend fun tryAutoPost(
+        tx: TransactionEntity,
+        accountsById: Map<Long, FinancialAccount>,
+        match: AccountMatcher.Match,
+    ): TransactionEntity? {
+        val generator = journalGenerationService ?: return null
+        val ledger = ledgerRepository ?: return null
+        if (tx.financialTreatment == FinancialTreatment.PENDING_REVIEW ||
+            tx.financialTreatment == FinancialTreatment.IGNORED
+        ) {
+            return null
+        }
+        if (tx.status != TransactionStatus.COMPLETED) return null
+        val source = tx.sourceAccountId?.let { accountsById[it] }
+        val destination = tx.destinationAccountId?.let { accountsById[it] }
+            ?: match.destinationAccountCandidate
+        val draft = generator.generate(tx, source, destination) ?: return null
+        val postedDraft = draft.copy(postingStatus = JournalPostingStatus.POSTED)
+        val journalId = ledger.create(postedDraft)
+        if (journalId <= 0L) return null
+        val posted = tx.copy(
+            linkedJournalEntryId = journalId,
+            postingStatus = TransactionPostingStatus.POSTED,
+            needsReview = false,
+            accountLinkNeedsReview = false,
+            updatedAt = now(),
+        )
+        transactionRepository.update(posted)
+        return posted
+    }
+
+    companion object {
+        fun resolveTreatment(tx: TransactionEntity, smsBody: String? = null): FinancialTreatment {
+            if (tx.financialTreatment != FinancialTreatment.PENDING_REVIEW) {
+                return tx.financialTreatment
+            }
+            return LocalTreatmentAuditor.auditTransaction(tx, smsBody = smsBody).treatment
         }
     }
 }

@@ -28,18 +28,20 @@ class SystemAccountSeeder(
             SystemAccountKey.REFUND_CLEARING -> AccountNature.LIABILITY
             SystemAccountKey.EXPENSE_CLEARING,
             SystemAccountKey.BANK_FEE_EXPENSE,
-            SystemAccountKey.UNASSIGNED_CLEARING -> AccountNature.ASSET
+            SystemAccountKey.UNASSIGNED_CLEARING,
+            SystemAccountKey.CASH_ON_HAND -> AccountNature.ASSET
         }
+        val isCashOnHand = key == SystemAccountKey.CASH_ON_HAND
         return FinancialAccountEntity(
-            displayName = key.name,
+            displayName = if (isCashOnHand) "نقد في اليد" else key.name,
             institutionName = null,
-            accountType = AccountType.OTHER,
+            accountType = if (isCashOnHand) AccountType.CASH else AccountType.OTHER,
             accountNature = nature,
             currency = Currency.SAR,
             openingBalance = java.math.BigDecimal.ZERO,
             openingBalanceDate = 0L,
-            includeInNetWorth = false,
-            includeInLiquidity = false,
+            includeInNetWorth = isCashOnHand,
+            includeInLiquidity = isCashOnHand,
             isOwnedByUser = false,
             systemAccountKey = key,
             isActive = true,

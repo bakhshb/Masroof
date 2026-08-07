@@ -113,4 +113,46 @@ class AccountIdentifierRepositoryTest {
         assertEquals(IdentifierAddResult.Added, outcome.result)
         assertEquals("7519", outcome.identifier?.normalizedValue)
     }
+
+    @Test fun sameBankAccountAcceptsMultipleDistinctLastFours() = runBlocking {
+        val repo = newRepo(bank(1))
+        assertEquals(
+            IdentifierAddResult.Added,
+            repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "حساب", "1111")).result,
+        )
+        assertEquals(
+            IdentifierAddResult.Added,
+            repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.DEBIT_CARD_LAST4, "مدى", "2222")).result,
+        )
+        assertEquals(
+            IdentifierAddResult.Added,
+            repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.IBAN_LAST4, "آيبان", "3333")).result,
+        )
+        assertEquals(
+            IdentifierAddResult.Added,
+            repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "حساب2", "4444")).result,
+        )
+        val values = repo.getForAccount(1).map { it.normalizedValue }.toSet()
+        assertEquals(setOf("1111", "2222", "3333", "4444"), values)
+    }
+
+    @Test fun creditCardAcceptsThreeDistinctLastFours() = runBlocking {
+        val card = bank(1, type = AccountType.CREDIT_CARD).copy(accountNature = AccountNature.LIABILITY)
+        val repo = newRepo(card)
+        for (last in listOf("1111", "2222", "3333")) {
+            assertEquals(
+                IdentifierAddResult.Added,
+                repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "فيزا", last)).result,
+            )
+        }
+        assertEquals(3, repo.getForAccount(1).size)
+        assertEquals(
+            setOf("1111", "2222", "3333"),
+            repo.findAccountsByLastFourAnyType("2222").map { it.id }.toSet().let {
+                // ensure lookup finds the card
+                assertTrue(it.contains(1L))
+                repo.getForAccount(1).map { row -> row.normalizedValue }.toSet()
+            },
+        )
+    }
 }

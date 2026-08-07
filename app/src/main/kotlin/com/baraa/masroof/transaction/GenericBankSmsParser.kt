@@ -38,9 +38,16 @@ open class GenericBankSmsParser : BankSmsParser {
         val currency = detectCurrencyForMatcher(lines, matchedRules)
         val type = detectType(lines)
         val status = detectStatus(lines)
-        val amount = extractAmountWithNotes(lines, notes)
+        // Limit-change SMS put the new limit under balance/limit labels, not amount labels.
+        val amount = when (type) {
+            TransactionType.CREDIT_LIMIT_CHANGE ->
+                extractAmount(lines) ?: extractCreditLimitAmount(lines)
+            else -> extractAmountWithNotes(lines, notes)
+        }
         val identifiers = extractIdentifiers(lines)
-        val cardOrAccount = identifiers.firstOrNull()?.lastFour
+        val cardOrAccount = identifiers.firstOrNull { it.role == IdentifierRole.DESTINATION }?.lastFour
+            ?: identifiers.firstOrNull { it.role == IdentifierRole.SOURCE }?.lastFour
+            ?: identifiers.firstOrNull()?.lastFour
         val merchant = extractMerchant(lines)
         val (date, time) = extractDateTime(lines, smsTimestampMillis, notes)
         val confidence = computeConfidence(amount, currency, type, merchant, cardOrAccount, date, time)
@@ -98,7 +105,11 @@ open class GenericBankSmsParser : BankSmsParser {
         val joinedAll = lines.joinToString(" ") { (it.label + " " + it.value).lowercase(Locale.ROOT) }
         val pairs = listOf(
             DECLINED_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.DECLINED,
+            CREDIT_LIMIT_CHANGE_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.CREDIT_LIMIT_CHANGE,
             ONLINE_PURCHASE_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.ONLINE_PURCHASE,
+            INTERNAL_TRANSFER_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.INTERNAL_TRANSFER,
+            LOAN_INSTALLMENT_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.LOAN_INSTALLMENT,
+            BILL_PAYMENT_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.BILL_PAYMENT,
             TRANSFER_IN_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.TRANSFER_IN,
             TRANSFER_OUT_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.TRANSFER_OUT,
             CASH_WITHDRAWAL_LABELS.map { it.lowercase(Locale.ROOT) } to TransactionType.CASH_WITHDRAWAL,
@@ -146,6 +157,27 @@ open class GenericBankSmsParser : BankSmsParser {
         return runCatching { BigDecimal(amount) }.getOrNull()?.takeIf { it.signum() > 0 }
     }
 
+    /**
+     * New credit limit is usually labeled as a balance/limit field (e.g. الحد الائتماني),
+     * not as a transaction amount. Digits are extracted only from those labeled lines.
+     */
+    protected open fun extractCreditLimitAmount(lines: List<ParsedLine>): BigDecimal? {
+        for (line in lines) {
+            val label = line.label.trim()
+            val lower = label.lowercase(Locale.ROOT)
+            val isLimitLabel =
+                LineBasedFieldParser.balanceLabelRegex().matches(label) ||
+                    CREDIT_LIMIT_CHANGE_LABELS.any { cue -> cue.lowercase(Locale.ROOT) in lower } ||
+                    ("حد" in label && ("ائتمان" in label || "credit" in lower || "limit" in lower))
+            if (!isLimitLabel) continue
+            // Never scrape unlabeled noise — only this labeled value.
+            val normalized = BankTextNormalizer.normalizeForParsing(line.value).replace(",", "")
+            val amount = Regex("""[-+]?\d+(?:\.\d+)?""").find(normalized)?.value ?: continue
+            return runCatching { BigDecimal(amount) }.getOrNull()?.takeIf { it.signum() > 0 }
+        }
+        return null
+    }
+
     protected open fun extractAmountWithNotes(lines: List<ParsedLine>, notes: MutableList<String>): BigDecimal? {
         val amount = extractAmount(lines)
         if (amount == null) notes.add("AMOUNT_NOT_RELIABLY_IDENTIFIED")
@@ -166,13 +198,18 @@ open class GenericBankSmsParser : BankSmsParser {
                 "رمز" in label ||
                 "معاملة" in label ||
                 "transaction" in label ||
-                "رقم العملية" in label
+                "رقم العملية" in label ||
+                "فاتورة" in label ||
+                "مفوتر" in label
             ) {
                 continue
             }
             val type = when {
                 "مدى" in label || "debit" in label -> com.baraa.masroof.data.db.AccountIdentifierType.DEBIT_CARD_LAST4
-                "ائتمان" in label || "credit" in label -> com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4
+                "ائتمان" in label || "credit" in label ||
+                    "فيزا" in label || "visa" in label ||
+                    "ماستركارد" in label || "mastercard" in label || "master card" in label ->
+                    com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4
                 "iban" in label || "آيبان" in label || "ايبان" in label || "الايبان" in label ->
                     com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4
                 "محفظ" in label || "wallet" in label -> com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4
@@ -199,6 +236,19 @@ open class GenericBankSmsParser : BankSmsParser {
                 val original = line.value
                 val trimmed = original.trim().trim('.', ' ', ',')
                 if (trimmed.isNotEmpty()) return trimmed
+            }
+        }
+        // Incoming transfer counterparty: "من: اسم الشخص" (not an account last-four).
+        for (line in lines) {
+            val label = line.label.trim()
+            if (label == "من" || label.equals("from", ignoreCase = true)) {
+                val trimmed = line.value.trim().trim('.', ' ', '*', ',')
+                if (trimmed.isNotEmpty() &&
+                    LineBasedFieldParser.lastFourFromValue(trimmed) == null &&
+                    trimmed.any { it.isLetter() }
+                ) {
+                    return trimmed
+                }
             }
         }
         return null
@@ -272,12 +322,93 @@ open class GenericBankSmsParser : BankSmsParser {
 
     companion object {
         const val NEEDS_REVIEW_CONFIDENCE_FLOOR: Int = 30
-        private val ONLINE_PURCHASE_LABELS = listOf("شراء عبر الإنترنت", "شراء عبر الانترنت", "online purchase", "online_purchase", "Google Pay")
-        private val PURCHASE_LABELS = listOf("عملية شراء", "شراء", "purchase", "pos purchase", "شراء عبر نقاط البيع")
+        private val ONLINE_PURCHASE_LABELS = listOf(
+            "شراء عبر الإنترنت",
+            "شراء عبر الانترنت",
+            "online purchase",
+            "online_purchase",
+            "Google Pay",
+            "Apple Pay",
+            "Samsung Pay",
+        )
+        private val CREDIT_LIMIT_CHANGE_LABELS = listOf(
+            "تغيير حد الرصيد",
+            "تم تغيير الحد الائتماني",
+            "تغيير الحد الائتماني",
+            "الحد الائتماني الجديد",
+            "حد ائتماني جديد",
+            "تحديث الحد الائتماني",
+            "credit limit change",
+            "new credit limit",
+            "credit limit has been changed",
+            "your credit limit",
+        )
+        private val PURCHASE_LABELS = listOf(
+            "عملية شراء",
+            "شراء عبر نقاط البيع",
+            "نقاط البيع",
+            "pos purchase",
+            "شراء",
+            "purchase",
+        )
+        private val LOAN_INSTALLMENT_LABELS = listOf(
+            "قسط تمويل",
+            "قسط القرض",
+            "خصم قسط",
+            "قسط شهري",
+            "loan installment",
+            "financing installment",
+            "installment",
+        )
+        private val BILL_PAYMENT_LABELS = listOf(
+            "سداد فاتورة",
+            "سداد فاتوره",
+            "دفع فاتورة",
+            "bill payment",
+            "sadad",
+            "سداد سداد",
+        )
         private val CASH_WITHDRAWAL_LABELS = listOf("سحب نقدي", "سحب من الصراف", "atm withdrawal", "cash withdrawal", "withdrawal")
-        private val TRANSFER_OUT_LABELS = listOf("عملية حوالة مالية صادرة مقبولة", "حوالة مالية صادرة", "حوالة صادرة", "تحويل صادر", "حوالة", "outgoing transfer", "transfer out", "sent")
-        private val TRANSFER_IN_LABELS = listOf("حوالة واردة", "حوالة واردة داخلية", "تحويل وارد", "حوالة", "وارد إليك", "incoming transfer", "transfer in", "received")
-        private val CARD_PAYMENT_LABELS = listOf("سداد بطاقة", "سداد بطاقة ائتمانية", "card payment", "credit card payment", "سداد")
+        private val INTERNAL_TRANSFER_LABELS = listOf(
+            "حوالة صادرة بين حساباتك",
+            "حوالة واردة بين حساباتك",
+            "حوالة بين حساباتك",
+            "حوالة واردة داخلية",
+            "حوالة صادرة داخلية",
+            "حوالة داخلية",
+            "تحويل داخلي",
+            "تحويل بين حساباتي",
+            "بين حساباتك",
+            "بين حساباتي",
+            "internal transfer",
+        )
+        private val TRANSFER_OUT_LABELS = listOf(
+            "عملية حوالة مالية صادرة مقبولة",
+            "حوالة مالية صادرة",
+            "حوالة صادرة",
+            "حوالة خارجة",
+            "تحويل صادر",
+            "تحويل خارج",
+            "outgoing transfer",
+            "transfer out",
+            "sent",
+        )
+        private val TRANSFER_IN_LABELS = listOf(
+            "عملية حوالة مالية واردة",
+            "حوالة مالية واردة",
+            "حوالة واردة",
+            "تحويل وارد",
+            "وارد إليك",
+            "incoming transfer",
+            "transfer in",
+            "received",
+        )
+        private val CARD_PAYMENT_LABELS = listOf(
+            "سداد بطاقة ائتمانية",
+            "سداد بطاقة",
+            "card payment",
+            "credit card payment",
+        )
         private val REFUND_LABELS = listOf("استرداد", "مسترد", "refund", "reversed transaction")
         private val SALARY_LABELS = listOf("راتب", "salary", "wages")
         private val BANK_FEE_LABELS = listOf("رسوم", "bank fee", "service charge", "fee")

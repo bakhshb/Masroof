@@ -5,18 +5,20 @@ import com.baraa.masroof.transaction.GenericBankSmsParser
 /**
  * Dedicated parser templates for the major Saudi banks + a few digital wallets.
  *
- * **Important**: real Saudi bank SMS samples are still required to add
- * bank-specific patterns on top of the shared base. The current concrete
- * parsers simply declare their sender aliases and inherit the generic
- * extraction logic — they will be enriched with real patterns as samples
- * become available. Adding a bank-specific pattern set should be a matter
- * of overriding the relevant protected hook on [GenericBankSmsParser] (or
- * adding new keyword / pattern lists and calling them from the base).
+ * **Architecture classification (2026-08):**
+ * - **A / replaceable by Pattern Engine** for body field extraction once the
+ *   sender has APPROVED [MessagePatternDefinition] rows.
+ * - **B / still needed** as thin **sender-routing shells** so
+ *   [BankParserRegistry] can attach a stable `parserName` / institution hint
+ *   for senders that do not yet have trained patterns. They inherit
+ *   [GenericBankSmsParser] extraction only — not bank-specific body rules.
+ *
+ * Do not expand these classes with institution-specific accounting logic.
+ * Prefer teaching patterns under «رسائل البنوك».
  *
  * Per the spec we deliberately do NOT add separate parsers for `mada`,
  * `Visa`, or `Mastercard`: those are card-network names that almost
- * always appear *inside* a bank message, not as the sender. If a real
- * sample proves otherwise, add them.
+ * always appear *inside* a bank message, not as the sender.
  */
 
 // -- Priority 100 — dedicated bank parsers ---------------------------------

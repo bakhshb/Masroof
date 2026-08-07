@@ -14,21 +14,53 @@ data class ParsedLine(val label: String, val value: String)
 object LineBasedFieldParser {
     private const val LINE_BREAK_REGEX = "[\n\r]+"
     private const val LABEL_SEPARATORS = ":：:：=: =|:"
-    private val AMOUNT_LABEL_REGEX = Regex("""^(بمبلغ|مبلغ|Amount|Transaction Amount|Purchase Amount|Transfer Amount|Payment Amount|مبلغ العملية|قيمة العملية|قيمة الشراء|قيمة التحويل)$""", RegexOption.IGNORE_CASE)
-    private val AMOUNT_LABELS = listOf("Amount", "Transaction Amount", "Purchase Amount", "Transfer Amount", "Payment Amount", "بمبلغ", "بقيمة", "مبلغ", "مبلغ العملية", "قيمة العملية", "قيمة الشراء", "قيمة التحويل")
+    private val AMOUNT_LABEL_REGEX = Regex("""^(بمبلغ|بقيمة|مبلغ|Amount|Transaction Amount|Purchase Amount|Transfer Amount|Payment Amount|Debited Amount|Credited Amount|Withdrawal Amount|مبلغ العملية|قيمة العملية|قيمة الشراء|قيمة التحويل|مبلغ التحويل|قيمة السحب|مبلغ السحب|المبلغ المخصوم|المبلغ المحول|المبلغ المستقطع|قيمة الخصم|مبلغ الخصم|قيمة الشحن|مبلغ الشحن|القيمة|of|القسط)$""", RegexOption.IGNORE_CASE)
+    private val AMOUNT_LABELS = listOf(
+        "Amount", "Transaction Amount", "Purchase Amount", "Transfer Amount", "Payment Amount",
+        "Debited Amount", "Credited Amount", "Withdrawal Amount",
+        "بمبلغ", "بقيمة", "مبلغ", "مبلغ العملية", "قيمة العملية", "قيمة الشراء", "قيمة التحويل",
+        "مبلغ التحويل", "قيمة السحب", "مبلغ السحب", "المبلغ المخصوم", "المبلغ المحول",
+        "المبلغ المستقطع", "قيمة الخصم", "مبلغ الخصم", "قيمة الشحن", "مبلغ الشحن",
+        "القيمة",
+        // Compact English bank SMS: "... of : 33.03 SAR ..."
+        "of",
+        // Loan installment SMS
+        "القسط",
+    )
     init { }
-    private val BALANCE_LABEL_REGEX = Regex("""^(الرصيد|الرصيد المتاح|الرصيد الحالي|المتبقي|إجمالي المبلغ المستحق|المبلغ المستحق|الحد الائتماني|Available Balance|Current Balance|Remaining Balance|Total Amount Due|Amount Due|Credit Limit)$""", RegexOption.IGNORE_CASE)
-    private val CARD_LABEL_REGEX = Regex("""^(بطاقة ائتمانية|البطاقة|بطاقة|Card|Credit Card|بطاقة مدى رقم|بطاقة مدى)$""", RegexOption.IGNORE_CASE)
-    private val ACCOUNT_LABEL_REGEX = Regex("""^(رقم الحساب|الحساب|خصمت من حساب|الى|إلى حساب|إلى|من حساب|Account|Debited from account|Credited to account)$""", RegexOption.IGNORE_CASE)
-    private val MERCHANT_LABEL_REGEX = Regex("""^(Merchant|التاجر|المستفيد|لدى|في|Name|اسم المرسل)$""", RegexOption.IGNORE_CASE)
-    private val BANK_ACCOUNT_LABEL_REGEX = Regex("""^(رقم الحساب|الحساب|خصمت من حساب|الى حساب|إلى حساب|الى|إلى|من حساب|Account|Debited from account|Credited to account)$""", RegexOption.IGNORE_CASE)
+    private val BALANCE_LABEL_REGEX = Regex(
+        """^(الرصيد|الرصيد المتاح|الرصيد الحالي|المتبقي|المبلغ المتبقي|إجمالي المبلغ المستحق|المبلغ المستحق|الحد الائتماني|الحد الائتماني الجديد|حد ائتماني جديد|Available Balance|Available Balance is|Current Balance|Remaining Balance|Total Amount Due|Amount Due|Due Amount|Credit Limit|New Credit Limit)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val CARD_LABEL_REGEX = Regex("""^(بطاقة ائتمانية|البطاقة|بطاقة|Card|Credit Card|Debit Card|بطاقة مدى رقم|بطاقة مدى)$""", RegexOption.IGNORE_CASE)
+    private val ACCOUNT_LABEL_REGEX = Regex(
+        """^(رقم الحساب|الحساب|خصمت من حساب|أودعت إلى حساب|أودع إلى حساب|الى حساب|إلى حساب|الى|إلى|من حساب|من|Account|Debited from account|Credited to account)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    // "في" is datetime in Saudi SMS (في: 09:08 30-07-2026), not merchant.
+    private val MERCHANT_LABEL_REGEX = Regex("""^(Merchant|التاجر|المستفيد|لدى|at|لـ|ل|الخدمة|Name|اسم المرسل)$""", RegexOption.IGNORE_CASE)
+    private val BANK_ACCOUNT_LABEL_REGEX = Regex(
+        """^(رقم الحساب|الحساب|خصمت من حساب|أودعت إلى حساب|أودع إلى حساب|الى حساب|إلى حساب|الى|إلى|من حساب|من|Account|Debited from account|Credited to account)$""",
+        RegexOption.IGNORE_CASE,
+    )
     private val CARD_DIGIT_REGEX = Regex("""^\*+(\d{4})$|^\d{4}$""")
     private val MONEY_REGEX = Regex("""^([A-Z]{2,3})?\s*([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*([A-Z]{2,3})?$""")
     private val TIME_REGEX = Regex("""(\d{1,2}):(\d{2})(?::(\d{2}))?""")
     private val DATE_REGEX = listOf(Regex("""(\d{4})[/-](\d{1,2})[/-](\d{1,2})"""), Regex("""(\d{1,2})[/-](\d{1,2})[/-](\d{4})"""))
 
+    /**
+     * Compact English SMS packs many `Label: value` pairs on one line.
+     * Longer markers must be listed before shorter ones (`Available Balance is`
+     * before `Available Balance`; word-boundary `at`/`of`/`on`).
+     */
+    private val INLINE_FIELD_MARKER = Regex(
+        """(?i)(Available Balance is|Available Balance|Due Amount|Amount Due|Total Amount Due|Current Balance|Credit Card|Debit Card|\bat|\bof|\bon)\s*:""",
+    )
+
     fun splitLines(body: String): List<ParsedLine> {
-        val rawLines = body.split(Regex(LINE_BREAK_REGEX))
+        val rawLines = expandCompactInlineFields(body).flatMap { chunk ->
+            chunk.split(Regex(LINE_BREAK_REGEX))
+        }
         val lines = mutableListOf<ParsedLine>()
         for (raw in rawLines) {
             val trimmed = raw.trim()
@@ -41,6 +73,38 @@ object LineBasedFieldParser {
             lines += ParsedLine(split.first, originalValue.trim())
         }
         return lines
+    }
+
+    /**
+     * Turns a single-line multi-field English SMS into one line per field so
+     * label-strict extraction can find amount / card / merchant / date.
+     * Leaves already well-structured multi-line Arabic SMS unchanged.
+     */
+    internal fun expandCompactInlineFields(body: String): List<String> {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val existingLabeledLines = trimmed.lines().count { line ->
+            val t = line.trim()
+            t.contains(':') || t.contains('：')
+        }
+        // Multi-line labeled Saudi SMS (Arabic POS, etc.) — do not rewrite.
+        if (existingLabeledLines >= 3) return listOf(trimmed)
+
+        val matches = INLINE_FIELD_MARKER.findAll(trimmed).toList()
+        if (matches.size < 2) return listOf(trimmed)
+
+        val out = mutableListOf<String>()
+        val prefix = trimmed.substring(0, matches.first().range.first).trim()
+        if (prefix.isNotEmpty()) out += prefix
+        for (i in matches.indices) {
+            val match = matches[i]
+            val label = match.groupValues[1].trim()
+            val valueStart = match.range.last + 1
+            val valueEnd = if (i + 1 < matches.size) matches[i + 1].range.first else trimmed.length
+            val value = trimmed.substring(valueStart, valueEnd).trim()
+            out += "$label: $value"
+        }
+        return out
     }
 
     fun lastFourFromValue(value: String): String? {

@@ -101,21 +101,14 @@ class ImportFlowAndHomeNavigationTest {
     }
 
     @Test fun homeNavigationWorksFromImportScreen() {
-        // The PrimaryNavigation.navigateToPrimaryTab uses
-        // popUpTo(primary/HOME) { inclusive = false }, launchSingleTop, restoreState.
-        // This contract guarantees that hitting Home from anywhere
-        // (including route/import_messages) returns to primary/HOME.
-        val route = "primary/HOME"
-        // Pop behavior:
-        val popUpTo = "primary/HOME"
-        val inclusive = false
-        val launchSingleTop = true
-        val restoreState = true
-        assertEquals("primary/HOME", route)
-        assertEquals("primary/HOME", popUpTo)
-        assertFalse("Must not be inclusive", inclusive)
-        assertTrue("Must be launchSingleTop", launchSingleTop)
-        assertTrue("Must restore state", restoreState)
+        // HOME from Import/Review must popBackStack to primary/HOME rather than
+        // navigate(launchSingleTop)+restoreState, which is a no-op when HOME
+        // is already under the child route on the back stack.
+        val homeRoute = "primary/HOME"
+        val strategy = HomeNavStrategy.fromImportOrReview
+        assertEquals(homeRoute, strategy.targetRoute)
+        assertEquals(HomeNavStrategy.Action.POP_BACK_TO_HOME, strategy.action)
+        assertFalse("Must not pop HOME itself", strategy.inclusive)
     }
 
     @Test fun bottomNavigationWorksFromImportScreen() {
@@ -132,6 +125,7 @@ class ImportFlowAndHomeNavigationTest {
         val expectedHome = "primary/HOME"
         assertEquals("الرئيسية", title)
         assertTrue("Home must be reachable from any screen", expectedHome.isNotBlank())
+        assertEquals(HomeNavStrategy.Action.POP_BACK_TO_HOME, HomeNavStrategy.fromImportOrReview.action)
     }
 
     @Test fun dashboardAndAccountScreenShowSameBalance() {

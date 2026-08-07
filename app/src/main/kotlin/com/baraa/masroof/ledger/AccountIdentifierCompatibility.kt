@@ -47,7 +47,9 @@ object AccountIdentifierCompatibility {
             AccountIdentifierType.CREDIT_CARD_LAST4,
             AccountIdentifierType.DEBIT_CARD_LAST4,
         )
-        TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN, TransactionType.INTERNAL_TRANSFER -> listOf(
+        TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN, TransactionType.INTERNAL_TRANSFER,
+        TransactionType.LOAN_INSTALLMENT, TransactionType.BILL_PAYMENT,
+        -> listOf(
             AccountIdentifierType.ACCOUNT_LAST4,
             AccountIdentifierType.IBAN_LAST4,
         )

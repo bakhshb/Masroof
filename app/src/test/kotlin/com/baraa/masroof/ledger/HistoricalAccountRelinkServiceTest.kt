@@ -120,7 +120,7 @@ class HistoricalAccountRelinkServiceTest {
     }
 
     @Test
-    fun doesNotOverwriteExistingProposedLink() = runBlocking {
+    fun rematchesWrongTentativeLinkWhenLastFourNowUnique() = runBlocking {
         val accountDao = FakeAccountDao(listOf(accountEntity(1), accountEntity(2)))
         val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
         identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "7271"))
@@ -138,8 +138,9 @@ class HistoricalAccountRelinkServiceTest {
             identifierRepo,
         )
         val result = service.relinkUnposted()
-        assertEquals(0, result.updated)
-        assertEquals(2L, transactions.getById(1)?.sourceAccountId)
+        assertEquals(1, result.updated)
+        assertEquals(1L, transactions.getById(1)?.sourceAccountId)
+        assertEquals(false, transactions.getById(1)?.accountLinkNeedsReview)
     }
 
     @Test
@@ -163,5 +164,114 @@ class HistoricalAccountRelinkServiceTest {
         val result = service.relinkUnposted()
         assertEquals(0, result.updated)
         assertNull(transactions.getById(1)?.sourceAccountId)
+    }
+
+    @Test
+    fun secondAccountIdentifierRelinksPreviouslyUnlinkedRows() = runBlocking {
+        val accountDao = FakeAccountDao(listOf(accountEntity(1), accountEntity(2)))
+        val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "bank", "bank"))
+        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "1111"))
+        // Account 2 not yet identified when tx was imported unlinked
+        val transactions = FakeTransactionRepository()
+        transactions.insert(tx(1, "2222", linkSource = AccountLinkSource.UNLINKED))
+        identifierRepo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "bank", "bank"))
+        identifierRepo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "B", "2222"))
+        val service = HistoricalAccountRelinkService(
+            transactions,
+            RoomFinancialAccountRepository(accountDao),
+            identifierRepo,
+        )
+        val result = service.relinkUnposted()
+        assertEquals(1, result.updated)
+        assertEquals(2L, transactions.getById(1)?.sourceAccountId)
+        assertTrue(result.linkedConfirmed >= 1)
+    }
+
+    @Test
+    fun pendingReviewPurchaseReclassifiedToExpenseAndLinked() = runBlocking {
+        val accountDao = FakeAccountDao(listOf(accountEntity(1)))
+        val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "7271"))
+        val transactions = FakeTransactionRepository()
+        transactions.insert(
+            tx(1, "7271").copy(
+                financialTreatment = FinancialTreatment.PENDING_REVIEW,
+                transactionType = TransactionType.PURCHASE,
+            ),
+        )
+        val service = HistoricalAccountRelinkService(
+            transactions,
+            RoomFinancialAccountRepository(accountDao),
+            identifierRepo,
+        )
+        val result = service.relinkUnposted()
+        assertEquals(1, result.updated)
+        val row = transactions.getById(1)!!
+        assertEquals(FinancialTreatment.EXPENSE, row.financialTreatment)
+        assertEquals(1L, row.sourceAccountId)
+        assertEquals(false, row.accountLinkNeedsReview)
+        assertEquals(false, row.needsReview)
+        assertTrue(result.linkedConfirmed >= 1)
+    }
+
+    @Test
+    fun pendingReviewTransferOutBecomesExpenseWithoutPostingWhenNoJournalService() = runBlocking {
+        val accountDao = FakeAccountDao(listOf(accountEntity(1)))
+        val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "7271"))
+        val transactions = FakeTransactionRepository()
+        transactions.insert(
+            tx(1, "7271").copy(
+                financialTreatment = FinancialTreatment.PENDING_REVIEW,
+                transactionType = TransactionType.TRANSFER_OUT,
+            ),
+        )
+        val service = HistoricalAccountRelinkService(
+            transactions,
+            RoomFinancialAccountRepository(accountDao),
+            identifierRepo,
+        )
+        val result = service.relinkUnposted()
+        val row = transactions.getById(1)!!
+        assertEquals(FinancialTreatment.EXPENSE, row.financialTreatment)
+        assertEquals(1L, row.sourceAccountId)
+        assertNull(row.linkedJournalEntryId)
+        assertEquals(0, result.posted)
+    }
+
+    @Test
+    fun stuckNeedsReviewLastFourMatchIsRelinkCandidate() = runBlocking {
+        val accountDao = FakeAccountDao(listOf(accountEntity(1)))
+        val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "7271"))
+        val transactions = FakeTransactionRepository()
+        transactions.insert(
+            tx(1, "7271", linkSource = AccountLinkSource.LAST_FOUR_MATCH).copy(
+                sourceAccountId = null,
+                accountLinkNeedsReview = false,
+                needsReview = true,
+                financialTreatment = FinancialTreatment.PENDING_REVIEW,
+            ),
+        )
+        val service = HistoricalAccountRelinkService(
+            transactions,
+            RoomFinancialAccountRepository(accountDao),
+            identifierRepo,
+        )
+        val result = service.relinkUnposted()
+        assertEquals(1, result.updated)
+        assertEquals(FinancialTreatment.EXPENSE, transactions.getById(1)?.financialTreatment)
+        assertEquals(1L, transactions.getById(1)?.sourceAccountId)
+    }
+
+    @Test
+    fun resolveTreatmentMapsPurchasePendingToExpense() {
+        val pending = tx(1, "7271").copy(financialTreatment = FinancialTreatment.PENDING_REVIEW)
+        assertEquals(FinancialTreatment.EXPENSE, HistoricalAccountRelinkService.resolveTreatment(pending))
+        val transferOut = pending.copy(transactionType = TransactionType.TRANSFER_OUT)
+        assertEquals(FinancialTreatment.EXPENSE, HistoricalAccountRelinkService.resolveTreatment(transferOut))
+        val transferIn = pending.copy(transactionType = TransactionType.TRANSFER_IN)
+        assertEquals(FinancialTreatment.INCOME, HistoricalAccountRelinkService.resolveTreatment(transferIn))
     }
 }

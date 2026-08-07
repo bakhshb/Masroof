@@ -6,21 +6,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -47,19 +51,13 @@ import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.R
 import com.baraa.masroof.diagnostics.DeveloperPreferences
 import com.baraa.masroof.ui.theme.FinancialShapes
+import com.baraa.masroof.ui.theme.FinancialTypography
+import com.baraa.masroof.ui.theme.Spacing
 import com.baraa.masroof.ui.theme.ThemePreference
 
 /**
- * Settings landing screen.
- *
- * The previous SettingsScreen kept a list of empty-lambda params
- * (onCategories = {}, …) that looked interactive but never navigated.
- * This composable uses the captured [SettingsDestinations] registry so
- * every row maps to a known route; the parent [SettingsNavHost]
- * fulfills the actual navigation. Rows that haven't been implemented
- * yet are visibly disabled, dimmed, and surface a "قريباً" caption
- * (or a confirmation dialog on tap) so the user understands the
- * difference between a broken row and a planned feature.
+ * App preferences landing: appearance, messaging, and diagnostics.
+ * Product hubs (accounts, categories, …) live under More.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +74,7 @@ fun SettingsScreen(
     val futureNotice = remember { mutableStateOf<SettingsDestination?>(null) }
     val themePreference by app.themePreferenceRepository.observe()
         .collectAsStateWithLifecycle(initialValue = app.themePreferenceRepository.snapshot())
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     androidx.compose.material3.Scaffold(
         topBar = {
@@ -83,7 +82,7 @@ fun SettingsScreen(
                 title = { Text(stringResource(id = R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
                     }
                 },
             )
@@ -93,7 +92,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(horizontal = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = navBarBottom + 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             AppearanceSection(
@@ -101,30 +102,34 @@ fun SettingsScreen(
                 onPreferenceChange = { app.themePreferenceRepository.set(it) },
             )
 
-            SettingsDestinations.all
+            SettingsDestinations.landing
                 .groupBy { it.group }
                 .forEach { (group, dests) ->
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GroupHeader(group.header)
-                        dests.forEach { dest ->
-                            DestinationRow(
-                                destination = dest,
-                                onClick = {
-                                    if (dest.implemented) onNavigate(dest.route)
-                                    else futureNotice.value = dest
-                                },
-                            )
-                        }
+                    GroupHeader(group.header)
+                    dests.forEach { dest ->
+                        DestinationRow(
+                            destination = dest,
+                            subtitle = subtitleFor(dest),
+                            onClick = {
+                                if (dest.implemented) onNavigate(dest.route)
+                                else futureNotice.value = dest
+                            },
+                        )
                     }
                 }
 
-            HorizontalDivider()
-            SwitchRow(title = stringResource(R.string.diagnostics_show_dev_details), checked = showDevDetails, onCheckedChange = {
-                showDevDetails = it; devPrefs.showDevDetails = it
-            })
-            SwitchRow(title = stringResource(R.string.diagnostics_test_data_mode), checked = testDataMode, onCheckedChange = {
-                testDataMode = it; devPrefs.testDataMode = it
-            })
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.x2))
+            GroupHeader("أدوات المطوّر")
+            SwitchRow(
+                title = stringResource(R.string.diagnostics_show_dev_details),
+                checked = showDevDetails,
+                onCheckedChange = { showDevDetails = it; devPrefs.showDevDetails = it },
+            )
+            SwitchRow(
+                title = stringResource(R.string.diagnostics_test_data_mode),
+                checked = testDataMode,
+                onCheckedChange = { testDataMode = it; devPrefs.testDataMode = it },
+            )
         }
     }
 
@@ -133,7 +138,11 @@ fun SettingsScreen(
             onDismissRequest = { futureNotice.value = null },
             title = { Text(dest.title) },
             text = { Text("هذه الميزة قيد التطوير") },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { futureNotice.value = null }) { Text("حسناً") } },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { futureNotice.value = null }) {
+                    Text("حسناً")
+                }
+            },
         )
     }
 }
@@ -155,14 +164,22 @@ private fun AppearanceSection(
                 Icon(
                     Icons.Filled.DarkMode,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(24.dp),
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    "وضع العرض",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                Column {
+                    Text(
+                        "وضع العرض",
+                        style = FinancialTypography.merchant,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "تلقائي يتبع إعدادات الجهاز",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -217,9 +234,21 @@ private fun GroupHeader(label: String) {
 }
 
 @Composable
-private fun DestinationRow(destination: SettingsDestination, onClick: () -> Unit) {
-    val container = if (destination.implemented) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
-    val titleColor = if (destination.implemented) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+private fun DestinationRow(
+    destination: SettingsDestination,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    val container = if (destination.implemented) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val titleColor = if (destination.implemented) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -229,35 +258,47 @@ private fun DestinationRow(destination: SettingsDestination, onClick: () -> Unit
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = iconFor(destination), contentDescription = null, tint = titleColor)
+            Icon(
+                imageVector = iconFor(destination),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(24.dp),
+            )
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(destination.title, style = MaterialTheme.typography.titleSmall, color = titleColor)
-                if (!destination.implemented) {
-                    Text("قريباً", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(destination.title, style = FinancialTypography.merchant, color = titleColor)
+                Text(
+                    if (!destination.implemented) "قريباً" else subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (destination.implemented) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
 }
 
+private fun subtitleFor(destination: SettingsDestination): String = when (destination) {
+    SettingsDestinations.autoSmsImport -> "قراءة الرسائل الواردة وتسجيلها تلقائياً"
+    SettingsDestinations.transactionNotifications -> "تنبيه عند إضافة عملية جديدة"
+    SettingsDestinations.diagnostics -> "حالة التطبيق والسجلات الآمنة"
+    SettingsDestinations.testData -> "تجربة الاستيراد بعينات وهمية"
+    SettingsDestinations.releaseNotes -> "ما الجديد في هذا الإصدار"
+    else -> ""
+}
+
 private fun iconFor(destination: SettingsDestination): ImageVector = when (destination) {
-    SettingsDestinations.categoryManagement -> Icons.Filled.Style
-    SettingsDestinations.merchantMemory -> Icons.Filled.Storefront
-    SettingsDestinations.aiCategorization -> Icons.Filled.Settings
-    SettingsDestinations.aiSuggestions -> Icons.Filled.Inbox
-    SettingsDestinations.aiBatch -> Icons.Filled.Storefront
-    SettingsDestinations.accounts -> Icons.Filled.AccountBox
-    SettingsDestinations.linkTransactions -> Icons.Filled.AccountBox
-    SettingsDestinations.financialHistory -> Icons.Filled.History
-    SettingsDestinations.accountLinkRules -> Icons.Filled.AccountBox
-    SettingsDestinations.senderMappings -> Icons.Filled.Info
+    SettingsDestinations.autoSmsImport -> Icons.Filled.Sms
+    SettingsDestinations.transactionNotifications -> Icons.Filled.Notifications
     SettingsDestinations.diagnostics -> Icons.Filled.Info
-    SettingsDestinations.testData -> Icons.Filled.Inbox
-    SettingsDestinations.releaseNotes -> Icons.Filled.Info
+    SettingsDestinations.testData -> Icons.Filled.Science
+    SettingsDestinations.releaseNotes -> Icons.Filled.Inbox
     else -> Icons.Filled.Info
 }
 
@@ -266,10 +307,11 @@ private fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = FinancialShapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(title, style = FinancialTypography.merchant, modifier = Modifier.weight(1f))
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }

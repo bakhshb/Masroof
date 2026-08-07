@@ -105,16 +105,8 @@ class SmsReceiver : BroadcastReceiver() {
      */
     private fun isFinancial(message: SmsMessage): Boolean {
         val body = message.body ?: return false
-        if (BankSmsFilter.classifyMessage(message.sender, body).reason == MatchReason.NONE) {
-            return false
-        }
-        if (looksLikeOtp(body)) return false
-        return true
-    }
-
-    private fun looksLikeOtp(body: String): Boolean {
-        val lower = body.lowercase()
-        return lower.contains("otp") || lower.contains("رمز التحقق") || lower.contains("verification")
+        // OTP / auth challenges are rejected inside BankSmsFilter.classifyMessage.
+        return BankSmsFilter.classifyMessage(message.sender, body).isMatch
     }
 
     private fun updateCounters(app: MasroofApplication, result: com.baraa.masroof.data.repository.SmsImportResult) {

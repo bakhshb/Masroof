@@ -59,6 +59,18 @@ class JournalGenerationTest {
         assertEquals(99L, fee.postings.first().accountId)
     }
 
+    @Test fun cashWithdrawalDebitsExpenseClearingFromBankWithoutCashAccount() = runBlocking {
+        val draft = generator.generate(
+            tx(FinancialTreatment.CASH_WITHDRAWAL),
+            account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET),
+            destination = null,
+        )!!
+        assertEquals(JournalType.CASH_WITHDRAWAL, draft.journalType)
+        assertEquals(listOf(99L, 1L), draft.postings.map { it.accountId })
+        assertEquals(listOf(PostingSide.DEBIT, PostingSide.CREDIT), draft.postings.map { it.postingSide })
+        assertTrue(JournalValidator.validate(draft.copy(postingStatus = JournalPostingStatus.POSTED), true).valid)
+    }
+
     @Test fun pendingAndDeclinedTransactionsCreateNoJournal() = runBlocking {
         assertNull(generator.generate(tx(FinancialTreatment.EXPENSE, TransactionStatus.PENDING), account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET), null))
         assertNull(generator.generate(tx(FinancialTreatment.EXPENSE, TransactionStatus.DECLINED), account(1, AccountType.BANK_ACCOUNT, AccountNature.ASSET), null))

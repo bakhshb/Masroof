@@ -64,9 +64,17 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 - [x] Al Rajhi registry routing + credit-card fixture via bank parser
 - [x] Generic fallback retained for other banks
 
-## Phase 10 — Release hardening
+## Phase 11 — SenderProfile architecture
 
-- [x] Dead DesignComponents purge
-- [x] Device checklist documented
-- [ ] Version bump from `0.1.0-test` (deferred until device validation)
-- [ ] Physical-device checklist execution (requires phone)
+- [x] Room v20 SenderProfile + account_sender_profiles + alias migration
+- [x] Room v21 MessagePatternDefinition + PatternFieldDefinition
+- [x] Value-token pattern discovery (`SmsStructureNormalizer`)
+- [x] More → رسائل البنوك training UI
+- [x] Account edit: select trained sender + manual typed identifiers
+- [x] Import uses APPROVED patterns; UNKNOWN skip reason
+- [x] Matcher prefers typed ID + sender cross-ref
+- [x] SENDER_ALIAS deprecated with dual-read/write
+- [x] Production import/training off legacy `sender_message_patterns` (table kept for migrations/tests)
+- [x] Thin bank parsers classified as sender-routing shells only
+- [ ] Drop legacy pattern table + learner code (after device soak)
+- [ ] Physical-device checklist execution

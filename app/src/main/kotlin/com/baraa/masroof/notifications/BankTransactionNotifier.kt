@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.baraa.masroof.MainActivity
-import com.baraa.masroof.R
 import com.baraa.masroof.data.repository.SmsImportResult
 import java.text.NumberFormat
 import java.util.Locale
@@ -30,21 +29,25 @@ class BankTransactionNotifier(private val context: Context) {
     }
 
     fun notifyDebitOrCreditSummary(linked: Int, accounts: List<SmsImportResult.AffectedAccountSummary>) {
-        val totalCredits = accounts.sumOf { it.totalCredits }
-        val totalDebits = accounts.sumOf { it.totalDebits }
+        val totalIn = accounts.fold(java.math.BigDecimal.ZERO) { acc, a -> acc.add(a.moneyIn) }
+        val totalOut = accounts.fold(java.math.BigDecimal.ZERO) { acc, a -> acc.add(a.moneyOut) }
         val sample = accounts.firstOrNull()
-        val title = if (totalCredits.signum() > totalDebits.signum()) {
-            "تم تسجيل مبلغ وارد"
+        // Prefer outflow wording when more money left the accounts than entered.
+        val title = if (totalOut.compareTo(totalIn) > 0) {
+            "تم تسجيل خصم / مصروف"
         } else {
-            "تم تسجيل عملية شراء"
+            "تم تسجيل مبلغ وارد"
         }
         val body = buildString {
-            if (totalCredits.signum() > 0) append("تمت إضافة ${formatAmount(totalCredits)} ر.س")
-            else if (totalDebits.signum() > 0) append("تم تسجيل خصم ${formatAmount(totalDebits)} ر.س")
-            sample?.let { append(" • ${it.accountName}") }
-            if (context.applicationContext.let { true } && context.resources != null) {
-                append(" • الرصيد المحسوب ${formatAmount(sample?.calculatedBalance ?: totalCredits)} ر.س")
+            when {
+                totalOut.compareTo(totalIn) > 0 && totalOut.signum() > 0 ->
+                    append("خصم ${formatAmount(totalOut)} ر.س")
+                totalIn.signum() > 0 ->
+                    append("إضافة ${formatAmount(totalIn)} ر.س")
+                else -> append("تم تحديث الحساب")
             }
+            sample?.let { append(" • ${it.accountName}") }
+            sample?.let { append(" • الرصيد المحسوب ${formatAmount(it.calculatedBalance)} ر.س") }
         }
         post(NOTIF_ID_TX, title, body)
     }
@@ -67,7 +70,7 @@ class BankTransactionNotifier(private val context: Context) {
         val pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pending = PendingIntent.getActivity(context, id, intent, pendingIntentFlags)
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(com.baraa.masroof.R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -89,7 +92,7 @@ class BankTransactionNotifier(private val context: Context) {
     }
 
     private fun formatAmount(value: java.math.BigDecimal): String =
-        NumberFormat.getNumberInstance(Locale("ar", "SA")).apply {
+        NumberFormat.getNumberInstance(Locale.US).apply {
             maximumFractionDigits = 2
             minimumFractionDigits = if (value.stripTrailingZeros().scale() > 0) 2 else 0
         }.format(value.abs())

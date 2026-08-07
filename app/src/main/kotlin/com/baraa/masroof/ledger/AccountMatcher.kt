@@ -1,6 +1,5 @@
 package com.baraa.masroof.ledger
 
-import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.data.repository.AccountIdentifierRepository
@@ -12,12 +11,14 @@ import com.baraa.masroof.transaction.ParsedIdentifierEvidence
  * Deterministic account matching.
  *
  * Priority:
- *  1. Typed identifier evidence (SOURCE-role preferred when roles are present)
- *  2. Untyped TX last-four mapped by transaction type
- *  3. Unambiguous active [SENDER_ALIAS] (needs review; never auto-confirmed)
+ *  1. Exact typed identifier evidence (SOURCE-role preferred when roles are present)
+ *  2. Same last-four across last4 identifier types (label type mismatch soft-match)
+ *  3. Untyped TX last-four across last4 identifier types
+ *  4. Unambiguous active [SENDER_ALIAS] (needs review; never auto-confirmed)
  *
  * Institution name alone never selects an account. Matching uses typed
- * [AccountIdentifierEntity] rows only.
+ * [AccountIdentifierEntity] rows only. Same-sender multi-account setups
+ * require a unique last-four — sender never breaks ties.
  */
 object AccountMatcher {
     data class Match(
@@ -46,34 +47,63 @@ object AccountMatcher {
         }
 
         if (strictEvidence.isNotEmpty()) {
+            // Incoming transfers credit the user's account (DESTINATION). Prefer that
+            // over counterparty "خصمت من حساب" SOURCE last-fours from the other bank.
             val primaryEvidence = when {
+                transaction.transactionType == com.baraa.masroof.transaction.TransactionType.TRANSFER_IN &&
+                    strictEvidence.any { it.role == IdentifierRole.DESTINATION } ->
+                    strictEvidence.filter { it.role == IdentifierRole.DESTINATION }
                 strictEvidence.any { it.role == IdentifierRole.SOURCE } ->
                     strictEvidence.filter { it.role == IdentifierRole.SOURCE }
                 else -> strictEvidence.filter {
                     it.role == IdentifierRole.UNSPECIFIED || it.role == IdentifierRole.SOURCE
                 }.ifEmpty { strictEvidence }
             }
-            val primary = resolveTyped(primaryEvidence, eligibleIds, identifierRepository, transaction)
             val destinationEvidence = strictEvidence.filter { it.role == IdentifierRole.DESTINATION }
-            val destination = if (destinationEvidence.isEmpty()) {
-                null
-            } else {
-                resolveTyped(destinationEvidence, eligibleIds, identifierRepository, transaction)
-                    .singleOrNull()
-                    ?.takeIf { it.id != primary.singleOrNull()?.id }
-            }
-            return when {
-                primary.size == 1 -> matched(
-                    account = primary.single(),
+
+            val primaryExact = resolveTyped(primaryEvidence, eligibleIds, identifierRepository, transaction)
+            when {
+                primaryExact.size == 1 -> return matched(
+                    account = primaryExact.single(),
                     source = AccountLinkSource.LAST_FOUR_MATCH,
                     confidence = 100,
                     review = false,
                     level = AccountLinkConfidence.CONFIRMED,
                     code = "typed_identifier_match",
-                    destination = destination,
+                    destination = resolveDestination(
+                        destinationEvidence,
+                        primaryExact.single().id,
+                        eligibleIds,
+                        identifierRepository,
+                        transaction,
+                    ),
                 )
-                primary.size > 1 -> unmatched("ambiguous_typed_identifier")
-                else -> unmatched("missing_account_identifier")
+                primaryExact.size > 1 -> return unmatched("ambiguous_typed_identifier")
+            }
+
+            val primaryCross = resolveByLastFours(
+                primaryEvidence.map { it.lastFour }.distinct(),
+                eligibleIds,
+                identifierRepository,
+                transaction,
+            )
+            when {
+                primaryCross.size == 1 -> return matched(
+                    account = primaryCross.single(),
+                    source = AccountLinkSource.LAST_FOUR_MATCH,
+                    confidence = 100,
+                    review = false,
+                    level = AccountLinkConfidence.CONFIRMED,
+                    code = "last_four_cross_type_match",
+                    destination = resolveDestination(
+                        destinationEvidence,
+                        primaryCross.single().id,
+                        eligibleIds,
+                        identifierRepository,
+                        transaction,
+                    ),
+                )
+                primaryCross.size > 1 -> return unmatched("ambiguous_typed_identifier")
             }
         }
 
@@ -83,28 +113,22 @@ object AccountMatcher {
             ?.takeLast(4)
             ?.takeIf { it.length == 4 }
         if (fallbackLastFour != null) {
-            val inferred = AccountIdentifierCompatibility.identifierTypesFor(transaction.transactionType)
-                .map {
-                    ParsedIdentifierEvidence(
-                        type = it,
-                        lastFour = fallbackLastFour,
-                        role = IdentifierRole.UNSPECIFIED,
-                        confidence = 70,
-                        extractionRule = "transaction.accountOrCardLastFourDigits",
-                    )
-                }
-            val typed = resolveTyped(inferred, eligibleIds, identifierRepository, transaction)
+            val byAnyType = resolveByLastFours(
+                listOf(fallbackLastFour),
+                eligibleIds,
+                identifierRepository,
+                transaction,
+            )
             when {
-                typed.size == 1 -> return matched(
-                    typed.single(),
+                byAnyType.size == 1 -> return matched(
+                    byAnyType.single(),
                     AccountLinkSource.LAST_FOUR_MATCH,
                     100,
                     false,
                     AccountLinkConfidence.CONFIRMED,
-                    "typed_identifier_match",
+                    "last_four_cross_type_match",
                 )
-                typed.size > 1 -> return unmatched("ambiguous_typed_identifier")
-                else -> return unmatched("missing_account_identifier")
+                byAnyType.size > 1 -> return unmatched("ambiguous_typed_identifier")
             }
         }
 
@@ -132,25 +156,73 @@ object AccountMatcher {
         return unmatched("missing_account_identifier")
     }
 
+    private suspend fun resolveDestination(
+        destinationEvidence: List<ParsedIdentifierEvidence>,
+        primaryAccountId: Long,
+        eligibleIds: Set<Long>,
+        identifierRepository: AccountIdentifierRepository,
+        transaction: TransactionEntity,
+    ): FinancialAccount? {
+        if (destinationEvidence.isEmpty()) return null
+        val exact = resolveTyped(destinationEvidence, eligibleIds, identifierRepository, transaction)
+            .singleOrNull()
+            ?.takeIf { it.id != primaryAccountId }
+        if (exact != null) return exact
+        return resolveByLastFours(
+            destinationEvidence.map { it.lastFour }.distinct(),
+            eligibleIds,
+            identifierRepository,
+            transaction,
+        ).singleOrNull()?.takeIf { it.id != primaryAccountId }
+    }
+
     private suspend fun resolveTyped(
         evidence: List<ParsedIdentifierEvidence>,
         eligibleIds: Set<Long>,
         identifierRepository: AccountIdentifierRepository,
         transaction: TransactionEntity,
-    ): List<FinancialAccount> = buildList {
-        for (item in evidence) {
-            addAll(
-                identifierRepository.findAccountsByIdentifier(item.type, item.lastFour).filter {
-                    it.id in eligibleIds &&
-                        AccountIdentifierCompatibility.isCompatibleTyped(it.accountType, item.type) &&
-                        AccountIdentifierCompatibility.accountCompatibleWithoutIdentifier(
-                            it.accountType,
-                            transaction.transactionType,
-                        )
-                },
-            )
+    ): List<FinancialAccount> {
+        val typed = buildList {
+            for (item in evidence) {
+                addAll(
+                    identifierRepository.findAccountsByIdentifier(item.type, item.lastFour).filter {
+                        it.id in eligibleIds &&
+                            AccountIdentifierCompatibility.isCompatibleTyped(it.accountType, item.type) &&
+                            AccountIdentifierCompatibility.accountCompatibleWithoutIdentifier(
+                                it.accountType,
+                                transaction.transactionType,
+                            )
+                    },
+                )
+            }
+        }.distinctBy { it.id }
+        if (typed.size <= 1) return typed
+        // Prefer accounts associated with this SMS sender (profile cross-ref ∪ legacy alias).
+        // Never pick by insertion order when identifiers conflict across senders.
+        val senderLinked = identifierRepository.accountsForSender(transaction.originalSender)
+            .map { it.id }
+            .toSet()
+        if (senderLinked.isEmpty()) return typed
+        val narrowed = typed.filter { it.id in senderLinked }
+        return narrowed.ifEmpty { typed }
+    }
+
+    private suspend fun resolveByLastFours(
+        lastFours: List<String>,
+        eligibleIds: Set<Long>,
+        identifierRepository: AccountIdentifierRepository,
+        transaction: TransactionEntity,
+    ): List<FinancialAccount> = lastFours
+        .flatMap { digits ->
+            identifierRepository.findAccountsByLastFourAnyType(digits).filter {
+                it.id in eligibleIds &&
+                    AccountIdentifierCompatibility.accountCompatibleWithoutIdentifier(
+                        it.accountType,
+                        transaction.transactionType,
+                    )
+            }
         }
-    }.distinctBy { it.id }
+        .distinctBy { it.id }
 
     private fun matched(
         account: FinancialAccount,

@@ -35,7 +35,34 @@ data class AccountSummary(
 ) {
     /** True when this is a credit-card account — uses outstanding/available logic. */
     val isCreditCard: Boolean get() = accountType == AccountType.CREDIT_CARD
-    val netMovement: BigDecimal get() = totalCredits.subtract(totalDebits)
+
+    /**
+     * Signed change in the account's reported balance since opening:
+     *  - ASSET (bank/wallet): debits − credits (expenses reduce the balance)
+     *  - LIABILITY (card): credits − debits (purchases raise outstanding)
+     */
+    val balanceDelta: BigDecimal
+        get() = when (accountNature) {
+            AccountNature.ASSET -> totalDebits.subtract(totalCredits)
+            AccountNature.LIABILITY -> totalCredits.subtract(totalDebits)
+        }
+
+    /** @deprecated Use [balanceDelta]; kept for callers that assumed credit−debit. */
+    val netMovement: BigDecimal get() = balanceDelta
+
+    /** Cash-in (asset) or new charges (liability). */
+    val moneyIn: BigDecimal
+        get() = when (accountNature) {
+            AccountNature.ASSET -> totalDebits
+            AccountNature.LIABILITY -> totalCredits
+        }
+
+    /** Cash-out (asset) or payments reducing debt (liability). */
+    val moneyOut: BigDecimal
+        get() = when (accountNature) {
+            AccountNature.ASSET -> totalCredits
+            AccountNature.LIABILITY -> totalDebits
+        }
 
     /**
      * For credit cards:

@@ -38,8 +38,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AccountLinkRuleEntity::class,
         AccountIdentifierEntity::class,
         SenderInstitutionMappingEntity::class,
+        TransactionSmsBodyEntity::class,
+        SenderMessagePatternEntity::class,
+        SenderProfileEntity::class,
+        AccountSenderProfileCrossRef::class,
+        MessagePatternDefinitionEntity::class,
+        PatternFieldDefinitionEntity::class,
     ],
-    version = 15,
+    version = 21,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -57,6 +63,12 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun accountLinkRuleDao(): AccountLinkRuleDao
     abstract fun accountIdentifierDao(): AccountIdentifierDao
     abstract fun senderInstitutionMappingDao(): SenderInstitutionMappingDao
+    abstract fun transactionSmsBodyDao(): TransactionSmsBodyDao
+    abstract fun senderMessagePatternDao(): SenderMessagePatternDao
+    abstract fun senderProfileDao(): SenderProfileDao
+    abstract fun accountSenderProfileDao(): AccountSenderProfileDao
+    abstract fun messagePatternDefinitionDao(): MessagePatternDefinitionDao
+    abstract fun patternFieldDefinitionDao(): PatternFieldDefinitionDao
 
     companion object {
         const val DATABASE_NAME: String = "masroof.db"
@@ -503,6 +515,359 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive: AI deployment mode + on-device model path (no data loss). */
+        val MIGRATION_15_16: Migration = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `ai_settings` ADD COLUMN `deploymentMode` TEXT NOT NULL DEFAULT 'REMOTE'",
+                )
+                db.execSQL(
+                    "ALTER TABLE `ai_settings` ADD COLUMN `onDeviceModelPath` TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
+        /** Additive: local SMS body store for on-device link assist. */
+        val MIGRATION_16_17: Migration = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `transaction_sms_bodies` (
+                        `transactionId` INTEGER NOT NULL,
+                        `body` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`transactionId`),
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        /** Additive: teach-by-example SMS patterns (no raw bodies). */
+        val MIGRATION_17_18: Migration = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sender_message_patterns` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `senderKey` TEXT NOT NULL,
+                        `accountId` INTEGER NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `amountLabels` TEXT NOT NULL,
+                        `typeCues` TEXT NOT NULL,
+                        `lineLabels` TEXT NOT NULL,
+                        `minScore` INTEGER NOT NULL,
+                        `exampleCount` INTEGER NOT NULL,
+                        `active` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`accountId`) REFERENCES `financial_accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sender_message_patterns_senderKey` ON `sender_message_patterns` (`senderKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sender_message_patterns_accountId` ON `sender_message_patterns` (`accountId`)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_sender_message_patterns_senderKey_accountId_kind` ON `sender_message_patterns` (`senderKey`, `accountId`, `kind`)",
+                )
+            }
+        }
+
+        /**
+         * Patterns belong to sender styles (structureKey), not accounts.
+         * Recreates table: nullable accountId (no FK), unique(senderKey, structureKey, kind).
+         */
+        val MIGRATION_18_19: Migration = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sender_message_patterns_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `senderKey` TEXT NOT NULL,
+                        `structureKey` TEXT NOT NULL,
+                        `accountId` INTEGER,
+                        `kind` TEXT NOT NULL,
+                        `amountLabels` TEXT NOT NULL,
+                        `typeCues` TEXT NOT NULL,
+                        `lineLabels` TEXT NOT NULL,
+                        `minScore` INTEGER NOT NULL,
+                        `exampleCount` INTEGER NOT NULL,
+                        `active` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `sender_message_patterns_new` (
+                        `id`, `senderKey`, `structureKey`, `accountId`, `kind`,
+                        `amountLabels`, `typeCues`, `lineLabels`,
+                        `minScore`, `exampleCount`, `active`, `createdAt`, `updatedAt`
+                    )
+                    SELECT
+                        `id`,
+                        `senderKey`,
+                        CASE
+                            WHEN length(trim(`lineLabels`)) > 0
+                                THEN replace(`lineLabels`, char(10), '|')
+                            ELSE 'legacy-' || `id`
+                        END,
+                        NULL,
+                        `kind`,
+                        `amountLabels`,
+                        `typeCues`,
+                        `lineLabels`,
+                        `minScore`,
+                        `exampleCount`,
+                        `active`,
+                        `createdAt`,
+                        `updatedAt`
+                    FROM `sender_message_patterns`
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE `sender_message_patterns`")
+                db.execSQL("ALTER TABLE `sender_message_patterns_new` RENAME TO `sender_message_patterns`")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sender_message_patterns_senderKey` ON `sender_message_patterns` (`senderKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sender_message_patterns_accountId` ON `sender_message_patterns` (`accountId`)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_sender_message_patterns_senderKey_structureKey_kind` ON `sender_message_patterns` (`senderKey`, `structureKey`, `kind`)",
+                )
+            }
+        }
+
+        /**
+         * SenderProfile + account↔sender many-to-many.
+         * Idempotent backfill from active SENDER_ALIAS and institution mappings.
+         */
+        val MIGRATION_19_20: Migration = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sender_profiles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `displaySender` TEXT NOT NULL,
+                        `normalizedSenderKey` TEXT NOT NULL,
+                        `institutionId` TEXT,
+                        `displayInstitutionName` TEXT,
+                        `active` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_sender_profiles_normalizedSenderKey` ON `sender_profiles` (`normalizedSenderKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sender_profiles_active` ON `sender_profiles` (`active`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `account_sender_profiles` (
+                        `accountId` INTEGER NOT NULL,
+                        `senderProfileId` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`accountId`, `senderProfileId`),
+                        FOREIGN KEY(`accountId`) REFERENCES `financial_accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`senderProfileId`) REFERENCES `sender_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_account_sender_profiles_accountId` ON `account_sender_profiles` (`accountId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_account_sender_profiles_senderProfileId` ON `account_sender_profiles` (`senderProfileId`)",
+                )
+                // Backfill profiles from SENDER_ALIAS (distinct keys).
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO sender_profiles (
+                        displaySender, normalizedSenderKey, institutionId, displayInstitutionName,
+                        active, createdAt, updatedAt
+                    )
+                    SELECT
+                        MAX(ai.displayLabel),
+                        ai.normalizedValue,
+                        NULL,
+                        (
+                            SELECT m.institutionName FROM sender_institution_mapping m
+                            WHERE m.senderKey = ai.normalizedValue AND m.isActive = 1
+                            LIMIT 1
+                        ),
+                        1,
+                        MIN(ai.createdAt),
+                        MAX(ai.updatedAt)
+                    FROM account_identifiers ai
+                    WHERE ai.identifierType = 'SENDER_ALIAS'
+                      AND ai.isActive = 1
+                      AND length(trim(ai.normalizedValue)) > 0
+                    GROUP BY ai.normalizedValue
+                    """.trimIndent(),
+                )
+                // Also create profiles from institution mappings not already present.
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO sender_profiles (
+                        displaySender, normalizedSenderKey, institutionId, displayInstitutionName,
+                        active, createdAt, updatedAt
+                    )
+                    SELECT
+                        m.senderKey,
+                        m.senderKey,
+                        NULL,
+                        m.institutionName,
+                        CASE WHEN m.isActive = 1 THEN 1 ELSE 0 END,
+                        COALESCE(m.createdAt, 0),
+                        COALESCE(m.lastConfirmedAt, m.createdAt, 0)
+                    FROM sender_institution_mapping m
+                    WHERE length(trim(m.senderKey)) > 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM sender_profiles sp
+                          WHERE sp.normalizedSenderKey = m.senderKey
+                      )
+                    """.trimIndent(),
+                )
+                // Link accounts that had SENDER_ALIAS to the matching profile.
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO account_sender_profiles (accountId, senderProfileId, createdAt)
+                    SELECT ai.accountId, sp.id, COALESCE(ai.createdAt, 0)
+                    FROM account_identifiers ai
+                    INNER JOIN sender_profiles sp ON sp.normalizedSenderKey = ai.normalizedValue
+                    WHERE ai.identifierType = 'SENDER_ALIAS' AND ai.isActive = 1
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        /** Message pattern definitions + field maps (labels only). */
+        val MIGRATION_20_21: Migration = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `message_pattern_definitions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `senderProfileId` INTEGER NOT NULL,
+                        `userFriendlyName` TEXT NOT NULL,
+                        `normalizedSignature` TEXT NOT NULL,
+                        `transactionType` TEXT,
+                        `direction` TEXT,
+                        `channel` TEXT,
+                        `status` TEXT NOT NULL,
+                        `version` INTEGER NOT NULL,
+                        `origin` TEXT NOT NULL,
+                        `confidence` INTEGER NOT NULL,
+                        `userConfirmed` INTEGER NOT NULL,
+                        `exampleCount` INTEGER NOT NULL,
+                        `activeFrom` INTEGER,
+                        `deprecatedAt` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`senderProfileId`) REFERENCES `sender_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_message_pattern_definitions_senderProfileId` ON `message_pattern_definitions` (`senderProfileId`)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_message_pattern_definitions_senderProfileId_normalizedSignature_version` ON `message_pattern_definitions` (`senderProfileId`, `normalizedSignature`, `version`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_message_pattern_definitions_status` ON `message_pattern_definitions` (`status`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pattern_field_definitions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `patternId` INTEGER NOT NULL,
+                        `canonicalField` TEXT NOT NULL,
+                        `sourceLabel` TEXT NOT NULL,
+                        `extractionStrategy` TEXT NOT NULL,
+                        `required` INTEGER NOT NULL,
+                        `role` TEXT NOT NULL,
+                        `valueType` TEXT NOT NULL,
+                        FOREIGN KEY(`patternId`) REFERENCES `message_pattern_definitions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_pattern_field_definitions_patternId` ON `pattern_field_definitions` (`patternId`)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_pattern_field_definitions_patternId_canonicalField_sourceLabel` ON `pattern_field_definitions` (`patternId`, `canonicalField`, `sourceLabel`)",
+                )
+                // Ensure profiles exist for taught pattern senders.
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO sender_profiles (
+                        displaySender, normalizedSenderKey, institutionId, displayInstitutionName,
+                        active, createdAt, updatedAt
+                    )
+                    SELECT
+                        p.senderKey,
+                        p.senderKey,
+                        NULL,
+                        NULL,
+                        1,
+                        p.createdAt,
+                        p.updatedAt
+                    FROM sender_message_patterns p
+                    WHERE p.active = 1
+                      AND length(trim(p.senderKey)) > 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM sender_profiles sp
+                          WHERE sp.normalizedSenderKey = p.senderKey
+                      )
+                    """.trimIndent(),
+                )
+                // Migrate INCLUDE patterns → APPROVED definitions (signature = structureKey).
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO message_pattern_definitions (
+                        senderProfileId, userFriendlyName, normalizedSignature,
+                        transactionType, direction, channel, status, version, origin,
+                        confidence, userConfirmed, exampleCount, activeFrom, deprecatedAt,
+                        createdAt, updatedAt
+                    )
+                    SELECT
+                        sp.id,
+                        CASE
+                            WHEN length(trim(p.typeCues)) > 0
+                                THEN replace(substr(p.typeCues, 1, instr(p.typeCues || char(10), char(10)) - 1), char(10), '')
+                            ELSE 'نمط مستورد'
+                        END,
+                        p.structureKey,
+                        NULL, NULL, NULL,
+                        'APPROVED',
+                        1,
+                        'MIGRATED',
+                        50,
+                        1,
+                        p.exampleCount,
+                        p.createdAt,
+                        NULL,
+                        p.createdAt,
+                        p.updatedAt
+                    FROM sender_message_patterns p
+                    INNER JOIN sender_profiles sp ON sp.normalizedSenderKey = p.senderKey
+                    WHERE p.active = 1 AND p.kind = 'INCLUDE_TRANSACTION'
+                    """.trimIndent(),
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -519,6 +884,12 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21,
         )
 
         fun build(context: Context): MasroofDatabase =

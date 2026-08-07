@@ -4,11 +4,13 @@ import com.baraa.masroof.data.db.Category
 import com.baraa.masroof.rules.rules.ArabicMerchantCategoryRule
 import com.baraa.masroof.rules.rules.BankFeeRule
 import com.baraa.masroof.rules.rules.CardPaymentRule
+import com.baraa.masroof.rules.rules.CreditLimitChangeRule
 import com.baraa.masroof.rules.rules.DeclinedRule
 import com.baraa.masroof.rules.rules.HighConfidenceMerchantRule
 import com.baraa.masroof.rules.rules.InternalTransferRule
 import com.baraa.masroof.rules.rules.InvestmentTransferRule
 import com.baraa.masroof.rules.rules.MerchantMemoryRule
+import com.baraa.masroof.rules.rules.ParsedTypeFallbackRule
 import com.baraa.masroof.rules.rules.PendingStatusRule
 import com.baraa.masroof.rules.rules.RefundRule
 import com.baraa.masroof.rules.rules.SalaryRule
@@ -29,12 +31,13 @@ object RuleEngineFactory {
      * a rule for a new priority is a one-line change here.
      */
     val REGISTERED_PRIORITIES: List<RulePriority> = listOf(
-        RulePriority.SAFETY,             // DeclinedRule + PendingStatusRule
+        RulePriority.SAFETY,             // DeclinedRule + CreditLimitChangeRule + PendingStatusRule
         RulePriority.SAFETY_CRITICAL,    // CardPaymentRule + RefundRule + BankFeeRule + SalaryRule
         RulePriority.INTERNAL_TRANSFER,  // InternalTransferRule + InvestmentTransferRule + WalletTopUpRule
         RulePriority.MERCHANT_MEMORY,    // MerchantMemoryRule
         RulePriority.MERCHANT_RULE,      // HighConfidenceMerchantRule
         RulePriority.CATEGORY_RULE,      // ArabicMerchantCategoryRule
+        RulePriority.FALLBACK,           // ParsedTypeFallbackRule
     )
 
     fun build(
@@ -46,6 +49,7 @@ object RuleEngineFactory {
 
         val rules: List<TransactionRule> = listOf(
             DeclinedRule(),
+            CreditLimitChangeRule(),
             PendingStatusRule(),
             CardPaymentRule(),
             RefundRule(),
@@ -66,6 +70,7 @@ object RuleEngineFactory {
                 categoryByName = ::catByName,
             ),
             ArabicMerchantCategoryRule(categoryByName = ::catByName),
+            ParsedTypeFallbackRule(),
         )
         return RuleEngine(rules)
     }
@@ -100,13 +105,13 @@ object RuleEngineFactory {
     fun describeActiveRules(): List<String> = REGISTERED_PRIORITIES
         .flatMap { p ->
             when (p) {
-                RulePriority.SAFETY -> listOf("DeclinedRule", "PendingStatusRule")
+                RulePriority.SAFETY -> listOf("DeclinedRule", "CreditLimitChangeRule", "PendingStatusRule")
                 RulePriority.SAFETY_CRITICAL -> listOf("CardPaymentRule", "RefundRule", "BankFeeRule", "SalaryRule")
                 RulePriority.INTERNAL_TRANSFER -> listOf("InternalTransferRule", "InvestmentTransferRule", "WalletTopUpRule")
                 RulePriority.MERCHANT_MEMORY -> listOf("MerchantMemoryRule")
                 RulePriority.MERCHANT_RULE -> listOf("HighConfidenceMerchantRule")
                 RulePriority.CATEGORY_RULE -> listOf("ArabicMerchantCategoryRule")
-                RulePriority.FALLBACK -> emptyList()
+                RulePriority.FALLBACK -> listOf("ParsedTypeFallbackRule")
             }.map { "${it}@${p.name}#${p.order}" }
         }
 

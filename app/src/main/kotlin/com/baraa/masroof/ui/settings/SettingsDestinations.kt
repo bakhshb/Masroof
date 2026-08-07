@@ -40,6 +40,7 @@ object SettingsDestinations {
     val financialHistory = SettingsDestination("settings/financial_history", "السجل المالي", SettingsGroup.AccountsAndLinking)
     val accountLinkRules = SettingsDestination("settings/account_link_rules", "قواعد الربط المحفوظة", SettingsGroup.AccountsAndLinking)
     val senderMappings = SettingsDestination("settings/sender_mappings", "مرسلو الرسائل والمؤسسات", SettingsGroup.AccountsAndLinking)
+    val bankMessages = SettingsDestination("settings/bank_messages", "رسائل البنوك", SettingsGroup.AccountsAndLinking)
 
     // Diagnostics group
     val diagnostics = SettingsDestination("settings/diagnostics", "تشخيص التطبيق", SettingsGroup.Diagnostics)
@@ -50,12 +51,25 @@ object SettingsDestinations {
     val autoSmsImport = SettingsDestination("settings/auto_sms_import", "استيراد رسائل البنك تلقائياً", SettingsGroup.Messages)
     val transactionNotifications = SettingsDestination("settings/transaction_notifications", "إشعار عند تسجيل عملية جديدة", SettingsGroup.Messages)
 
+    /**
+     * Rows shown on the Settings landing screen. Product hubs (accounts,
+     * categories, history, …) live under More to avoid duplication.
+     */
+    val landing: List<SettingsDestination>
+        get() = listOf(
+            autoSmsImport,
+            transactionNotifications,
+            diagnostics,
+            testData,
+            releaseNotes,
+        )
+
     init {
         all = listOf(
             // Categories
             categoryManagement, merchantMemory, aiCategorization, aiSuggestions, aiBatch,
             // Accounts and linking
-            accounts, linkTransactions, financialHistory, accountLinkRules, senderMappings,
+            accounts, linkTransactions, financialHistory, accountLinkRules, senderMappings, bankMessages,
             // Diagnostics
             diagnostics, testData, releaseNotes,
             // Messages

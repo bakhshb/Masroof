@@ -61,6 +61,7 @@ enum class FailureReason {
     INVALID_CATEGORY,      // model returned an unknown category id
     INVALID_CONFIDENCE,    // confidence outside 0..100
     SERVER,                // 5xx
+    MODEL_NOT_READY,       // on-device model file missing / unloadable
     UNKNOWN,
 }
 

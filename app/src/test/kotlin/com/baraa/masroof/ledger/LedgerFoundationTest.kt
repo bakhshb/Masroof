@@ -66,6 +66,23 @@ class LedgerFoundationTest {
         val salary = journal(postings = listOf(posting(1, PostingSide.DEBIT, "500")))
         assertEquals(BigDecimal("1400"), AccountBalanceService.balance(bank, listOf(purchase, salary), day))
     }
+    @Test fun assetExpenseCreditsReduceBalanceDelta() {
+        val summary = AccountBalanceCalculator.calculate(
+            account = com.baraa.masroof.data.db.FinancialAccountEntity(
+                id = 1, displayName = "Bank", institutionName = null,
+                accountType = AccountType.BANK_ACCOUNT, accountNature = AccountNature.ASSET,
+                currency = Currency.SAR, openingBalance = BigDecimal("1000"),
+                openingBalanceDate = day.atStartOfDay(ZoneId.of("Asia/Riyadh")).toInstant().toEpochMilli(),
+                includeInNetWorth = true, includeInLiquidity = true, isOwnedByUser = true,
+                systemAccountKey = null, isActive = true, notes = null, createdAt = 0, updatedAt = 0,
+            ),
+            journals = listOf(journal(postings = listOf(posting(1, PostingSide.CREDIT, "250")))),
+        )
+        assertEquals(BigDecimal("250"), summary.moneyOut)
+        assertEquals(BigDecimal.ZERO, summary.moneyIn)
+        assertEquals(BigDecimal("-250"), summary.balanceDelta)
+        assertEquals(BigDecimal("750"), summary.calculatedBalance)
+    }
     @Test fun liabilityPurchasePaymentAndRefundUseCreditIncrease() {
         val card = account(2, AccountNature.LIABILITY, AccountType.CREDIT_CARD, "0", false)
         val purchase = journal(postings = listOf(posting(2, PostingSide.CREDIT, "250")))

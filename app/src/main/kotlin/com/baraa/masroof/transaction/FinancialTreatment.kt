@@ -28,7 +28,7 @@ enum class FinancialTreatment {
     /** A bank fee / service charge. */
     BANK_FEE,
 
-    /** Cash taken out of an account. Tracked separately from EXPENSE. */
+    /** ATM / cash withdrawal from a bank or salary account. Tracked separately from purchases; does not require a cash-on-hand account. */
     CASH_WITHDRAWAL,
 
     /** The user must review this transaction before it can be tallied. */
@@ -38,10 +38,9 @@ enum class FinancialTreatment {
     IGNORED,
     ;
 
-    /** True when a balanced journal needs both a source and a destination account. */
+    /** True when a balanced journal needs both a source and a destination *user* account. */
     val requiresTwoAccounts: Boolean
         get() = this == INTERNAL_TRANSFER ||
             this == CREDIT_CARD_PAYMENT ||
-            this == INVESTMENT ||
-            this == CASH_WITHDRAWAL
+            this == INVESTMENT
 }

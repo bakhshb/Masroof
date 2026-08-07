@@ -2,7 +2,28 @@
 
 ## AD-001 — Typed account identifiers over legacy lastFourDigits
 
-`AccountIdentifierEntity` with types (`ACCOUNT_LAST4`, `CREDIT_CARD_LAST4`, `DEBIT_CARD_LAST4`, `IBAN_LAST4`, `WALLET_LAST4`, `SENDER_ALIAS`) is the production source of truth. Schema v15 removes legacy columns from `financial_accounts` after idempotent backfill. Ambiguous matches require user confirmation. Identifiers are never auto-created from SMS without explicit user confirmation.
+`AccountIdentifierEntity` with types (`ACCOUNT_LAST4`, `CREDIT_CARD_LAST4`, `DEBIT_CARD_LAST4`, `IBAN_LAST4`, `WALLET_LAST4`) is the production source of truth for **instrument** identity. Schema v15 removes legacy columns from `financial_accounts` after idempotent backfill. Ambiguous matches require user confirmation. Identifiers are never auto-created from SMS without explicit user confirmation.
+
+`SENDER_ALIAS` is **deprecated**. Sender identity lives on `SenderProfile` + `account_sender_profiles`. Legacy alias rows dual-read/dual-write until fully retired.
+
+## AD-011 — SenderProfile → Pattern → Identifier → Account
+
+Responsibilities stay separated:
+
+1. **SenderProfile** — which SMS source/institution family
+2. **MessagePatternDefinition** — what kind of message and how fields are structured
+3. **Typed AccountIdentifier** — which exact account/card
+4. **Financial engine** — accounting treatment
+
+Patterns never hard-link to one FinancialAccount. Same pattern may apply to many accounts under one sender via extracted last4 fields.
+
+## AD-012 — Pattern statuses and unknown safety
+
+Statuses: APPROVED, IGNORED, UNKNOWN, DEPRECATED. Import posts only from APPROVED (and DEPRECATED for historical formats). Unmatched messages from a trained sender create UNKNOWN candidates — never silent discard.
+
+## AD-013 — Legacy flat patterns out of production import
+
+`sender_message_patterns` and `SenderMessagePatternRepository` remain for Room history and unit tests only. Production import/training uses `MessagePatternDefinition` via «رسائل البنوك». `SmsImportMode.TEACH_FROM_EXAMPLES` is removed. Thin bank parser classes stay as sender-routing shells over `GenericBankSmsParser` — not as competing allowlists.
 
 ## AD-002 — Nested NavHosts
 
@@ -22,7 +43,7 @@ Never use `fallbackToDestructiveMigration()`. All schema changes are explicit, i
 
 ## AD-006 — AI categorization optional and off by default
 
-Deterministic rules and merchant memory run first. Optional AI never receives raw SMS, OTPs, or full identifiers. Networking requires explicit user configuration.
+Deterministic rules and merchant memory run first. Optional AI never receives raw SMS, OTPs, or full identifiers. Networking requires explicit user configuration. AI may later suggest UNKNOWN pattern groupings only after sanitization — never choose accounts or post journals.
 
 ## AD-007 — Incremental package evolution
 

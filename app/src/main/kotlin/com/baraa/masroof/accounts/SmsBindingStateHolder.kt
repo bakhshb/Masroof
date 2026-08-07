@@ -6,6 +6,7 @@ import com.baraa.masroof.data.repository.IdentifierAddOutcome
 import com.baraa.masroof.data.repository.IdentifierAddResult
 import com.baraa.masroof.data.repository.IdentifierForm
 import com.baraa.masroof.sms.BankSmsFilter
+import com.baraa.masroof.sms.ExpectedSalaryDateService
 import com.baraa.masroof.sms.SmsImportRange
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.sms.SmsRepository
@@ -15,25 +16,38 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** View-layer observable state and operations for the SMS-binding picker. */
 class SmsBindingStateHolder(
     private val smsRepository: SmsRepository,
     private val identifierRepository: AccountIdentifierRepository,
+    private val afterBindRelink: (suspend () -> Unit)? = null,
+    private val todayProvider: () -> LocalDate = { LocalDate.now() },
 ) {
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
 
+    enum class RangeMode {
+        LAST_7,
+        LAST_30,
+        LAST_SALARY,
+        CUSTOM_FROM,
+    }
+
     data class State(
         val loading: Boolean = false,
         val messages: List<SmsMessage> = emptyList(),
-        val days: Int = 30,
+        val rangeMode: RangeMode = RangeMode.LAST_30,
+        val customFrom: LocalDate = LocalDate.now().minusDays(29),
         val senderQuery: String = "",
         val showAllMessages: Boolean = false,
         val selected: SmsMessage? = null,
         val analysis: AccountSmsAnalysis? = null,
         val error: String? = null,
         val committed: Boolean = false,
+        val rangeLabel: String = "",
     ) {
         val visibleMessages get() = messages.filter { message ->
             message.sender.orEmpty().contains(senderQuery, ignoreCase = true) &&
@@ -41,13 +55,37 @@ class SmsBindingStateHolder(
         }
     }
 
-    suspend fun refresh() = refreshFor(days = _state.value.days)
+    suspend fun refresh() = refreshFor(_state.value.rangeMode, _state.value.customFrom)
 
-    suspend fun refreshFor(days: Int) {
-        _state.update { it.copy(loading = true, days = days) }
-        val loaded = runCatching { smsRepository.loadInbox(SmsImportRange.lastDays(LocalDate.now(), days), 100) }.getOrDefault(emptyList())
+    suspend fun refreshFor(mode: RangeMode, customFrom: LocalDate = _state.value.customFrom) {
+        val today = todayProvider()
+        val from = customFrom.coerceAtMost(today)
+        _state.update {
+            it.copy(
+                loading = true,
+                rangeMode = mode,
+                customFrom = from,
+                rangeLabel = describeRange(mode, from, today),
+            )
+        }
+        val range = resolveRange(mode, from, today)
+        val loaded = runCatching {
+            smsRepository.loadInbox(range, BINDING_INBOX_LIMIT)
+        }.getOrDefault(emptyList())
             .sortedByDescending { BankSmsFilter.classifyMessage(it.sender, it.body).isMatch }
         _state.update { it.copy(loading = false, messages = loaded) }
+    }
+
+    fun setCustomFrom(date: LocalDate) {
+        val today = todayProvider()
+        val from = date.coerceAtMost(today)
+        _state.update {
+            it.copy(
+                customFrom = from,
+                rangeMode = RangeMode.CUSTOM_FROM,
+                rangeLabel = describeRange(RangeMode.CUSTOM_FROM, from, today),
+            )
+        }
     }
 
     fun setSenderQuery(value: String) = _state.update { it.copy(senderQuery = value) }
@@ -67,6 +105,7 @@ class SmsBindingStateHolder(
         }
         val identifierOk = analysis.identifierType == null || (identifierOutcome != null && identifierOutcome.result != IdentifierAddResult.Rejected && identifierOutcome.identifier != null)
         if (senderOk && identifierOk) {
+            runCatching { afterBindRelink?.invoke() }
             _state.update { it.copy(committed = true, error = null) }
             return true
         }
@@ -81,5 +120,27 @@ class SmsBindingStateHolder(
         AccountIdentifierType.WALLET_LAST4 -> "محفظة"
         AccountIdentifierType.ACCOUNT_LAST4 -> "حساب"
         AccountIdentifierType.SENDER_ALIAS -> "اسم المرسل"
+    }
+
+    companion object {
+        const val BINDING_INBOX_LIMIT: Int = 500
+
+        fun resolveRange(mode: RangeMode, customFrom: LocalDate, today: LocalDate): SmsImportRange = when (mode) {
+            RangeMode.LAST_7 -> SmsImportRange.lastDays(today, 7)
+            RangeMode.LAST_30 -> SmsImportRange.lastDays(today, 30)
+            RangeMode.LAST_SALARY -> SmsImportRange.sinceLastSalary(today)
+            RangeMode.CUSTOM_FROM -> SmsImportRange.custom(customFrom.coerceAtMost(today), today, today)
+        }
+
+        fun describeRange(mode: RangeMode, customFrom: LocalDate, today: LocalDate): String {
+            val range = resolveRange(mode, customFrom, today)
+            val fmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("ar"))
+            val from = range.start.toLocalDate().format(fmt)
+            val to = range.displayEndDate.format(fmt)
+            return "$from → $to"
+        }
+
+        fun expectedSalaryDate(today: LocalDate): LocalDate =
+            ExpectedSalaryDateService.mostRecentSalaryDate(today)
     }
 }

@@ -100,6 +100,30 @@ class GenericBankSmsParserTest {
     }
 
     @Test
+    fun parsesOutgoingHiwalaKharija() {
+        val r = parser.parse(
+            sender = "SNB",
+            body = "حوالة خارجة\nبمبلغ: 300 ريال\nحساب: 7271",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.TRANSFER_OUT, r.transactionType)
+    }
+
+    @Test
+    fun bareHiwalaWithoutDirectionIsNotForcedTransfer() {
+        val r = parser.parse(
+            sender = "Bank",
+            body = "حوالة\nبمبلغ: 100 ريال",
+            smsTimestampMillis = null,
+        )
+        assertTrue(
+            "Bare حوالة must not force TRANSFER_IN/OUT",
+            r.transactionType != TransactionType.TRANSFER_IN &&
+                r.transactionType != TransactionType.TRANSFER_OUT,
+        )
+    }
+
+    @Test
     fun parsesCardPayment() {
         val r = parser.parse(
             sender = "BankAlbilad",
@@ -109,6 +133,22 @@ class GenericBankSmsParserTest {
         assertEquals(TransactionType.CARD_PAYMENT, r.transactionType)
         assertEquals(0, BigDecimal("1250").compareTo(r.amount))
         assertEquals(Currency.SAR, r.currency)
+    }
+
+    @Test
+    fun visaCardLabelExtractsCreditCardLastFour() {
+        val r = parser.parse(
+            sender = "SNB",
+            body = "شراء\nبطاقة فيزا: 4444\nبمبلغ: 200 ر.س\nالتاجر: Store",
+            smsTimestampMillis = null,
+        )
+        assertEquals("4444", r.accountOrCardLastFourDigits)
+        assertTrue(
+            r.identifierEvidence.any {
+                it.type == com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 &&
+                    it.lastFour == "4444"
+            },
+        )
     }
 
     @Test
@@ -371,6 +411,18 @@ class GenericBankSmsParserTest {
     // -- Original sender / message preserved --------------------------------
 
     @Test
+    fun parsesCreditLimitChangeAndExtractsNewLimit() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "نوع العملية: تغيير حد الرصيد\nالحد الائتماني الجديد: 25000 ريال\nبطاقة: ****4321",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.CREDIT_LIMIT_CHANGE, r.transactionType)
+        assertEquals(0, BigDecimal("25000").compareTo(r.amount))
+        assertEquals("4321", r.accountOrCardLastFourDigits)
+    }
+
+    @Test
     fun preservesOriginalSenderAndMessage() {
         val r = parser.parse(
             sender = "AlRajhi Bank",
@@ -379,6 +431,50 @@ class GenericBankSmsParserTest {
         )
         assertEquals("AlRajhi Bank", r.originalSender)
         assertEquals("شراء\nبمبلغ: 250 ريال\nالتاجر: Starbucks", r.originalMessage)
+    }
+
+    @Test
+    fun parsesCompactEnglishApplePayCreditCardPurchase() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = "Online Purchase Apple Pay Credit Card: 8332 at :RIDE APP of : 33.03 SAR on : 2026-07-30 10:01 Available Balance is: 18313.81 SAR Due Amount: 802.62 SAR",
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.ONLINE_PURCHASE, r.transactionType)
+        assertEquals(0, BigDecimal("33.03").compareTo(r.amount))
+        assertEquals(Currency.SAR, r.currency)
+        assertEquals("8332", r.accountOrCardLastFourDigits)
+        assertEquals("RIDE APP", r.merchant)
+        assertEquals(LocalDate.of(2026, 7, 30), r.transactionDate)
+        // Due / available balances must never become the purchase amount.
+        assertTrue(r.amount!!.compareTo(BigDecimal("802.62")) != 0)
+        assertTrue(r.amount!!.compareTo(BigDecimal("18313.81")) != 0)
+    }
+
+    @Test
+    fun parsesArabicPosSamsungPayWithoutTreatingDatetimeAsMerchant() {
+        val r = parser.parse(
+            sender = "AlRajhi",
+            body = """
+                شراء عبر نقاط البيع (Samsung Pay)
+                بطاقة ائتمانية: 7271
+                لدى: FUEL STATION CO
+                بمبلغ: 178.02 SAR
+                في: 09:08 30-07-2026
+                الرصيد المتاح: 18346.84 SAR
+                إجمالي المبلغ المستحق:802.62 SAR
+            """.trimIndent(),
+            smsTimestampMillis = null,
+        )
+        assertEquals(TransactionType.PURCHASE, r.transactionType)
+        assertEquals(0, BigDecimal("178.02").compareTo(r.amount))
+        assertEquals("7271", r.accountOrCardLastFourDigits)
+        assertEquals("FUEL STATION CO", r.merchant)
+        assertEquals(LocalDate.of(2026, 7, 30), r.transactionDate)
+        assertEquals(LocalTime.of(9, 8), r.transactionTime)
+        assertTrue(r.identifierEvidence.any {
+            it.type == com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4 && it.lastFour == "7271"
+        })
     }
 
     @Test

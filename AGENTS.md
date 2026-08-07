@@ -30,17 +30,20 @@ into financial transactions.
 - Add regression tests for every supported SMS example.
 
 ## Account Identification
-- Use AccountIdentifierEntity instead of legacy lastFourDigits.
-- Supported identifier types:
-  ACCOUNT_LAST4
-  CREDIT_CARD_LAST4
-  DEBIT_CARD_LAST4
-  IBAN_LAST4
-  WALLET_LAST4
-  SENDER_ALIAS
-- Do not automatically create identifiers from SMS messages.
-- Ambiguous matches must require user confirmation.
-- Account-type compatibility rules must always be enforced.
+- Prefer AccountIdentifierEntity for instrument identifiers:
+  ACCOUNT_LAST4, CREDIT_CARD_LAST4, DEBIT_CARD_LAST4, IBAN_LAST4, WALLET_LAST4
+- Sender identity belongs to SenderProfile + account↔sender many-to-many — not SENDER_ALIAS
+- SENDER_ALIAS is deprecated (migration dual-read only)
+- Do not automatically create identifiers from SMS messages
+- Ambiguous matches must require user confirmation
+- Account-type compatibility rules must always be enforced
+- Patterns never hard-link to a single FinancialAccount
+
+## SMS Patterns
+- Train senders under «رسائل البنوك» separately from account creation
+- MessagePatternDefinition statuses: APPROVED / IGNORED / UNKNOWN / DEPRECATED
+- PatternFieldDefinition stores labels → canonical fields only (never personal values)
+- Known senders with unmatched messages must create UNKNOWN candidates (never silent drop)
 
 ## Development Process
 - Inspect the existing implementation before making changes.

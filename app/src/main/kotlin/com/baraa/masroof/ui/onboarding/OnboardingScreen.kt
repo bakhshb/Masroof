@@ -210,6 +210,15 @@ fun OnboardingScreen(
                     onFinished()
                 }
             },
+            onImportNow = {
+                // Finish onboarding; ImportSessionHints already holds the opening date.
+                pendingSmsBindingAccount = null
+                scope.launch {
+                    app.financialSetupRepository.save(setupFrom(uiState, completed = true))
+                    repository.markCompleted()
+                    onFinished()
+                }
+            },
         )
     }
 }
@@ -268,7 +277,15 @@ private fun StartDateStep(state: UiOnboardingState, onNext: () -> Unit) {
                         state.trackingDate = when (opt) {
                             StartDateOption.TODAY -> java.time.LocalDate.now()
                             StartDateOption.MONTH_START -> java.time.YearMonth.now().atDay(1)
-                            StartDateOption.CUSTOM -> state.trackingDate
+                            StartDateOption.CUSTOM -> {
+                                // Prefer a past date so the calendar is clearly needed.
+                                val current = state.trackingDate
+                                if (current == java.time.LocalDate.now()) {
+                                    java.time.LocalDate.now().minusMonths(1)
+                                } else {
+                                    current
+                                }
+                            }
                         }
                     },
                 ) {
@@ -281,14 +298,17 @@ private fun StartDateStep(state: UiOnboardingState, onNext: () -> Unit) {
             }
         }
         if (state.option == StartDateOption.CUSTOM) {
-            OutlinedTextField(
-                value = state.trackingDate.toString(),
-                onValueChange = { /* no-op: read-only */ },
-                enabled = false,
-                readOnly = true,
-                label = { Text("تاريخ مخصص (يظهر هنا، قابل للتعديل بعد الإعداد)") },
+            com.baraa.masroof.ui.theme.CalendarDateField(
+                label = "تاريخ بداية المتابعة",
+                selected = state.trackingDate,
+                onSelected = { state.trackingDate = it },
+                maxDate = java.time.LocalDate.now(),
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = { Text("يمكنك تعديل هذا التاريخ لاحقًا من شاشة السجل المالي.") },
+            )
+            Text(
+                "اختر التاريخ من التقويم. يمكنك تعديله لاحقًا من الاستيراد أو السجل المالي.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Text(if (state.option == StartDateOption.TODAY) "أدخل رصيدك الحالي لكل حساب." else "أدخل الرصيد الذي كان موجودًا في بداية التاريخ المختار، وليس رصيدك الحالي.", style = MaterialTheme.typography.bodyMedium)

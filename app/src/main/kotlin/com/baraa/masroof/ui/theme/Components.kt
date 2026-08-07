@@ -152,21 +152,22 @@ fun HeroBalanceCard(
 
 @Composable
 private fun MonthChangeChip(change: BigDecimal) {
-    val sign = if (change.signum() >= 0) "+" else ""
+    val negative = change.signum() < 0
     val formatted = remember(change) {
-        NumberFormat.getNumberInstance(Locale("ar", "SA")).apply { maximumFractionDigits = 2 }.format(change)
+        NumberFormat.getNumberInstance(Locale.US).apply { maximumFractionDigits = 2 }.format(change.abs())
     }
+    val signed = if (negative) "−$formatted" else "+$formatted"
     Surface(
         shape = FinancialShapes.pill,
-        color = if (change.signum() >= 0) SemanticColors.positiveContainer() else SemanticColors.expenseContainer(),
+        color = if (negative) SemanticColors.expenseContainer() else SemanticColors.positiveContainer(),
     ) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            val chipColor = if (change.signum() >= 0) SemanticColors.positive() else SemanticColors.expense()
-            Text("$sign$formatted ريال", style = FinancialTypography.badge, color = chipColor)
+            val chipColor = if (negative) SemanticColors.expense() else SemanticColors.positive()
+            Text("$signed ريال", style = FinancialTypography.badge, color = chipColor)
             Text("هذا الشهر", style = FinancialTypography.badge, color = chipColor)
         }
     }
@@ -353,9 +354,34 @@ fun SecondaryButton(label: String, onClick: () -> Unit, enabled: Boolean = true,
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = Spacing.touch),
+        enabled = enabled,
         shape = FinancialShapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) { Text(label, style = FinancialTypography.button, color = MaterialTheme.colorScheme.onSurface) }
+}
+
+/** Irreversible action — filled error color. */
+@Composable
+fun DestructiveButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = Spacing.touch),
+        enabled = enabled,
+        shape = FinancialShapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        ),
+    ) { Text(label, style = FinancialTypography.button) }
+}
+
+@Composable
+fun DestructiveTextButton(label: String, onClick: () -> Unit, enabled: Boolean = true) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text(label) }
 }
 
 data class FilterChipModel(val id: String, val label: String, val selected: Boolean = false, val removable: Boolean = true)

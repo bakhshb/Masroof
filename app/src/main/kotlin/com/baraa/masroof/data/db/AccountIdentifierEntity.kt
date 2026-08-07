@@ -4,7 +4,16 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-enum class AccountIdentifierType { ACCOUNT_LAST4, CREDIT_CARD_LAST4, DEBIT_CARD_LAST4, IBAN_LAST4, WALLET_LAST4, SENDER_ALIAS }
+enum class AccountIdentifierType {
+    ACCOUNT_LAST4,
+    CREDIT_CARD_LAST4,
+    DEBIT_CARD_LAST4,
+    IBAN_LAST4,
+    WALLET_LAST4,
+    /** @deprecated Prefer SenderProfile + account_sender_profiles. Kept for migration dual-read. */
+    @Deprecated("Use SenderProfile association instead of account identifier")
+    SENDER_ALIAS,
+}
 
 @Entity(
     tableName = "account_identifiers",

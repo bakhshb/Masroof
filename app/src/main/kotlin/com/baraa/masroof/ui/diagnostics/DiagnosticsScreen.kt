@@ -184,6 +184,60 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
             DiagnosticsCard(title = "عدد العمليات المستوردة تلقائياً", value = app.developerPreferences.autoImportedCount.toString())
             DiagnosticsCard(title = "عدد العمليات التي تحتاج مراجعة", value = app.developerPreferences.autoNeedsReviewCount.toString())
             DiagnosticsCard(title = "عدد المكررات", value = app.developerPreferences.autoDuplicateCount.toString())
+            DiagnosticsCard(title = "عدد المكررات", value = app.developerPreferences.autoDuplicateCount.toString())
+
+            var showClearImportConfirm by remember { mutableStateOf(false) }
+            var clearImportSummary by remember { mutableStateOf<String?>(null) }
+            Text("تجربة الاستيراد", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "يمسح العمليات والقيود فقط. تبقى الحسابات والمعرفات والأرصدة الافتتاحية كما هي حتى تعيد الاستيراد.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(
+                onClick = { showClearImportConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) {
+                Text("مسح العمليات المستوردة (للاختبار)")
+            }
+            clearImportSummary?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (showClearImportConfirm) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showClearImportConfirm = false },
+                    title = { Text("مسح الاستيراد؟") },
+                    text = {
+                        Text(
+                            "سيُحذف كل العمليات والقيود المرحّلة. لن تُحذف الحسابات ولا آخر 4 أرقام ولا الرصيد الافتتاحي. يمكنك بعدها استيراد الرسائل من جديد.",
+                        )
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                showClearImportConfirm = false
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) {
+                                        app.importResetService.clearImportedLedger()
+                                    }
+                                    clearImportSummary =
+                                        "تم المسح: ${result.deletedTransactions} عملية · ${result.deletedJournals} قيد. الحسابات محفوظة."
+                                    snapshot = withContext(Dispatchers.IO) { app.diagnosticCollector.snapshot() }
+                                }
+                            },
+                        ) { Text("مسح") }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showClearImportConfirm = false }) {
+                            Text("إلغاء")
+                        }
+                    },
+                )
+            }
+
             var relinkSummary by remember { mutableStateOf<String?>(null) }
             var relinkPreview by remember { mutableStateOf<com.baraa.masroof.ledger.HistoricalAccountRelinkService.Result?>(null) }
             Button(

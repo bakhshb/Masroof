@@ -56,6 +56,7 @@ data class SmsImportRange(
         const val QUICK_LAST_SALARY = "last-salary"
         const val QUICK_LAST_SEVEN = "last-7-days"
         const val QUICK_LAST_THIRTY = "last-30-days"
+        const val QUICK_OPENING_BALANCE = "opening-balance"
         const val QUICK_CUSTOM = "custom"
 
         /** The default import range for first-run import dialog. */
@@ -67,6 +68,27 @@ data class SmsImportRange(
                 endExclusive = now,
                 label = "من بداية هذا الشهر إلى اليوم",
                 quickId = QUICK_MONTH_START,
+            )
+        }
+
+        /**
+         * Prefer opening/tracking start when it is before this month so users
+         * who opened the ledger mid-month (or last month) do not miss SMS.
+         */
+        fun preferredDefault(today: LocalDate, openingOrTrackingStart: LocalDate?): SmsImportRange {
+            if (openingOrTrackingStart != null && openingOrTrackingStart.isBefore(today.withDayOfMonth(1))) {
+                return fromOpeningBalance(today, openingOrTrackingStart)
+            }
+            return default(today)
+        }
+
+        fun fromOpeningBalance(today: LocalDate, openingDate: LocalDate): SmsImportRange {
+            val from = if (openingDate.isAfter(today)) today else openingDate
+            return SmsImportRange(
+                start = from.atStartOfDay(),
+                endExclusive = today.plusDays(1).atStartOfDay(),
+                label = "من تاريخ الرصيد الافتتاحي إلى اليوم",
+                quickId = QUICK_OPENING_BALANCE,
             )
         }
 

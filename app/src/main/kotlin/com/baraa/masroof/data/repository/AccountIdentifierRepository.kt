@@ -39,6 +39,8 @@ private fun FinancialAccountEntity.toDomainRef(): FinancialAccount = toDomain()
 class AccountIdentifierRepository(
     private val dao: AccountIdentifierDao,
     private val accountDao: FinancialAccountDao,
+    private val senderProfileDao: com.baraa.masroof.data.db.SenderProfileDao? = null,
+    private val accountSenderDao: com.baraa.masroof.data.db.AccountSenderProfileDao? = null,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
 
@@ -68,13 +70,39 @@ class AccountIdentifierRepository(
         return matches.mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
     }
 
+    /**
+     * Accounts that have any active last-four identifier equal to [value]
+     * (ACCOUNT / DEBIT / CREDIT / IBAN / WALLET). Excludes [SENDER_ALIAS].
+     */
+    suspend fun findAccountsByLastFourAnyType(value: String): List<FinancialAccount> {
+        val normalized = normalize(AccountIdentifierType.ACCOUNT_LAST4, value)
+        if (normalized.length != 4) return emptyList()
+        val matches = dao.getActive().filter {
+            it.identifierType != AccountIdentifierType.SENDER_ALIAS &&
+                it.normalizedValue == normalized
+        }
+        return matches
+            .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
+            .distinctBy { it.id }
+    }
+
     suspend fun accountsForSender(sender: String?): List<FinancialAccount> {
         if (sender.isNullOrBlank()) return emptyList()
         val key = normalize(AccountIdentifierType.SENDER_ALIAS, sender)
         if (key.isEmpty()) return emptyList()
-        return dao.getByType(AccountIdentifierType.SENDER_ALIAS)
+        val fromAlias = dao.getByType(AccountIdentifierType.SENDER_ALIAS)
             .filter { it.isActive && it.normalizedValue == key }
             .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
+        // Preferred: SenderProfile cross-ref (many accounts per sender).
+        val fromProfile = run {
+            val profile = senderProfileDao?.findByKey(key) ?: return@run emptyList()
+            accountSenderDao?.accountIdsForSender(profile.id)
+                ?.mapNotNull { accountDao.getById(it)?.toDomainRef() }
+                .orEmpty()
+        }
+        return (fromProfile + fromAlias)
+            .filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
+            .distinctBy { it.id }
     }
 
     /** Sender keys explicitly attached to active, user-owned accounts (typed only). */
@@ -151,6 +179,10 @@ class AccountIdentifierRepository(
             ),
         )
         val inserted = if (newId > 0L) dao.getById(newId) else null
+        // Dual-write: keep SenderProfile + cross-ref in sync while SENDER_ALIAS is deprecated.
+        if (form.identifierType == AccountIdentifierType.SENDER_ALIAS && inserted != null) {
+            syncSenderProfileLink(accountId, normalized, form.rawValue.trim().ifBlank { normalized })
+        }
         val message = if (conflicts.isNotEmpty()) {
             "هذا المعرف مستخدم في حساب آخر، وقد تحتاج العمليات المرتبطة به إلى مراجعة يدوية."
         } else {
@@ -161,6 +193,40 @@ class AccountIdentifierRepository(
             identifier = inserted,
             conflictingAccounts = conflicts,
             message = message,
+        )
+    }
+
+    /**
+     * Prefer [SenderProfileRepository.associateAccount] for new code.
+     * Kept so legacy SENDER_ALIAS writes also populate the profile model.
+     */
+    private suspend fun syncSenderProfileLink(accountId: Long, key: String, display: String) {
+        val profileDao = senderProfileDao ?: return
+        val linkDao = accountSenderDao ?: return
+        val ts = now()
+        val existing = profileDao.findByKey(key)
+        val profileId = if (existing == null) {
+            profileDao.insert(
+                com.baraa.masroof.data.db.SenderProfileEntity(
+                    displaySender = display,
+                    normalizedSenderKey = key,
+                    active = true,
+                    createdAt = ts,
+                    updatedAt = ts,
+                ),
+            )
+        } else {
+            if (!existing.active) {
+                profileDao.update(existing.copy(active = true, updatedAt = ts))
+            }
+            existing.id
+        }
+        linkDao.insert(
+            com.baraa.masroof.data.db.AccountSenderProfileCrossRef(
+                accountId = accountId,
+                senderProfileId = profileId,
+                createdAt = ts,
+            ),
         )
     }
 

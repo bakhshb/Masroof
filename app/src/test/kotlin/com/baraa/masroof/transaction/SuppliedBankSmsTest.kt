@@ -76,7 +76,7 @@ class SuppliedBankSmsTest {
             في: 2026-08-03 10:38
         """.trimIndent()
         val r = parser.parse(null, body, null)
-        assertEquals(TransactionType.TRANSFER_IN, r.transactionType)
+        assertEquals(TransactionType.INTERNAL_TRANSFER, r.transactionType)
         assertEquals(0, BigDecimal("4445.67").compareTo(r.amount))
         assertEquals(Currency.SAR, r.currency)
     }

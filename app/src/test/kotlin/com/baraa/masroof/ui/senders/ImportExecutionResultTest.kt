@@ -98,11 +98,40 @@ class ImportExecutionResultTest {
     }
 
     /**
-     * Spec L.9 — Success requires importedCount > 0.
+     * Spec L.9 — Success requires importedCount > 0; all-duplicates map to AlreadyImported.
      */
     @Test fun successRequiresImportedCountPositive() {
         val result = SmsImportResult(importedTransactions = 12, linkedTransactions = 12, postedTransactions = 12)
         assertTrue("importedCount must be > 0 for success", result.importedTransactions > 0)
+        assertTrue(mapImportCommitResult(result) is ImportExecutionResult.Success)
+    }
+
+    @Test fun allDuplicatesMapToAlreadyImportedNotFailure() {
+        val result = SmsImportResult(
+            scannedMessages = 10,
+            duplicateTransactions = 10,
+            importedTransactions = 0,
+        )
+        val mapped = mapImportCommitResult(result)
+        assertTrue(mapped is ImportExecutionResult.AlreadyImported)
+        assertEquals(10, (mapped as ImportExecutionResult.AlreadyImported).duplicateCount)
+    }
+
+    @Test fun duplicateOnlyScanUsesAlreadyImportedButtonLabel() {
+        val preview = ScanPreview(
+            scannedMessages = 8,
+            recognizedTransactions = 8,
+            needsReviewTransactions = 0,
+            duplicateTransactions = 8,
+            beforeTrackingStartCount = 0,
+        )
+        assertEquals(0, preview.readyCount)
+        assertEquals("مستوردة سابقًا · 8 مكررة", importCommitButtonLabel(preview))
+    }
+
+    @Test fun importButtonLabelReflectsReadyCountViaHelper() {
+        val preview = ScanPreview(recognizedTransactions = 5, needsReviewTransactions = 0)
+        assertEquals("استيراد 5 عملية", importCommitButtonLabel(preview))
     }
 
     /**

@@ -10,6 +10,7 @@ import com.baraa.masroof.ledger.AccountSummary
 import com.baraa.masroof.ledger.JournalGenerationService
 import com.baraa.masroof.ledger.JournalPostingStatus
 import com.baraa.masroof.ledger.LedgerRepository
+import com.baraa.masroof.ledger.LocalTreatmentAuditor
 import com.baraa.masroof.ledger.PostingSide
 import com.baraa.masroof.rules.RuleContext
 import com.baraa.masroof.rules.RuleEngine
@@ -134,6 +135,12 @@ data class SmsImportResult(
         val totalDebits: BigDecimal,
         val calculatedBalance: BigDecimal,
         val lastUpdatedAt: Long = 0L,
+        val accountNature: com.baraa.masroof.transaction.AccountNature =
+            com.baraa.masroof.transaction.AccountNature.ASSET,
+        /** Increases bank cash (or raises card outstanding). */
+        val moneyIn: BigDecimal = totalDebits,
+        /** Leaves bank cash (or pays down card outstanding). */
+        val moneyOut: BigDecimal = totalCredits,
     )
 
     data class TransactionImportLog(
@@ -170,14 +177,54 @@ data class ScanPreview(
     val nonFinancialMessages: Int = 0,
     val unparsedMessages: Int = 0,
     val unregisteredSenderMessages: Int = 0,
+    /** OTP / 3-D Secure challenge SMS skipped (not ledger transactions). */
+    val otpOrAuthMessages: Int = 0,
     val duplicateTransactions: Int = 0,
     val needsReviewTransactions: Int = 0,
     val beforeTrackingStartCount: Int = 0,
     val institutionGroups: List<InstitutionGroup> = emptyList(),
     val perTransaction: List<PreviewItem> = emptyList(),
     val discoveredSenders: List<DiscoveredSender> = emptyList(),
+    /** Aggregated skips (no SMS bodies) for «رسائل لم تُستورد». */
+    val skippedSenders: List<SkippedSenderGroup> = emptyList(),
 ) {
     data class DiscoveredSender(val sender: String, val messageCount: Int, val latestTimestamp: Long, val likelyInstitution: String?)
+
+    enum class SkipReason {
+        UNREGISTERED_SENDER,
+        NO_AMOUNT,
+        NON_FINANCIAL,
+        OTP_OR_AUTH,
+        PATTERN_NOT_SELECTED,
+        UNKNOWN_PATTERN,
+    }
+
+    data class SkippedSenderGroup(
+        val senderDisplay: String,
+        val reason: SkipReason,
+        val messageCount: Int,
+        /** One TextSanitizer-redacted sample; never the raw SMS body. */
+        val redactedSample: String? = null,
+        val latestTimestamp: Long = 0L,
+    ) {
+        val reasonAr: String
+            get() = when (reason) {
+                SkipReason.UNREGISTERED_SENDER -> "مرسل غير مسجل على حساباتك"
+                SkipReason.NO_AMOUNT -> "تعذّر استخراج المبلغ"
+                SkipReason.NON_FINANCIAL -> "ليست رسالة مالية واضحة"
+                SkipReason.OTP_OR_AUTH -> "رمز تحقق / تأكيد هوية — ليست عملية مالية"
+                SkipReason.PATTERN_NOT_SELECTED -> "نمط غير محدد للاستيراد"
+                SkipReason.UNKNOWN_PATTERN -> "نمط جديد يحتاج مراجعة"
+            }
+    }
+
+    /** Mutable accumulator while scanning; never stores raw SMS. */
+    data class SkipAccum(
+        var count: Int = 0,
+        var redactedSample: String? = null,
+        var latestTimestamp: Long = 0L,
+    )
+
     /** Exclusive count of messages with [ImportDisposition.READY]. */
     val readyCount: Int
         get() = if (perTransaction.isNotEmpty()) {
@@ -217,6 +264,29 @@ data class ScanPreview(
         val date: LocalDate?,
         val disposition: ImportDisposition,
     )
+
+    companion object {
+        const val MAX_SKIPPED_GROUPS = 10
+
+        fun aggregateSkipped(
+            buckets: Map<Pair<String, SkipReason>, SkipAccum>,
+        ): List<SkippedSenderGroup> =
+            buckets
+                .map { (key, acc) ->
+                    SkippedSenderGroup(
+                        senderDisplay = key.first,
+                        reason = key.second,
+                        messageCount = acc.count,
+                        redactedSample = acc.redactedSample,
+                        latestTimestamp = acc.latestTimestamp,
+                    )
+                }
+                .sortedWith(
+                    compareByDescending<SkippedSenderGroup> { it.messageCount }
+                        .thenBy { it.senderDisplay },
+                )
+                .take(MAX_SKIPPED_GROUPS)
+    }
 }
 
 /**
@@ -250,9 +320,17 @@ class SmsImportOrchestrator(
     private val ledgerRepository: LedgerRepository,
     private val systemAccounts: suspend (com.baraa.masroof.ledger.SystemAccountKey) -> Long,
     private val institutionResolver: com.baraa.masroof.ledger.FinancialInstitutionResolver,
+    private val smsBodyRepository: TransactionSmsBodyRepository? = null,
+    private val senderProfileRepository: SenderProfileRepository? = null,
+    private val messagePatternRepository: MessagePatternRepository? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) {
+    /** Persist SMS body locally for on-device link assist. Never logs the body. */
+    private suspend fun rememberSmsBody(transactionId: Long, body: String?) {
+        if (transactionId <= 0L) return
+        runCatching { smsBodyRepository?.save(transactionId, body) }
+    }
     /**
      * Step 1 — read-only scan. Returns a [ScanPreview] describing what
      * the eventual commit would do.
@@ -263,20 +341,23 @@ class SmsImportOrchestrator(
         mode: SmsImportMode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
     ): ScanPreview = withContext(Dispatchers.IO) {
         val registeredSenders = registeredSenderKeys()
-        if (mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && registeredSenders.isEmpty()) {
+        val authorizedSenders = registeredSenders
+
+        if (mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && authorizedSenders.isEmpty()) {
             return@withContext ScanPreview(mode = mode, configuredSenderCount = 0, hasRegisteredSenders = false)
         }
         if (mode == SmsImportMode.DISCOVER_NEW_SENDERS) {
             val discoveries = messages.asSequence()
-                .filter { sms -> SenderNormalizer.normalize(sms.sender) !in registeredSenders }
+                .filter { sms -> !com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(sms.body) }
+                .filter { sms -> SenderNormalizer.normalize(sms.sender) !in authorizedSenders }
                 .filter { isLikelyFinancialSender(it.sender) || com.baraa.masroof.sms.BankSmsFilter.classifyMessage(it.sender, it.body).isMatch }
                 .groupBy { it.sender?.trim().orEmpty() }
                 .filterKeys { it.isNotBlank() }
                 .map { (sender, rows) -> ScanPreview.DiscoveredSender(sender, rows.size, rows.maxOf { it.timestamp }, null) }
                 .sortedByDescending { it.latestTimestamp }
             return@withContext ScanPreview(
-                mode = mode, configuredSenderCount = registeredSenders.size, scannedMessages = messages.size,
-                unregisteredSenderMessages = messages.count { SenderNormalizer.normalize(it.sender) !in registeredSenders },
+                mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = messages.size,
+                unregisteredSenderMessages = messages.count { SenderNormalizer.normalize(it.sender) !in authorizedSenders },
                 discoveredSenders = discoveries,
             )
         }
@@ -288,23 +369,102 @@ class SmsImportOrchestrator(
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
         val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots)
         var scanned = 0; var recognized = 0; var nonFinancial = 0; var unparsed = 0
-        var unregistered = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
+        var unregistered = 0; var otpOrAuth = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
         val groups = linkedMapOf<String, MutableList<ScanPreview.PreviewItem>>()
         val items = ArrayList<ScanPreview.PreviewItem>()
         val batchTimestampsByKey = mutableMapOf<String, MutableList<Long>>()
+        val skipBuckets = linkedMapOf<Pair<String, ScanPreview.SkipReason>, ScanPreview.SkipAccum>()
+        fun bumpSkip(sender: String?, reason: ScanPreview.SkipReason, body: String?, timestamp: Long) {
+            val key = (sender?.trim().orEmpty().ifBlank { "—" }) to reason
+            val acc = skipBuckets.getOrPut(key) { ScanPreview.SkipAccum() }
+            acc.count++
+            if (timestamp > acc.latestTimestamp) acc.latestTimestamp = timestamp
+            if (acc.redactedSample == null && !body.isNullOrBlank()) {
+                val redacted = com.baraa.masroof.diagnostics.TextSanitizer.sanitize(body)
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                    .take(240)
+                if (redacted.isNotBlank()) acc.redactedSample = redacted
+            }
+        }
 
         for (sms in messages) {
             scanned++
-            // This is intentionally before BankParserRegistry: unrelated bank messages
-            // must not consume parsing work or become review/duplicate candidates.
-            if (SenderNormalizer.normalize(sms.sender) !in registeredSenders) { unregistered++; continue }
-            val parsed = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
-            if (parsed.amount == null || parsed.confidence < 30) {
-                if (isLikelyFinancialSender(sms.sender)) unparsed++ else nonFinancial++
+            val senderKey = SenderNormalizer.normalize(sms.sender).orEmpty()
+            if (com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(sms.body)) {
+                otpOrAuth++
+                bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
+                continue
+            }
+            if (senderKey !in authorizedSenders) {
+                unregistered++
+                bumpSkip(sms.sender, ScanPreview.SkipReason.UNREGISTERED_SENDER, sms.body, sms.timestamp)
+                continue
+            }
+            val profile = senderProfileRepository?.findByRawSender(sms.sender)
+            val definitionPatterns = if (profile != null && messagePatternRepository != null) {
+                messagePatternRepository.getForSender(profile.id)
+            } else {
+                emptyList()
+            }
+            val hasDefinitionPatterns = definitionPatterns.any {
+                it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED ||
+                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.DEPRECATED ||
+                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.IGNORED
+            }
+
+            if (hasDefinitionPatterns) {
+                if (com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)) {
+                    otpOrAuth++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
+                    continue
+                }
+                val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
+                if (defMatch == null) {
+                    if (profile != null && messagePatternRepository != null) {
+                        val signature = com.baraa.masroof.sms.SmsStructureNormalizer.signatureFromBody(sms.body)
+                        messagePatternRepository.ensureUnknown(
+                            senderProfileId = profile.id,
+                            signature = signature,
+                            friendlyName = com.baraa.masroof.sms.SmsStructureNormalizer.friendlyNameHint(sms.body),
+                        )
+                    }
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.UNKNOWN_PATTERN, sms.body, sms.timestamp)
+                    continue
+                }
+                if (defMatch.pattern.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.IGNORED) {
+                    otpOrAuth++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
+                    continue
+                }
+            }
+
+            var parsed = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
+            if (hasDefinitionPatterns) {
+                val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
+                if (defMatch != null &&
+                    defMatch.pattern.definition.status != com.baraa.masroof.data.db.MessagePatternStatus.IGNORED
+                ) {
+                    val extracted = com.baraa.masroof.sms.PatternFieldExtractor.extract(sms.body, defMatch.pattern)
+                    parsed = com.baraa.masroof.sms.PatternFieldExtractor.toParsedTransaction(extracted, parsed)
+                }
+            }
+            if (parsed.amount == null) {
+                if (isLikelyFinancialSender(sms.sender) || hasDefinitionPatterns) {
+                    unparsed++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.NO_AMOUNT, sms.body, sms.timestamp)
+                } else {
+                    nonFinancial++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.NON_FINANCIAL, sms.body, sms.timestamp)
+                }
                 continue
             }
             val entity = buildEntity(sms, parsed, engine, context)
-            if (entity == null) { unparsed++; continue }
+            if (entity == null) {
+                unparsed++
+                bumpSkip(sms.sender, ScanPreview.SkipReason.NO_AMOUNT, sms.body, sms.timestamp)
+                continue
+            }
             recognized++
             val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
             val similarExisting = entity.transactionSimilarityKey
@@ -320,13 +480,17 @@ class SmsImportOrchestrator(
             val before = trackingStartDate != null && entity.transactionDate != null && entity.transactionDate.isBefore(trackingStartDate)
             val incompleteTwoSided = entity.financialTreatment.requiresTwoAccounts &&
                 match.account != null &&
+                !match.needsReview &&
                 match.destinationAccountCandidate == null
+            // Confirmed last-four only: sender-only proposals are not "matched" for READY.
+            val confirmedMatch = match.account != null && !match.needsReview
+            val lowConfidence = parsed.confidence < 30
             val disposition = ImportDispositionClassifier.classify(
                 isExactDuplicate = isDup,
                 isPossibleDuplicate = isPossibleDup,
                 isBeforeTrackingStart = before && !isDup && !isPossibleDup,
-                accountMatched = match.account != null,
-                needsConfirmation = (match.account != null && match.needsReview) || incompleteTwoSided,
+                accountMatched = confirmedMatch && !lowConfidence,
+                needsConfirmation = incompleteTwoSided || lowConfidence,
             )
             val isReviewNow = disposition == ImportDisposition.NEEDS_ACCOUNT ||
                 disposition == ImportDisposition.NEEDS_CONFIRMATION ||
@@ -348,17 +512,19 @@ class SmsImportOrchestrator(
                 sender = sms.sender, parsedInstitution = parserInstitution(parsed), parserIdentity = parsed.parserName,
                 knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
             ).institutionDisplayName
+            val previewAccount = match.account?.takeIf { !match.needsReview }
             val item = ScanPreview.PreviewItem(
-                sms.id, sms.sender, entity.amount, entity.transactionType, match.account?.id,
-                match.account?.displayName, isDup || isPossibleDup, isReviewNow, before, entity.transactionDate, disposition,
+                sms.id, sms.sender, entity.amount, entity.transactionType, previewAccount?.id,
+                previewAccount?.displayName, isDup || isPossibleDup, isReviewNow, before, entity.transactionDate, disposition,
             )
             groups.getOrPut(institutionKey) { mutableListOf() }.add(item)
             items += item
         }
         ScanPreview(
-            mode = mode, configuredSenderCount = registeredSenders.size, scannedMessages = scanned,
+            mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = scanned,
             recognizedTransactions = recognized, nonFinancialMessages = nonFinancial, unparsedMessages = unparsed,
-            unregisteredSenderMessages = unregistered, duplicateTransactions = duplicates, needsReviewTransactions = needsReview,
+            unregisteredSenderMessages = unregistered, otpOrAuthMessages = otpOrAuth,
+            duplicateTransactions = duplicates, needsReviewTransactions = needsReview,
             beforeTrackingStartCount = beforeTracking,
             institutionGroups = groups.map { (institution, its) ->
                 ScanPreview.InstitutionGroup(
@@ -373,17 +539,22 @@ class SmsImportOrchestrator(
                 )
             },
             perTransaction = items,
+            skippedSenders = ScanPreview.aggregateSkipped(skipBuckets),
         )
     }
 
     private suspend fun registeredSenderKeys(): Set<String> {
-        val direct = accountIdentifierRepository.activeOwnedSenderAliases().toMutableSet()
+        // Dual-read: SenderProfile cross-ref (preferred) ∪ legacy SENDER_ALIAS ∪ institution mapping.
+        val fromProfiles = senderProfileRepository?.activeOwnedSenderKeys().orEmpty().toMutableSet()
+        fromProfiles += accountIdentifierRepository.activeOwnedSenderAliases()
         val ownedInstitutions = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
             .mapNotNull { it.institutionName?.trim()?.lowercase() }.toSet()
         database.senderInstitutionMappingDao().getActive()
             .filter { it.institutionName.trim().lowercase() in ownedInstitutions }
-            .mapTo(direct) { SenderNormalizer.normalize(it.senderKey).orEmpty() }
-        return direct.filter { it.isNotBlank() }.toSet()
+            .mapTo(fromProfiles) { SenderNormalizer.normalize(it.senderKey).orEmpty() }
+        // Trained profiles without account link still authorize for pattern review import path.
+        fromProfiles += senderProfileRepository?.activeProfileKeys().orEmpty()
+        return fromProfiles.filter { it.isNotBlank() }.toSet()
     }
 
     /**
@@ -415,10 +586,15 @@ class SmsImportOrchestrator(
         val log = mutableListOf<SmsImportResult.TransactionImportLog>()
         val previewBySms = scanPreview.perTransaction.associateBy { it.smsId }
         val registeredSenders = registeredSenderKeys()
+        val authorizedSenders = registeredSenders
 
         database.withTransaction {
             for (sms in importedSms) {
-                if (scanPreview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && SenderNormalizer.normalize(sms.sender) !in registeredSenders) continue
+                if (scanPreview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY &&
+                    SenderNormalizer.normalize(sms.sender) !in authorizedSenders
+                ) {
+                    continue
+                }
                 val previewItem = previewBySms[sms.id]
                 if (previewItem == null) continue
                 when (previewItem.disposition) {
@@ -429,8 +605,29 @@ class SmsImportOrchestrator(
                     ImportDisposition.UNREGISTERED_SENDER, ImportDisposition.IGNORED, ImportDisposition.UNPARSED -> continue
                     else -> Unit
                 }
-                val parsed: ParsedTransaction = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
-                if (parsed.amount == null || parsed.confidence < 30) continue
+                val profile = senderProfileRepository?.findByRawSender(sms.sender)
+                val definitionPatterns = if (profile != null && messagePatternRepository != null) {
+                    messagePatternRepository.getForSender(profile.id)
+                } else {
+                    emptyList()
+                }
+                val hasDefinitionPatterns = definitionPatterns.any {
+                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED ||
+                        it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.DEPRECATED
+                }
+                if (hasDefinitionPatterns) {
+                    val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
+                    if (defMatch == null) continue
+                }
+                var parsed: ParsedTransaction = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
+                if (hasDefinitionPatterns) {
+                    val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
+                    if (defMatch != null) {
+                        val extracted = com.baraa.masroof.sms.PatternFieldExtractor.extract(sms.body, defMatch.pattern)
+                        parsed = com.baraa.masroof.sms.PatternFieldExtractor.toParsedTransaction(extracted, parsed)
+                    }
+                }
+                if (parsed.amount == null) continue
                 val entity = buildEntity(sms, parsed, engine, context) ?: continue
                 if (previewItem.disposition == ImportDisposition.POSSIBLE_DUPLICATE) {
                     val marked = entity.copy(
@@ -443,6 +640,7 @@ class SmsImportOrchestrator(
                     )
                     val id = transactionRepository.insert(marked)
                     if (id > 0L) {
+                        rememberSmsBody(id, sms.body)
                         imported++
                         reviewCount++
                         log += SmsImportResult.TransactionImportLog(
@@ -467,6 +665,7 @@ class SmsImportOrchestrator(
                     )
                     val id = transactionRepository.insert(marked)
                     if (id > 0L) {
+                        rememberSmsBody(id, sms.body)
                         preTracking++
                         imported++
                         reviewCount++
@@ -483,9 +682,65 @@ class SmsImportOrchestrator(
                     }
                     continue
                 }
+                // Credit-limit notices / declined IGNORED rows: store as VOIDED, never journal.
+                if (entity.financialTreatment == FinancialTreatment.IGNORED ||
+                    entity.transactionType == TransactionType.CREDIT_LIMIT_CHANGE
+                ) {
+                    val voided = entity.copy(
+                        financialTreatment = FinancialTreatment.IGNORED,
+                        needsReview = false,
+                        userConfirmed = true,
+                        postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.VOIDED,
+                        exclusionReason = entity.exclusionReason
+                            ?: "تغيير حد ائتماني أو إشعار غير مالي — مستبعد من الأرصدة",
+                        updatedAt = nowProvider(),
+                    )
+                    val id = transactionRepository.insert(voided)
+                    if (id > 0L) {
+                        rememberSmsBody(id, sms.body)
+                        imported++
+                        val match = accountMatcher.match(
+                            voided,
+                            ownedAccounts,
+                            accountIdentifierRepository,
+                            parsed.identifierEvidence,
+                        )
+                        val card = match.account?.takeIf {
+                            it.accountType == com.baraa.masroof.transaction.AccountType.CREDIT_CARD
+                        }
+                        val limit = entity.amount
+                        if (card != null && limit != null &&
+                            (entity.transactionType == TransactionType.CREDIT_LIMIT_CHANGE ||
+                                entity.exclusionReason?.contains("حد") == true ||
+                                parsed.transactionType == TransactionType.CREDIT_LIMIT_CHANGE)
+                        ) {
+                            runCatching {
+                                com.baraa.masroof.ledger.CreditLimitUpdater.applyToAccount(
+                                    account = card,
+                                    newLimit = limit,
+                                    dao = database.financialAccountDao(),
+                                    now = nowProvider,
+                                )
+                            }
+                        }
+                        log += SmsImportResult.TransactionImportLog(
+                            smsId = sms.id, sender = null, amount = entity.amount,
+                            transactionType = entity.transactionType.name,
+                            linkedAccountId = card?.id,
+                            journalEntryId = null,
+                            debitAccountId = null, creditAccountId = null,
+                            postingStatus = "IGNORED",
+                            includedInCalculatedBalance = false,
+                        )
+                    } else {
+                        duplicates++
+                    }
+                    continue
+                }
                 val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
                 val twoSidedOk = !entity.financialTreatment.requiresTwoAccounts ||
-                    match.destinationAccountCandidate != null
+                    match.destinationAccountCandidate != null ||
+                    entity.financialTreatment == FinancialTreatment.CASH_WITHDRAWAL
                 val hasLinkedAccount = match.account != null && !match.needsReview && twoSidedOk
                 val linked = entity.withAccountMatch(match)
                 val txId = transactionRepository.insert(linked)
@@ -493,6 +748,7 @@ class SmsImportOrchestrator(
                     duplicates++
                     continue
                 }
+                rememberSmsBody(txId, sms.body)
                 imported++
 
                 // Per spec: NEEDS_REVIEW transactions must NOT affect balance
@@ -515,6 +771,9 @@ class SmsImportOrchestrator(
                 val persistedLinked = linked.copy(id = txId)
                 val source = ownedAccounts.firstOrNull { it.id == persistedLinked.sourceAccountId }
                 val destination = ownedAccounts.firstOrNull { it.id == persistedLinked.destinationAccountId }
+                    ?: persistedLinked.destinationAccountId?.let { id ->
+                        database.financialAccountDao().getById(id)?.toDomain()
+                    }
                 val draft = journalGenerationService.generate(persistedLinked, source, destination)
 
                 if (draft != null) {
@@ -593,6 +852,9 @@ class SmsImportOrchestrator(
                             totalDebits = s.totalDebits,
                             calculatedBalance = s.calculatedBalance,
                             lastUpdatedAt = s.lastRecalculationAt,
+                            accountNature = s.accountNature,
+                            moneyIn = s.moneyIn,
+                            moneyOut = s.moneyOut,
                         )
                     }
                 }
@@ -630,8 +892,21 @@ class SmsImportOrchestrator(
     }
 
     /** Account placement is treatment-specific; category is not account evidence. */
-    private fun TransactionEntity.withAccountMatch(match: AccountMatcher.Match): TransactionEntity {
-        val accountId = match.account?.id
+    private suspend fun TransactionEntity.withAccountMatch(match: AccountMatcher.Match): TransactionEntity {
+        // Sender-only / ambiguous proposals must not sticky-link an account id —
+        // otherwise later accounts from the same bank cannot rematch these rows.
+        if (match.needsReview || match.account == null) {
+            return copy(
+                sourceAccountId = null,
+                destinationAccountId = null,
+                accountLinkSource = com.baraa.masroof.ledger.AccountLinkSource.UNLINKED,
+                accountLinkConfidence = match.confidence,
+                accountLinkNeedsReview = true,
+                needsReview = true,
+                postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
+            )
+        }
+        val accountId = match.account.id
         val sourceId = when (financialTreatment) {
             FinancialTreatment.EXPENSE, FinancialTreatment.BANK_FEE, FinancialTreatment.CASH_WITHDRAWAL,
             FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT -> accountId
@@ -639,7 +914,8 @@ class SmsImportOrchestrator(
         }
         val destinationId = when (financialTreatment) {
             FinancialTreatment.INCOME, FinancialTreatment.REFUND -> accountId
-            FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT -> match.destinationAccountCandidate?.id
+            FinancialTreatment.INTERNAL_TRANSFER, FinancialTreatment.CREDIT_CARD_PAYMENT, FinancialTreatment.INVESTMENT ->
+                match.destinationAccountCandidate?.id
             else -> null
         }
         return copy(
@@ -647,8 +923,8 @@ class SmsImportOrchestrator(
             destinationAccountId = destinationId,
             accountLinkSource = match.source,
             accountLinkConfidence = match.confidence,
-            accountLinkNeedsReview = match.needsReview,
-            needsReview = needsReview || accountId == null || match.needsReview,
+            accountLinkNeedsReview = false,
+            needsReview = needsReview,
             postingStatus = com.baraa.masroof.ledger.TransactionPostingStatus.NEEDS_REVIEW,
         )
     }
@@ -722,6 +998,28 @@ class SmsImportOrchestrator(
             parsed = p,
         )
         val verdict = engine.classify(input, context)
+        val audited = if (verdict.financialTreatment == FinancialTreatment.PENDING_REVIEW) {
+            val audit = LocalTreatmentAuditor.audit(
+                type = p.transactionType,
+                body = sms.body,
+                currentTreatment = FinancialTreatment.PENDING_REVIEW,
+                hasConfirmedTwoOwnedSides = false,
+            )
+            // Apply single-sided auto treatments; leave two-sided / unclear for review.
+            if (audit.autoApply && !audit.treatment.requiresTwoAccounts) {
+                verdict.copy(
+                    financialTreatment = audit.treatment,
+                    confidence = maxOf(verdict.confidence, audit.confidence),
+                    reason = audit.reasonAr,
+                    excludeFromSpending = audit.treatment != FinancialTreatment.EXPENSE &&
+                        audit.treatment != FinancialTreatment.BANK_FEE,
+                )
+            } else {
+                verdict
+            }
+        } else {
+            verdict
+        }
         val dateSource = when {
             p.transactionDate != null && p.parsingNotes.any { it.startsWith("date from message body") } ->
                 com.baraa.masroof.data.db.DateSource.FROM_BODY
@@ -747,13 +1045,13 @@ class SmsImportOrchestrator(
             createdAt = timestamp,
             updatedAt = timestamp,
             transactionSimilarityKey = similarityKey,
-            financialTreatment = verdict.financialTreatment,
-            categoryId = verdict.categoryId,
-            categorySource = verdict.source,
-            categoryConfidence = verdict.confidence,
-            needsReview = verdict.financialTreatment == FinancialTreatment.PENDING_REVIEW,
+            financialTreatment = audited.financialTreatment,
+            categoryId = audited.categoryId,
+            categorySource = audited.source,
+            categoryConfidence = audited.confidence,
+            needsReview = audited.financialTreatment == FinancialTreatment.PENDING_REVIEW,
             userConfirmed = false,
-            exclusionReason = if (verdict.excludeFromSpending) verdict.reason else null,
+            exclusionReason = if (audited.excludeFromSpending) audited.reason else null,
         )
     }
 }

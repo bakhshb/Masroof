@@ -23,6 +23,17 @@ interface JournalDao {
 
     @Query("DELETE FROM journal_entries WHERE id = :id")
     suspend fun deleteJournal(id: Long): Int
+
+    /** Clears every journal; postings cascade via FK. Used by import reset only. */
+    @Query("DELETE FROM ledger_postings")
+    suspend fun deleteAllPostings()
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun deleteAllJournals()
+
+    @Query("SELECT COUNT(*) FROM journal_entries")
+    suspend fun countJournals(): Int
+
     @Query("SELECT * FROM journal_entries WHERE id = :id")
     suspend fun getJournal(id: Long): JournalEntryEntity?
 

@@ -21,7 +21,11 @@ data class AccountSmsAnalysis(
 )
 
 object AccountSmsAnalyzer {
-    /** A collapsed picker preview: masks digit sequences and omits OTP/balance lines. */
+    /**
+     * Collapsed picker preview: omits OTP/balance lines and masks long digit
+     * runs while keeping the last four visible (e.g. `••••7271`) so the user
+     * can pick the right account SMS.
+     */
     fun sanitizedPreview(body: String?): String {
         val safe = body.orEmpty().lineSequence()
             .filterNot {
@@ -31,7 +35,10 @@ object AccountSmsAnalyzer {
                     it.contains("balance", true)
             }
             .joinToString(" ")
-            .replace(Regex("\\d{4,}"), "••••")
+            .replace(Regex("\\d{4,}")) { match ->
+                val digits = match.value
+                "••••" + digits.takeLast(4)
+            }
             .replace(Regex("\\s+"), " ")
             .trim()
         return safe.take(110)
@@ -75,7 +82,9 @@ object AccountSmsAnalyzer {
 
     private fun identifierType(body: String?, accountType: AccountType): AccountIdentifierType = when {
         body.orEmpty().contains("مدى") -> AccountIdentifierType.DEBIT_CARD_LAST4
-        body.orEmpty().contains("ائتمان") || body.orEmpty().contains("credit", true) ->
+        body.orEmpty().contains("ائتمان") || body.orEmpty().contains("credit", true) ||
+            body.orEmpty().contains("فيزا") || body.orEmpty().contains("visa", true) ||
+            body.orEmpty().contains("mastercard", true) ->
             AccountIdentifierType.CREDIT_CARD_LAST4
         else -> AccountIdentifierCompatibility.defaultIdentifierTypeFor(accountType)
             ?: AccountIdentifierType.ACCOUNT_LAST4

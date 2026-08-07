@@ -21,6 +21,7 @@ class SettingsNavRegistrationTest {
         SettingsDestinations.financialHistory.route,
         SettingsDestinations.accountLinkRules.route,
         SettingsDestinations.senderMappings.route,
+        SettingsDestinations.bankMessages.route,
         SettingsDestinations.diagnostics.route,
         SettingsDestinations.testData.route,
         SettingsDestinations.releaseNotes.route,

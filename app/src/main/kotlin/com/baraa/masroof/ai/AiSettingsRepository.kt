@@ -22,9 +22,13 @@ class AiSettingsRepository(
         val stored = dao.get() ?: AiSettingsEntity.DEFAULTS
         AiProviderConfig(
             enabled = stored.enabled,
+            deploymentMode = runCatching {
+                AiDeploymentMode.valueOf(stored.deploymentMode)
+            }.getOrDefault(AiDeploymentMode.REMOTE),
             providerLabel = stored.providerLabel,
             baseUrl = stored.baseUrl,
             modelName = stored.modelName,
+            onDeviceModelPath = stored.onDeviceModelPath,
             apiKey = keyStore.getApiKey().orEmpty(),
             shareExactAmount = stored.shareExactAmount,
             minimumConfidence = stored.minimumConfidence,
@@ -40,6 +44,8 @@ class AiSettingsRepository(
             providerLabel = config.providerLabel,
             baseUrl = config.baseUrl,
             modelName = config.modelName,
+            deploymentMode = config.deploymentMode.name,
+            onDeviceModelPath = config.onDeviceModelPath,
             shareExactAmount = config.shareExactAmount,
             minimumConfidence = config.minimumConfidence,
             requireHttps = config.requireHttps,

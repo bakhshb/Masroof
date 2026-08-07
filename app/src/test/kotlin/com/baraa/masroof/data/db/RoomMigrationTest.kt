@@ -86,9 +86,69 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration15to16AddsOnDeviceAiColumns() {
+        assertEquals(15, MasroofDatabase.MIGRATION_15_16.startVersion)
+        assertEquals(16, MasroofDatabase.MIGRATION_15_16.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("ADD COLUMN `deploymentMode`"))
+        assertTrue(source.contains("ADD COLUMN `onDeviceModelPath`"))
+    }
+
+    @Test
+    fun migration16to17AddsTransactionSmsBodiesTable() {
+        assertEquals(16, MasroofDatabase.MIGRATION_16_17.startVersion)
+        assertEquals(17, MasroofDatabase.MIGRATION_16_17.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `transaction_sms_bodies`"))
+        assertTrue(source.contains("FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`)"))
+        assertTrue(source.contains("ON DELETE CASCADE"))
+    }
+
+    @Test
+    fun migration17to18AddsSenderMessagePatternsTable() {
+        assertEquals(17, MasroofDatabase.MIGRATION_17_18.startVersion)
+        assertEquals(18, MasroofDatabase.MIGRATION_17_18.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `sender_message_patterns`"))
+        assertTrue(source.contains("index_sender_message_patterns_senderKey_accountId_kind"))
+    }
+
+    @Test
+    fun migration18to19DetachesPatternsFromAccountAndAddsStructureKey() {
+        assertEquals(18, MasroofDatabase.MIGRATION_18_19.startVersion)
+        assertEquals(19, MasroofDatabase.MIGRATION_18_19.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("sender_message_patterns_new"))
+        assertTrue(source.contains("structureKey"))
+        assertTrue(source.contains("index_sender_message_patterns_senderKey_structureKey_kind"))
+    }
+
+    @Test
+    fun migration19to20AddsSenderProfiles() {
+        assertEquals(19, MasroofDatabase.MIGRATION_19_20.startVersion)
+        assertEquals(20, MasroofDatabase.MIGRATION_19_20.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `sender_profiles`"))
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `account_sender_profiles`"))
+        assertTrue(source.contains("SENDER_ALIAS"))
+    }
+
+    @Test
+    fun migration20to21AddsMessagePatternDefinitions() {
+        assertEquals(20, MasroofDatabase.MIGRATION_20_21.startVersion)
+        assertEquals(21, MasroofDatabase.MIGRATION_20_21.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `message_pattern_definitions`"))
+        assertTrue(source.contains("CREATE TABLE IF NOT EXISTS `pattern_field_definitions`"))
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
-        val expected = setOf("1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15")
+        val expected = setOf(
+            "1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15",
+            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21",
+        )
         val missing = expected - versions.toSet()
         assertTrue(
             "ALL_MIGRATIONS missing $missing (was: $versions)",

@@ -73,10 +73,14 @@ class JournalGenerationService(
                     PostingDraft(it.id, PostingSide.CREDIT, amount, currency),
                 ))
             }
-            FinancialTreatment.CASH_WITHDRAWAL -> if (source != null && destination != null) draft(JournalType.CASH_WITHDRAWAL, listOf(
-                PostingDraft(destination.id, PostingSide.DEBIT, amount, currency),
-                PostingDraft(source.id, PostingSide.CREDIT, amount, currency),
-            )) else null
+            FinancialTreatment.CASH_WITHDRAWAL -> source?.let {
+                // Same balance effect as spending from the bank/salary account —
+                // no separate cash-on-hand destination is required.
+                draft(JournalType.CASH_WITHDRAWAL, listOf(
+                    PostingDraft(system(SystemAccountKey.EXPENSE_CLEARING), PostingSide.DEBIT, amount, currency),
+                    PostingDraft(it.id, PostingSide.CREDIT, amount, currency),
+                ))
+            }
             FinancialTreatment.PENDING_REVIEW, FinancialTreatment.IGNORED -> null
         }
     }

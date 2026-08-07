@@ -21,6 +21,7 @@ import com.baraa.masroof.ui.sms.SmsPermissionRequiredBanner
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
@@ -36,6 +37,7 @@ fun TransactionOperationsScreen(
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
+    val scope = rememberCoroutineScope()
     val transactions by app.transactionRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val categories by app.categoryRepository.observeAll().collectAsStateWithLifecycle(emptyList())
@@ -49,6 +51,8 @@ fun TransactionOperationsScreen(
     }
     var showFilters by remember { mutableStateOf(false) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    var correcting by remember { mutableStateOf<TransactionEntity?>(null) }
+    var correctionError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(topBar = {
         CenterAlignedTopAppBar(title = { Text("العمليات") }, actions = {
@@ -63,6 +67,9 @@ fun TransactionOperationsScreen(
                 SecondaryButton(label = "فلترة", onClick = { showFilters = true }, modifier = Modifier.weight(0.6f))
             }
             SmsPermissionRequiredBanner(onImportClick = onOpenImport, modifier = Modifier.fillMaxWidth())
+            correctionError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
             OutlinedTextField(state.query, { state.query = it; if (it.isEmpty()) debouncedQuery = "" }, label = { Text("بحث") }, modifier = Modifier.fillMaxWidth(), trailingIcon = { if (state.query.isNotEmpty()) IconButton(onClick = { state.query = ""; debouncedQuery = "" }) { Icon(Icons.Filled.Close, "مسح") } })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = state.needsReview, onClick = { state.needsReview = !state.needsReview }, label = { Text("يحتاج مراجعة") })
@@ -72,7 +79,7 @@ fun TransactionOperationsScreen(
             }
             Text("عدد النتائج: ${visible.size}")
             if (visible.isEmpty()) Text("لا توجد نتائج مطابقة", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else Text("طابور المراجعة: ${visible.count { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW }}")
+            else Text("قائمة المراجعة: ${visible.count { it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW }}")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
                 items(visible, key = { it.id }) { tx ->
                     ReviewCard(
@@ -81,12 +88,47 @@ fun TransactionOperationsScreen(
                         categories = categories,
                         showAdvanced = showAdvanced,
                         onOpenReview = onOpenReview,
+                        onCorrect = {
+                            scope.launch {
+                                correctionError = null
+                                runCatching {
+                                    app.transactionCorrectionService.reopenForCorrection(tx)
+                                }.onSuccess { reopened ->
+                                    correcting = reopened
+                                }.onFailure {
+                                    correctionError = "تعذّر فتح التصحيح — العملية ليست مُرحّلة"
+                                }
+                            }
+                        },
                     )
                 }
             }
         }
     }
     if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { showFilters = false })
+    correcting?.let { tx ->
+        AccountChooserDialog(
+            tx = tx,
+            accounts = accounts,
+            onDismiss = { correcting = null },
+        ) { sourceId, destinationId, rememberLink, saveIdentifier, preferredAccount, treatment ->
+            scope.launch {
+                val candidate = preferredAccount?.let {
+                    if (saveIdentifier) com.baraa.masroof.ledger.DiscoveredIdentifierProposer.propose(tx, it) else null
+                }
+                app.transactionLinkingService.applyUserLink(
+                    transaction = tx,
+                    sourceAccountId = sourceId,
+                    destinationAccountId = destinationId,
+                    accounts = accounts,
+                    rememberForFuture = rememberLink,
+                    identifierToAdd = candidate,
+                    financialTreatment = treatment,
+                )
+                correcting = null
+            }
+        }
+    }
 }
 
 @Composable
@@ -96,15 +138,19 @@ private fun ReviewCard(
     categories: List<com.baraa.masroof.data.db.Category>,
     showAdvanced: Boolean,
     onOpenReview: () -> Unit,
+    onCorrect: () -> Unit,
 ) {
     val accountName = accounts.firstOrNull { it.id == transaction.sourceAccountId || it.id == transaction.destinationAccountId }?.displayName
     val categoryName = categories.firstOrNull { it.id == transaction.categoryId }?.nameAr
     val reviewReason = when {
         transaction.accountLinkSource.name == "UNLINKED" -> "تحتاج تحديد الحساب"
         transaction.postingStatus == TransactionPostingStatus.NEEDS_REVIEW -> "تحتاج مراجعة"
+        transaction.postingStatus == TransactionPostingStatus.POSTED -> "مُرحّلة"
         else -> "جاهزة للاعتماد"
     }
     val needsAction = transaction.needsReview || transaction.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || transaction.accountLinkNeedsReview
+    val canCorrect = transaction.postingStatus == TransactionPostingStatus.POSTED ||
+        transaction.postingStatus == TransactionPostingStatus.REVERSED
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -119,9 +165,14 @@ private fun ReviewCard(
             Text(accountName?.let { "الحساب: $it" } ?: "الحساب غير محدد")
             transaction.accountOrCardLastFourDigits?.let { Text("المعرّف المنتهي بـ ••••$it") }
             if (categoryName != null) Text("التصنيف: $categoryName")
-            Text(reviewReason, color = if (reviewReason == "جاهزة للاعتماد") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-            if (needsAction) {
-                TextButton(onClick = onOpenReview) { Text("فتح المراجعة") }
+            Text(reviewReason, color = if (reviewReason == "مُرحّلة" || reviewReason == "جاهزة للاعتماد") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (needsAction) {
+                    TextButton(onClick = onOpenReview) { Text("فتح المراجعة") }
+                }
+                if (canCorrect) {
+                    TextButton(onClick = onCorrect) { Text("تصحيح") }
+                }
             }
             if (showAdvanced) {
                 Text("تفاصيل فنية: parser=${transaction.transactionType} • link=${transaction.accountLinkSource.name} • status=${transaction.postingStatus.name} • tx#${transaction.id}")

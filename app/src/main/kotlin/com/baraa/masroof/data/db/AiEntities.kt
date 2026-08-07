@@ -95,6 +95,12 @@ data class AiSettingsEntity(
     @ColumnInfo(name = "modelName")
     val modelName: String,
 
+    @ColumnInfo(name = "deploymentMode")
+    val deploymentMode: String = "REMOTE",
+
+    @ColumnInfo(name = "onDeviceModelPath")
+    val onDeviceModelPath: String = "",
+
     @ColumnInfo(name = "shareExactAmount")
     val shareExactAmount: Boolean,
 
@@ -120,6 +126,8 @@ data class AiSettingsEntity(
             providerLabel = "OpenAI-compatible",
             baseUrl = "https://api.openai.com",
             modelName = "gpt-4o-mini",
+            deploymentMode = "REMOTE",
+            onDeviceModelPath = "",
             shareExactAmount = false,
             minimumConfidence = 80,
             requireHttps = true,

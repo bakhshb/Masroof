@@ -30,13 +30,18 @@ fun IdentifiersSection(
     accountId: Long,
     accountType: com.baraa.masroof.transaction.AccountType,
     onPossibleConflict: (IdentifierAddOutcome) -> Unit = {},
+    onImportAfterBind: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val repo = app.accountIdentifierRepository
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<AccountIdentifierEntity>>(emptyList()) }
-    var showAdd by remember { mutableStateOf(false) }
+    val pendingSenderInitial = remember {
+        com.baraa.masroof.ui.senders.ImportSessionHints.consumePreferredSender()
+    }
+    var pendingSender by remember { mutableStateOf(pendingSenderInitial) }
+    var showAdd by remember { mutableStateOf(pendingSenderInitial != null) }
     var showSmsBinding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AccountIdentifierEntity?>(null) }
     LaunchedEffect(accountId) {
@@ -47,9 +52,16 @@ fun IdentifiersSection(
             Text("معرفات الحساب", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             TextButton(onClick = { showAdd = true }) { Text("إدخال المعرفات يدويًا") }
         }
-        TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) { Text("ربط الحساب برسالة بنكية") }
+        Text(
+            "أدخل آخر 4 أرقام للحساب / البطاقة / الآيبان يدوياً. مرسل الرسائل يُختار من القسم أعلاه.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("استخراج آخر 4 أرقام من رسالة")
+        }
         if (items.isEmpty()) Text("لا توجد معرفات بعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        items.forEach { identifier ->
+        items.filter { it.identifierType != AccountIdentifierType.SENDER_ALIAS }.forEach { identifier ->
             IdentifierRow(
                 identifier = identifier,
                 onToggle = { active -> scope.launch { repo.setActive(identifier.id, active) } },
@@ -57,15 +69,31 @@ fun IdentifiersSection(
                 onDelete = { scope.launch { repo.delete(identifier) } },
             )
         }
-        if (showSmsBinding) AccountSmsBindingDialog(accountId, accountType) { showSmsBinding = false }
+        if (showSmsBinding) {
+            AccountSmsBindingDialog(
+                accountId = accountId,
+                accountType = accountType,
+                onDismiss = { showSmsBinding = false },
+                onImportNow = {
+                    showSmsBinding = false
+                    onImportAfterBind?.invoke()
+                },
+            )
+        }
         if (showAdd) {
             AddIdentifierDialog(
                 accountId = accountId,
                 repository = repo,
-                onDismiss = { showAdd = false },
-                onSaved = {
+                initialType = AccountIdentifierType.ACCOUNT_LAST4,
+                initialValue = "",
+                onDismiss = { showAdd = false; pendingSender = null },
+                onSaved = { outcome ->
                     showAdd = false
-                    onPossibleConflict(it)
+                    pendingSender = null
+                    onPossibleConflict(outcome)
+                    scope.launch {
+                        runCatching { app.historicalAccountRelinkService.relinkUnposted(dryRun = false) }
+                    }
                 },
             )
         }
@@ -115,9 +143,11 @@ private fun AddIdentifierDialog(
     repository: AccountIdentifierRepository,
     onDismiss: () -> Unit,
     onSaved: (IdentifierAddOutcome) -> Unit,
+    initialType: AccountIdentifierType = AccountIdentifierType.ACCOUNT_LAST4,
+    initialValue: String = "",
 ) {
-    var type by remember { mutableStateOf(AccountIdentifierType.ACCOUNT_LAST4) }
-    var value by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(initialType) }
+    var value by remember { mutableStateOf(initialValue) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     AlertDialog(
@@ -129,7 +159,9 @@ private fun AddIdentifierDialog(
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(value = typeLabel(type), onValueChange = {}, readOnly = true, label = { Text("نوع المعرف") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        AccountIdentifierType.values().forEach { valueType ->
+                        AccountIdentifierType.values()
+                            .filter { it != AccountIdentifierType.SENDER_ALIAS }
+                            .forEach { valueType ->
                             DropdownMenuItem(text = { Text(typeLabel(valueType)) }, onClick = { type = valueType; expanded = false })
                         }
                     }
@@ -218,5 +250,5 @@ private fun typeLabel(type: AccountIdentifierType): String = when (type) {
 
 private fun maskedValue(identifier: AccountIdentifierEntity): String = when (identifier.identifierType) {
     AccountIdentifierType.SENDER_ALIAS -> identifier.displayLabel
-    else -> "•••• ${identifier.displayLabel.takeLast(4)}"
+    else -> "•••• ${identifier.normalizedValue.takeLast(4)}"
 }

@@ -17,5 +17,16 @@ class LineBasedFieldParserTest {
         assertTrue(LineBasedFieldParser.containsAmountLabel("Amount"))
         assertTrue(LineBasedFieldParser.containsAmountLabel("Purchase Amount"))
         assertTrue(LineBasedFieldParser.containsAmountLabel("Transaction Amount"))
+        assertTrue(LineBasedFieldParser.containsAmountLabel("of"))
+    }
+
+    @Test fun expandsCompactEnglishInlineFields() {
+        val body =
+            "Online Purchase Apple Pay Credit Card: 8332 at :RIDE APP of : 33.03 SAR on : 2026-07-30 10:01 Available Balance is: 18313.81 SAR Due Amount: 802.62 SAR"
+        val lines = LineBasedFieldParser.splitLines(body)
+        assertTrue(lines.any { it.label.equals("Credit Card", ignoreCase = true) && it.value.contains("8332") })
+        assertTrue(lines.any { it.label.equals("of", ignoreCase = true) && it.value.contains("33.03") })
+        assertTrue(lines.any { it.label.equals("at", ignoreCase = true) && it.value.contains("RIDE APP") })
+        assertTrue(lines.any { it.label.equals("Due Amount", ignoreCase = true) && it.value.contains("802.62") })
     }
 }

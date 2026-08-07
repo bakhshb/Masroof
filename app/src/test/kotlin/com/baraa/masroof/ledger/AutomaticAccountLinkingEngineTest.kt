@@ -64,26 +64,30 @@ class AutomaticAccountLinkingEngineTest {
     private fun repoWith(vararg triples: Triple<FinancialAccount, AccountIdentifierType, String>): AccountIdentifierRepository {
         val accountDao = FakeAccountDao()
         val repo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        val inserted = mutableSetOf<Long>()
         for ((account, type, value) in triples) {
-            val entity = FinancialAccountEntity(
-                id = account.id,
-                displayName = account.displayName,
-                institutionName = account.institutionName,
-                accountType = account.accountType,
-                accountNature = account.accountNature,
-                currency = account.currency,
-                openingBalance = account.openingBalance,
-                openingBalanceDate = account.openingBalanceDate,
-                includeInNetWorth = account.includeInNetWorth,
-                includeInLiquidity = account.includeInLiquidity,
-                isOwnedByUser = account.isOwnedByUser,
-                systemAccountKey = account.systemAccountKey,
-                isActive = account.isActive,
-                notes = account.notes,
-                createdAt = 0L,
-                updatedAt = 0L,
-            )
-            runBlocking { accountDao.insert(entity) }
+            if (account.id !in inserted) {
+                val entity = FinancialAccountEntity(
+                    id = account.id,
+                    displayName = account.displayName,
+                    institutionName = account.institutionName,
+                    accountType = account.accountType,
+                    accountNature = account.accountNature,
+                    currency = account.currency,
+                    openingBalance = account.openingBalance,
+                    openingBalanceDate = account.openingBalanceDate,
+                    includeInNetWorth = account.includeInNetWorth,
+                    includeInLiquidity = account.includeInLiquidity,
+                    isOwnedByUser = account.isOwnedByUser,
+                    systemAccountKey = account.systemAccountKey,
+                    isActive = account.isActive,
+                    notes = account.notes,
+                    createdAt = 0L,
+                    updatedAt = 0L,
+                )
+                runBlocking { accountDao.insert(entity) }
+                inserted += account.id
+            }
             runBlocking {
                 repo.addOrUpdate(account.id, IdentifierForm(type, account.displayName, value))
             }
@@ -187,5 +191,96 @@ class AutomaticAccountLinkingEngineTest {
             repo,
         )
         assertNull("sender must not match without typed SENDER_ALIAS", m.account)
+    }
+
+    @Test
+    fun debitEvidenceMatchesStoredAccountLastFourSameSenderMultiAccount() = runBlocking {
+        val a1 = account(1, AccountType.BANK_ACCOUNT)
+        val a2 = account(2, AccountType.BANK_ACCOUNT)
+        val a3 = account(3, AccountType.BANK_ACCOUNT)
+        val card = account(4, AccountType.CREDIT_CARD)
+        val accounts = listOf(a1, a2, a3, card)
+        val repo = repoWith(
+            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
+            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
+            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
+            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+        )
+        val evidence = listOf(
+            com.baraa.masroof.transaction.ParsedIdentifierEvidence(
+                type = AccountIdentifierType.DEBIT_CARD_LAST4,
+                lastFour = "2222",
+                role = com.baraa.masroof.transaction.IdentifierRole.SOURCE,
+                confidence = 90,
+                extractionRule = "label:DEBIT_CARD_LAST4",
+            ),
+        )
+        val m = AccountMatcher.match(
+            tx("2222").copy(accountOrCardLastFourDigits = "2222"),
+            accounts,
+            repo,
+            evidence,
+        )
+        assertEquals(a2.id, m.account?.id)
+        assertEquals(false, m.needsReview)
+        assertEquals("last_four_cross_type_match", m.diagnosticCode)
+        assertEquals(AccountLinkConfidence.CONFIRMED, m.level)
+    }
+
+    @Test
+    fun creditEvidenceMatchesCreditCardAmongSameSenderAccounts() = runBlocking {
+        val a1 = account(1, AccountType.BANK_ACCOUNT)
+        val a2 = account(2, AccountType.BANK_ACCOUNT)
+        val a3 = account(3, AccountType.BANK_ACCOUNT)
+        val card = account(4, AccountType.CREDIT_CARD)
+        val accounts = listOf(a1, a2, a3, card)
+        val repo = repoWith(
+            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
+            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
+            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
+            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+        )
+        val evidence = listOf(
+            com.baraa.masroof.transaction.ParsedIdentifierEvidence(
+                type = AccountIdentifierType.CREDIT_CARD_LAST4,
+                lastFour = "4444",
+                role = com.baraa.masroof.transaction.IdentifierRole.UNSPECIFIED,
+                confidence = 90,
+                extractionRule = "label:CREDIT_CARD_LAST4",
+            ),
+        )
+        val m = AccountMatcher.match(tx("4444"), accounts, repo, evidence)
+        assertEquals(card.id, m.account?.id)
+        assertEquals(false, m.needsReview)
+    }
+
+    @Test
+    fun sameSenderWithoutLastFourDoesNotGuessAmongMultipleAccounts() = runBlocking {
+        val a1 = account(1, AccountType.BANK_ACCOUNT)
+        val a2 = account(2, AccountType.BANK_ACCOUNT)
+        val a3 = account(3, AccountType.BANK_ACCOUNT)
+        val card = account(4, AccountType.CREDIT_CARD)
+        val accounts = listOf(a1, a2, a3, card)
+        val repo = repoWith(
+            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
+            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
+            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
+            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+        )
+        val m = AccountMatcher.match(tx(null), accounts, repo, emptyList())
+        assertNull(m.account)
+        assertEquals("ambiguous_sender", m.diagnosticCode)
     }
 }

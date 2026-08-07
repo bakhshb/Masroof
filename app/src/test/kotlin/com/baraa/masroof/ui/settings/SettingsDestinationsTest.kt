@@ -28,6 +28,20 @@ class SettingsDestinationsTest {
         for (e in expected) assertTrue("missing row: $e", titles.contains(e))
     }
 
+    @Test fun landingShowsOnlyAppPreferences() {
+        val landingTitles = SettingsDestinations.landing.map { it.title }
+        assertTrue(landingTitles.contains("استيراد رسائل البنك تلقائياً"))
+        assertTrue(landingTitles.contains("إشعار عند تسجيل عملية جديدة"))
+        assertTrue(landingTitles.contains("تشخيص التطبيق"))
+        assertFalse("Accounts must stay on More, not Settings landing", landingTitles.contains("الحسابات"))
+        assertFalse("Categories must stay on More, not Settings landing", landingTitles.contains("إدارة التصنيفات"))
+        assertFalse("Financial history must stay on More", landingTitles.contains("السجل المالي"))
+        assertEquals(
+            setOf(SettingsGroup.Messages, SettingsGroup.Diagnostics),
+            SettingsDestinations.landing.map { it.group }.toSet(),
+        )
+    }
+
     @Test fun everyRouteIsUnique() {
         val routes = SettingsDestinations.all.map { it.route }
         assertEquals(routes.size, routes.toSet().size)

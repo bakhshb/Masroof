@@ -31,6 +31,40 @@ class DeclinedRule : TransactionRule {
 }
 
 /**
+ * Credit-limit change notices are informational only — never spending and
+ * never posted to the ledger.
+ */
+class CreditLimitChangeRule : TransactionRule {
+    override val name: String = "CreditLimitChangeRule"
+    override val priority: RulePriority = RulePriority.SAFETY
+    override fun evaluate(input: RuleInput, context: RuleContext): RuleResult? {
+        val body = input.body.orEmpty().lowercase(java.util.Locale.ROOT)
+        val fromType = input.type == TransactionType.CREDIT_LIMIT_CHANGE
+        val fromBody = LIMIT_CUES.any { it in body }
+        if (!fromType && !fromBody) return null
+        return RuleResult(
+            financialTreatment = FinancialTreatment.IGNORED,
+            categoryId = null,
+            confidence = 100,
+            reason = "credit limit change — ignored for balances",
+            source = CategorySource.RULE,
+            excludeFromSpending = true,
+        )
+    }
+
+    companion object {
+        private val LIMIT_CUES = listOf(
+            "تغيير حد الرصيد",
+            "تم تغيير الحد الائتماني",
+            "تغيير الحد الائتماني",
+            "الحد الائتماني الجديد",
+            "credit limit change",
+            "new credit limit",
+        )
+    }
+}
+
+/**
  * Transactions still pending confirmation stay PENDING_REVIEW. The
  * spending calculator excludes them from confirmed totals.
  */

@@ -120,4 +120,25 @@ class Converters {
     @TypeConverter fun toTransactionPostingStatus(value: String): TransactionPostingStatus = TransactionPostingStatus.valueOf(value)
     @TypeConverter fun fromOpeningBalanceKind(value: OpeningBalanceKind): String = value.name
     @TypeConverter fun toOpeningBalanceKind(value: String): OpeningBalanceKind = OpeningBalanceKind.valueOf(value)
+
+    @TypeConverter
+    fun fromSenderMessagePatternKind(value: SenderMessagePatternKind): String = value.name
+
+    @TypeConverter
+    fun toSenderMessagePatternKind(value: String): SenderMessagePatternKind =
+        SenderMessagePatternKind.valueOf(value)
+
+    @TypeConverter fun fromMessagePatternStatus(value: MessagePatternStatus): String = value.name
+    @TypeConverter fun toMessagePatternStatus(value: String): MessagePatternStatus = MessagePatternStatus.valueOf(value)
+    @TypeConverter fun fromPatternOrigin(value: PatternOrigin): String = value.name
+    @TypeConverter fun toPatternOrigin(value: String): PatternOrigin = PatternOrigin.valueOf(value)
+    @TypeConverter fun fromPatternCanonicalField(value: PatternCanonicalField): String = value.name
+    @TypeConverter fun toPatternCanonicalField(value: String): PatternCanonicalField = PatternCanonicalField.valueOf(value)
+    @TypeConverter fun fromPatternFieldRole(value: PatternFieldRole): String = value.name
+    @TypeConverter fun toPatternFieldRole(value: String): PatternFieldRole = PatternFieldRole.valueOf(value)
+    @TypeConverter fun fromPatternValueType(value: PatternValueType): String = value.name
+    @TypeConverter fun toPatternValueType(value: String): PatternValueType = PatternValueType.valueOf(value)
+    @TypeConverter fun fromPatternExtractionStrategy(value: PatternExtractionStrategy): String = value.name
+    @TypeConverter fun toPatternExtractionStrategy(value: String): PatternExtractionStrategy =
+        PatternExtractionStrategy.valueOf(value)
 }

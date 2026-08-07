@@ -5,12 +5,15 @@ import com.baraa.masroof.ai.AiBatchCategorizationService
 import com.baraa.masroof.ai.AiCacheRepository
 import com.baraa.masroof.ai.AiCategorizationProvider
 import com.baraa.masroof.ai.AiCategorizationService
+import com.baraa.masroof.ai.AiDeploymentMode
 import com.baraa.masroof.ai.AiHttpClient
 import com.baraa.masroof.ai.AiProviderConfig
 import com.baraa.masroof.ai.AiSettingsRepository
 import com.baraa.masroof.ai.AiSuggestionRepository
 import com.baraa.masroof.ai.DisabledAiCategorizationProvider
 import com.baraa.masroof.ai.EncryptedAiSettingsStore
+import com.baraa.masroof.ai.OnDeviceLinkAssistProvider
+import com.baraa.masroof.ai.OnDeviceModelStore
 import com.baraa.masroof.ai.OpenAiCompatibleProvider
 import com.baraa.masroof.ai.RemoteAiHttpClient
 import com.baraa.masroof.diagnostics.DiagnosticCollector
@@ -136,17 +139,59 @@ class MasroofApplication : Application() {
         return aiService
     }
 
-    private fun rebuildAiIfNeeded() {
+    @Volatile
+    private var cachedLinkAssist: OnDeviceLinkAssistProvider? = null
+
+    private fun rebuildAiIfNeeded(force: Boolean = false) {
         val current = runCatching {
             kotlinx.coroutines.runBlocking { aiSettingsRepository.load() }
         }.getOrElse { AiProviderConfig() }
-        if (current != cachedAiConfig) {
-            cachedAiConfig = current
-            cachedProvider = if (current.isReady) {
-                OpenAiCompatibleProvider(current, aiHttpClient)
-            } else {
+        val path = current.onDeviceModelPath.ifBlank {
+            OnDeviceModelStore.defaultModelPath(filesDir)
+        }
+        val wantOnDevice = current.enabled &&
+            current.deploymentMode == AiDeploymentMode.ON_DEVICE
+        val haveLinkAssist = cachedLinkAssist != null
+        if (!force && current == cachedAiConfig && wantOnDevice == haveLinkAssist) {
+            return
+        }
+        cachedAiConfig = current
+        cachedLinkAssist = null
+        cachedProvider = when {
+            !current.enabled -> DisabledAiCategorizationProvider()
+            wantOnDevice -> {
+                // SMS-heuristic link assist only — no native LLM (device crashes).
+                cachedLinkAssist = runCatching {
+                    OnDeviceLinkAssistProvider(current.copy(onDeviceModelPath = path))
+                }.getOrNull()
                 DisabledAiCategorizationProvider()
             }
+            current.isRemoteReady -> OpenAiCompatibleProvider(current, aiHttpClient)
+            else -> DisabledAiCategorizationProvider()
+        }
+    }
+
+    /** On-device link assist when deployment mode is ON_DEVICE. */
+    fun onDeviceLinkAssistProvider(): OnDeviceLinkAssistProvider? {
+        rebuildAiIfNeeded()
+        return cachedLinkAssist?.takeIf { it.isReady() }
+    }
+
+    /**
+     * Status check for on-device mode. Native LLM inference is disabled for
+     * stability; link assist uses the local SMS body only.
+     */
+    suspend fun probeOnDeviceModel(): String {
+        rebuildAiIfNeeded(force = true)
+        val cfg = cachedAiConfig
+        if (!cfg.enabled) return "فعّل الذكاء الاصطناعي أولًا"
+        if (cfg.deploymentMode != AiDeploymentMode.ON_DEVICE) {
+            return "فعّل وضع «على الجهاز» أولًا"
+        }
+        return if (cachedLinkAssist?.isReady() == true) {
+            "جاهز: اقتراح الربط من نص الرسالة محليًا (بدون تشغيل نموذج ثقيل)"
+        } else {
+            "احفظ الإعدادات ثم أعد المحاولة"
         }
     }
 
@@ -209,7 +254,38 @@ class MasroofApplication : Application() {
     }
 
     val accountLinkRuleRepository: AccountLinkRuleRepository by lazy { AccountLinkRuleRepository(database.accountLinkRuleDao()) }
-    val accountIdentifierRepository: com.baraa.masroof.data.repository.AccountIdentifierRepository by lazy { com.baraa.masroof.data.repository.AccountIdentifierRepository(database.accountIdentifierDao(), database.financialAccountDao()) }
+    val accountIdentifierRepository: com.baraa.masroof.data.repository.AccountIdentifierRepository by lazy {
+        com.baraa.masroof.data.repository.AccountIdentifierRepository(
+            dao = database.accountIdentifierDao(),
+            accountDao = database.financialAccountDao(),
+            senderProfileDao = database.senderProfileDao(),
+            accountSenderDao = database.accountSenderProfileDao(),
+        )
+    }
+
+    val senderProfileRepository: com.baraa.masroof.data.repository.SenderProfileRepository by lazy {
+        com.baraa.masroof.data.repository.SenderProfileRepository(
+            dao = database.senderProfileDao(),
+            accountSenderDao = database.accountSenderProfileDao(),
+            accountDao = database.financialAccountDao(),
+            mappingDao = database.senderInstitutionMappingDao(),
+        )
+    }
+
+    val messagePatternRepository: com.baraa.masroof.data.repository.MessagePatternRepository by lazy {
+        com.baraa.masroof.data.repository.MessagePatternRepository(
+            definitionDao = database.messagePatternDefinitionDao(),
+            fieldDao = database.patternFieldDefinitionDao(),
+        )
+    }
+
+    val linkPatternSuggester: com.baraa.masroof.ledger.LinkPatternSuggester by lazy {
+        com.baraa.masroof.ledger.LinkPatternSuggester(
+            identifierRepository = accountIdentifierRepository,
+            rules = accountLinkRuleRepository,
+            smsBodyRepository = transactionSmsBodyRepository,
+        )
+    }
     val senderInstitutionMappingRepository: com.baraa.masroof.data.repository.SenderInstitutionMappingRepository by lazy {
         com.baraa.masroof.data.repository.RoomSenderInstitutionMappingRepository(
             dao = database.senderInstitutionMappingDao(),
@@ -228,12 +304,28 @@ class MasroofApplication : Application() {
         TransactionLinkingService(transactionRepository, ledgerRepository, journalGenerationService, accountIdentifierRepository, accountLinkRuleRepository)
     }
 
+    val transactionCorrectionService: com.baraa.masroof.ledger.TransactionCorrectionService by lazy {
+        com.baraa.masroof.ledger.TransactionCorrectionService(
+            transactions = transactionRepository,
+            journalReverser = com.baraa.masroof.ledger.JournalReverser { journalId ->
+                ledgerRepository.reverse(journalId)
+            },
+        )
+    }
+
     val historicalAccountRelinkService: com.baraa.masroof.ledger.HistoricalAccountRelinkService by lazy {
         com.baraa.masroof.ledger.HistoricalAccountRelinkService(
             transactionRepository = transactionRepository,
             financialAccountRepository = financialAccountRepository,
             identifierRepository = accountIdentifierRepository,
+            journalGenerationService = journalGenerationService,
+            ledgerRepository = ledgerRepository,
+            systemAccounts = { key -> systemAccountSeeder.accountId(key) },
         )
+    }
+
+    val importResetService: com.baraa.masroof.ledger.ImportResetService by lazy {
+        com.baraa.masroof.ledger.ImportResetService(database)
     }
 
     /**
@@ -244,6 +336,18 @@ class MasroofApplication : Application() {
      * the **structured result** with actual posted-journal counts so the
      * UI cannot claim "linked N transactions" without evidence.
      */
+    val transactionSmsBodyRepository: com.baraa.masroof.data.repository.TransactionSmsBodyRepository by lazy {
+        com.baraa.masroof.data.repository.TransactionSmsBodyRepository(database.transactionSmsBodyDao())
+    }
+
+    /** Kept for schema/tests only — production training uses [messagePatternRepository]. */
+    @Deprecated("Use messagePatternRepository / BankMessagesScreen")
+    val senderMessagePatternRepository: com.baraa.masroof.data.repository.SenderMessagePatternRepository by lazy {
+        com.baraa.masroof.data.repository.SenderMessagePatternRepository(
+            dao = database.senderMessagePatternDao(),
+        )
+    }
+
     val importOrchestrator: com.baraa.masroof.data.repository.SmsImportOrchestrator by lazy {
         com.baraa.masroof.data.repository.SmsImportOrchestrator(
             database = database,
@@ -256,6 +360,9 @@ class MasroofApplication : Application() {
             ledgerRepository = ledgerRepository,
             systemAccounts = { key -> systemAccountSeeder.accountId(key) },
             institutionResolver = institutionResolver,
+            smsBodyRepository = transactionSmsBodyRepository,
+            senderProfileRepository = senderProfileRepository,
+            messagePatternRepository = messagePatternRepository,
         )
     }
 

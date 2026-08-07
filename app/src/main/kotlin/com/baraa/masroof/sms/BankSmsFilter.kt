@@ -8,7 +8,7 @@ import java.text.Normalizer
  * - [KNOWN_SENDER] the sender matched a known financial institution
  * - [KEYWORDS]     the body contains enough financial keywords
  * - [BOTH]         both signals fired
- * - [NONE]         the message is not considered financial
+ * - [NONE]         the message is not considered financial (incl. OTP / auth)
  */
 enum class MatchReason { KNOWN_SENDER, KEYWORDS, BOTH, NONE }
 
@@ -26,11 +26,11 @@ data class MatchResult(val isMatch: Boolean, val reason: MatchReason)
  *  - Tweak the threshold by changing [KEYWORD_THRESHOLD].
  *
  * Matching rules:
- *  - A message is a match if the normalized sender is in [KNOWN_SENDERS] OR
- *    the body contains at least [KEYWORD_THRESHOLD] distinct financial keywords
- *    (Arabic and English counted together).
- *  - OTP-only / advertisement / personal messages rarely accumulate enough
- *    financial keywords to cross the threshold, so they are naturally rejected.
+ *  - OTP / purchase-verification / 3-D Secure messages are never a match,
+ *    even from a known bank sender (those are not ledger transactions).
+ *  - Otherwise a message is a match if the normalized sender is in
+ *    [KNOWN_SENDERS] OR the body contains at least [KEYWORD_THRESHOLD]
+ *    distinct financial keywords (Arabic and English counted together).
  */
 object BankSmsFilter {
 
@@ -105,6 +105,46 @@ object BankSmsFilter {
     )
 
     /**
+     * Challenge / one-time-password SMS patterns.
+     *
+     * Important: many Saudi **purchase receipts** end with a safety disclaimer
+     * like «لا تشارك رمز التحقق» — that alone must NOT mark the SMS as OTP.
+     * We only reject when a real code is being issued (cue + digits) or an
+     * explicit 3-D Secure / one-time-password challenge phrase is present.
+     */
+    private val OTP_CODE_PATTERNS: List<Regex> = listOf(
+        Regex("""رمز\s*التحقق\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""رمز\s*التأكيد\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""كود\s*التحقق\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""رمز\s*الأمان\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""رمزك\s*هو\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""الكود\s*الخاص\s*بك\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""أ?دخل\s*الرمز\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""استخدم\s*الرمز\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""\botp\b[\s\-]*(?:code)?\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""\byour\s+otp\s+is\s+\d{4,8}"""),
+        Regex("""\byour\s+code\s+is\s+\d{4,8}"""),
+        Regex("""verification\s+code\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""auth(?:entication)?\s+code\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""one[\s\-]?time\s+password\s*[:：=]?\s*\d{4,8}"""),
+        Regex("""passcode\s*[:：=]?\s*\d{4,8}"""),
+    )
+
+    /** Explicit challenge phrases that do not need adjacent digits. */
+    private val OTP_CHALLENGE_PHRASES: Set<String> = setOf(
+        "one-time password",
+        "one time password",
+        "onetime password",
+        "كلمة المرور لمرة واحدة",
+        "كلمة السر لمرة واحدة",
+        "كلمة السر الديناميكية",
+        "3d secure",
+        "3-d secure",
+        "للموافقة على العملية أدخل",
+        "للتأكيد أدخل الرمز",
+    )
+
+    /**
      * Minimum number of distinct financial keywords (Arabic + English combined)
      * required in a body for the body to be considered a financial message
      * when the sender is not a known financial sender.
@@ -122,10 +162,27 @@ object BankSmsFilter {
         classifyMessage(sender, body).isMatch
 
     /**
+     * True when the body is a bank OTP / purchase confirmation code / 3-D Secure
+     * challenge — not a ledger transaction, even if it mentions an amount.
+     *
+     * Disclaimers on normal receipts (e.g. «لا تشارك رمز التحقق مع أي شخص»
+     * without an issued code) return false.
+     */
+    fun isOtpOrAuthenticationMessage(body: String?): Boolean {
+        if (body.isNullOrBlank()) return false
+        val normalized = normalizeForKeywordSearch(body)
+        if (OTP_CODE_PATTERNS.any { it.containsMatchIn(normalized) }) return true
+        return OTP_CHALLENGE_PHRASES.any { it in normalized }
+    }
+
+    /**
      * Classify a message and return both the boolean verdict and the reason.
      * Safe to call with null inputs — returns [MatchResult] with [MatchReason.NONE].
      */
     fun classifyMessage(sender: String?, body: String?): MatchResult {
+        if (isOtpOrAuthenticationMessage(body)) {
+            return MatchResult(isMatch = false, reason = MatchReason.NONE)
+        }
         val senderKnown = isKnownFinancialSender(sender)
         val bodyMatch = hasFinancialKeywords(body)
         val reason = when {

@@ -274,6 +274,88 @@ class BankSmsFilterTest {
     }
 
     @Test
+    fun otpFromKnownBankWithPurchaseAmount_stillRejected() {
+        // Banks often send a 3-D Secure / OTP SMS that mentions the same
+        // purchase amount as the later receipt — must not become a duplicate tx.
+        assertFalse(
+            BankSmsFilter.isLikelyFinancialMessage(
+                sender = "AlRajhi",
+                body = """
+                    رمز التحقق: 482913
+                    لعملية شراء بمبلغ 51.99 ريال
+                    لا تشارك الرمز مع أي شخص
+                """.trimIndent(),
+            ),
+        )
+        assertTrue(
+            BankSmsFilter.isOtpOrAuthenticationMessage(
+                """
+                    رمز التحقق: 482913
+                    لعملية شراء بمبلغ 51.99 ريال
+                    لا تشارك الرمز مع أي شخص
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun purchaseReceiptWithOtpDisclaimerOnly_isStillFinancial() {
+        // Real receipts often end with a safety note mentioning «رمز التحقق»
+        // without issuing a code — that must NOT wipe the purchase SMS.
+        val body = """
+            شراء عبر الانترنت
+            بمبلغ: 51.99 SAR
+            لدى: Store
+            بطاقة: 7271
+            لا تشارك رمز التحقق أو بيانات بطاقتك مع أي شخص
+        """.trimIndent()
+        assertFalse(BankSmsFilter.isOtpOrAuthenticationMessage(body))
+        assertTrue(BankSmsFilter.isLikelyFinancialMessage("AlRajhi", body))
+    }
+
+    @Test
+    fun englishOtpFromKnownBank_rejected() {
+        assertFalse(
+            BankSmsFilter.isLikelyFinancialMessage(
+                sender = "SNB",
+                body = "Your OTP is 123456 for a purchase of SAR 50. Do not share this code.",
+            ),
+        )
+    }
+
+    @Test
+    fun hotpotMerchant_notTreatedAsOtpSubstring() {
+        assertFalse(
+            BankSmsFilter.isOtpOrAuthenticationMessage("شراء لدى HOTPOT بمبلغ 50 ريال"),
+        )
+    }
+
+    @Test
+    fun normalPurchaseReceipt_notTreatedAsOtp() {
+        assertTrue(
+            BankSmsFilter.isLikelyFinancialMessage(
+                sender = "AlRajhi",
+                body = """
+                    شراء عبر الانترنت
+                    بمبلغ: 51.99 SAR
+                    لدى: Store
+                    بطاقة: 7271
+                """.trimIndent(),
+            ),
+        )
+        assertFalse(
+            BankSmsFilter.isOtpOrAuthenticationMessage(
+                """
+                    شراء عبر الانترنت
+                    بمبلغ: 51.99 SAR
+                    لدى: Store
+                    بطاقة: 7271
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun advertisement_rejected() {
         assertFalse(
             BankSmsFilter.isLikelyFinancialMessage(

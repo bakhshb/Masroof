@@ -32,6 +32,7 @@ import com.baraa.masroof.transaction.AccountLiquidityDefaults
 import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
+import com.baraa.masroof.ui.theme.CalendarDateField
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -61,6 +62,7 @@ fun AccountEditDialog(
     onDismiss: () -> Unit,
     onSave: (AccountDraft) -> Unit,
     onDelete: (() -> Unit)? = null,
+    onImportAfterBind: (() -> Unit)? = null,
 ) {
     var displayName by remember(existing) { mutableStateOf(existing?.displayName.orEmpty()) }
     var institutionName by remember(existing) { mutableStateOf(existing?.institutionName.orEmpty()) }
@@ -69,8 +71,8 @@ fun AccountEditDialog(
         mutableStateOf(existing?.accountNature ?: AccountNature.defaultNatureFor(accountType))
     }
     var amountText by remember(existing) { mutableStateOf(existing?.openingBalance?.toPlainString().orEmpty()) }
-    var dateText by remember(existing, defaultOpeningDate) {
-        mutableStateOf(existing?.openingBalanceDate?.takeIf { it > 0L }?.toLocalDate()?.toString() ?: defaultOpeningDate.toString())
+    var openingDate by remember(existing, defaultOpeningDate) {
+        mutableStateOf(existing?.openingBalanceDate?.takeIf { it > 0L }?.toLocalDate() ?: defaultOpeningDate)
     }
     var currency by remember(existing) { mutableStateOf(existing?.currency ?: Currency.SAR) }
     var includeInNetWorth by remember(existing) { mutableStateOf(existing?.includeInNetWorth ?: true) }
@@ -84,13 +86,13 @@ fun AccountEditDialog(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val balance = amountText.toBigDecimalOrNull()
-    val date = runCatching { LocalDate.parse(dateText) }.getOrNull()
-    val errors = if (balance != null && date != null) {
+    val date = openingDate
+    val errors = if (balance != null) {
         AccountInputValidator.validate(displayName, balance, date)
     } else {
         emptyList()
     }
-    val valid = balance != null && date != null && errors.isEmpty()
+    val valid = balance != null && errors.isEmpty()
     val duplicateWarning = DuplicateAccountDetector.isDuplicate(
         candidate = DuplicateAccountDetector.AccountToCheck(
             institutionName = institutionName,
@@ -153,19 +155,31 @@ fun AccountEditDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text("الرصيد الافتتاحي") },
-                    supportingText = { Text("أدخل الالتزامات كمبالغ موجبة") },
+                    label = {
+                        Text(
+                            if (accountType == AccountType.CREDIT_CARD) "المبلغ المستحق الافتتاحي"
+                            else "الرصيد الافتتاحي",
+                        )
+                    },
+                    supportingText = {
+                        Text(
+                            if (accountType == AccountType.CREDIT_CARD) {
+                                "أدخل ما تدين به البطاقة اليوم كمبلغ موجب (صفر إن لم يكن هناك مستحق)."
+                            } else {
+                                "أدخل الالتزامات كمبالغ موجبة"
+                            },
+                        )
+                    },
                     isError = balance == null || errors.any { it.key == AccountInputValidator.ErrorKey.NEGATIVE_OPENING_BALANCE },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = dateText,
-                    onValueChange = { dateText = it },
-                    label = { Text("تاريخ الرصيد الافتتاحي (YYYY-MM-DD)") },
-                    isError = date == null || errors.any { it.key == AccountInputValidator.ErrorKey.FUTURE_DATE },
-                    singleLine = true,
+                CalendarDateField(
+                    label = "تاريخ الرصيد الافتتاحي",
+                    selected = openingDate,
+                    onSelected = { openingDate = it },
+                    maxDate = LocalDate.now(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ExposedDropdownMenuBox(
@@ -189,8 +203,20 @@ fun AccountEditDialog(
                         }
                     }
                 }
-                ToggleRow("يدخل في صافي الثروة", includeInNetWorth) { includeInNetWorth = it }
-                ToggleRow("يدخل في السيولة", includeInLiquidity) { includeInLiquidity = it }
+                if (accountType == AccountType.CREDIT_CARD) {
+                    ToggleRow("يُطرح من صافي الثروة (التزام)", includeInNetWorth) { includeInNetWorth = it }
+                    ToggleRow("يدخل في السيولة المتاحة", includeInLiquidity) { includeInLiquidity = it }
+                    if (includeInLiquidity) {
+                        Text(
+                            "بطاقة الائتمان دين وليست نقدًا متاحًا. تفعيل السيولة غير موصى به.",
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        )
+                    }
+                } else {
+                    ToggleRow("يدخل في صافي الثروة", includeInNetWorth) { includeInNetWorth = it }
+                    ToggleRow("يدخل في السيولة", includeInLiquidity) { includeInLiquidity = it }
+                }
                 if (existing != null) {
                     ToggleRow("الحساب نشط", isActive) { isActive = it }
                 }
@@ -202,13 +228,18 @@ fun AccountEditDialog(
                 }
                 if (existing == null) {
                     Text(
-                        "بعد الحفظ يمكنك إضافة معرفات الحساب (آخر 4 أرقام / اسم المرسل) من قسم معرفات الحساب.",
+                        "بعد الحفظ اختر مرسل الرسائل وأضف معرفات الحساب (آخر 4 أرقام) يدوياً.",
                         style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                         color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 existing?.let { account ->
-                    IdentifiersSection(accountId = account.id, accountType = account.accountType)
+                    AccountSenderProfilesSection(accountId = account.id)
+                    IdentifiersSection(
+                        accountId = account.id,
+                        accountType = account.accountType,
+                        onImportAfterBind = onImportAfterBind,
+                    )
                 }
                 OutlinedTextField(
                     value = notes,
@@ -233,7 +264,7 @@ fun AccountEditDialog(
                             accountNature = accountNature,
                             currency = currency,
                             openingBalance = balance!!,
-                            openingBalanceDate = date!!.toEpochMillis(),
+                            openingBalanceDate = date.toEpochMillis(),
                             includeInNetWorth = includeInNetWorth,
                             includeInLiquidity = includeInLiquidity && accountNature == AccountNature.ASSET,
                             isActive = isActive,

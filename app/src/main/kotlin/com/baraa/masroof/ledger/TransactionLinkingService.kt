@@ -30,9 +30,21 @@ class TransactionLinkingService(
         rememberForFuture: Boolean = false,
         proposedAccountId: Long? = null,
         identifierToAdd: IdentifierCandidate? = null,
+        financialTreatment: FinancialTreatment? = null,
     ): TransactionEntity {
         require(transaction.postingStatus != TransactionPostingStatus.POSTED) { "posted_transaction_requires_correction" }
+        val treatment = financialTreatment ?: transaction.financialTreatment
+        require(treatment != FinancialTreatment.PENDING_REVIEW && treatment != FinancialTreatment.IGNORED) {
+            "review_requires_financial_treatment"
+        }
+        if (treatment.requiresTwoAccounts) {
+            require(sourceAccountId != null && destinationAccountId != null) {
+                "two_sided_link_requires_source_and_destination"
+            }
+            require(sourceAccountId != destinationAccountId) { "two_sided_accounts_must_differ" }
+        }
         val linked = transaction.copy(
+            financialTreatment = treatment,
             sourceAccountId = sourceAccountId,
             destinationAccountId = destinationAccountId,
             accountLinkSource = AccountLinkSource.USER,
@@ -46,16 +58,6 @@ class TransactionLinkingService(
         val source = accounts.firstOrNull { it.id == sourceAccountId }
         val destination = accounts.firstOrNull { it.id == destinationAccountId }
         val preferred = source ?: destination
-        // Review confirmation is the only path that may post a balanced
-        // journal. We must keep the draft until the caller explicitly
-        // requests POSTING; preserving the previous draft-only behavior
-        // here would silently mark the row as reviewed but never balance it.
-        if (transaction.financialTreatment.requiresTwoAccounts) {
-            require(sourceAccountId != null && destinationAccountId != null) {
-                "two_sided_link_requires_source_and_destination"
-            }
-            require(sourceAccountId != destinationAccountId) { "two_sided_accounts_must_differ" }
-        }
         val draft = generator.generate(linked, source, destination)
         val resolvedId = if (draft != null && transaction.linkedJournalEntryId == null) ledger.create(draft)
         else transaction.linkedJournalEntryId

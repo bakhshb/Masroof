@@ -80,6 +80,45 @@ object AiResponseValidator {
         )
     }
 
+    /**
+     * Validate a bare categorization JSON object (on-device models return
+     * JSON directly, not an OpenAI chat-completions envelope).
+     */
+    fun validateDirect(
+        rawJson: String,
+        request: AiCategorizationRequest,
+        providerName: String,
+        modelName: String,
+    ): AiCategorizationResult? {
+        val inner = parseInner(rawJson) ?: return null
+        val categoryId = inner.categoryId ?: return null
+        val categoryName = inner.categoryName?.trim().orEmpty()
+        val normalizedMerchant = inner.normalizedMerchantName?.trim()
+            ?.ifEmpty { request.normalizedMerchant }
+            .orEmpty()
+            .ifEmpty { request.normalizedMerchant }
+        val confidence = inner.confidence ?: return null
+        val explanation = inner.explanation?.trim().orEmpty()
+        if (categoryName.isEmpty()) return null
+        if (normalizedMerchant.isEmpty()) return null
+        if (confidence !in 0..100) return null
+        if (request.allowedCategories.none { it.id == categoryId }) return null
+        return AiCategorizationResult(
+            categoryId = categoryId,
+            categoryName = categoryName,
+            normalizedMerchantName = normalizedMerchant,
+            confidence = confidence,
+            explanation = if (explanation.length > MAX_EXPLANATION_LENGTH) {
+                explanation.substring(0, MAX_EXPLANATION_LENGTH)
+            } else {
+                explanation
+            },
+            providerName = providerName,
+            modelName = modelName,
+            responseVersion = AiPromptBuilder.RESPONSE_VERSION,
+        )
+    }
+
     /** Parse the outer envelope, returning null on malformed input. */
     fun parseEnvelope(rawBody: String): AiJson.ChatCompletionsResponse? {
         if (rawBody.isBlank()) return null

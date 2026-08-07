@@ -13,6 +13,8 @@ enum class SystemAccountKey {
     BANK_FEE_EXPENSE,
     REFUND_CLEARING,
     UNASSIGNED_CLEARING,
+    /** Destination for ATM / cash withdrawal journals (asset). */
+    CASH_ON_HAND,
 }
 
 enum class JournalType {

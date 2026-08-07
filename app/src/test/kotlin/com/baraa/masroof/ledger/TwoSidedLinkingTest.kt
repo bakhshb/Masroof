@@ -54,6 +54,7 @@ class TwoSidedLinkingTest {
         assertTrue(FinancialTreatment.INTERNAL_TRANSFER.requiresTwoAccounts)
         assertTrue(FinancialTreatment.INVESTMENT.requiresTwoAccounts)
         assertTrue(!FinancialTreatment.EXPENSE.requiresTwoAccounts)
+        assertTrue(!FinancialTreatment.CASH_WITHDRAWAL.requiresTwoAccounts)
     }
 
     private fun account(id: Long, type: AccountType, name: String) = FinancialAccount(

@@ -83,8 +83,20 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                         if (currentRoute == route) return@NavigationBarItem
                         navigateToPrimaryTab(navController, entry)
                     },
-                    icon = { Icon(if (selected) entry.selectedIcon else entry.unselectedIcon, entry.title) },
+                    icon = {
+                        Icon(
+                            if (selected) entry.selectedIcon else entry.unselectedIcon,
+                            entry.title,
+                        )
+                    },
                     label = { Text(entry.title) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.secondary,
+                        selectedTextColor = MaterialTheme.colorScheme.secondary,
+                        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 )
             }
         }
@@ -117,6 +129,9 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onShowImportedTransactions = { navigateToPrimaryTab(navController, PrimaryTab.TRANSACTIONS) },
                     onNavigateToAccounts = { navigateToPrimaryTab(navController, PrimaryTab.ACCOUNTS) },
                     onReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
+                    onBankMessages = {
+                        navController.navigate(SettingsDestinations.bankMessages.route) { launchSingleTop = true }
+                    },
                 )
             }
             composable(ReviewQueueRoute) {
@@ -130,17 +145,28 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                 )
             }
             composable("primary/ACCOUNTS") {
-                com.baraa.masroof.ui.accounts.AccountListScreen(onClose = null)
+                com.baraa.masroof.ui.accounts.AccountListScreen(
+                    onClose = null,
+                    onOpenImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
+                )
             }
             composable(AppRoutes.bindAccount(0L).substringBeforeLast("/") + "/{accountId}") { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("accountId")?.toLongOrNull() ?: 0L
-                com.baraa.masroof.ui.accounts.AccountBindRoute(accountId = id) { navController.popBackStack() }
+                com.baraa.masroof.ui.accounts.AccountBindRoute(
+                    accountId = id,
+                    onBack = { navController.popBackStack() },
+                    onImportNow = {
+                        navController.popBackStack()
+                        navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
+                    },
+                )
             }
             composable("primary/MORE") {
                 MoreMenu(
                     onSettings = { navController.navigate("settings/list") },
                     onCategories = { navController.navigate(SettingsDestinations.categoryManagement.route) },
                     onAccounts = { navController.navigate(SettingsDestinations.accounts.route) },
+                    onBankMessages = { navController.navigate(SettingsDestinations.bankMessages.route) },
                     onSenderMappings = { navController.navigate(SettingsDestinations.senderMappings.route) },
                     onLinkRules = { navController.navigate(SettingsDestinations.accountLinkRules.route) },
                     onFinancialHistory = { navController.navigate(SettingsDestinations.financialHistory.route) },
@@ -168,7 +194,10 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                 AiSuggestionsScreen(onClose = { navController.popBackStack() }, minimumConfidence = 70)
             }
             composable(SettingsDestinations.accounts.route) {
-                com.baraa.masroof.ui.accounts.AccountListScreen(onClose = { navController.popBackStack() })
+                com.baraa.masroof.ui.accounts.AccountListScreen(
+                    onClose = { navController.popBackStack() },
+                    onOpenImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
+                )
             }
             composable(SettingsDestinations.linkTransactions.route) {
                 AccountLinkRulesScreen(onClose = { navController.popBackStack() })
@@ -181,6 +210,9 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
             }
             composable(SettingsDestinations.senderMappings.route) {
                 SenderMappingsScreen(onClose = { navController.popBackStack() })
+            }
+            composable(SettingsDestinations.bankMessages.route) {
+                com.baraa.masroof.ui.senders.BankMessagesScreen(onBack = { navController.popBackStack() })
             }
             composable(SettingsDestinations.diagnostics.route) {
                 DiagnosticsScreen(onClose = { navController.popBackStack() })
@@ -228,9 +260,21 @@ const val ReviewQueueRoute: String = AppRoutes.REVIEW
  * Switch to a primary bottom-nav tab. Pops the import / settings stack
  * first so back navigation from HOME closes the app instead of returning
  * to the import screen.
+ *
+ * HOME is special-cased: navigate()+launchSingleTop+restoreState is a
+ * no-op when HOME is already under Import/Review, so we pop back to it.
  */
 private fun navigateToPrimaryTab(navController: NavHostController, tab: PrimaryTab) {
     val route = "primary/${tab.name}"
+    // Leave nested screens (import / review) so post-import CTAs always work.
+    navController.popBackStack(ImportMessagesRoute, inclusive = true)
+    navController.popBackStack(ReviewQueueRoute, inclusive = true)
+    if (tab == PrimaryTab.HOME) {
+        if (!navController.popBackStack("primary/HOME", inclusive = false)) {
+            navController.navigate(route) { launchSingleTop = true }
+        }
+        return
+    }
     navController.navigate(route) {
         popUpTo("primary/HOME") { inclusive = false; saveState = true }
         launchSingleTop = true

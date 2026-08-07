@@ -1,23 +1,30 @@
 package com.baraa.masroof.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +41,9 @@ import com.baraa.masroof.data.db.AccountIdentifierEntity
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.ledger.HistoricalFinancialService
+import com.baraa.masroof.ledger.TransactionPostingStatus
+import com.baraa.masroof.transaction.AccountType
+import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionType
 import com.baraa.masroof.ui.charts.ChartCard
 import com.baraa.masroof.ui.charts.ChartMappers
@@ -46,7 +56,9 @@ import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.FinancialTypography
 import com.baraa.masroof.ui.theme.HeroBalanceCard
 import com.baraa.masroof.ui.theme.LoadingSkeleton
+import com.baraa.masroof.ui.theme.MoneyValue
 import com.baraa.masroof.ui.theme.MonthSelector
+import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.SectionHeader
 import com.baraa.masroof.ui.theme.SemanticColors
@@ -56,10 +68,13 @@ import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Monthly-first home dashboard with composition donut and daily spend columns.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onImportMessages: () -> Unit = {},
@@ -75,6 +90,7 @@ fun HomeScreen(
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
 
     var month by remember { mutableStateOf(YearMonth.now()) }
+    var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
 
     val trackingStartDate: LocalDate? = remember(setup) {
         val s = setup ?: return@remember null
@@ -95,16 +111,42 @@ fun HomeScreen(
     val endLiquidity = remember(journals) { journals.lastOrNull()?.endOfDayLiquidity }
     val startLiquidity = remember(journals) { journals.firstOrNull()?.startOfDayLiquidity ?: BigDecimal.ZERO }
     val endNetWorth = remember(journals) { journals.lastOrNull()?.endOfDayNetWorth }
-    val endLiabilities = remember(journals) {
-        journals.lastOrNull()?.accounts
-            ?.filter {
-                it.trackingStatus == com.baraa.masroof.ledger.HistoricalTrackingStatus.TRACKED &&
-                    it.accountNature == com.baraa.masroof.transaction.AccountNature.LIABILITY &&
-                    it.accountType == com.baraa.masroof.transaction.AccountType.CREDIT_CARD &&
-                    it.includedInNetWorth
+    val journalVersion by app.database.journalDao().observePosted().collectAsStateWithLifecycle(initialValue = emptyList())
+    var creditCards by remember { mutableStateOf<List<CreditCardHomeSummary>>(emptyList()) }
+    LaunchedEffect(accounts, journalVersion.size) {
+        creditCards = withContext(Dispatchers.IO) {
+            val cards = accounts.filter {
+                it.isActive &&
+                    it.isOwnedByUser &&
+                    it.systemAccountKey == null &&
+                    it.accountType == AccountType.CREDIT_CARD
             }
-            ?.fold(BigDecimal.ZERO) { acc, row -> acc + row.endOfDayBalance }
-            ?: BigDecimal.ZERO
+            if (cards.isEmpty()) return@withContext emptyList()
+            val posted = app.database.journalDao().getAllForRecalculation()
+            cards.map { card ->
+                val outstanding = com.baraa.masroof.ledger.AccountBalanceService.balance(
+                    account = card,
+                    journals = posted,
+                    asOfDate = LocalDate.now(),
+                )
+                val limit = card.creditLimit
+                val available = if (limit != null && limit.signum() > 0) {
+                    limit.subtract(outstanding).coerceAtLeast(BigDecimal.ZERO)
+                } else {
+                    null
+                }
+                CreditCardHomeSummary(
+                    accountId = card.id,
+                    name = card.displayName,
+                    outstanding = outstanding,
+                    creditLimit = limit,
+                    availableCredit = available,
+                )
+            }
+        }
+    }
+    val creditCardLiabilities = remember(creditCards) {
+        creditCards.fold(BigDecimal.ZERO) { acc, card -> acc + card.outstanding }
     }
     val monthChange = (endLiquidity ?: BigDecimal.ZERO) - startLiquidity
     val isCurrentMonth = month == YearMonth.now()
@@ -120,6 +162,15 @@ fun HomeScreen(
         monthHistory?.let { ChartMappers.dailyExpenseSeries(it) }.orEmpty()
     }
     val expenseSeriesHasData = ChartMappers.hasNonZero(expenseSeries)
+    val spendDays = remember(expenseSeries, month) {
+        expenseSeries.filter { it.value.signum() > 0 }.map { month.atDay(it.dayOfMonth) }
+    }
+    val dayTransactions = remember(selectedDay, transactions) {
+        selectedDay?.let { day -> spendingTransactionsForDay(transactions, day) }.orEmpty()
+    }
+    val dayTotal = remember(dayTransactions) {
+        dayTransactions.fold(BigDecimal.ZERO) { acc, tx -> acc + (tx.amount ?: BigDecimal.ZERO).abs() }
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
         item {
@@ -153,9 +204,23 @@ fun HomeScreen(
                 )
                 FinancialMetric(
                     label = "التزامات البطاقات",
-                    amount = endLiabilities,
+                    amount = creditCardLiabilities,
                     modifier = Modifier.weight(1f),
                     icon = Icons.Filled.CreditCard,
+                )
+            }
+        }
+        if (creditCards.isNotEmpty()) {
+            item {
+                CreditCardsLimitSection(cards = creditCards)
+            }
+        }
+        if (accounts.isNotEmpty() && donutSlices.isEmpty() && !expenseSeriesHasData) {
+            item {
+                ImportGuidanceCard(
+                    hasReviewItems = reviewCount > 0,
+                    onImport = onImportMessages,
+                    onReview = onOpenReview,
                 )
             }
         }
@@ -177,20 +242,48 @@ fun HomeScreen(
             item {
                 ChartCard(
                     title = "المصروفات اليومية",
-                    subtitle = "اتجاه الإنفاق خلال أيام الشهر",
+                    subtitle = "اختر يومًا لعرض تفاصيل ما صرفت فيه",
                     isEmpty = !expenseSeriesHasData,
                     emptyMessage = "لا توجد مصروفات مسجّلة في هذا الشهر",
                 ) {
-                    DailyTrendColumnChart(
-                        points = expenseSeries,
-                        columnColorArgb = SemanticColors.expense().toArgb(),
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+                        DailyTrendColumnChart(
+                            points = expenseSeries,
+                            columnColorArgb = SemanticColors.expense().toArgb(),
+                        )
+                        if (spendDays.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.x2),
+                            ) {
+                                spendDays.forEach { day ->
+                                    val selected = selectedDay == day
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = { selectedDay = day },
+                                        label = {
+                                            Text("${day.dayOfMonth}")
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
         if (reviewCount > 0 || beforeTrackingCount > 0) {
             item { SectionHeader("يحتاج انتباهك") }
-            if (reviewCount > 0) item { AttentionBanner(title = "عمليات تحتاج مراجعة", description = "بعض العمليات لم تكتمل معالجتها بعد.", actionLabel = "فتح", onAction = onOpenReview) }
+            if (reviewCount > 0) item {
+                AttentionBanner(
+                    title = "عمليات تحتاج مراجعة ($reviewCount)",
+                    description = "لن يتغيّر الرصيد ولن تظهر المخططات حتى تؤكد ربط هذه العمليات بالحسابات.",
+                    actionLabel = "فتح",
+                    onAction = onOpenReview,
+                )
+            }
             if (beforeTrackingCount > 0) item { AttentionBanner(title = "عمليات قبل تاريخ بداية المتابعة", description = "هذه العمليات لم تُحتسب في أرصدتك.", actionLabel = "عرض", onAction = onOpenReview) }
         }
         item {
@@ -223,11 +316,165 @@ fun HomeScreen(
             }
         }
     }
+
+    val sheetDay = selectedDay
+    if (sheetDay != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val dayFmt = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("ar")) }
+        ModalBottomSheet(
+            onDismissRequest = { selectedDay = null },
+            sheetState = sheetState,
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.x4)
+                    .padding(bottom = Spacing.x6),
+                verticalArrangement = Arrangement.spacedBy(Spacing.x3),
+            ) {
+                Text(
+                    "مصروفات ${sheetDay.format(dayFmt)}",
+                    style = FinancialTypography.sectionTitle,
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("الإجمالي", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    MoneyValue(dayTotal, isExpense = true)
+                }
+                if (dayTransactions.isEmpty()) {
+                    Text(
+                        "لا توجد عمليات مصروف مسجّلة في هذا اليوم.",
+                        style = FinancialTypography.metadata,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.x2),
+                    ) {
+                        items(dayTransactions, key = { it.id }) { tx ->
+                            TransactionRow(
+                                presentation = tx.toPresentation(
+                                    identifiers = identifiersByAccount[resolveAccountId(tx, accounts)] ?: emptyList(),
+                                ),
+                                onClick = {
+                                    selectedDay = null
+                                    onOpenReview()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreditCardsLimitSection(cards: List<CreditCardHomeSummary>) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+        SectionHeader("البطاقات الائتمانية")
+        cards.forEach { card ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = FinancialShapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(
+                    Modifier.padding(Spacing.x4),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.x2),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(card.name, style = FinancialTypography.merchant)
+                        Text("فيزا / ائتمان", style = FinancialTypography.badge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.x2),
+                    ) {
+                        LimitMetric(label = "المستحق", amount = card.outstanding, modifier = Modifier.weight(1f), expenseTint = true)
+                        LimitMetric(
+                            label = "الحد الائتماني",
+                            amount = card.creditLimit,
+                            modifier = Modifier.weight(1f),
+                            missingHint = "غير محدّد",
+                        )
+                        LimitMetric(
+                            label = "المتاح",
+                            amount = card.availableCredit,
+                            modifier = Modifier.weight(1f),
+                            missingHint = "—",
+                        )
+                    }
+                    if (card.creditLimit == null || card.creditLimit.signum() <= 0) {
+                        Text(
+                            "حد البطاقة غير محفوظ بعد. سيُحدَّث تلقائيًا من رسالة «تغيير حد الرصيد»، أو أدخله من الحسابات.",
+                            style = FinancialTypography.metadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LimitMetric(
+    label: String,
+    amount: BigDecimal?,
+    modifier: Modifier = Modifier,
+    expenseTint: Boolean = false,
+    missingHint: String = "—",
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+        Text(label, style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (amount != null) {
+            MoneyValue(amount, isExpense = if (expenseTint) true else null, emphasize = false)
+        } else {
+            Text(missingHint, style = FinancialTypography.merchant, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ImportGuidanceCard(
+    hasReviewItems: Boolean,
+    onImport: () -> Unit,
+    onReview: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    ) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text("لم تُستورد عمليات بعد", style = FinancialTypography.sectionTitle, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(
+                "الرصيد الظاهر هو رصيدك الافتتاحي فقط. ليتطابق مع البنك تقريباً:",
+                style = FinancialTypography.metadata,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text("1. اربط الحساب برسالة من البنك (مرسل + آخر 4 أرقام).", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("2. استورد الرسائل من تاريخ الرصيد الافتتاحي حتى اليوم.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("3. أكمل قائمة المراجعة إن ظهرت عمليات غير مربوطة.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            PrimaryButton(label = "استيراد الرسائل", onClick = onImport, modifier = Modifier.fillMaxWidth())
+            if (hasReviewItems) {
+                SecondaryButton(label = "فتح قائمة المراجعة", onClick = onReview, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
 }
 
 @Composable
 private fun TrackingStartSummary(date: LocalDate) {
-    val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ar"))
+    val fmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("ar"))
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = FinancialShapes.medium,
@@ -265,6 +512,34 @@ private fun produceMonthHistory(
     return state
 }
 
+private data class CreditCardHomeSummary(
+    val accountId: Long,
+    val name: String,
+    val outstanding: BigDecimal,
+    val creditLimit: BigDecimal?,
+    val availableCredit: BigDecimal?,
+)
+
+/** Spending rows for a calendar day — matches the daily expense chart buckets. */
+internal fun spendingTransactionsForDay(
+    transactions: List<TransactionEntity>,
+    day: LocalDate,
+): List<TransactionEntity> {
+    val spendTreatments = setOf(
+        FinancialTreatment.EXPENSE,
+        FinancialTreatment.BANK_FEE,
+        FinancialTreatment.CASH_WITHDRAWAL,
+    )
+    return transactions
+        .filter { tx ->
+            tx.transactionDate == day &&
+                tx.financialTreatment in spendTreatments &&
+                tx.postingStatus != TransactionPostingStatus.VOIDED &&
+                !tx.needsReview
+        }
+        .sortedByDescending { it.smsTimestamp }
+}
+
 private fun resolveAccountId(tx: TransactionEntity, accounts: List<FinancialAccount>): Long? {
     if (tx.sourceAccountId != null) return tx.sourceAccountId
     if (tx.destinationAccountId != null) return tx.destinationAccountId
@@ -277,7 +552,7 @@ private fun TransactionEntity.toPresentation(identifiers: List<AccountIdentifier
         transactionId = id,
         amount = amount ?: BigDecimal.ZERO,
         amountLabel = amount?.let { "${it.toPlainString()} ${currency.name}" } ?: "—",
-        isExpense = financialTreatment.name in listOf("EXPENSE", "BANK_FEE"),
+        isExpense = financialTreatment.name in listOf("EXPENSE", "BANK_FEE", "CASH_WITHDRAWAL"),
         merchantOrLabel = merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: TransactionPresentationFactory.friendlyTransactionType(transactionType),
         friendlyType = TransactionPresentationFactory.friendlyTransactionType(transactionType),
         institutionDisplayName = institutionDisplayName,
@@ -289,7 +564,7 @@ private fun TransactionEntity.toPresentation(identifiers: List<AccountIdentifier
             else -> null
         },
         currency = currency.name,
-        dateLabel = transactionDate?.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ar"))) ?: "—",
+        dateLabel = transactionDate?.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("ar"))) ?: "—",
         requiresReview = needsReview,
         needsAttention = exclusionReason != null && needsReview,
         exclusionReason = exclusionReason,

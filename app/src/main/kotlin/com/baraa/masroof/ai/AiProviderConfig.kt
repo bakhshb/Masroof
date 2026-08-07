@@ -15,14 +15,35 @@ package com.baraa.masroof.ai
  */
 data class AiProviderConfig(
     val enabled: Boolean = false,
+    val deploymentMode: AiDeploymentMode = AiDeploymentMode.REMOTE,
     val providerLabel: String = "OpenAI-compatible",
     val baseUrl: String = "https://api.openai.com",
     val modelName: String = "gpt-4o-mini",
+    /** Absolute path to an on-device `.task` / `.litertlm` model file. */
+    val onDeviceModelPath: String = "",
     val apiKey: String = "",
     val shareExactAmount: Boolean = false,
     val minimumConfidence: Int = 80,
     val requireHttps: Boolean = true,
     val timeoutMillis: Long = 15_000L,
 ) {
-    val isReady: Boolean get() = enabled && baseUrl.isNotBlank() && modelName.isNotBlank() && apiKey.isNotBlank()
+    val isRemoteReady: Boolean
+        get() = enabled &&
+            deploymentMode == AiDeploymentMode.REMOTE &&
+            baseUrl.isNotBlank() &&
+            modelName.isNotBlank() &&
+            apiKey.isNotBlank()
+
+    val isOnDeviceReady: Boolean
+        get() = enabled &&
+            deploymentMode == AiDeploymentMode.ON_DEVICE &&
+            onDeviceModelPath.isNotBlank() &&
+            OnDeviceModelStore.isPresent(onDeviceModelPath)
+
+    /** True when the selected deployment can be constructed. */
+    val isReady: Boolean
+        get() = when (deploymentMode) {
+            AiDeploymentMode.REMOTE -> isRemoteReady
+            AiDeploymentMode.ON_DEVICE -> isOnDeviceReady
+        }
 }

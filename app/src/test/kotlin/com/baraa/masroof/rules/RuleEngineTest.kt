@@ -183,6 +183,36 @@ class RuleEngineTest {
     }
 
     @Test
+    fun creditLimitChangeIgnoredAndExcludedFromSpending() {
+        val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
+        val verdict = engine.classify(
+            makeInput(
+                type = TransactionType.CREDIT_LIMIT_CHANGE,
+                amount = BigDecimal("25000"),
+                merchant = null,
+                body = "تغيير حد الرصيد\nالحد الائتماني الجديد: 25000 ريال",
+            ),
+            emptyContext(),
+        )
+        assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
+        assertTrue("limit change must not affect spending", verdict.excludeFromSpending)
+    }
+
+    @Test
+    fun creditLimitChangeDetectedFromBodyEvenIfTypeUnknown() {
+        val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
+        val verdict = engine.classify(
+            makeInput(
+                type = TransactionType.UNKNOWN,
+                amount = BigDecimal("30000"),
+                body = "تم تغيير الحد الائتماني لبطاقتك",
+            ),
+            emptyContext(),
+        )
+        assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
+    }
+
+    @Test
     fun pendingTransactionExcludedFromConfirmedSpending() {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
@@ -218,20 +248,52 @@ class RuleEngineTest {
     }
 
     @Test
-    fun transferNotAutomaticallyTreatedAsExpense() {
+    fun transferOutUsesParsedTypeFallbackExpense() {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
-            makeInput(type = TransactionType.TRANSFER_OUT, merchant = null, sender = "UnknownBank"),
+            makeInput(type = TransactionType.TRANSFER_OUT, merchant = null, sender = "UnknownBank", body = "حوالة صادرة"),
             emptyContext()
         )
-        // No owned accounts + no transfer destination → PENDING_REVIEW,
-        // never EXPENSE. The user must confirm whether the transfer is
-        // internal, to a person, or to an investment.
-        assertFalse(
-            "a transfer with no owned accounts must not be EXPENSE",
-            verdict.financialTreatment == FinancialTreatment.EXPENSE
+        // External outgoing transfer is treated as money leaving the user
+        // (EXPENSE) until confirmed as internal between owned accounts.
+        assertEquals(FinancialTreatment.EXPENSE, verdict.financialTreatment)
+        assertTrue(verdict.reason.contains("ParsedTypeFallbackRule"))
+    }
+
+    @Test
+    fun purchaseWithoutMerchantUsesParsedTypeFallbackExpense() {
+        val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
+        val verdict = engine.classify(
+            makeInput(type = TransactionType.PURCHASE, merchant = null, body = "شراء بمبلغ 50"),
+            emptyContext(),
         )
-        assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
+        assertEquals(FinancialTreatment.EXPENSE, verdict.financialTreatment)
+        assertNull(verdict.categoryId)
+        assertFalse(verdict.excludeFromSpending)
+        assertTrue(verdict.reason.contains("ParsedTypeFallbackRule"))
+    }
+
+    @Test
+    fun depositWithoutMerchantUsesParsedTypeFallbackIncome() {
+        val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
+        val verdict = engine.classify(
+            makeInput(type = TransactionType.DEPOSIT, merchant = null, body = "تم إيداع مبلغ"),
+            emptyContext(),
+        )
+        assertEquals(FinancialTreatment.INCOME, verdict.financialTreatment)
+        assertTrue(verdict.excludeFromSpending)
+        assertTrue(verdict.reason.contains("ParsedTypeFallbackRule"))
+    }
+
+    @Test
+    fun cashWithdrawalUsesParsedTypeFallback() {
+        val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
+        val verdict = engine.classify(
+            makeInput(type = TransactionType.CASH_WITHDRAWAL, merchant = null, body = "سحب نقدي"),
+            emptyContext(),
+        )
+        assertEquals(FinancialTreatment.CASH_WITHDRAWAL, verdict.financialTreatment)
+        assertTrue(verdict.reason.contains("ParsedTypeFallbackRule"))
     }
 
     // -- Internal transfer -------------------------------------------------
@@ -267,7 +329,9 @@ class RuleEngineTest {
             ),
             emptyContext(accounts = listOf(sourceAcc))
         )
-        assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
+        // Unknown external recipient: treat as money leaving the user (EXPENSE).
+        // User can reclassify as internal transfer in review if needed.
+        assertEquals(FinancialTreatment.EXPENSE, verdict.financialTreatment)
     }
 
     @Test

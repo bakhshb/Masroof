@@ -49,19 +49,24 @@ import com.baraa.masroof.data.repository.SmsImportMode
 import com.baraa.masroof.data.repository.SmsImportResult
 import com.baraa.masroof.sms.SmsImportRange
 import com.baraa.masroof.sms.SmsMessage
+import com.baraa.masroof.ui.senders.ImportSessionHints
 import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.FinancialTypography
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
+import com.baraa.masroof.ui.theme.DestructiveButton
+import com.baraa.masroof.ui.theme.DestructiveTextButton
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.SectionHeader
 import com.baraa.masroof.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** Typed import execution state. Surfaced to the UI in place of the
  *  raw `SmsImportResult` so the user always sees a clear
- *  Idle / Loading / Success / Failure signal. */
+ *  Idle / Loading / Success / AlreadyImported / Failure signal. */
 sealed interface ImportExecutionResult {
     data object Idle : ImportExecutionResult
     data object Loading : ImportExecutionResult
@@ -72,10 +77,52 @@ sealed interface ImportExecutionResult {
         val affectedAccountIds: List<Long>,
         val raw: SmsImportResult,
     ) : ImportExecutionResult
+    /** Commit found nothing new because everything was an exact duplicate. */
+    data class AlreadyImported(
+        val duplicateCount: Int,
+        val raw: SmsImportResult,
+    ) : ImportExecutionResult
     data class Failure(
         val userMessage: String,
         val technicalMessage: String?,
     ) : ImportExecutionResult
+}
+
+/** Button label for the scan → commit CTA. */
+internal fun importCommitButtonLabel(preview: ScanPreview): String {
+    val readyCount = preview.readyCount
+    val reviewCount = preview.needsReviewTransactions
+    val importable = readyCount + reviewCount + preview.beforeTrackingStartCount
+    return when {
+        readyCount > 0 && reviewCount > 0 ->
+            "استيراد $readyCount جاهزة و$reviewCount للمراجعة"
+        readyCount > 0 -> "استيراد $readyCount عملية"
+        reviewCount > 0 -> "استيراد $reviewCount للمراجعة"
+        preview.beforeTrackingStartCount > 0 ->
+            "استيراد ${preview.beforeTrackingStartCount} كسجل فقط"
+        importable == 0 && preview.duplicateTransactions > 0 ->
+            "مستوردة سابقًا · ${preview.duplicateTransactions} مكررة"
+        else -> "لا توجد عمليات جاهزة"
+    }
+}
+
+/** Maps orchestrator commit output to a typed UI result. */
+internal fun mapImportCommitResult(result: SmsImportResult): ImportExecutionResult = when {
+    result.importedTransactions > 0 -> ImportExecutionResult.Success(
+        importedCount = result.importedTransactions,
+        linkedCount = result.linkedTransactions,
+        postedCount = result.postedTransactions,
+        affectedAccountIds = result.updatedAccountIds,
+        raw = result,
+    )
+    result.duplicateTransactions > 0 -> ImportExecutionResult.AlreadyImported(
+        duplicateCount = result.duplicateTransactions,
+        raw = result,
+    )
+    else -> ImportExecutionResult.Failure(
+        userMessage = "لم يتم استيراد أي عملية. تحقق من البيانات وحاول مجدداً.",
+        technicalMessage = "commit produced 0 imported transactions",
+    )
 }
 
 /**
@@ -106,25 +153,42 @@ fun ImportMessagesScreen(
     onShowImportedTransactions: () -> Unit = onTransactions,
     onNavigateToAccounts: () -> Unit = onAccounts,
     onReview: () -> Unit,
+    onBankMessages: () -> Unit = onMore,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
     val registeredSenderCount by produceState(initialValue = 0) {
-        value = app.accountIdentifierRepository.activeOwnedSenderAliases().size
+        value = app.senderProfileRepository.activeOwnedSenderKeys().size
+            .coerceAtLeast(app.accountIdentifierRepository.activeOwnedSenderAliases().size)
     }
 
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
-    val openingBalanceDate: LocalDate? = remember(setup) {
-        val s = setup ?: return@remember null
-        java.time.Instant.ofEpochMilli(s.trackingStartDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+    val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
+    val openingBalanceDate: LocalDate? = remember(setup, accounts) {
+        val fromSetup = setup?.trackingStartDate?.takeIf { it > 0L }?.let {
+            java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        }
+        val fromAccounts = accounts
+            .filter { it.systemAccountKey == null && it.openingBalanceDate > 0L }
+            .map {
+                java.time.Instant.ofEpochMilli(it.openingBalanceDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            }
+            .minOrNull()
+        listOfNotNull(fromSetup, fromAccounts).minOrNull()
     }
 
+    val initialRange = remember(openingBalanceDate) {
+        val hinted = ImportSessionHints.consumePreferredFromDate()
+        val start = listOfNotNull(hinted, openingBalanceDate).minOrNull()
+        SmsImportRange.preferredDefault(today, start)
+    }
     var importMode by remember { mutableStateOf(SmsImportMode.REGISTERED_ACCOUNTS_ONLY) }
-    var quickId by remember { mutableStateOf(SmsImportRange.QUICK_MONTH_START) }
-    var customFrom by remember { mutableStateOf(today.withDayOfMonth(1)) }
+    var quickId by remember { mutableStateOf(initialRange.quickId) }
+    var customFrom by remember { mutableStateOf(initialRange.start.toLocalDate()) }
     var customTo by remember { mutableStateOf(today) }
+    var openingRangeAnchor by remember { mutableStateOf(initialRange.start.toLocalDate()) }
     var permissionGranted by remember { mutableStateOf(snapshotReadSms(context)) }
     var permissionPermanentlyDenied by remember {
         mutableStateOf(!permissionGranted && (context as? Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) == false)
@@ -176,7 +240,7 @@ fun ImportMessagesScreen(
             Column(
                 modifier = Modifier.padding(horizontal = Spacing.x4, vertical = Spacing.x3),
                 verticalArrangement = Arrangement.spacedBy(Spacing.x3),
-            ) {
+            ) content@{
                 PermissionStatePanel(
                     granted = permissionGranted,
                     permanentlyDenied = permissionPermanentlyDenied,
@@ -188,7 +252,7 @@ fun ImportMessagesScreen(
 
                 if (!permissionGranted) {
                     Text("تعذر فحص الرسائل لأن إذن قراءة الرسائل غير ممنوح.", color = MaterialTheme.colorScheme.error, style = FinancialTypography.merchant)
-                    return@Column
+                    return@content
                 }
 
                 OpeningBalanceDateCard(
@@ -196,10 +260,104 @@ fun ImportMessagesScreen(
                     onEdit = { showTrackEditDialog = true },
                 )
 
+                val showingImportResult = importResult is ImportExecutionResult.Success ||
+                    importResult is ImportExecutionResult.AlreadyImported ||
+                    importResult is ImportExecutionResult.Failure
+
+                if (showingImportResult) {
+                    when (val r = importResult) {
+                        is ImportExecutionResult.Success -> {
+                            CommitResultCard(
+                                result = r.raw,
+                                onShowImportedTransactions = onShowImportedTransactions,
+                                onNavigateToAccounts = onNavigateToAccounts,
+                                onHome = onHome,
+                                onReview = onReview,
+                                onImportAgain = {
+                                    importResult = ImportExecutionResult.Idle
+                                    scanPreview = null
+                                },
+                            )
+                        }
+                        is ImportExecutionResult.AlreadyImported -> {
+                            AlreadyImportedCard(
+                                duplicateCount = r.duplicateCount,
+                                onNavigateToAccounts = onNavigateToAccounts,
+                                onHome = onHome,
+                                onImportAgain = {
+                                    importResult = ImportExecutionResult.Idle
+                                    scanPreview = null
+                                },
+                            )
+                        }
+                        is ImportExecutionResult.Failure -> {
+                            FailureCard(r)
+                            PrimaryButton(
+                                label = "إعادة المحاولة",
+                                onClick = {
+                                    importResult = ImportExecutionResult.Idle
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            SecondaryButton(label = "الرئيسية", onClick = onHome, modifier = Modifier.fillMaxWidth())
+                        }
+                        else -> Unit
+                    }
+                    return@content
+                }
+
+                var showClearImportConfirm by remember { mutableStateOf(false) }
+                var clearImportSummary by remember { mutableStateOf<String?>(null) }
+                DestructiveButton(
+                    label = "مسح العمليات المستوردة",
+                    onClick = { showClearImportConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                clearImportSummary?.let {
+                    Text(it, style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (showClearImportConfirm) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showClearImportConfirm = false },
+                        title = { Text("مسح الاستيراد؟") },
+                        text = {
+                            Text(
+                                "يحذف العمليات والقيود فقط. الحسابات وآخر 4 والرصيد الافتتاحي تبقى. ثم أعد الفحص والاستيراد.",
+                            )
+                        },
+                        confirmButton = {
+                            DestructiveTextButton(
+                                label = "مسح",
+                                onClick = {
+                                    showClearImportConfirm = false
+                                    scope.launch {
+                                        val result = withContext(Dispatchers.IO) {
+                                            app.importResetService.clearImportedLedger()
+                                        }
+                                        scanPreview = null
+                                        importResult = ImportExecutionResult.Idle
+                                        phase = ImportPhase.Idle
+                                        clearImportSummary =
+                                            "تم: ${result.deletedTransactions} عملية · ${result.deletedJournals} قيد — أعد الفحص الآن"
+                                    }
+                                },
+                            )
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { showClearImportConfirm = false }) {
+                                Text("إلغاء")
+                            }
+                        },
+                    )
+                }
+
                 ImportModeSection(
                     selected = importMode,
                     registeredSenderCount = registeredSenderCount,
-                    onSelected = { importMode = it },
+                    onSelected = {
+                        importMode = it
+                        scanPreview = null
+                    },
                 )
 
                 ImportRangeSection(
@@ -209,9 +367,12 @@ fun ImportMessagesScreen(
                     customTo = customTo,
                     onCustomFromChange = { customFrom = it },
                     onCustomToChange = { customTo = it },
+                    openingBalanceDate = openingRangeAnchor.takeIf {
+                        it.isBefore(today.withDayOfMonth(1)) || quickId == SmsImportRange.QUICK_OPENING_BALANCE
+                    } ?: openingBalanceDate,
                 )
 
-                when (val p = phase) {
+                when (phase) {
                     ImportPhase.Scanning -> {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                         Text("جارٍ فحص الرسائل", style = FinancialTypography.merchant)
@@ -222,7 +383,7 @@ fun ImportMessagesScreen(
                         Text("جارٍ استيراد العمليات", style = FinancialTypography.merchant)
                     }
                     ImportPhase.Idle -> {
-                        val range = resolveRange(quickId, today, customFrom, customTo)
+                        val range = resolveRange(quickId, today, customFrom, customTo, openingRangeAnchor)
                         PrimaryButton(
                             label = "فحص الرسائل",
                             enabled = range != null && permissionGranted,
@@ -249,14 +410,18 @@ fun ImportMessagesScreen(
 
                 scanPreview?.let { preview ->
                     if (!preview.hasRegisteredSenders && preview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY) {
-                        NoRegisteredSenderCard(onAccounts = onNavigateToAccounts, onDiscovery = { importMode = SmsImportMode.DISCOVER_NEW_SENDERS })
+                        NoRegisteredSenderCard(
+                            onAccounts = onNavigateToAccounts,
+                            onDiscovery = { importMode = SmsImportMode.DISCOVER_NEW_SENDERS },
+                            onTeach = onBankMessages,
+                        )
                         return@let
                     }
                     if (preview.mode == SmsImportMode.DISCOVER_NEW_SENDERS) {
                         DiscoveryResultsCard(preview, onAccounts = onNavigateToAccounts)
                         return@let
                     }
-                    ScanResultsCard(preview)
+                    ScanResultsCard(preview, onAccounts = onNavigateToAccounts)
                     val readyCount = preview.readyCount
                     val reviewCount = preview.needsReviewTransactions
                     val importable = readyCount + reviewCount + preview.beforeTrackingStartCount
@@ -267,15 +432,16 @@ fun ImportMessagesScreen(
                             onImportAsLogOnly = { showLogOnlyConfirmation = true },
                         )
                     }
+                    if (importable == 0 && preview.duplicateTransactions > 0) {
+                        Text(
+                            "للتحديث استخدم «إعادة ربط وترحيل المطابق» من شاشة الحسابات — إعادة الاستيراد لا تعيد معالجة الرسائل المستوردة سابقًا.",
+                            style = FinancialTypography.metadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
                         PrimaryButton(
-                            label = when {
-                                readyCount > 0 && reviewCount > 0 ->
-                                    "استيراد $readyCount جاهزة و$reviewCount للمراجعة"
-                                readyCount > 0 -> "استيراد $readyCount عملية"
-                                reviewCount > 0 -> "استيراد $reviewCount للمراجعة"
-                                else -> "لا توجد عمليات جاهزة"
-                            },
+                            label = importCommitButtonLabel(preview),
                             enabled = importable > 0 && phase == ImportPhase.Idle && importResult !is ImportExecutionResult.Loading,
                             onClick = {
                                 if (importable <= 0) return@PrimaryButton
@@ -300,24 +466,14 @@ fun ImportMessagesScreen(
                                     }
                                     importResult = outcome.fold(
                                         onSuccess = { result ->
-                                            if (result.importedTransactions > 0) {
+                                            val mapped = mapImportCommitResult(result)
+                                            if (mapped is ImportExecutionResult.Success) {
                                                 android.util.Log.i(
                                                     "SmsImport",
                                                     "SMS_IMPORT_COMMIT_SUCCESS imported=${result.importedTransactions} linked=${result.linkedTransactions} posted=${result.postedTransactions} affected=${result.updatedAccountIds.size} accounts=${result.affectedAccounts.size}",
                                                 )
-                                                ImportExecutionResult.Success(
-                                                    importedCount = result.importedTransactions,
-                                                    linkedCount = result.linkedTransactions,
-                                                    postedCount = result.postedTransactions,
-                                                    affectedAccountIds = result.updatedAccountIds,
-                                                    raw = result,
-                                                )
-                                            } else {
-                                                ImportExecutionResult.Failure(
-                                                    userMessage = "لم يتم استيراد أي عملية. تحقق من البيانات وحاول مجدداً.",
-                                                    technicalMessage = "commit produced 0 imported transactions",
-                                                )
                                             }
+                                            mapped
                                         },
                                         onFailure = { t ->
                                             android.util.Log.e("SmsImport", "SMS_IMPORT_COMMIT_FAILED", t)
@@ -348,8 +504,8 @@ fun ImportMessagesScreen(
                                             app.importOrchestrator.commit(snapshot, openingBalanceDate, lastLoadedMessages)
                                         }
                                         importResult = outcome.fold(
-                                            onSuccess = { result -> ImportExecutionResult.Success(result.importedTransactions, result.linkedTransactions, result.postedTransactions, result.updatedAccountIds, result) },
-                                            onFailure = { error -> ImportExecutionResult.Failure("تعذر تجهيز طابور المراجعة.", error.message) },
+                                            onSuccess = { mapImportCommitResult(it) },
+                                            onFailure = { error -> ImportExecutionResult.Failure("تعذر تجهيز قائمة المراجعة.", error.message) },
                                         )
                                         phase = ImportPhase.Idle
                                         if (outcome.isSuccess) onReview()
@@ -365,24 +521,6 @@ fun ImportMessagesScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                }
-
-                when (val r = importResult) {
-                    is ImportExecutionResult.Success -> {
-                        CommitResultCard(
-                            result = r.raw,
-                            onShowImportedTransactions = onShowImportedTransactions,
-                            onNavigateToAccounts = onNavigateToAccounts,
-                            onHome = onHome,
-                        )
-                    }
-                    is ImportExecutionResult.Failure -> {
-                        FailureCard(r)
-                        PrimaryButton(label = "إعادة المحاولة", onClick = {
-                            importResult = ImportExecutionResult.Idle
-                        })
-                    }
-                    is ImportExecutionResult.Loading, ImportExecutionResult.Idle -> Unit
                 }
             }
             // Bottom inset so the final buttons are never under the
@@ -455,6 +593,7 @@ private fun ImportRangeSection(
     customTo: LocalDate,
     onCustomFromChange: (LocalDate) -> Unit,
     onCustomToChange: (LocalDate) -> Unit,
+    openingBalanceDate: LocalDate? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
         Text("فترة الرسائل المطلوب فحصها", style = FinancialTypography.merchant)
@@ -464,20 +603,41 @@ private fun ImportRangeSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val today = LocalDate.now()
-        val range = resolveRange(quickId, today, customFrom, customTo)
-        val (from, to) = rangeDisplay(quickId, customFrom, customTo, today)
+        val range = resolveRange(quickId, today, customFrom, customTo, openingBalanceDate)
+        val (from, to) = rangeDisplay(quickId, customFrom, customTo, today, openingBalanceDate)
         com.baraa.masroof.ui.theme.ImportSummaryCard(
             rangeLabel = humanDateRange(from, to),
             allowedInstitutionCount = 0,
         )
+        val dayFmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale("ar"))
+        Text(
+            "يشمل يوم ${from.format(dayFmt)} من الساعة 00:00 حتى نهاية يوم ${to.format(dayFmt)}.",
+            style = FinancialTypography.metadata,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "الرصيد الافتتاحي منفصل: الحركات قبل تاريخه تُحفظ كسجل ولا تغيّر الرصيد. لاستبعاد يوم الرصيد الافتتاحي من الحركات، اضبط المتابعة على اليوم التالي.",
+            style = FinancialTypography.metadata,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val chips = buildList {
+            if (openingBalanceDate != null && !openingBalanceDate.isAfter(today)) {
+                add(
+                    com.baraa.masroof.ui.theme.FilterChipModel(
+                        SmsImportRange.QUICK_OPENING_BALANCE,
+                        "من تاريخ الرصيد الافتتاحي",
+                        selected = quickId == SmsImportRange.QUICK_OPENING_BALANCE,
+                    ),
+                )
+            }
+            add(com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_MONTH_START, "من بداية هذا الشهر", selected = quickId == SmsImportRange.QUICK_MONTH_START))
+            add(com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SALARY, "منذ آخر راتب", selected = quickId == SmsImportRange.QUICK_LAST_SALARY))
+            add(com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SEVEN, "آخر 7 أيام", selected = quickId == SmsImportRange.QUICK_LAST_SEVEN))
+            add(com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_THIRTY, "آخر 30 يومًا", selected = quickId == SmsImportRange.QUICK_LAST_THIRTY))
+            add(com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_CUSTOM, "تحديد فترة", selected = quickId == SmsImportRange.QUICK_CUSTOM))
+        }
         com.baraa.masroof.ui.theme.FilterChipRow(
-            chips = listOf(
-                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_MONTH_START, "من بداية هذا الشهر", selected = quickId == SmsImportRange.QUICK_MONTH_START),
-                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SALARY, "منذ آخر راتب", selected = quickId == SmsImportRange.QUICK_LAST_SALARY),
-                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_SEVEN, "آخر 7 أيام", selected = quickId == SmsImportRange.QUICK_LAST_SEVEN),
-                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_LAST_THIRTY, "آخر 30 يومًا", selected = quickId == SmsImportRange.QUICK_LAST_THIRTY),
-                com.baraa.masroof.ui.theme.FilterChipModel(SmsImportRange.QUICK_CUSTOM, "تحديد فترة", selected = quickId == SmsImportRange.QUICK_CUSTOM),
-            ),
+            chips = chips,
             onChipClick = onQuickIdChange,
         )
         if (quickId == SmsImportRange.QUICK_CUSTOM) {
@@ -493,7 +653,17 @@ private fun ImportRangeSection(
     }
 }
 
-private fun rangeDisplay(quickId: String, customFrom: LocalDate, customTo: LocalDate, today: LocalDate): Pair<LocalDate, LocalDate> = when (quickId) {
+private fun rangeDisplay(
+    quickId: String,
+    customFrom: LocalDate,
+    customTo: LocalDate,
+    today: LocalDate,
+    openingBalanceDate: LocalDate? = null,
+): Pair<LocalDate, LocalDate> = when (quickId) {
+    SmsImportRange.QUICK_OPENING_BALANCE -> {
+        val from = openingBalanceDate ?: today.withDayOfMonth(1)
+        (if (from.isAfter(today)) today else from) to today
+    }
     SmsImportRange.QUICK_MONTH_START -> today.withDayOfMonth(1) to today
     SmsImportRange.QUICK_LAST_SALARY -> {
         val r = SmsImportRange.sinceLastSalary(today)
@@ -506,21 +676,59 @@ private fun rangeDisplay(quickId: String, customFrom: LocalDate, customTo: Local
 }
 
 @Composable
-private fun ScanResultsCard(preview: ScanPreview) {
+private fun ScanResultsCard(preview: ScanPreview, onAccounts: () -> Unit) {
     SectionHeader("نتائج الفحص")
     val ready = preview.readyCount
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
-            Text("تم فحص رسائل حساباتك المسجلة", style = FinancialTypography.merchant)
+            Text("تم فحص الرسائل ضمن الفترة — بهذا الترتيب:", style = FinancialTypography.merchant)
+            Text(
+                "1) رمز تحقق/OTP يُستبعد فقط إذا وُجد رمز رقمي مع عبارة التحقق (تنويه «لا تشارك الرمز» وحده لا يكفي)\n" +
+                    "2) مرسل غير مسجّل على حساباتك → يُتجاهل\n" +
+                    "3) مرسل مسجّل بدون مبلغ مستخرج من تسمية معروفة → لا يُستورد\n" +
+                    "4) الباقي → عملية مرشّحة للاستيراد/المراجعة",
+                style = FinancialTypography.metadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             BulletRow("الرسائل ضمن الفترة", "${preview.scannedMessages}")
-            BulletRow("رسائل المرسلين المسجلين", "${preview.scannedMessages - preview.unregisteredSenderMessages}")
-            BulletRow("رسائل من مرسلين غير مسجلين تم تجاهلها", "${preview.unregisteredSenderMessages}")
+            BulletRow("رموز تحقق / تأكيد هوية (مستبعدة)", "${preview.otpOrAuthMessages}")
+            BulletRow("رسائل من مرسلين غير مسجلين", "${preview.unregisteredSenderMessages}")
+            BulletRow("رسائل المرسلين المسجلين (بعد الاستبعاد)", "${(preview.scannedMessages - preview.unregisteredSenderMessages - preview.otpOrAuthMessages).coerceAtLeast(0)}")
             BulletRow("العمليات المالية المكتشفة", "${preview.recognizedTransactions}")
+            BulletRow("تعذّر استخراج المبلغ (لم تُستورد)", "${preview.unparsedMessages}")
             BulletRow("جاهزة للاستيراد", "${ready}")
             BulletRow("تحتاج مراجعة", "${preview.needsReviewTransactions}")
             BulletRow("غير مالية أو غير معروفة", "${preview.nonFinancialMessages}")
             BulletRow("مكررة", "${preview.duplicateTransactions}")
             BulletRow("أقدم من تاريخ الرصيد الافتتاحي", "${preview.beforeTrackingStartCount}")
+            if (preview.otpOrAuthMessages > 0) {
+                Text(
+                    "رموز التحقق لا تُحتسب عملياتًا حتى لو ذكرت المبلغ — إيصال الشراء المنفصل هو ما يُستورد.",
+                    style = FinancialTypography.metadata,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (preview.unparsedMessages > 0) {
+                Text(
+                    "بعض رسائل البنوك لم يُستخرج منها مبلغ — لن تدخل الرصيد. أعد الاستيراد بعد تحديث المحلل أو راجع المرسل.",
+                    style = FinancialTypography.metadata,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (preview.unregisteredSenderMessages > 0) {
+                Text(
+                    "رسائل من مرسلين غير مسجلين على حساباتك تُتجاهل. أضف معرّف المرسل على الحساب أو استخدم اكتشاف المرسلين.",
+                    style = FinancialTypography.metadata,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (preview.scannedMessages >= com.baraa.masroof.sms.SmsRepository.DEFAULT_LIMIT) {
+                Text(
+                    "وصلت لحد قراءة الرسائل (${com.baraa.masroof.sms.SmsRepository.DEFAULT_LIMIT}). قصّر الفترة أو استورد على دفعات حتى لا يُفقد شيء.",
+                    style = FinancialTypography.metadata,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
     Text(
@@ -528,10 +736,90 @@ private fun ScanResultsCard(preview: ScanPreview) {
         style = FinancialTypography.metadata,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    if (preview.skippedSenders.isNotEmpty() || preview.beforeTrackingStartCount > 0) {
+        SkippedMessagesCard(preview, onAccounts = onAccounts)
+    }
     if (preview.institutionGroups.isNotEmpty()) {
         SectionHeader("البنوك المعروفة")
         preview.institutionGroups.forEach { group ->
             InstitutionRow(group)
+        }
+    }
+}
+
+@Composable
+private fun SkippedMessagesCard(preview: ScanPreview, onAccounts: () -> Unit) {
+    val context = LocalContext.current
+    SectionHeader("رسائل لم تُستورد")
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text(
+                "أعلى ${ScanPreview.MAX_SKIPPED_GROUPS} مجموعات حسب العدد. النصوص معروضة بعد إزالة البيانات الحساسة فقط.",
+                style = FinancialTypography.metadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            preview.skippedSenders.forEach { group ->
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+                    Text("${group.senderDisplay} • ${group.messageCount}", style = FinancialTypography.merchant)
+                    Text(group.reasonAr, style = FinancialTypography.metadata)
+                    if (!group.redactedSample.isNullOrBlank() &&
+                        (group.reason == ScanPreview.SkipReason.NO_AMOUNT ||
+                            group.reason == ScanPreview.SkipReason.UNREGISTERED_SENDER ||
+                            group.reason == ScanPreview.SkipReason.PATTERN_NOT_SELECTED)
+                    ) {
+                        Text(
+                            group.redactedSample,
+                            style = FinancialTypography.metadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    when (group.reason) {
+                        ScanPreview.SkipReason.UNREGISTERED_SENDER -> {
+                            SecondaryButton(
+                                "ربط «${group.senderDisplay}» بحساب",
+                                onClick = {
+                                    ImportSessionHints.setPreferredSender(group.senderDisplay)
+                                    onAccounts()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        ScanPreview.SkipReason.NO_AMOUNT -> {
+                            if (!group.redactedSample.isNullOrBlank()) {
+                                SecondaryButton(
+                                    "نسخ نموذج للاختبار",
+                                    onClick = {
+                                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                            as android.content.ClipboardManager
+                                        cm.setPrimaryClip(
+                                            android.content.ClipData.newPlainText(
+                                                "masroof-fixture",
+                                                group.redactedSample,
+                                            ),
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                        ScanPreview.SkipReason.PATTERN_NOT_SELECTED,
+                        ScanPreview.SkipReason.UNKNOWN_PATTERN,
+                        ScanPreview.SkipReason.NON_FINANCIAL,
+                        ScanPreview.SkipReason.OTP_OR_AUTH -> Unit
+                    }
+                }
+            }
+            if (preview.beforeTrackingStartCount > 0) {
+                Text(
+                    "أقدم من تاريخ الرصيد الافتتاحي: ${preview.beforeTrackingStartCount} (تُحفظ كسجل فقط ولا تغيّر الرصيد)",
+                    style = FinancialTypography.metadata,
+                )
+            }
         }
     }
 }
@@ -572,6 +860,8 @@ private fun CommitResultCard(
     onShowImportedTransactions: () -> Unit,
     onNavigateToAccounts: () -> Unit,
     onHome: () -> Unit,
+    onReview: () -> Unit,
+    onImportAgain: () -> Unit,
 ) {
     SectionHeader("اكتمل الاستيراد")
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -583,13 +873,82 @@ private fun CommitResultCard(
             BulletRow("تحتاج مراجعة", "${result.needsReviewTransactions} عملية")
         }
     }
+    if (result.postedTransactions == 0 && result.needsReviewTransactions > 0) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = FinancialShapes.medium,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+        ) {
+            Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                Text(
+                    "لم تُحدَّث الأرصدة بعد",
+                    style = FinancialTypography.merchant,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Text(
+                    "كل العمليات المستوردة تحتاج مراجعة وربطاً بالحساب. أكمل المراجعة حتى تظهر المخططات ويتغيّر الرصيد.",
+                    style = FinancialTypography.metadata,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+        }
+    }
+    if (result.importedTransactions == 0 && result.scannedMessages > 0 && result.unregisteredSenderMessages == result.scannedMessages) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = FinancialShapes.medium,
+            color = MaterialTheme.colorScheme.errorContainer,
+        ) {
+            Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                Text("لم تُطابق أي رسالة مرسلين مسجلين", style = FinancialTypography.merchant)
+                Text("تأكد أن اسم المرسل في الربط يطابق مرسل صندوق الوارد، أو أعد ربط الحساب برسالة حديثة.")
+                SecondaryButton(label = "الحسابات والربط", onClick = onNavigateToAccounts, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
     if (result.affectedAccounts.isNotEmpty()) {
         SectionHeader("الحسابات المحدّثة")
         result.affectedAccounts.forEach { AffectedAccountCard(it) }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2), modifier = Modifier.fillMaxWidth()) {
-        SecondaryButton(label = "عرض العمليات المستوردة", onClick = onShowImportedTransactions, modifier = Modifier.weight(1f))
-        SecondaryButton(label = "العودة إلى الرئيسية", onClick = onHome, modifier = Modifier.weight(1f))
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2), modifier = Modifier.fillMaxWidth()) {
+        if (result.needsReviewTransactions > 0) {
+            PrimaryButton(label = "افتح قائمة المراجعة", onClick = onReview, modifier = Modifier.fillMaxWidth())
+        } else {
+            PrimaryButton(label = "عرض العمليات", onClick = onShowImportedTransactions, modifier = Modifier.fillMaxWidth())
+        }
+        SecondaryButton(label = "الرئيسية", onClick = onHome, modifier = Modifier.fillMaxWidth())
+        SecondaryButton(label = "استيراد فترة أخرى", onClick = onImportAgain, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun AlreadyImportedCard(
+    duplicateCount: Int,
+    onNavigateToAccounts: () -> Unit,
+    onHome: () -> Unit,
+    onImportAgain: () -> Unit,
+) {
+    SectionHeader("لا عمليات جديدة")
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = FinancialShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+            Text(
+                "لا عمليات جديدة — الكل مستورد سابقًا ($duplicateCount مكررة).",
+                style = FinancialTypography.merchant,
+            )
+            Text(
+                "إعادة الاستيراد لا تعيد معالجة الرسائل القديمة. لتحديث الربط والترحيل استخدم «إعادة ربط وترحيل المطابق» من الحسابات.",
+                style = FinancialTypography.metadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            PrimaryButton(label = "الحسابات والربط", onClick = onNavigateToAccounts, modifier = Modifier.fillMaxWidth())
+            SecondaryButton(label = "الرئيسية", onClick = onHome, modifier = Modifier.fillMaxWidth())
+            SecondaryButton(label = "استيراد فترة أخرى", onClick = onImportAgain, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -615,9 +974,22 @@ private fun AffectedAccountCard(a: SmsImportResult.AffectedAccountSummary) {
             Text(a.accountName, style = FinancialTypography.merchant)
             val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ar"))
             BulletRow("الرصيد الافتتاحي في ${a.openingBalanceDate?.format(fmt) ?: "—"}", "${a.openingBalance.toPlainString()} ر.س")
-            BulletRow("المبالغ الداخلة", "${a.totalCredits.toPlainString()} ر.س")
-            BulletRow("المبالغ الخارجة", "${a.totalDebits.toPlainString()} ر.س")
-            BulletRow("الرصيد المحسوب اليوم", "${a.calculatedBalance.toPlainString()} ر.س")
+            val isLiability = a.accountNature == com.baraa.masroof.transaction.AccountNature.LIABILITY
+            BulletRow(
+                if (isLiability) "زيادة المستحق (مشتريات)" else "المبالغ الواردة للحساب",
+                "${a.moneyIn.toPlainString()} ر.س",
+            )
+            BulletRow(
+                if (isLiability) "تخفيض المستحق (سداد)" else "المبالغ الصادرة من الحساب",
+                "${a.moneyOut.toPlainString()} ر.س",
+            )
+            val delta = a.moneyIn.subtract(a.moneyOut)
+            val deltaLabel = if (isLiability) "تغيّر المستحق" else "صافي الحركة"
+            BulletRow(deltaLabel, "${delta.toPlainString()} ر.س")
+            BulletRow(
+                if (isLiability) "المستحق المحسوب اليوم" else "الرصيد المحسوب اليوم",
+                "${a.calculatedBalance.toPlainString()} ر.س",
+            )
         }
     }
 }
@@ -626,27 +998,26 @@ private fun AffectedAccountCard(a: SmsImportResult.AffectedAccountSummary) {
 @Composable
 private fun OpeningBalanceEditorDialog(initial: LocalDate, onDismiss: () -> Unit, onSave: (LocalDate) -> Unit) {
     val today = LocalDate.now()
-    var year by remember { mutableStateOf(initial.year) }
-    var month by remember { mutableStateOf(initial.monthValue) }
-    var day by remember { mutableStateOf(initial.dayOfMonth) }
+    var picked by remember { mutableStateOf(initial) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("تعديل تاريخ الرصيد الافتتاحي") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                Text("اختر التاريخ المرتبط بالرصيد الافتتاحي.", style = FinancialTypography.metadata)
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                    OutlinedTextField(value = day.toString(), onValueChange = { day = it.toIntOrNull() ?: day }, label = { Text("يوم") }, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = month.toString(), onValueChange = { month = it.toIntOrNull() ?: month }, label = { Text("شهر") }, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = year.toString(), onValueChange = { year = it.toIntOrNull() ?: year }, label = { Text("سنة") }, modifier = Modifier.weight(1f))
-                }
+                Text("اختر التاريخ المرتبط بالرصيد الافتتاحي من التقويم.", style = FinancialTypography.metadata)
+                com.baraa.masroof.ui.theme.CalendarDateField(
+                    label = "تاريخ الرصيد الافتتاحي",
+                    selected = picked,
+                    onSelected = { picked = it },
+                    maxDate = today,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = {
-                val date = runCatching { LocalDate.of(year, month, day) }.getOrNull()
-                if (date != null && !date.isAfter(today)) onSave(date)
-            }) { Text("حفظ") }
+            androidx.compose.material3.TextButton(
+                onClick = { if (!picked.isAfter(today)) onSave(picked) },
+            ) { Text("حفظ") }
         },
         dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("إلغاء") } },
     )
@@ -695,7 +1066,14 @@ private fun BulletRow(label: String, value: String) {
 private fun snapshotReadSms(context: android.content.Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
 
-private fun resolveRange(quickId: String, today: LocalDate, customFrom: LocalDate, customTo: LocalDate): SmsImportRange? = when (quickId) {
+private fun resolveRange(
+    quickId: String,
+    today: LocalDate,
+    customFrom: LocalDate,
+    customTo: LocalDate,
+    openingBalanceDate: LocalDate? = null,
+): SmsImportRange? = when (quickId) {
+    SmsImportRange.QUICK_OPENING_BALANCE -> openingBalanceDate?.let { SmsImportRange.fromOpeningBalance(today, it) }
     SmsImportRange.QUICK_MONTH_START -> SmsImportRange.default(today)
     SmsImportRange.QUICK_LAST_SALARY -> SmsImportRange.sinceLastSalary(today)
     SmsImportRange.QUICK_LAST_SEVEN -> SmsImportRange.lastDays(today, 7)
@@ -717,16 +1095,21 @@ private fun ImportModeSection(selected: SmsImportMode, registeredSenderCount: In
         Text("فحص رسائل المرسلين المرتبطين بالحسابات التي أضفتها فقط. سيتم فحص رسائل $registeredSenderCount مرسلين مسجلين.", style = FinancialTypography.metadata)
         FilterChip(selected = selected == SmsImportMode.DISCOVER_NEW_SENDERS, onClick = { onSelected(SmsImportMode.DISCOVER_NEW_SENDERS) }, label = { Text("البحث عن مرسلين جدد") })
         Text("العثور على مرسلين ماليين لم تضفهم بعد، دون استيراد عمليات.", style = FinancialTypography.metadata)
+        Text(
+            "لتعليم المرسلين وأنماط الرسائل استخدم «رسائل البنوك» من المزيد.",
+            style = FinancialTypography.metadata,
+        )
     }
 }
 
 @Composable
-private fun NoRegisteredSenderCard(onAccounts: () -> Unit, onDiscovery: () -> Unit) {
+private fun NoRegisteredSenderCard(onAccounts: () -> Unit, onDiscovery: () -> Unit, onTeach: () -> Unit = onDiscovery) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
             Text("لم يتم إضافة مرسلي رسائل للحسابات بعد", style = FinancialTypography.merchant)
-            Text("أضف اسم مرسل رسائل البنك إلى أحد حساباتك، أو استخدم البحث عن مرسلين جدد.")
-            PrimaryButton("إضافة مرسل إلى حساب", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
+            Text("علّم مرسلاً من «رسائل البنوك»، أو اربط مرسل بحساب، أو ابحث عن مرسلين جدد.")
+            PrimaryButton("رسائل البنوك", onClick = onTeach, modifier = Modifier.fillMaxWidth())
+            SecondaryButton("إضافة مرسل إلى حساب", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
             SecondaryButton("البحث عن مرسلين جدد", onClick = onDiscovery, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -740,8 +1123,18 @@ private fun DiscoveryResultsCard(preview: ScanPreview, onAccounts: () -> Unit) {
             if (preview.discoveredSenders.isEmpty()) Text("لا توجد رسائل من مرسلين جدد ضمن الفترة.")
             preview.discoveredSenders.forEach { sender ->
                 Text("${sender.sender} • ${sender.messageCount} رسالة")
-                Text("آخر رسالة: ${java.time.Instant.ofEpochMilli(sender.latestTimestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate()}", style = FinancialTypography.metadata)
-                SecondaryButton("ربط بحساب موجود", onClick = onAccounts, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "آخر رسالة: ${java.time.Instant.ofEpochMilli(sender.latestTimestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate()}",
+                    style = FinancialTypography.metadata,
+                )
+                SecondaryButton(
+                    "ربط «${sender.sender}» بحساب",
+                    onClick = {
+                        ImportSessionHints.setPreferredSender(sender.sender)
+                        onAccounts()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             // Intentionally no automatic import button — discovery must
             // remain a separate, manual flow.

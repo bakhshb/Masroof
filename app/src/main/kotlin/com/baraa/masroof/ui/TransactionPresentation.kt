@@ -117,7 +117,10 @@ object TransactionPresentationFactory {
         TransactionType.BANK_FEE -> "رسوم بنكية"
         TransactionType.INTERNAL_TRANSFER -> "تحويل داخلي"
         TransactionType.INVESTMENT_TRANSFER -> "تحويل استثماري"
+        TransactionType.LOAN_INSTALLMENT -> "قسط تمويل"
+        TransactionType.BILL_PAYMENT -> "سداد فاتورة"
         TransactionType.DECLINED -> "عملية مرفوضة"
+        TransactionType.CREDIT_LIMIT_CHANGE -> "تغيير حد الرصيد"
         TransactionType.UNKNOWN -> "عملية غير مصنفة"
     }
 

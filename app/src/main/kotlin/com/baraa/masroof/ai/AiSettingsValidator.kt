@@ -30,24 +30,29 @@ object AiSettingsValidator {
      */
     fun validate(config: AiProviderConfig, hasApiKey: Boolean): List<FieldError> {
         val errors = ArrayList<FieldError>()
-        // Base URL.
-        val url = config.baseUrl.trim()
-        if (url.isEmpty()) {
-            errors += FieldError(Field.BASE_URL, ErrorKey.EMPTY_BASE_URL)
-        } else if (!isValidUrl(url)) {
-            errors += FieldError(Field.BASE_URL, ErrorKey.INVALID_BASE_URL)
-        } else if (config.requireHttps && url.lowercase().startsWith("http://")) {
-            errors += FieldError(Field.BASE_URL, ErrorKey.HTTP_NOT_ALLOWED)
+        when (config.deploymentMode) {
+            AiDeploymentMode.REMOTE -> {
+                val url = config.baseUrl.trim()
+                if (url.isEmpty()) {
+                    errors += FieldError(Field.BASE_URL, ErrorKey.EMPTY_BASE_URL)
+                } else if (!isValidUrl(url)) {
+                    errors += FieldError(Field.BASE_URL, ErrorKey.INVALID_BASE_URL)
+                } else if (config.requireHttps && url.lowercase().startsWith("http://")) {
+                    errors += FieldError(Field.BASE_URL, ErrorKey.HTTP_NOT_ALLOWED)
+                }
+                if (config.modelName.isBlank()) {
+                    errors += FieldError(Field.MODEL_NAME, ErrorKey.EMPTY_MODEL_NAME)
+                }
+                if (!hasApiKey) {
+                    errors += FieldError(Field.API_KEY, ErrorKey.MISSING_API_KEY)
+                }
+            }
+            AiDeploymentMode.ON_DEVICE -> {
+                if (config.onDeviceModelPath.isBlank()) {
+                    errors += FieldError(Field.MODEL_NAME, ErrorKey.EMPTY_MODEL_NAME)
+                }
+            }
         }
-        // Model name.
-        if (config.modelName.isBlank()) {
-            errors += FieldError(Field.MODEL_NAME, ErrorKey.EMPTY_MODEL_NAME)
-        }
-        // API key.
-        if (!hasApiKey) {
-            errors += FieldError(Field.API_KEY, ErrorKey.MISSING_API_KEY)
-        }
-        // Confidence.
         if (config.minimumConfidence !in 0..100) {
             errors += FieldError(Field.MIN_CONFIDENCE, ErrorKey.CONFIDENCE_OUT_OF_RANGE)
         }
