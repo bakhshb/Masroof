@@ -6,7 +6,6 @@ package com.baraa.masroof.ui.accounts
 object AccountIdentifierLabels {
     /**
      * Joins active last-four values for one account as `•••• 1111 · •••• 2222`.
-     * Ignores [com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS].
      */
     fun formatLastFours(normalizedValues: List<String>): String? {
         val distinct = normalizedValues

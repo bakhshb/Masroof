@@ -161,7 +161,6 @@ fun ImportMessagesScreen(
     val today = LocalDate.now()
     val registeredSenderCount by produceState(initialValue = 0) {
         value = app.senderProfileRepository.activeOwnedSenderKeys().size
-            .coerceAtLeast(app.accountIdentifierRepository.activeOwnedSenderAliases().size)
     }
 
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)

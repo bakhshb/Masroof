@@ -10,8 +10,8 @@ import java.util.Locale
 
 /** Where the institution display name ultimately came from. */
 enum class InstitutionIdentificationSource {
-    /** Resolved through a sender alias that is registered on a financial account. */
-    ACCOUNT_SENDER_ALIAS,
+    /** Resolved through a SenderProfile linked to a financial account. */
+    ACCOUNT_SENDER_PROFILE,
     /** The parser emitted a known bank name. */
     PARSED_INSTITUTION,
     /** A user previously confirmed a sender → institution mapping. */
@@ -196,8 +196,11 @@ class FinancialInstitutionResolver(
             identifierType: AccountIdentifierType,
         ): Boolean = when (identifierType) {
             AccountIdentifierType.CREDIT_CARD_LAST4 -> account.accountType == com.baraa.masroof.transaction.AccountType.CREDIT_CARD
-            AccountIdentifierType.DEBIT_CARD_LAST4, AccountIdentifierType.WALLET_LAST4, AccountIdentifierType.ACCOUNT_LAST4, AccountIdentifierType.IBAN_LAST4 -> true
-            AccountIdentifierType.SENDER_ALIAS -> true
+            AccountIdentifierType.DEBIT_CARD_LAST4,
+            AccountIdentifierType.WALLET_LAST4,
+            AccountIdentifierType.ACCOUNT_LAST4,
+            AccountIdentifierType.IBAN_LAST4,
+            -> true
         }
 
         /** Stable sender key for identifier storage, mirrors [normalizeSender]. */

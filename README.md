@@ -2,7 +2,7 @@
 
 Android app that turns Saudi bank SMS into a double-entry style personal ledger — locally on the device.
 
-**Status:** `0.1.0-test` · Room schema **22** · minSdk 26 / targetSdk 34
+**Status:** `0.1.0-test` · Room schema **23** · minSdk 26 / targetSdk 34
 
 ## What it does
 

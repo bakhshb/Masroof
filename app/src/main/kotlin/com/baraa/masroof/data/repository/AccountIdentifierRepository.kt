@@ -72,52 +72,28 @@ class AccountIdentifierRepository(
 
     /**
      * Accounts that have any active last-four identifier equal to [value]
-     * (ACCOUNT / DEBIT / CREDIT / IBAN / WALLET). Excludes [SENDER_ALIAS].
+     * (ACCOUNT / DEBIT / CREDIT / IBAN / WALLET).
      */
     suspend fun findAccountsByLastFourAnyType(value: String): List<FinancialAccount> {
         val normalized = normalize(AccountIdentifierType.ACCOUNT_LAST4, value)
         if (normalized.length != 4) return emptyList()
-        val matches = dao.getActive().filter {
-            it.identifierType != AccountIdentifierType.SENDER_ALIAS &&
-                it.normalizedValue == normalized
-        }
+        val matches = dao.getActive().filter { it.normalizedValue == normalized }
         return matches
             .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
             .distinctBy { it.id }
     }
 
+    /** Accounts linked to this SMS sender via SenderProfile cross-ref. */
     suspend fun accountsForSender(sender: String?): List<FinancialAccount> {
         if (sender.isNullOrBlank()) return emptyList()
-        val key = normalize(AccountIdentifierType.SENDER_ALIAS, sender)
+        val key = com.baraa.masroof.ledger.FinancialInstitutionResolver.senderKey(sender).orEmpty()
         if (key.isEmpty()) return emptyList()
-        val fromAlias = dao.getByType(AccountIdentifierType.SENDER_ALIAS)
-            .filter { it.isActive && it.normalizedValue == key }
-            .mapNotNull { accountDao.getById(it.accountId)?.toDomainRef() }
-        // Preferred: SenderProfile cross-ref (many accounts per sender).
-        val fromProfile = run {
-            val profile = senderProfileDao?.findByKey(key) ?: return@run emptyList()
-            accountSenderDao?.accountIdsForSender(profile.id)
-                ?.mapNotNull { accountDao.getById(it)?.toDomainRef() }
-                .orEmpty()
-        }
-        return (fromProfile + fromAlias)
+        val profile = senderProfileDao?.findByKey(key) ?: return emptyList()
+        return accountSenderDao?.accountIdsForSender(profile.id)
+            ?.mapNotNull { accountDao.getById(it)?.toDomainRef() }
+            .orEmpty()
             .filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
             .distinctBy { it.id }
-    }
-
-    /** Sender keys explicitly attached to active, user-owned accounts (typed only). */
-    suspend fun activeOwnedSenderAliases(): Set<String> {
-        ensureLegacyIdentifierBackfill()
-        val ownedActiveIds = accountDao.getActive()
-            .filter { it.isOwnedByUser && it.systemAccountKey == null }
-            .map { it.id }
-            .toSet()
-        return dao.getByType(AccountIdentifierType.SENDER_ALIAS)
-            .asSequence()
-            .filter { it.isActive && it.accountId in ownedActiveIds }
-            .map { normalize(AccountIdentifierType.SENDER_ALIAS, it.normalizedValue) }
-            .filter { it.isNotBlank() }
-            .toSet()
     }
 
     /**
@@ -179,10 +155,6 @@ class AccountIdentifierRepository(
             ),
         )
         val inserted = if (newId > 0L) dao.getById(newId) else null
-        // Dual-write: keep SenderProfile + cross-ref in sync while SENDER_ALIAS is deprecated.
-        if (form.identifierType == AccountIdentifierType.SENDER_ALIAS && inserted != null) {
-            syncSenderProfileLink(accountId, normalized, form.rawValue.trim().ifBlank { normalized })
-        }
         val message = if (conflicts.isNotEmpty()) {
             "هذا المعرف مستخدم في حساب آخر، وقد تحتاج العمليات المرتبطة به إلى مراجعة يدوية."
         } else {
@@ -193,40 +165,6 @@ class AccountIdentifierRepository(
             identifier = inserted,
             conflictingAccounts = conflicts,
             message = message,
-        )
-    }
-
-    /**
-     * Prefer [SenderProfileRepository.associateAccount] for new code.
-     * Kept so legacy SENDER_ALIAS writes also populate the profile model.
-     */
-    private suspend fun syncSenderProfileLink(accountId: Long, key: String, display: String) {
-        val profileDao = senderProfileDao ?: return
-        val linkDao = accountSenderDao ?: return
-        val ts = now()
-        val existing = profileDao.findByKey(key)
-        val profileId = if (existing == null) {
-            profileDao.insert(
-                com.baraa.masroof.data.db.SenderProfileEntity(
-                    displaySender = display,
-                    normalizedSenderKey = key,
-                    active = true,
-                    createdAt = ts,
-                    updatedAt = ts,
-                ),
-            )
-        } else {
-            if (!existing.active) {
-                profileDao.update(existing.copy(active = true, updatedAt = ts))
-            }
-            existing.id
-        }
-        linkDao.insert(
-            com.baraa.masroof.data.db.AccountSenderProfileCrossRef(
-                accountId = accountId,
-                senderProfileId = profileId,
-                createdAt = ts,
-            ),
         )
     }
 
@@ -281,9 +219,6 @@ class AccountIdentifierRepository(
         fun normalize(type: AccountIdentifierType, value: String): String {
             val trimmed = value.trim()
             if (trimmed.isEmpty()) return ""
-            if (type == AccountIdentifierType.SENDER_ALIAS) {
-                return com.baraa.masroof.ledger.FinancialInstitutionResolver.senderKey(trimmed).orEmpty()
-            }
             val ascii = trimmed.toCharArray().map { c ->
                 when (c) {
                     '٠' -> '0'; '١' -> '1'; '٢' -> '2'; '٣' -> '3'; '٤' -> '4'
@@ -298,8 +233,6 @@ class AccountIdentifierRepository(
         fun validate(type: AccountIdentifierType, normalized: String): String? {
             if (normalized.isEmpty()) return "قيمة المعرف مطلوبة"
             return when (type) {
-                AccountIdentifierType.SENDER_ALIAS ->
-                    if (normalized.length < 2) "اسم المرسل قصير جدًا" else null
                 AccountIdentifierType.ACCOUNT_LAST4,
                 AccountIdentifierType.CREDIT_CARD_LAST4,
                 AccountIdentifierType.DEBIT_CARD_LAST4,

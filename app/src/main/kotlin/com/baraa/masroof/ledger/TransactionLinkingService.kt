@@ -125,7 +125,6 @@ class TransactionLinkingService(
         AccountIdentifierType.DEBIT_CARD_LAST4 -> "بطاقة مدى"
         AccountIdentifierType.IBAN_LAST4 -> "آيبان"
         AccountIdentifierType.WALLET_LAST4 -> "محفظة"
-        AccountIdentifierType.SENDER_ALIAS -> "مرسل"
     }
 
     suspend fun linkAndGenerate(

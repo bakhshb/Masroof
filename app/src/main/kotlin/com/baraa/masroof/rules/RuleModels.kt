@@ -72,14 +72,19 @@ data class RuleInput(
 
 /**
  * Read-only context passed to every rule. Holds the user's owned accounts,
- * merchant memory entries, the current category list, and optional typed
- * identifier snapshots for value-based account matching. Pure JVM data.
+ * merchant memory entries, the current category list, typed identifier
+ * snapshots, and SenderProfile→account links for sender-side matching.
  */
 data class RuleContext(
     val ownedAccounts: List<FinancialAccount>,
     val merchantMemories: List<MerchantMemory>,
     val categories: List<Category>,
     val accountIdentifiers: List<AccountIdentifierSnapshot> = emptyList(),
+    /**
+     * Normalized SMS sender key → owned account ids linked via
+     * [com.baraa.masroof.data.db.AccountSenderProfileCrossRef].
+     */
+    val accountsBySenderKey: Map<String, Set<Long>> = emptyMap(),
 )
 
 /** Output of a single rule. Null means "this rule does not match". */

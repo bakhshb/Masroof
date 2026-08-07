@@ -82,7 +82,7 @@ object AccountMatching {
         merchant: String?,
         accounts: List<FinancialAccount>,
     ): FinancialAccount? {
-        // sender is intentionally unused — typed SENDER_ALIAS matching
+        // sender is intentionally unused — SenderProfile matching lives in AccountMatcher
         // lives in AccountMatcher / AccountIdentifierRepository.
         return matchByName(body, merchant, accounts)
     }

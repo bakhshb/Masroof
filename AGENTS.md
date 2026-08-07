@@ -32,8 +32,8 @@ into financial transactions.
 ## Account Identification
 - Prefer AccountIdentifierEntity for instrument identifiers:
   ACCOUNT_LAST4, CREDIT_CARD_LAST4, DEBIT_CARD_LAST4, IBAN_LAST4, WALLET_LAST4
-- Sender identity belongs to SenderProfile + account↔sender many-to-many — not SENDER_ALIAS
-- SENDER_ALIAS is deprecated (migration dual-read only)
+- Sender identity belongs to SenderProfile + account↔sender many-to-many
+- Do not store SMS senders as AccountIdentifierType rows
 - Do not automatically create identifiers from SMS messages
 - Ambiguous matches must require user confirmation
 - Account-type compatibility rules must always be enforced

@@ -61,7 +61,7 @@ fun IdentifiersSection(
             Text("استخراج آخر 4 أرقام من رسالة")
         }
         if (items.isEmpty()) Text("لا توجد معرفات بعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        items.filter { it.identifierType != AccountIdentifierType.SENDER_ALIAS }.forEach { identifier ->
+        items.forEach { identifier ->
             IdentifierRow(
                 identifier = identifier,
                 onToggle = { active -> scope.launch { repo.setActive(identifier.id, active) } },
@@ -159,14 +159,12 @@ private fun AddIdentifierDialog(
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(value = typeLabel(type), onValueChange = {}, readOnly = true, label = { Text("نوع المعرف") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        AccountIdentifierType.values()
-                            .filter { it != AccountIdentifierType.SENDER_ALIAS }
-                            .forEach { valueType ->
+                        AccountIdentifierType.values().forEach { valueType ->
                             DropdownMenuItem(text = { Text(typeLabel(valueType)) }, onClick = { type = valueType; expanded = false })
                         }
                     }
                 }
-                OutlinedTextField(value = value, onValueChange = { value = it.filter { ch -> ch != ' ' } }, label = { Text(if (type == AccountIdentifierType.SENDER_ALIAS) "اسم المرسل" else "آخر 4 أرقام") }, isError = error != null, supportingText = { error?.let { Text(it) } }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = value, onValueChange = { value = it.filter { ch -> ch != ' ' } }, label = { Text("آخر 4 أرقام") }, isError = error != null, supportingText = { error?.let { Text(it) } }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -190,13 +188,7 @@ private fun EditIdentifierDialog(
     onSaved: (IdentifierAddOutcome) -> Unit,
 ) {
     var value by remember {
-        mutableStateOf(
-            if (identifier.identifierType == AccountIdentifierType.SENDER_ALIAS) {
-                identifier.displayLabel
-            } else {
-                identifier.normalizedValue
-            },
-        )
+        mutableStateOf(identifier.normalizedValue)
     }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -209,15 +201,7 @@ private fun EditIdentifierDialog(
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it.filter { ch -> ch != ' ' } },
-                    label = {
-                        Text(
-                            if (identifier.identifierType == AccountIdentifierType.SENDER_ALIAS) {
-                                "اسم المرسل"
-                            } else {
-                                "آخر 4 أرقام"
-                            },
-                        )
-                    },
+                    label = { Text("آخر 4 أرقام") },
                     isError = error != null,
                     supportingText = { error?.let { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
@@ -245,10 +229,8 @@ private fun typeLabel(type: AccountIdentifierType): String = when (type) {
     AccountIdentifierType.CREDIT_CARD_LAST4 -> "آخر أربعة أرقام للبطاقة الائتمانية"
     AccountIdentifierType.IBAN_LAST4 -> "آخر أربعة أرقام للآيبان"
     AccountIdentifierType.WALLET_LAST4 -> "آخر أربعة أرقام للمحفظة"
-    AccountIdentifierType.SENDER_ALIAS -> "اسم مرسل الرسائل"
 }
 
-private fun maskedValue(identifier: AccountIdentifierEntity): String = when (identifier.identifierType) {
-    AccountIdentifierType.SENDER_ALIAS -> identifier.displayLabel
-    else -> "•••• ${identifier.normalizedValue.takeLast(4)}"
-}
+private fun maskedValue(identifier: AccountIdentifierEntity): String =
+    "•••• ${identifier.normalizedValue.takeLast(4)}"
+

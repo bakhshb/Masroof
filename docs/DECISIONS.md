@@ -4,7 +4,7 @@
 
 `AccountIdentifierEntity` with types (`ACCOUNT_LAST4`, `CREDIT_CARD_LAST4`, `DEBIT_CARD_LAST4`, `IBAN_LAST4`, `WALLET_LAST4`) is the production source of truth for **instrument** identity. Schema v15 removes legacy columns from `financial_accounts` after idempotent backfill. Ambiguous matches require user confirmation. Identifiers are never auto-created from SMS without explicit user confirmation.
 
-`SENDER_ALIAS` is **deprecated**. Sender identity lives on `SenderProfile` + `account_sender_profiles`. Legacy alias rows dual-read/dual-write until fully retired.
+Sender identity lives only on `SenderProfile` + `account_sender_profiles`. Room **v23** deletes any leftover `SENDER_ALIAS` identifier rows after ensuring profile links exist (historical migrations 14→20 may still create them during upgrades).
 
 ## AD-011 — SenderProfile → Pattern → Identifier → Account
 

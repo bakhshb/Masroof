@@ -153,11 +153,19 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration22to23RemovesSenderAliasIdentifiers() {
+        assertEquals(22, MasroofDatabase.MIGRATION_22_23.startVersion)
+        assertEquals(23, MasroofDatabase.MIGRATION_22_23.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("DELETE FROM account_identifiers WHERE identifierType = 'SENDER_ALIAS'"))
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
         val expected = setOf(
             "1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15",
-            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21", "21->22",
+            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21", "21->22", "22->23",
         )
         val missing = expected - versions.toSet()
         assertTrue(

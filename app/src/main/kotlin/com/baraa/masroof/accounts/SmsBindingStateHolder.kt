@@ -5,6 +5,7 @@ import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.data.repository.IdentifierAddOutcome
 import com.baraa.masroof.data.repository.IdentifierAddResult
 import com.baraa.masroof.data.repository.IdentifierForm
+import com.baraa.masroof.data.repository.SenderProfileRepository
 import com.baraa.masroof.sms.BankSmsFilter
 import com.baraa.masroof.sms.ExpectedSalaryDateService
 import com.baraa.masroof.sms.SmsImportRange
@@ -23,6 +24,7 @@ import java.util.Locale
 class SmsBindingStateHolder(
     private val smsRepository: SmsRepository,
     private val identifierRepository: AccountIdentifierRepository,
+    private val senderProfileRepository: SenderProfileRepository,
     private val afterBindRelink: (suspend () -> Unit)? = null,
     private val todayProvider: () -> LocalDate = { LocalDate.now() },
 ) {
@@ -95,15 +97,24 @@ class SmsBindingStateHolder(
     }
     fun chooseAnother() = _state.update { it.copy(selected = null, analysis = null, error = null) }
 
-    /** Persist the confirmed binding; returns true only if both writes produced real rows. */
+    /** Persist the confirmed binding; returns true only if sender + identifier writes succeed. */
     suspend fun commit(accountId: Long): Boolean {
-        val analysis = _state.value.analysis ?: run { _state.update { it.copy(error = "تعذر استخراج بيانات آمنة من الرسالة.") } ; return false }
-        val sender = identifierRepository.addOrUpdate(accountId, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, analysis.senderDisplay, analysis.senderDisplay))
-        val senderOk = sender.result != IdentifierAddResult.Rejected && sender.identifier != null
+        val analysis = _state.value.analysis ?: run {
+            _state.update { it.copy(error = "تعذر استخراج بيانات آمنة من الرسالة.") }
+            return false
+        }
+        val senderOk = runCatching {
+            val profile = senderProfileRepository.upsertFromSmsSender(analysis.senderDisplay)
+            senderProfileRepository.associateAccount(accountId, profile.id)
+            true
+        }.getOrDefault(false)
         val identifierOutcome: IdentifierAddOutcome? = analysis.identifierType?.let { type ->
             identifierRepository.addOrUpdate(accountId, IdentifierForm(type, typeLabel(type), analysis.lastFour.orEmpty()))
         }
-        val identifierOk = analysis.identifierType == null || (identifierOutcome != null && identifierOutcome.result != IdentifierAddResult.Rejected && identifierOutcome.identifier != null)
+        val identifierOk = analysis.identifierType == null ||
+            (identifierOutcome != null &&
+                identifierOutcome.result != IdentifierAddResult.Rejected &&
+                identifierOutcome.identifier != null)
         if (senderOk && identifierOk) {
             runCatching { afterBindRelink?.invoke() }
             _state.update { it.copy(committed = true, error = null) }
@@ -119,7 +130,6 @@ class SmsBindingStateHolder(
         AccountIdentifierType.IBAN_LAST4 -> "آيبان"
         AccountIdentifierType.WALLET_LAST4 -> "محفظة"
         AccountIdentifierType.ACCOUNT_LAST4 -> "حساب"
-        AccountIdentifierType.SENDER_ALIAS -> "اسم المرسل"
     }
 
     companion object {

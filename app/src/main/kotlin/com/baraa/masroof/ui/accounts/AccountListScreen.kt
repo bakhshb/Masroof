@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.baraa.masroof.MasroofApplication
-import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.ledger.AccountBalanceService
 import com.baraa.masroof.ledger.TransactionPostingStatus
@@ -70,7 +69,7 @@ fun AccountListScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val identifierLabels = remember(identifiers) {
         identifiers
-            .filter { it.isActive && it.identifierType != AccountIdentifierType.SENDER_ALIAS }
+            .filter { it.isActive }
             .groupBy { it.accountId }
             .mapValues { (_, rows) ->
                 AccountIdentifierLabels.formatLastFours(rows.map { it.normalizedValue })

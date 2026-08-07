@@ -110,8 +110,8 @@ class AccountIdentifierMatchingRegressionTest {
                 AccountIdentifierSnapshot(1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
                 AccountIdentifierSnapshot(2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
                 AccountIdentifierSnapshot(3, AccountIdentifierType.ACCOUNT_LAST4, "9999"),
-                AccountIdentifierSnapshot(1, AccountIdentifierType.SENDER_ALIAS, "bank")
-            )
+            ),
+            accountsBySenderKey = mapOf("bank" to setOf(1L)),
         )
         val result = InternalTransferRule().evaluate(input, context)
         assertEquals(FinancialTreatment.INTERNAL_TRANSFER, result?.financialTreatment)
@@ -164,7 +164,7 @@ class AccountIdentifierMatchingRegressionTest {
             categories = emptyList(),
             accountIdentifiers = listOf(
                 AccountIdentifierSnapshot(2, AccountIdentifierType.ACCOUNT_LAST4, "9999"),
-                AccountIdentifierSnapshot(1, AccountIdentifierType.SENDER_ALIAS, "bank")
+                AccountIdentifierSnapshot(1, AccountIdentifierType.ACCOUNT_LAST4, "9999")
             )
         )
         assertNull(InternalTransferRule().evaluate(input, context))

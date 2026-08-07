@@ -364,8 +364,9 @@ class SmsImportOrchestrator(
         val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
         val merchantMemory = merchantMemoryRepository.getAll()
         val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
+        val accountsBySender = senderProfileRepository?.accountsBySenderKeyMap().orEmpty()
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
-        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots)
+        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots, accountsBySender)
         var scanned = 0; var recognized = 0; var nonFinancial = 0; var unparsed = 0
         var unregistered = 0; var otpOrAuth = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
         val groups = linkedMapOf<String, MutableList<ScanPreview.PreviewItem>>()
@@ -542,9 +543,8 @@ class SmsImportOrchestrator(
     }
 
     private suspend fun registeredSenderKeys(): Set<String> {
-        // Dual-read: SenderProfile cross-ref (preferred) ∪ legacy SENDER_ALIAS ∪ institution mapping.
+        // SenderProfile cross-ref (owned) ∪ trained profiles ∪ institution mapping.
         val fromProfiles = senderProfileRepository?.activeOwnedSenderKeys().orEmpty().toMutableSet()
-        fromProfiles += accountIdentifierRepository.activeOwnedSenderAliases()
         val ownedInstitutions = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
             .mapNotNull { it.institutionName?.trim()?.lowercase() }.toSet()
         database.senderInstitutionMappingDao().getActive()
@@ -570,8 +570,9 @@ class SmsImportOrchestrator(
         val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
         val merchantMemory = merchantMemoryRepository.getAll()
         val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
+        val accountsBySender = senderProfileRepository?.accountsBySenderKeyMap().orEmpty()
         val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
-        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots)
+        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots, accountsBySender)
 
         var imported = 0
         var linkedCount = 0

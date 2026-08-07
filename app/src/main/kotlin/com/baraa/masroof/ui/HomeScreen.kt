@@ -556,7 +556,7 @@ private fun TransactionEntity.toPresentation(identifiers: List<AccountIdentifier
         merchantOrLabel = merchantOrBeneficiary?.takeIf { it.isNotBlank() } ?: TransactionPresentationFactory.friendlyTransactionType(transactionType),
         friendlyType = TransactionPresentationFactory.friendlyTransactionType(transactionType),
         institutionDisplayName = institutionDisplayName,
-        institutionSource = com.baraa.masroof.ledger.InstitutionIdentificationSource.ACCOUNT_SENDER_ALIAS,
+        institutionSource = com.baraa.masroof.ledger.InstitutionIdentificationSource.ACCOUNT_SENDER_PROFILE,
         accountOrInstrumentLabel = accountOrCardLastFourDigits?.let { "•••• ${it.takeLast(4)}" } ?: "غير مرتبط بحساب",
         channelLabel = when (transactionType) {
             TransactionType.ONLINE_PURCHASE -> "عبر الإنترنت"

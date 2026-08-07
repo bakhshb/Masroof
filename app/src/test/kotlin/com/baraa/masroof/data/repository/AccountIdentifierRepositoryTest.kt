@@ -63,9 +63,22 @@ class AccountIdentifierRepositoryTest {
         assertTrue(found.isEmpty())
     }
 
-    @Test fun senderAliasMatchingIsCaseInsensitive() = runBlocking {
-        val repo = newRepo(bank(1))
-        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "AlRajhi", "alrajhi"))
+    @Test fun accountsForSenderUsesSenderProfileLinks() = runBlocking {
+        val accountDao = FakeAccountDao(listOf(bank(1)))
+        val profiles = com.baraa.masroof.ledger.FakeSenderProfileDao()
+        val links = com.baraa.masroof.ledger.FakeAccountSenderProfileDao(profiles) { setOf(1L) }
+        val repo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao, profiles, links)
+        val key = "alrajhi"
+        val pid = profiles.insert(
+            com.baraa.masroof.data.db.SenderProfileEntity(
+                displaySender = "AlRajhi",
+                normalizedSenderKey = key,
+                active = true,
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+        )
+        links.insert(com.baraa.masroof.data.db.AccountSenderProfileCrossRef(1L, pid, 1L))
         val matches = repo.accountsForSender("ALRAJHI")
         assertEquals(1, matches.size)
         assertEquals(1L, matches.single().id)
@@ -101,9 +114,9 @@ class AccountIdentifierRepositoryTest {
         assertEquals(1, repo.getForAccount(1).size)
     }
 
-    @Test fun senderAliasRejectsBlank() = runBlocking {
+    @Test fun blankLastFourIsRejected() = runBlocking {
         val repo = newRepo(bank(1))
-        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "x", "   "))
+        val outcome = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "x", "   "))
         assertEquals(IdentifierAddResult.Rejected, outcome.result)
     }
 

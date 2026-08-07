@@ -185,11 +185,44 @@ class AccountIdentifierSmsRegressionTest {
 
     // -- Matching edge cases ------------------------------------------------
 
+    private fun repoWithProfiles(
+        accounts: List<FinancialAccountEntity>,
+        identifiers: List<Triple<Long, AccountIdentifierType, String>> = emptyList(),
+        senderAccountIds: List<Long> = emptyList(),
+        senderKey: String = "snb",
+    ): AccountIdentifierRepository {
+        val accountDao = FakeAccountDao(accounts)
+        val profiles = com.baraa.masroof.ledger.FakeSenderProfileDao()
+        val links = com.baraa.masroof.ledger.FakeAccountSenderProfileDao(profiles) {
+            accounts.filter { it.isOwnedByUser }.map { it.id }.toSet()
+        }
+        val repo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao, profiles, links)
+        runBlocking {
+            for ((accountId, type, value) in identifiers) {
+                repo.addOrUpdate(accountId, IdentifierForm(type, value, value))
+            }
+            if (senderAccountIds.isNotEmpty()) {
+                val pid = profiles.insert(
+                    com.baraa.masroof.data.db.SenderProfileEntity(
+                        displaySender = senderKey,
+                        normalizedSenderKey = senderKey,
+                        active = true,
+                        createdAt = 1,
+                        updatedAt = 1,
+                    ),
+                )
+                for (aid in senderAccountIds) {
+                    links.insert(com.baraa.masroof.data.db.AccountSenderProfileCrossRef(aid, pid, 1L))
+                }
+            }
+        }
+        return repo
+    }
+
     @Test
-    fun oneSenderAliasLinksSingleCompatibleAccountWithReview() = runBlocking {
+    fun oneSenderProfileLinksSingleCompatibleAccountWithReview() = runBlocking {
         val bank = accountEntity(1)
-        val repo = AccountIdentifierRepository(FakeIdentifierDao(), FakeAccountDao(listOf(bank)))
-        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "SNB", "SNB"))
+        val repo = repoWithProfiles(listOf(bank), senderAccountIds = listOf(1L))
         val tx = TransactionEntity(
             id = 1, uniqueFingerprint = "a", smsTimestamp = 1, originalSender = "SNB",
             transactionType = TransactionType.PURCHASE, amount = BigDecimal.ONE, currency = Currency.SAR,
@@ -205,13 +238,10 @@ class AccountIdentifierSmsRegressionTest {
     }
 
     @Test
-    fun oneSenderAliasWithMultipleAccountsStaysUnlinked() = runBlocking {
+    fun oneSenderProfileWithMultipleAccountsStaysUnlinked() = runBlocking {
         val a = accountEntity(1)
         val b = accountEntity(2, type = AccountType.CREDIT_CARD)
-        val dao = FakeAccountDao(listOf(a, b))
-        val repo = AccountIdentifierRepository(FakeIdentifierDao(), dao)
-        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "SNB", "SNB"))
-        repo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "SNB", "SNB"))
+        val repo = repoWithProfiles(listOf(a, b), senderAccountIds = listOf(1L, 2L))
         val tx = TransactionEntity(
             id = 1, uniqueFingerprint = "a", smsTimestamp = 1, originalSender = "SNB",
             transactionType = TransactionType.PURCHASE, amount = BigDecimal.ONE, currency = Currency.SAR,
@@ -225,13 +255,14 @@ class AccountIdentifierSmsRegressionTest {
     }
 
     @Test
-    fun exactIdentifierWinsOverSenderAlias() = runBlocking {
+    fun exactIdentifierWinsOverSenderProfile() = runBlocking {
         val bank = accountEntity(1)
         val card = accountEntity(2, type = AccountType.CREDIT_CARD, name = "Card")
-        val dao = FakeAccountDao(listOf(bank, card))
-        val repo = AccountIdentifierRepository(FakeIdentifierDao(), dao)
-        repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "SNB", "SNB"))
-        repo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.CREDIT_CARD_LAST4, "Card", "7271"))
+        val repo = repoWithProfiles(
+            listOf(bank, card),
+            identifiers = listOf(Triple(2L, AccountIdentifierType.CREDIT_CARD_LAST4, "7271")),
+            senderAccountIds = listOf(1L),
+        )
         val tx = TransactionEntity(
             id = 1, uniqueFingerprint = "a", smsTimestamp = 1, originalSender = "SNB",
             transactionType = TransactionType.PURCHASE, amount = BigDecimal.ONE, currency = Currency.SAR,

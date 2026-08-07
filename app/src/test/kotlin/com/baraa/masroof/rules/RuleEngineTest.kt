@@ -4,6 +4,7 @@ import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.Category
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.repository.AccountIdentifierRepository
+import com.baraa.masroof.ledger.FinancialInstitutionResolver
 import com.baraa.masroof.transaction.CategorySource
 import com.baraa.masroof.transaction.Currency
 import com.baraa.masroof.transaction.FinancialTreatment
@@ -72,23 +73,18 @@ class RuleEngineTest {
         // Stash typed identifier snapshots on a side map keyed by account id
         // so emptyContext can build RuleContext without legacy columns.
         pendingSnapshots[account.id] = buildList {
-            for (alias in aliases) {
-                val key = AccountIdentifierRepository.normalize(
-                    AccountIdentifierType.SENDER_ALIAS,
-                    alias,
-                )
-                if (key.isNotBlank()) {
-                    add(AccountIdentifierSnapshot(account.id, AccountIdentifierType.SENDER_ALIAS, key))
-                }
-            }
             lastFour?.let { last ->
                 val idType = AccountIdentifierRepository.defaultIdentifierTypeFor(type) ?: return@let
                 add(AccountIdentifierSnapshot(account.id, idType, last))
             }
         }
+        pendingSenderKeys[account.id] = aliases.mapNotNull {
+            FinancialInstitutionResolver.senderKey(it)?.takeIf { k -> k.isNotBlank() }
+        }
     }
 
     private val pendingSnapshots = mutableMapOf<Long, List<AccountIdentifierSnapshot>>()
+    private val pendingSenderKeys = mutableMapOf<Long, List<String>>()
 
     private fun makeInput(
         type: TransactionType = TransactionType.PURCHASE,
@@ -126,12 +122,21 @@ class RuleEngineTest {
     private fun emptyContext(
         categories: List<Category> = emptyList(),
         accounts: List<FinancialAccount> = emptyList(),
-    ) = RuleContext(
-        ownedAccounts = accounts,
-        merchantMemories = emptyList(),
-        categories = categories,
-        accountIdentifiers = accounts.flatMap { pendingSnapshots[it.id].orEmpty() },
-    )
+    ): RuleContext {
+        val bySender = mutableMapOf<String, MutableSet<Long>>()
+        for (account in accounts) {
+            for (key in pendingSenderKeys[account.id].orEmpty()) {
+                bySender.getOrPut(key) { mutableSetOf() }.add(account.id)
+            }
+        }
+        return RuleContext(
+            ownedAccounts = accounts,
+            merchantMemories = emptyList(),
+            categories = categories,
+            accountIdentifiers = accounts.flatMap { pendingSnapshots[it.id].orEmpty() },
+            accountsBySenderKey = bySender.mapValues { it.value.toSet() },
+        )
+    }
 
     // -- Safety rules ------------------------------------------------------
 

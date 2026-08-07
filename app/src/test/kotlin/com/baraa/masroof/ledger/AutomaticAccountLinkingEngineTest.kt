@@ -1,11 +1,14 @@
 package com.baraa.masroof.ledger
 
 import com.baraa.masroof.data.db.AccountIdentifierType
+import com.baraa.masroof.data.db.AccountSenderProfileCrossRef
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.data.db.FinancialAccountEntity
+import com.baraa.masroof.data.db.SenderProfileEntity
 import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.data.repository.IdentifierForm
+import com.baraa.masroof.sms.SenderNormalizer
 import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
@@ -61,9 +64,21 @@ class AutomaticAccountLinkingEngineTest {
         financialTreatment = treatment,
     )
 
-    private fun repoWith(vararg triples: Triple<FinancialAccount, AccountIdentifierType, String>): AccountIdentifierRepository {
+    private fun repoWith(
+        vararg triples: Triple<FinancialAccount, AccountIdentifierType, String>,
+        senderLinks: List<Pair<Long, String>> = emptyList(),
+    ): AccountIdentifierRepository {
         val accountDao = FakeAccountDao()
-        val repo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
+        val profileDao = FakeSenderProfileDao()
+        val linkDao = FakeAccountSenderProfileDao(profileDao) {
+            runBlocking {
+                accountDao.getActive()
+                    .filter { it.isOwnedByUser && it.systemAccountKey == null }
+                    .map { it.id }
+                    .toSet()
+            }
+        }
+        val repo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao, profileDao, linkDao)
         val inserted = mutableSetOf<Long>()
         for ((account, type, value) in triples) {
             if (account.id !in inserted) {
@@ -92,6 +107,50 @@ class AutomaticAccountLinkingEngineTest {
                 repo.addOrUpdate(account.id, IdentifierForm(type, account.displayName, value))
             }
         }
+        runBlocking {
+            for ((accountId, rawSender) in senderLinks) {
+                if (accountId !in inserted) {
+                    val acct = triples.first { it.first.id == accountId }.first
+                    accountDao.insert(
+                        FinancialAccountEntity(
+                            id = acct.id,
+                            displayName = acct.displayName,
+                            institutionName = acct.institutionName,
+                            accountType = acct.accountType,
+                            accountNature = acct.accountNature,
+                            currency = acct.currency,
+                            openingBalance = acct.openingBalance,
+                            openingBalanceDate = acct.openingBalanceDate,
+                            includeInNetWorth = acct.includeInNetWorth,
+                            includeInLiquidity = acct.includeInLiquidity,
+                            isOwnedByUser = acct.isOwnedByUser,
+                            systemAccountKey = acct.systemAccountKey,
+                            isActive = acct.isActive,
+                            notes = acct.notes,
+                            createdAt = 0L,
+                            updatedAt = 0L,
+                        ),
+                    )
+                    inserted += accountId
+                }
+                val key = SenderNormalizer.normalize(rawSender) ?: continue
+                val existing = profileDao.findByKey(key)
+                val profileId = if (existing == null) {
+                    profileDao.insert(
+                        SenderProfileEntity(
+                            displaySender = rawSender,
+                            normalizedSenderKey = key,
+                            active = true,
+                            createdAt = 1L,
+                            updatedAt = 1L,
+                        ),
+                    )
+                } else {
+                    existing.id
+                }
+                linkDao.insert(AccountSenderProfileCrossRef(accountId, profileId, 1L))
+            }
+        }
         return repo
     }
 
@@ -100,8 +159,9 @@ class AutomaticAccountLinkingEngineTest {
         val bank = account(1, AccountType.BANK_ACCOUNT)
         val credit = account(2, AccountType.CREDIT_CARD)
         val repo = repoWith(
-            Triple(bank, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(bank, AccountIdentifierType.ACCOUNT_LAST4, "9999"),
             Triple(credit, AccountIdentifierType.CREDIT_CARD_LAST4, "7271"),
+            senderLinks = listOf(1L to "bank", 2L to "bank"),
         )
         val m = AccountMatcher.match(tx("7271", FinancialTreatment.EXPENSE), listOf(bank, credit), repo)
         assertEquals(credit.id, m.account?.id)
@@ -122,8 +182,9 @@ class AutomaticAccountLinkingEngineTest {
         val bank = account(1, AccountType.BANK_ACCOUNT)
         val card = account(2, AccountType.CREDIT_CARD)
         val repo = repoWith(
-            Triple(bank, AccountIdentifierType.SENDER_ALIAS, "bank"),
-            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
+            Triple(bank, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
+            Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "2222"),
+            senderLinks = listOf(1L to "bank", 2L to "bank"),
         )
         val m = AccountMatcher.match(tx(null, FinancialTreatment.EXPENSE), listOf(bank, card), repo)
         assertNull(m.account)
@@ -160,7 +221,7 @@ class AutomaticAccountLinkingEngineTest {
     }
 
     @Test
-    fun withoutTypedSenderAliasSenderDoesNotMatch() = runBlocking {
+    fun withoutSenderProfileLinkSenderDoesNotMatch() = runBlocking {
         val bank = account(1, AccountType.BANK_ACCOUNT)
         val accountDao = FakeAccountDao(
             listOf(
@@ -190,7 +251,7 @@ class AutomaticAccountLinkingEngineTest {
             listOf(bank),
             repo,
         )
-        assertNull("sender must not match without typed SENDER_ALIAS", m.account)
+        assertNull("sender must not match without SenderProfile link", m.account)
     }
 
     @Test
@@ -201,14 +262,11 @@ class AutomaticAccountLinkingEngineTest {
         val card = account(4, AccountType.CREDIT_CARD)
         val accounts = listOf(a1, a2, a3, card)
         val repo = repoWith(
-            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
-            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
-            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
-            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+            senderLinks = listOf(1L to "bank", 2L to "bank", 3L to "bank", 4L to "bank"),
         )
         val evidence = listOf(
             com.baraa.masroof.transaction.ParsedIdentifierEvidence(
@@ -239,14 +297,11 @@ class AutomaticAccountLinkingEngineTest {
         val card = account(4, AccountType.CREDIT_CARD)
         val accounts = listOf(a1, a2, a3, card)
         val repo = repoWith(
-            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
-            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
-            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
-            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+            senderLinks = listOf(1L to "bank", 2L to "bank", 3L to "bank", 4L to "bank"),
         )
         val evidence = listOf(
             com.baraa.masroof.transaction.ParsedIdentifierEvidence(
@@ -270,14 +325,11 @@ class AutomaticAccountLinkingEngineTest {
         val card = account(4, AccountType.CREDIT_CARD)
         val accounts = listOf(a1, a2, a3, card)
         val repo = repoWith(
-            Triple(a1, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a1, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
-            Triple(a2, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a2, AccountIdentifierType.ACCOUNT_LAST4, "2222"),
-            Triple(a3, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(a3, AccountIdentifierType.ACCOUNT_LAST4, "3333"),
-            Triple(card, AccountIdentifierType.SENDER_ALIAS, "bank"),
             Triple(card, AccountIdentifierType.CREDIT_CARD_LAST4, "4444"),
+            senderLinks = listOf(1L to "bank", 2L to "bank", 3L to "bank", 4L to "bank"),
         )
         val m = AccountMatcher.match(tx(null), accounts, repo, emptyList())
         assertNull(m.account)

@@ -1,6 +1,5 @@
 package com.baraa.masroof.rules.rules
 
-import com.baraa.masroof.data.db.AccountIdentifierType
 import com.baraa.masroof.data.db.FinancialAccount
 import com.baraa.masroof.ledger.AccountIdentifierCompatibility
 import com.baraa.masroof.ledger.FinancialInstitutionResolver
@@ -20,7 +19,8 @@ import com.baraa.masroof.transaction.TransactionType
  * Classifies a transfer as INTERNAL_TRANSFER when the SMS can be
  * confidently matched to two of the user's owned accounts (one as source,
  * one as destination). Typed identifier evidence is matched by type+value
- * against [RuleContext.accountIdentifiers]. Ambiguous matches return null.
+ * against [RuleContext.accountIdentifiers]. Sender links use
+ * [RuleContext.accountsBySenderKey]. Ambiguous matches return null.
  */
 class InternalTransferRule : TransactionRule {
     override val name: String = "InternalTransferRule"
@@ -58,7 +58,7 @@ class InternalTransferRule : TransactionRule {
         if (sourceEvidence != null) {
             findByEvidence(owned, sourceEvidence, context)?.let { return it }
         }
-        matchByTypedSender(owned, input.sender, context)?.let { return it }
+        matchBySenderLink(owned, input.sender, context)?.let { return it }
         return AccountMatching.matchByName(input.body, input.parsed.merchant, owned)
     }
 
@@ -82,20 +82,14 @@ class InternalTransferRule : TransactionRule {
         return AccountMatching.matchByName(input.body, input.parsed.merchant, remaining)
     }
 
-    private fun matchByTypedSender(
+    private fun matchBySenderLink(
         accounts: List<FinancialAccount>,
         sender: String?,
         context: RuleContext,
     ): FinancialAccount? {
         val key = FinancialInstitutionResolver.senderKey(sender) ?: return null
-        val ids = context.accountIdentifiers
-            .asSequence()
-            .filter {
-                it.identifierType == AccountIdentifierType.SENDER_ALIAS &&
-                    it.normalizedValue == key
-            }
-            .map { it.accountId }
-            .toSet()
+        val ids = context.accountsBySenderKey[key].orEmpty()
+        if (ids.isEmpty()) return null
         return accounts.filter { it.id in ids }.singleOrNull()
     }
 

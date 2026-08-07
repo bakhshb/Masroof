@@ -18,29 +18,22 @@ object AccountIdentifierCompatibility {
                 AccountIdentifierType.ACCOUNT_LAST4,
                 AccountIdentifierType.DEBIT_CARD_LAST4,
                 AccountIdentifierType.IBAN_LAST4,
-                AccountIdentifierType.SENDER_ALIAS,
             )
-            AccountType.CREDIT_CARD -> identifierType in setOf(
-                AccountIdentifierType.CREDIT_CARD_LAST4,
-                AccountIdentifierType.SENDER_ALIAS,
-            )
+            AccountType.CREDIT_CARD -> identifierType == AccountIdentifierType.CREDIT_CARD_LAST4
             AccountType.DIGITAL_WALLET, AccountType.WALLET -> identifierType in setOf(
                 AccountIdentifierType.WALLET_LAST4,
                 AccountIdentifierType.ACCOUNT_LAST4,
-                AccountIdentifierType.SENDER_ALIAS,
             )
             AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT -> identifierType in setOf(
                 AccountIdentifierType.ACCOUNT_LAST4,
                 AccountIdentifierType.IBAN_LAST4,
-                AccountIdentifierType.SENDER_ALIAS,
             )
-            else -> identifierType == AccountIdentifierType.SENDER_ALIAS
+            else -> false
         }
 
-    /** Compatibility without allowing SENDER_ALIAS (for typed SMS evidence). */
+    /** Typed SMS evidence must match account type (same rules as [isCompatibleWithAccount]). */
     fun isCompatibleTyped(accountType: AccountType, identifierType: AccountIdentifierType): Boolean =
-        identifierType != AccountIdentifierType.SENDER_ALIAS &&
-            isCompatibleWithAccount(accountType, identifierType)
+        isCompatibleWithAccount(accountType, identifierType)
 
     fun identifierTypesFor(transactionType: TransactionType): List<AccountIdentifierType> = when (transactionType) {
         TransactionType.CARD_PAYMENT -> listOf(

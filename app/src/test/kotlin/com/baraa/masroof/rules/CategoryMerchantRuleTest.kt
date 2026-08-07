@@ -268,18 +268,16 @@ class CategoryMerchantRuleTest {
                 accountIdentifiers = listOf(
                     com.baraa.masroof.rules.AccountIdentifierSnapshot(
                         2,
-                        com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS,
-                        com.baraa.masroof.data.repository.AccountIdentifierRepository.normalize(
-                            com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS,
-                            "stc pay"
-                        )
+                        com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4,
+                        "9999"
                     ),
                     com.baraa.masroof.rules.AccountIdentifierSnapshot(
                         1,
                         com.baraa.masroof.data.db.AccountIdentifierType.CREDIT_CARD_LAST4,
                         "1234"
                     )
-                )
+                ),
+                accountsBySenderKey = mapOf("stcpay" to setOf(2L)),
             )
         )
         assertEquals(FinancialTreatment.INTERNAL_TRANSFER, v.financialTreatment)

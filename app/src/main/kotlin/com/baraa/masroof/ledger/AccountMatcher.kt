@@ -14,11 +14,11 @@ import com.baraa.masroof.transaction.ParsedIdentifierEvidence
  *  1. Exact typed identifier evidence (SOURCE-role preferred when roles are present)
  *  2. Same last-four across last4 identifier types (label type mismatch soft-match)
  *  3. Untyped TX last-four across last4 identifier types
- *  4. Unambiguous active [SENDER_ALIAS] (needs review; never auto-confirmed)
+ *  4. Unambiguous SenderProfile↔account link (needs review; never auto-confirmed)
  *
  * Institution name alone never selects an account. Matching uses typed
- * [AccountIdentifierEntity] rows only. Same-sender multi-account setups
- * require a unique last-four — sender never breaks ties.
+ * [AccountIdentifierEntity] rows and SenderProfile cross-refs. Same-sender
+ * multi-account setups require a unique last-four — sender never breaks ties.
  */
 object AccountMatcher {
     data class Match(
@@ -197,7 +197,7 @@ object AccountMatcher {
             }
         }.distinctBy { it.id }
         if (typed.size <= 1) return typed
-        // Prefer accounts associated with this SMS sender (profile cross-ref ∪ legacy alias).
+        // Prefer accounts associated with this SMS sender (SenderProfile cross-ref).
         // Never pick by insertion order when identifiers conflict across senders.
         val senderLinked = identifierRepository.accountsForSender(transaction.originalSender)
             .map { it.id }

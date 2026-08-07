@@ -33,6 +33,7 @@ fun AccountSmsBindingDialog(
         SmsBindingStateHolder(
             smsRepository = app.smsRepository,
             identifierRepository = app.accountIdentifierRepository,
+            senderProfileRepository = app.senderProfileRepository,
             afterBindRelink = { app.historicalAccountRelinkService.relinkUnposted(dryRun = false) },
         )
     }
@@ -228,5 +229,4 @@ private fun identifierLabel(type: com.baraa.masroof.data.db.AccountIdentifierTyp
     com.baraa.masroof.data.db.AccountIdentifierType.IBAN_LAST4 -> "آيبان"
     com.baraa.masroof.data.db.AccountIdentifierType.WALLET_LAST4 -> "محفظة"
     com.baraa.masroof.data.db.AccountIdentifierType.ACCOUNT_LAST4 -> "حساب"
-    com.baraa.masroof.data.db.AccountIdentifierType.SENDER_ALIAS -> "اسم المرسل"
 }

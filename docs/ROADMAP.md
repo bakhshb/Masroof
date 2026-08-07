@@ -73,8 +73,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 - [x] Account edit: select trained sender + manual typed identifiers
 - [x] Import uses APPROVED patterns; UNKNOWN skip reason
 - [x] Matcher prefers typed ID + sender cross-ref
-- [x] SENDER_ALIAS deprecated with dual-read/write
-- [x] Production import/training off legacy `sender_message_patterns` (table kept for migrations/tests)
+- [x] SENDER_ALIAS removed (Room v23 deletes rows; SenderProfile is sole sender identity)
 - [x] Thin bank parsers classified as sender-routing shells only
 - [x] Room v22 drops legacy pattern table after IGNORE/amount-label backfill; learner code removed
 - [ ] Physical-device checklist execution (optional — alternate testing OK)

@@ -53,9 +53,6 @@ class WalletTopUpRule : TransactionRule {
     private fun typedMentions(context: RuleContext, account: FinancialAccount, input: RuleInput): Boolean {
         val ids = context.accountIdentifiers.filter { it.accountId == account.id }
         val body = (input.body.orEmpty() + " " + input.parsed.merchant.orEmpty()).lowercase()
-        if (ids.any { it.identifierType == AccountIdentifierType.SENDER_ALIAS && it.normalizedValue in body }) {
-            return true
-        }
         val lastFours = ids.map { it.normalizedValue }.filter { it.length == 4 }
         return lastFours.any { it in body } ||
             input.parsed.identifierEvidence.any { evidence ->

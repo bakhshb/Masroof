@@ -126,6 +126,21 @@ class SenderProfileRepository(
         accountSenderDao.activeOwnedSenderKeys().filter { it.isNotBlank() }.toSet()
     }
 
+    /** Normalized sender key → owned account ids (for rule-engine context). */
+    suspend fun accountsBySenderKeyMap(): Map<String, Set<Long>> = withContext(Dispatchers.IO) {
+        val result = mutableMapOf<String, MutableSet<Long>>()
+        for (profile in dao.getActive()) {
+            val ids = accountSenderDao.accountIdsForSender(profile.id)
+                .mapNotNull { accountDao.getById(it) }
+                .filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
+                .map { it.id }
+            if (ids.isNotEmpty()) {
+                result.getOrPut(profile.normalizedSenderKey) { mutableSetOf() }.addAll(ids)
+            }
+        }
+        result.mapValues { it.value.toSet() }
+    }
+
     /** All active profile keys (trained senders), even before account link. */
     suspend fun activeProfileKeys(): Set<String> = withContext(Dispatchers.IO) {
         dao.activeNormalizedKeys().filter { it.isNotBlank() }.toSet()

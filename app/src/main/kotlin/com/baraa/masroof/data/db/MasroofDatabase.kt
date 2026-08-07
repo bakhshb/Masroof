@@ -44,7 +44,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MessagePatternDefinitionEntity::class,
         PatternFieldDefinitionEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -951,6 +951,51 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Remove deprecated SENDER_ALIAS identifier rows. Sender identity is
+         * exclusively SenderProfile + account_sender_profiles (backfilled in v20).
+         */
+        val MIGRATION_22_23: Migration = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Ensure profiles exist for any remaining alias keys before delete.
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO sender_profiles (
+                        displaySender, normalizedSenderKey, institutionId, displayInstitutionName,
+                        active, createdAt, updatedAt
+                    )
+                    SELECT
+                        MAX(ai.displayLabel),
+                        ai.normalizedValue,
+                        NULL,
+                        NULL,
+                        1,
+                        MIN(ai.createdAt),
+                        MAX(ai.updatedAt)
+                    FROM account_identifiers ai
+                    WHERE ai.identifierType = 'SENDER_ALIAS'
+                      AND ai.isActive = 1
+                      AND length(trim(ai.normalizedValue)) > 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM sender_profiles sp
+                          WHERE sp.normalizedSenderKey = ai.normalizedValue
+                      )
+                    GROUP BY ai.normalizedValue
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO account_sender_profiles (accountId, senderProfileId, createdAt)
+                    SELECT ai.accountId, sp.id, COALESCE(ai.createdAt, 0)
+                    FROM account_identifiers ai
+                    INNER JOIN sender_profiles sp ON sp.normalizedSenderKey = ai.normalizedValue
+                    WHERE ai.identifierType = 'SENDER_ALIAS' AND ai.isActive = 1
+                    """.trimIndent(),
+                )
+                db.execSQL("DELETE FROM account_identifiers WHERE identifierType = 'SENDER_ALIAS'")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -974,6 +1019,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_19_20,
             MIGRATION_20_21,
             MIGRATION_21_22,
+            MIGRATION_22_23,
         )
 
         fun build(context: Context): MasroofDatabase =

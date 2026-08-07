@@ -170,12 +170,10 @@ class HistoricalAccountRelinkServiceTest {
     fun secondAccountIdentifierRelinksPreviouslyUnlinkedRows() = runBlocking {
         val accountDao = FakeAccountDao(listOf(accountEntity(1), accountEntity(2)))
         val identifierRepo = AccountIdentifierRepository(FakeIdentifierDao(), accountDao)
-        identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "bank", "bank"))
         identifierRepo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "A", "1111"))
         // Account 2 not yet identified when tx was imported unlinked
         val transactions = FakeTransactionRepository()
         transactions.insert(tx(1, "2222", linkSource = AccountLinkSource.UNLINKED))
-        identifierRepo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.SENDER_ALIAS, "bank", "bank"))
         identifierRepo.addOrUpdate(2, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "B", "2222"))
         val service = HistoricalAccountRelinkService(
             transactions,
