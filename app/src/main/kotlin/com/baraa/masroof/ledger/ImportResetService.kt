@@ -8,8 +8,8 @@ import com.baraa.masroof.data.db.MasroofDatabase
  *
  * Deletes transactions, journals, and postings so SMS can be re-imported
  * cleanly. **Preserves** owned accounts, typed identifiers, opening
- * balances, categories, merchant memory, financial setup, and
- * teach-by-example [sender_message_patterns].
+ * balances, categories, merchant memory, financial setup, sender profiles,
+ * and message pattern definitions.
  *
  * Never runs automatically — only from an explicit UI confirmation.
  */

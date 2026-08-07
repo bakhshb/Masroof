@@ -340,14 +340,6 @@ class MasroofApplication : Application() {
         com.baraa.masroof.data.repository.TransactionSmsBodyRepository(database.transactionSmsBodyDao())
     }
 
-    /** Kept for schema/tests only — production training uses [messagePatternRepository]. */
-    @Deprecated("Use messagePatternRepository / BankMessagesScreen")
-    val senderMessagePatternRepository: com.baraa.masroof.data.repository.SenderMessagePatternRepository by lazy {
-        com.baraa.masroof.data.repository.SenderMessagePatternRepository(
-            dao = database.senderMessagePatternDao(),
-        )
-    }
-
     val importOrchestrator: com.baraa.masroof.data.repository.SmsImportOrchestrator by lazy {
         com.baraa.masroof.data.repository.SmsImportOrchestrator(
             database = database,

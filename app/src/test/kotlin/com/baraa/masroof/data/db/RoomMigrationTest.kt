@@ -143,11 +143,21 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration21to22DropsLegacySenderMessagePatterns() {
+        assertEquals(21, MasroofDatabase.MIGRATION_21_22.startVersion)
+        assertEquals(22, MasroofDatabase.MIGRATION_21_22.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("DROP TABLE IF EXISTS `sender_message_patterns`"))
+        assertTrue(source.contains("'IGNORED'"))
+        assertTrue(source.contains("TRANSACTION_AMOUNT"))
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
         val expected = setOf(
             "1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15",
-            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21",
+            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21", "21->22",
         )
         val missing = expected - versions.toSet()
         assertTrue(

@@ -39,13 +39,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AccountIdentifierEntity::class,
         SenderInstitutionMappingEntity::class,
         TransactionSmsBodyEntity::class,
-        SenderMessagePatternEntity::class,
         SenderProfileEntity::class,
         AccountSenderProfileCrossRef::class,
         MessagePatternDefinitionEntity::class,
         PatternFieldDefinitionEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -64,7 +63,6 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun accountIdentifierDao(): AccountIdentifierDao
     abstract fun senderInstitutionMappingDao(): SenderInstitutionMappingDao
     abstract fun transactionSmsBodyDao(): TransactionSmsBodyDao
-    abstract fun senderMessagePatternDao(): SenderMessagePatternDao
     abstract fun senderProfileDao(): SenderProfileDao
     abstract fun accountSenderProfileDao(): AccountSenderProfileDao
     abstract fun messagePatternDefinitionDao(): MessagePatternDefinitionDao
@@ -868,6 +866,91 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Finish legacy flat-pattern retirement:
+         * migrate IGNORE rows + amount labels into definition tables, then drop
+         * `sender_message_patterns`. Historical migrations 17→21 keep creating
+         * that table for upgrades from older installs.
+         */
+        val MIGRATION_21_22: Migration = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // IGNORE_AUTH → IGNORED definitions (signature = structureKey).
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO message_pattern_definitions (
+                        senderProfileId, userFriendlyName, normalizedSignature,
+                        transactionType, direction, channel, status, version, origin,
+                        confidence, userConfirmed, exampleCount, activeFrom, deprecatedAt,
+                        createdAt, updatedAt
+                    )
+                    SELECT
+                        sp.id,
+                        'تجاهل / تحقق',
+                        p.structureKey,
+                        NULL, NULL, NULL,
+                        'IGNORED',
+                        1,
+                        'MIGRATED',
+                        50,
+                        1,
+                        p.exampleCount,
+                        NULL,
+                        NULL,
+                        p.createdAt,
+                        p.updatedAt
+                    FROM sender_message_patterns p
+                    INNER JOIN sender_profiles sp ON sp.normalizedSenderKey = p.senderKey
+                    WHERE p.active = 1 AND p.kind = 'IGNORE_AUTH'
+                    """.trimIndent(),
+                )
+                // Backfill TRANSACTION_AMOUNT labels from legacy amountLabels (newline list).
+                val cursor = db.query(
+                    """
+                    SELECT mpd.id AS patternId, p.amountLabels AS amountLabels
+                    FROM sender_message_patterns p
+                    INNER JOIN sender_profiles sp ON sp.normalizedSenderKey = p.senderKey
+                    INNER JOIN message_pattern_definitions mpd
+                        ON mpd.senderProfileId = sp.id
+                        AND mpd.normalizedSignature = p.structureKey
+                        AND mpd.version = 1
+                    WHERE p.active = 1
+                      AND p.kind = 'INCLUDE_TRANSACTION'
+                      AND length(trim(p.amountLabels)) > 0
+                    """.trimIndent(),
+                )
+                cursor.use { c ->
+                    val patternIdIdx = c.getColumnIndexOrThrow("patternId")
+                    val labelsIdx = c.getColumnIndexOrThrow("amountLabels")
+                    while (c.moveToNext()) {
+                        val patternId = c.getLong(patternIdIdx)
+                        val raw = c.getString(labelsIdx).orEmpty()
+                        for (label in raw.split('\n')) {
+                            val trimmed = label.trim()
+                            if (trimmed.isEmpty()) continue
+                            val escaped = trimmed.replace("'", "''")
+                            db.execSQL(
+                                """
+                                INSERT OR IGNORE INTO pattern_field_definitions (
+                                    patternId, canonicalField, sourceLabel,
+                                    extractionStrategy, required, role, valueType
+                                ) VALUES (
+                                    $patternId,
+                                    'TRANSACTION_AMOUNT',
+                                    '$escaped',
+                                    'LABELED_LINE',
+                                    0,
+                                    'PRIMARY',
+                                    'MONEY'
+                                )
+                                """.trimIndent(),
+                            )
+                        }
+                    }
+                }
+                db.execSQL("DROP TABLE IF EXISTS `sender_message_patterns`")
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -890,6 +973,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_18_19,
             MIGRATION_19_20,
             MIGRATION_20_21,
+            MIGRATION_21_22,
         )
 
         fun build(context: Context): MasroofDatabase =

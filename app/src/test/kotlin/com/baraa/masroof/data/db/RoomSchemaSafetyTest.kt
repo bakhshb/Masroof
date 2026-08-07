@@ -96,6 +96,13 @@ class RoomSchemaSafetyTest {
         assertTrue("v1 schema must exist: $v1", v1.exists())
         assertTrue("v2 schema must exist: $v2", v2.exists())
         assertTrue("v3 schema must exist: $v3", v3.exists())
+        assertTrue("v20 schema must exist", File(root, "20.json").exists())
+        assertTrue("v21 schema must exist", File(root, "21.json").exists())
+        // v22 is exported by KSP on compile after dropping sender_message_patterns.
+        assertTrue(
+            "v22 schema must exist after compile",
+            File(root, "22.json").exists(),
+        )
         // v3 must contain the new transaction columns and the new tables.
         val v3Json = v3.readText()
         assertTrue(

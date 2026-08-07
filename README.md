@@ -2,7 +2,7 @@
 
 Android app that turns Saudi bank SMS into a double-entry style personal ledger — locally on the device.
 
-**Status:** `0.1.0-test` · Room schema **21** · minSdk 26 / targetSdk 34
+**Status:** `0.1.0-test` · Room schema **22** · minSdk 26 / targetSdk 34
 
 ## What it does
 
@@ -58,10 +58,9 @@ Open the project in Android Studio (Giraffe+ / AGP matching `gradle/libs.version
 
 ## Still open
 
-- Run [`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md) on a real phone
-- After soak: drop legacy `sender_message_patterns` learner code (table already unused in production import)
-- Export missing Room schema snapshot for v20 if CI schema checks require every intermediate version
-- Optional on-device AI linking / categorization still experimental
+- Optional alternate device validation (see `docs/DEVICE_CHECKLIST.md` if useful)
+- Optional cloud AI categorization remains opt-in / off by default
+- On-device link assist uses local SMS heuristics (not a full on-device LLM)
 
 ## License
 

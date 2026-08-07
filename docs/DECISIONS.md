@@ -21,9 +21,14 @@ Patterns never hard-link to one FinancialAccount. Same pattern may apply to many
 
 Statuses: APPROVED, IGNORED, UNKNOWN, DEPRECATED. Import posts only from APPROVED (and DEPRECATED for historical formats). Unmatched messages from a trained sender create UNKNOWN candidates — never silent discard.
 
-## AD-013 — Legacy flat patterns out of production import
+## AD-013 — Legacy flat patterns retired
 
-`sender_message_patterns` and `SenderMessagePatternRepository` remain for Room history and unit tests only. Production import/training uses `MessagePatternDefinition` via «رسائل البنوك». `SmsImportMode.TEACH_FROM_EXAMPLES` is removed. Thin bank parser classes stay as sender-routing shells over `GenericBankSmsParser` — not as competing allowlists.
+Production import/training uses `MessagePatternDefinition` via «رسائل البنوك».
+Room **v22** migrates remaining IGNORE/amount-label data from
+`sender_message_patterns`, then drops that table. Historical migrations
+17→21 still create it for upgrades. `SmsImportMode.TEACH_FROM_EXAMPLES` and
+the flat learner/matcher code are removed. Thin bank parser classes stay as
+sender-routing shells over `GenericBankSmsParser` — not as competing allowlists.
 
 ## AD-002 — Nested NavHosts
 

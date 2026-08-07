@@ -195,7 +195,6 @@ data class ScanPreview(
         NO_AMOUNT,
         NON_FINANCIAL,
         OTP_OR_AUTH,
-        PATTERN_NOT_SELECTED,
         UNKNOWN_PATTERN,
     }
 
@@ -213,7 +212,6 @@ data class ScanPreview(
                 SkipReason.NO_AMOUNT -> "تعذّر استخراج المبلغ"
                 SkipReason.NON_FINANCIAL -> "ليست رسالة مالية واضحة"
                 SkipReason.OTP_OR_AUTH -> "رمز تحقق / تأكيد هوية — ليست عملية مالية"
-                SkipReason.PATTERN_NOT_SELECTED -> "نمط غير محدد للاستيراد"
                 SkipReason.UNKNOWN_PATTERN -> "نمط جديد يحتاج مراجعة"
             }
     }

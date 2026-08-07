@@ -121,13 +121,6 @@ class Converters {
     @TypeConverter fun fromOpeningBalanceKind(value: OpeningBalanceKind): String = value.name
     @TypeConverter fun toOpeningBalanceKind(value: String): OpeningBalanceKind = OpeningBalanceKind.valueOf(value)
 
-    @TypeConverter
-    fun fromSenderMessagePatternKind(value: SenderMessagePatternKind): String = value.name
-
-    @TypeConverter
-    fun toSenderMessagePatternKind(value: String): SenderMessagePatternKind =
-        SenderMessagePatternKind.valueOf(value)
-
     @TypeConverter fun fromMessagePatternStatus(value: MessagePatternStatus): String = value.name
     @TypeConverter fun toMessagePatternStatus(value: String): MessagePatternStatus = MessagePatternStatus.valueOf(value)
     @TypeConverter fun fromPatternOrigin(value: PatternOrigin): String = value.name

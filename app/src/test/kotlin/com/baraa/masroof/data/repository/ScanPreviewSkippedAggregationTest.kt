@@ -32,15 +32,15 @@ class ScanPreviewSkippedAggregationTest {
     }
 
     @Test
-    fun aggregateSkipped_preservesReasonArabicForPatternNotSelected() {
+    fun aggregateSkipped_preservesReasonArabicForUnknownPattern() {
         val groups = ScanPreview.aggregateSkipped(
             mapOf(
-                ("AlRajhi" to ScanPreview.SkipReason.PATTERN_NOT_SELECTED) to
+                ("AlRajhi" to ScanPreview.SkipReason.UNKNOWN_PATTERN) to
                     ScanPreview.SkipAccum(count = 4, redactedSample = "sample"),
             ),
         )
         assertEquals(1, groups.size)
-        assertEquals("نمط غير محدد للاستيراد", groups[0].reasonAr)
+        assertEquals("نمط جديد يحتاج مراجعة", groups[0].reasonAr)
     }
 
     @Test

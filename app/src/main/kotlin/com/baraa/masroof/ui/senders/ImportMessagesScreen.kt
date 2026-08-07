@@ -770,7 +770,7 @@ private fun SkippedMessagesCard(preview: ScanPreview, onAccounts: () -> Unit) {
                     if (!group.redactedSample.isNullOrBlank() &&
                         (group.reason == ScanPreview.SkipReason.NO_AMOUNT ||
                             group.reason == ScanPreview.SkipReason.UNREGISTERED_SENDER ||
-                            group.reason == ScanPreview.SkipReason.PATTERN_NOT_SELECTED)
+                            group.reason == ScanPreview.SkipReason.UNKNOWN_PATTERN)
                     ) {
                         Text(
                             group.redactedSample,
@@ -807,7 +807,6 @@ private fun SkippedMessagesCard(preview: ScanPreview, onAccounts: () -> Unit) {
                                 )
                             }
                         }
-                        ScanPreview.SkipReason.PATTERN_NOT_SELECTED,
                         ScanPreview.SkipReason.UNKNOWN_PATTERN,
                         ScanPreview.SkipReason.NON_FINANCIAL,
                         ScanPreview.SkipReason.OTP_OR_AUTH -> Unit

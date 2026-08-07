@@ -1,6 +1,6 @@
 # Masroof — Project State
 
-Last updated: 2026-08-07 (legacy flat patterns retired from production import)
+Last updated: 2026-08-07 (Room v22 drops legacy sender_message_patterns)
 
 ## Versions
 
@@ -9,7 +9,7 @@ Last updated: 2026-08-07 (legacy flat patterns retired from production import)
 | Branch | `main` |
 | versionName | `0.1.0-test` |
 | versionCode | `2` |
-| Room schema | **21** (`MIGRATION_19_20` SenderProfile; `MIGRATION_20_21` MessagePatternDefinition) |
+| Room schema | **22** (`MIGRATION_21_22` drops legacy flat patterns after IGNORE/label backfill) |
 | compileSdk / targetSdk | 34 |
 | minSdk | 26 |
 
@@ -25,12 +25,10 @@ Last updated: 2026-08-07 (legacy flat patterns retired from production import)
 - Import: authorized senders from profiles ∪ legacy alias ∪ institution mapping; APPROVED/DEPRECATED patterns extract fields; UNKNOWN never silently dropped
 - Matching: typed identifiers + sender cross-ref narrowing; sender alone never auto-confirms
 - Ledger: opening + POSTED journals via `AccountBalanceService`
+- On-device link assist: local SMS heuristics (no cloud; MediaPipe LLM path disabled)
 
 ## Remaining risks
 
-- Legacy `sender_message_patterns` table/code kept for migrations/tests only (not used in import)
-- Thin bank parsers remain as sender-routing shells over GenericBankSmsParser
 - `SENDER_ALIAS` enum remains for migration compatibility
-- Physical-device validation required before production use
 - Tokenization aggressiveness may over/under-merge patterns — tune with real fixtures
-- Room schema export for v20 may be missing from repo (v19→v21 migration still tested in code)
+- Optional cloud AI categorization remains opt-in and off by default

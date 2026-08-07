@@ -7,11 +7,12 @@ import java.io.File
 
 class ImportResetPreservesPatternsTest {
     @Test
-    fun clearImportedLedger_doesNotMentionDeletingSenderMessagePatterns() {
+    fun clearImportedLedger_preservesPatternDefinitionsAndDoesNotDeleteThem() {
         val source = File("src/main/kotlin/com/baraa/masroof/ledger/ImportResetService.kt").readText()
         assertTrue(source.contains("clearImportedLedger"))
-        assertTrue(source.contains("sender_message_patterns") || source.contains("teach-by-example"))
-        assertFalse(source.contains("senderMessagePatternDao().delete"))
-        assertFalse(source.contains("DELETE FROM sender_message_patterns"))
+        assertTrue(source.contains("message pattern definitions") || source.contains("sender profiles"))
+        assertFalse(source.contains("messagePatternDefinitionDao().delete"))
+        assertFalse(source.contains("DELETE FROM message_pattern_definitions"))
+        assertFalse(source.contains("DELETE FROM sender_profiles"))
     }
 }

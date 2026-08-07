@@ -76,5 +76,5 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 - [x] SENDER_ALIAS deprecated with dual-read/write
 - [x] Production import/training off legacy `sender_message_patterns` (table kept for migrations/tests)
 - [x] Thin bank parsers classified as sender-routing shells only
-- [ ] Drop legacy pattern table + learner code (after device soak)
-- [ ] Physical-device checklist execution
+- [x] Room v22 drops legacy pattern table after IGNORE/amount-label backfill; learner code removed
+- [ ] Physical-device checklist execution (optional — alternate testing OK)
