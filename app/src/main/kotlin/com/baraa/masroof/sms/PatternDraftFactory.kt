@@ -36,7 +36,7 @@ sealed interface PatternDraftResult {
     /** OTP / non-financial / bank-service / empty — never a transaction template. */
     data class NonFinancial(val reason: String) : PatternDraftResult
     /** A CORE stage threw; the user should pick a different message. */
-    data class Failed(val stage: String) : PatternDraftResult
+    data class Failed(val stage: String, val detail: String = "") : PatternDraftResult
 }
 
 /**
@@ -86,7 +86,7 @@ object PatternDraftFactory {
             MessageTypeCueCatalog.detect(body)
         } catch (failure: Throwable) {
             if (failure is VirtualMachineError) throw failure
-            return PatternDraftResult.Failed("TYPE_CUE")
+            return PatternDraftResult.Failed("TYPE_CUE", debugDetail(failure))
         }
         if (cue.transactionType == TransactionType.NON_FINANCIAL ||
             MessageTypeCueCatalog.isNonFinancialCue(body)
@@ -99,7 +99,7 @@ object PatternDraftFactory {
             MessageTemplateEngine.buildFromSms(body)
         } catch (failure: Throwable) {
             if (failure is VirtualMachineError) throw failure
-            return PatternDraftResult.Failed("TEMPLATE_BUILD")
+            return PatternDraftResult.Failed("TEMPLATE_BUILD", debugDetail(failure))
         }
         val templateText = built.templateText
         if (templateText.isBlank()) {
@@ -110,7 +110,7 @@ object PatternDraftFactory {
             buildFieldDrafts(body)
         } catch (failure: Throwable) {
             if (failure is VirtualMachineError) throw failure
-            return PatternDraftResult.Failed("FIELD_EXTRACT")
+            return PatternDraftResult.Failed("FIELD_EXTRACT", debugDetail(failure))
         }
 
         val resolvedType = built.transactionType ?: cue.transactionType
@@ -214,6 +214,26 @@ object PatternDraftFactory {
                 required = field.required,
             )
         }
+    }
+
+    /**
+     * DEBUG-only, SMS-free throwable detail for the manual draft [PatternDraftResult.Failed].
+     * For NoClassDefFoundError this surfaces the missing class FQN so an Android
+     * packaging/class-loading failure can be diagnosed without touching parsing.
+     * Returns "" in release.
+     */
+    private fun debugDetail(throwable: Throwable): String {
+        if (!com.baraa.masroof.BuildConfig.DEBUG) return ""
+        val msg = throwable.message?.trim().orEmpty().take(200)
+        val cause = throwable.cause
+        val causePart = if (cause != null) {
+            " cause=${cause.javaClass.simpleName.ifBlank { cause.javaClass.name }}${(cause.message?.trim() ?: "").takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""}"
+        } else ""
+        val frame = throwable.stackTrace.firstOrNull()?.let { f ->
+            val where = f.fileName?.let { n -> "($n${if (f.lineNumber > 0) ":${f.lineNumber}" else ""})" } ?: ""
+            " at=${f.className.substringAfterLast('.')}.${f.methodName}$where"
+        } ?: ""
+        return listOfNotNull(msg.ifBlank { null }?.let { "msg=$it" }, causePart.takeIf { it.isNotBlank() }, frame.takeIf { it.isNotBlank() }).joinToString(" ")
     }
 
     private fun safeHash(value: String): String = runCatching {

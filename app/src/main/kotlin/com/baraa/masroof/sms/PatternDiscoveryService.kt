@@ -26,6 +26,16 @@ data class PatternDiscoveryFailure(
     val bodyHash: String,
     val stage: PatternDiscoveryStage,
     val exceptionClass: String,
+    /** DEBUG-only: throwable.message (for NoClassDefFoundError this is the
+     *  missing class FQN). Never contains SMS content. Empty in release. */
+    val exceptionMessage: String = "",
+    /** DEBUG-only: cause class simple name, or "". */
+    val causeClass: String = "",
+    /** DEBUG-only: cause.message, or "". */
+    val causeMessage: String = "",
+    /** DEBUG-only: first few stack frames as "ClassName.methodName(fileName:line)".
+     *  Internal class/method names only — never SMS. Empty in release. */
+    val topStackFrames: List<String> = emptyList(),
 )
 
 data class PatternDiscoveryResult(
@@ -76,6 +86,10 @@ data class PatternDiscoveryResult(
                     count = list.size,
                     optional = key.third,
                     sampleBodyHashes = list.map { it.second.bodyHash }.distinct().take(3),
+                    exceptionMessage = list.firstOrNull()?.second?.exceptionMessage.orEmpty(),
+                    causeClass = list.firstOrNull()?.second?.causeClass.orEmpty(),
+                    causeMessage = list.firstOrNull()?.second?.causeMessage.orEmpty(),
+                    topStackFrames = list.firstOrNull()?.second?.topStackFrames.orEmpty(),
                 )
             }
             .sortedWith(
@@ -95,6 +109,11 @@ data class StageFailureBreakdown(
     val optional: Boolean,
     /** First 3 short body hashes for this group (never raw SMS). */
     val sampleBodyHashes: List<String>,
+    /** DEBUG-only representative throwable detail (first failure in group). */
+    val exceptionMessage: String = "",
+    val causeClass: String = "",
+    val causeMessage: String = "",
+    val topStackFrames: List<String> = emptyList(),
 )
 
 data class DiscoveredMessagePattern(
@@ -480,7 +499,46 @@ object PatternDiscoveryService {
         bodyHash = safeHash(body),
         stage = stage,
         exceptionClass = cause.javaClass.simpleName.ifBlank { cause.javaClass.name },
+        exceptionMessage = safeDebugMessage(cause),
+        causeClass = cause.cause?.javaClass?.simpleName?.ifBlank { cause.cause?.javaClass?.name }.orEmpty(),
+        causeMessage = safeDebugMessage(cause.cause),
+        topStackFrames = safeDebugStackFrames(cause),
     )
+
+    /**
+     * DEBUG-only, SMS-free throwable detail. [NoClassDefFoundError.message]
+     * is normally the missing class FQN — exactly what is needed to diagnose
+     * Android class-loading/packaging failures. Returns "" in release builds
+     * so no internal detail is surfaced to end users.
+     */
+    private fun safeDebugMessage(throwable: Throwable?): String {
+        if (!com.baraa.masroof.BuildConfig.DEBUG) return ""
+        val message = throwable?.message?.trim().orEmpty()
+        // No SMS can appear here (this is an exception message), but guard
+        // against an unreasonably long message just in case.
+        return message.take(200)
+    }
+
+    private fun safeDebugStackFrames(throwable: Throwable): List<String> {
+        if (!com.baraa.masroof.BuildConfig.DEBUG) return emptyList()
+        return throwable.stackTrace.take(5).map { frame ->
+            buildString {
+                append(frame.className.substringAfterLast('.'))
+                append('.')
+                append(frame.methodName)
+                val where = frame.fileName
+                if (where != null) {
+                    append('(')
+                    append(where)
+                    if (frame.lineNumber > 0) {
+                        append(':')
+                        append(frame.lineNumber)
+                    }
+                    append(')')
+                }
+            }
+        }
+    }
 
     private fun safeHash(value: String): String = runCatching {
         MessageDigest.getInstance("SHA-256")
