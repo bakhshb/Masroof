@@ -82,6 +82,7 @@ object CanonicalPatternFieldClassifier {
 
     private fun isAccount(n: String) =
         n == "الحساب" || n == "رقم الحساب" || n == "account" ||
+            n == "حساب" ||
             n == "بطاقه" || n == "card"
 
     private fun isMerchant(n: String) =

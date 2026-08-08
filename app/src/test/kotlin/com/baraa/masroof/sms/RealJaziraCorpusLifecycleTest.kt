@@ -81,9 +81,18 @@ class RealJaziraCorpusLifecycleTest {
         val sms = corpusSms()
         val result = discovery()
         for (message in sms) {
+            // Mirror the production [TemplateResolutionService.resolve] tier
+            // order: signature match first (handles compact-inline bodies where
+            // strict line-by-line matching disagrees with the resolver),
+            // then strict template matching.
+            val runtimeSignature = SmsStructureNormalizer.signatureFromBody(message.body)
             val matched = result.patterns.any { p ->
-                p.exactVariants.any { v -> MessageTemplateEngine.matches(v.templateText, message.body) } ||
-                    MessageTemplateEngine.matches(p.templateText, message.body)
+                p.exactVariants.any { v ->
+                    val sig = v.signature.substringBefore("#revision:")
+                    sig.isNotBlank() && sig == runtimeSignature
+                } ||
+                    MessageTemplateEngine.matches(p.templateText, message.body) ||
+                    p.exactVariants.any { v -> MessageTemplateEngine.matches(v.templateText, message.body) }
             }
             assertTrue("case sms id=${message.id} disappeared from discovery", matched)
         }

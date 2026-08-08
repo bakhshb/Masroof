@@ -65,6 +65,14 @@ import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
+/** Editor save error: a generic message, or a specific suspicious-digit-run
+ *  finding that the user can auto-replace in one tap. */
+sealed class EditorError {
+    data class Generic(val messageAr: String) : EditorError()
+    data class DigitRun(val finding: com.baraa.masroof.sms.DigitRunFinding) : EditorError()
+}
+
+
 @Composable
 fun TemplateEditorScreen(
     patternId: Long,
@@ -220,10 +228,11 @@ private fun TemplateEditorContent(
     var selectedType by remember(editorKey) { mutableStateOf(initialDraft.transactionType) }
     var direction by remember(editorKey) { mutableStateOf(initialDraft.direction) }
     var templateText by remember(editorKey) { mutableStateOf(initialDraft.templateText) }
+    var templateEdited by remember(editorKey) { mutableStateOf(false) }
     var status by remember(editorKey) { mutableStateOf(initialDraft.status) }
     var active by remember(editorKey) { mutableStateOf(initialDraft.active) }
     var saving by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var errorState by remember { mutableStateOf<EditorError?>(null) }
     var showFullTemplate by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
     var showTypePicker by remember { mutableStateOf(false) }
@@ -263,17 +272,27 @@ private fun TemplateEditorContent(
             }
         } catch (t: Throwable) {
             android.util.Log.e("TemplateEditor", "navigation after save failed id=$savedPatternId", t)
-            error = "تم الحفظ لكن تعذر الرجوع: ${t.message ?: t.javaClass.simpleName}"
+            errorState = EditorError.Generic("تم الحفظ لكن تعذر الرجوع: ${t.message ?: t.javaClass.simpleName}")
         }
     }
 
     fun save(approve: Boolean) {
         val value = draft()
+        // Unedited auto-generated drafts (e.g. from PatternDraftFactory) are
+        // engine-clean: every digit is already a placeholder. Only enforce the
+        // suspicious-digit-run check once the user actually edits the template.
+        if (templateEdited) {
+            val digitRun = TemplateEditValidator.findSuspiciousDigitRun(value.templateText)
+            if (digitRun != null) {
+                errorState = EditorError.DigitRun(digitRun)
+                return
+            }
+        }
         when (val validation = TemplateEditValidator.validate(value)) {
-            is TemplateEditValidation.Error -> error = validation.messageAr
+            is TemplateEditValidation.Error -> errorState = EditorError.Generic(validation.messageAr)
             TemplateEditValidation.Ok -> scope.launch {
                 saving = true
-                error = null
+                errorState = null
                 try {
                     val result = onSave(value, approve)
                     when (result) {
@@ -284,21 +303,21 @@ private fun TemplateEditorContent(
                             return@launch
                         }
                         is MessagePatternRepository.TemplateUpdateResult.ValidationError ->
-                            error = result.messageAr
+                            errorState = EditorError.Generic(result.messageAr)
                         MessagePatternRepository.TemplateUpdateResult.NotFound ->
-                            error = "النمط غير موجود"
+                            errorState = EditorError.Generic("النمط غير موجود")
                         MessagePatternRepository.TemplateUpdateResult.SenderNotFound ->
-                            error = "المرسل غير موجود"
+                            errorState = EditorError.Generic("المرسل غير موجود")
                         MessagePatternRepository.TemplateUpdateResult.SenderInactive ->
-                            error = "المرسل غير نشط"
+                            errorState = EditorError.Generic("المرسل غير نشط")
                         is MessagePatternRepository.TemplateUpdateResult.CanonicalCollision ->
-                            error = "يوجد نمط آخر بنفس البنية"
+                            errorState = EditorError.Generic("يوجد نمط آخر بنفس البنية")
                         is MessagePatternRepository.TemplateUpdateResult.Failure ->
-                            error = result.messageAr
+                            errorState = EditorError.Generic(result.messageAr)
                     }
                 } catch (t: Throwable) {
                     android.util.Log.e("TemplateEditor", "save crashed", t)
-                    error = "تعذر حفظ النمط: ${t.message ?: t.javaClass.simpleName}"
+                    errorState = EditorError.Generic("تعذر حفظ النمط: ${t.message ?: t.javaClass.simpleName}")
                 }
                 saving = false
             }
@@ -389,7 +408,7 @@ private fun TemplateEditorContent(
                 if (showFullTemplate) {
                     OutlinedTextField(
                         templateText,
-                        onValueChange = { templateText = it },
+                        onValueChange = { templateText = it; templateEdited = true },
                         label = { Text("نص بنية النمط") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 4,
@@ -446,7 +465,20 @@ private fun TemplateEditorContent(
                     }
                 }
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            errorState?.let { err ->
+                when (err) {
+                    is EditorError.Generic -> Text(err.messageAr, color = MaterialTheme.colorScheme.error)
+                    is EditorError.DigitRun -> DigitRunErrorBlock(
+                        finding = err.finding,
+                        onAutoReplace = { suggested ->
+                            templateText = templateText.replaceFirst(err.finding.rawMatch, suggested)
+                            templateEdited = true
+                            errorState = null
+                        },
+                        onDismiss = { errorState = null },
+                    )
+                }
+            }
             if (isUnknownCandidate) {
                 PrimaryButton(
                     label = if (saving) "جارٍ الحفظ…" else "حفظ واعتماد",
@@ -649,4 +681,29 @@ private fun expectedValueType(field: PatternCanonicalField): PatternValueType = 
     PatternCanonicalField.TRANSACTION_DATE -> PatternValueType.DATE
     PatternCanonicalField.TRANSACTION_TIME -> PatternValueType.TIME
     else -> PatternValueType.TEXT
+}
+
+@Composable
+private fun DigitRunErrorBlock(
+    finding: com.baraa.masroof.sms.DigitRunFinding,
+    onAutoReplace: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.x1),
+    ) {
+        Text(
+            "تتابع رقمي في السطر ${finding.lineNumber}: '${finding.rawMatch}' — استبدله تلقائيًا بـ ${finding.suggestedPlaceholder}؟",
+            color = MaterialTheme.colorScheme.error,
+            style = FinancialTypography.metadata,
+        )
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.x2),
+        ) {
+            androidx.compose.material3.TextButton(onClick = { onAutoReplace(finding.suggestedPlaceholder) }) {
+                Text("استبدال بـ ${finding.suggestedPlaceholder}")
+            }
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("إلغاء") }
+        }
+    }
 }

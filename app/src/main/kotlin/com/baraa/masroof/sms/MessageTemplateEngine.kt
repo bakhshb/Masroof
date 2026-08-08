@@ -47,12 +47,28 @@ object MessageTemplateEngine {
             )
         }
         val cue = MessageTypeCueCatalog.detect(raw)
-        val originalLines = raw.lineSequence().map { it.trimEnd() }.filter { it.isNotBlank() }.toList()
+        // Expand compact inline fields (multiple label:value pairs on a single
+        // line, e.g. English credit-card SMS) so each label is templatized on
+        // its own. Each chunk produced by expandCompactInlineFields is either
+        // a single "label: value" pair or a label-only fragment, matching the
+        // pre-existing per-line assumption so original labels, separators and
+        // ordering are preserved.
+        val chunks = com.baraa.masroof.transaction.LineBasedFieldParser
+            .expandCompactInlineFields(raw)
 
         val outLines = mutableListOf<String>()
         val placeholders = linkedSetOf<String>()
 
-        for (orig in originalLines) {
+        // For multi-line bodies expandCompactInlineFields returns the whole body
+        // as a single chunk; for compact-inline it returns per-label chunks.
+        // In both cases each logical line (between newlines) carries at most
+        // one label:value pair, so split per line before templatizing.
+        val lines = chunks.flatMap { it.split('\n') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        for (orig in lines) {
+            if (orig.isBlank()) continue
             val split = splitPreserve(orig)
             if (split == null) {
                 val (cleaned, _) = MessageTypeCueCatalog.stripWalletSuffix(orig.trim())
@@ -167,6 +183,11 @@ object MessageTemplateEngine {
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT in canonicalFields -> {
                 remaining = replaceMoneyKeepingCurrency(remaining) { put("AMOUNT") }
+                // Compact English amount line: "of: 41.30 SAR At Amazon SA".
+                // After money replace the tail still carries the merchant as
+                // literal text; promote it so it is captured per-SMS, not baked
+                // into the template.
+                remaining = extractCompactMerchantTail(remaining) { put("MERCHANT") }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("CREDIT_CARD_LAST4") }
@@ -226,6 +247,28 @@ object MessageTemplateEngine {
             }
         }
         return remaining.trim()
+    }
+
+    /**
+     * Compact-English merchant tail extractor. On a TRANSACTION_AMOUNT line
+     * like `of: 41.30 SAR At Amazon SA`, after money replacement the value
+     * ends with ` At <merchant>`. Promote that trailing merchant to the
+     * provided token so it is captured per-SMS at match time instead of
+     * being baked into the template as literal text. Returns the value
+     * unchanged when no merchant cue is present.
+     */
+    private fun extractCompactMerchantTail(value: String, put: () -> String): String {
+        val folded = MessageTypeCueCatalog.foldArabic(value)
+        val atIdx = folded.indexOf(" at ")
+        if (atIdx < 0) return value
+        // foldArabic is character-for-character (lowercase + Arabic letter
+        // fold), so the index aligns with the original string.
+        val merchant = value.substring(atIdx + 4).trim()
+        if (merchant.isEmpty()) return value
+        put()  // registers the placeholder in the shared set
+        // Replace the merchant tail with the {MERCHANT} token so the merchant
+        // is captured per-SMS at match time instead of being baked literal.
+        return value.substring(0, atIdx) + "{" + put() + "}"
     }
 
     private fun replaceMoneyKeepingCurrency(value: String, amountToken: () -> String): String {
