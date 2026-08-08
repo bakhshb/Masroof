@@ -63,6 +63,20 @@ internal fun runtimeEligibleApprovedBySemanticKey(
         }
         .toMap()
 
+internal fun safeDiagnosticSample(
+    body: String?,
+    sanitizer: (String?) -> String = com.baraa.masroof.diagnostics.TextSanitizer::sanitize,
+): String? {
+    if (body.isNullOrBlank()) return null
+    return runCatching {
+        sanitizer(body)
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(240)
+            .takeIf { it.isNotBlank() }
+    }.getOrNull()
+}
+
 enum class ImportDisposition {
     READY, NEEDS_ACCOUNT, NEEDS_CONFIRMATION, NEEDS_INSTITUTION, UNPARSED,
     EXACT_DUPLICATE, POSSIBLE_DUPLICATE, BEFORE_TRACKING_START, UNREGISTERED_SENDER, IGNORED,
@@ -719,11 +733,7 @@ class SmsImportOrchestrator(
             acc.count++
             if (timestamp > acc.latestTimestamp) acc.latestTimestamp = timestamp
             if (acc.redactedSample == null && !body.isNullOrBlank()) {
-                val redacted = com.baraa.masroof.diagnostics.TextSanitizer.sanitize(body)
-                    .replace(Regex("\\s+"), " ")
-                    .trim()
-                    .take(240)
-                if (redacted.isNotBlank()) acc.redactedSample = redacted
+                safeDiagnosticSample(body)?.let { acc.redactedSample = it }
             }
         }
         fun reviewItem(
@@ -1111,7 +1121,9 @@ class SmsImportOrchestrator(
                     }
                 }
             } catch (t: Throwable) {
-                android.util.Log.w("SmsImport", "scan row failed smsId=${sms.id}", t)
+                runCatching {
+                    android.util.Log.w("SmsImport", "scan row failed smsId=${sms.id}", t)
+                }
                 if (!countedInTemplateStage) {
                     templateInput++
                 }

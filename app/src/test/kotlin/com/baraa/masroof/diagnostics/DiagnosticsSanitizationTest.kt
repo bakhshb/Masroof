@@ -103,6 +103,64 @@ class DiagnosticsSanitizationTest {
     }
 
     @Test
+    fun sequentialArabicBalanceKeywordsDoNotCreateBackwardRange() {
+        val raw = """
+            الرصيد المتاح :SAR 17230.03
+            إجمالي المبلغ المستحق:2380.88 SAR
+        """.trimIndent()
+        val sanitized = TextSanitizer.sanitize(raw)
+        assertTrue(sanitized.contains("[BALANCE]"))
+        assertFalse(sanitized.contains("17230.03"))
+    }
+
+    @Test
+    fun repeatedArabicBalanceFieldsAreRedactedMonotonically() {
+        val sanitized = TextSanitizer.sanitize(
+            "الرصيد المتاح: 1000 SAR\nالرصيد الحالي: 900 SAR",
+        )
+        assertFalse(sanitized.contains("1000"))
+        assertFalse(sanitized.contains("900"))
+        assertEquals(2, Regex("""\[BALANCE]""").findAll(sanitized).count())
+    }
+
+    @Test
+    fun repeatedEnglishBalanceFieldsAreRedactedMonotonically() {
+        val sanitized = TextSanitizer.sanitize(
+            "available balance: SAR 500\nremaining balance: SAR 400",
+        )
+        assertFalse(sanitized.contains("500"))
+        assertFalse(sanitized.contains("400"))
+        assertEquals(2, Regex("""\[BALANCE]""").findAll(sanitized).count())
+    }
+
+    @Test
+    fun oneLineContainingBothArabicBalanceWordsIsSafe() {
+        val sanitized = TextSanitizer.sanitize("الرصيد المتاح: 321.45 SAR")
+        assertFalse(sanitized.contains("321.45"))
+        assertTrue(sanitized.contains("[BALANCE]"))
+    }
+
+    @Test
+    fun multipleOtpKeywordsBeforeOneCodeDoNotCreateBackwardRange() {
+        val sanitized = TextSanitizer.sanitize(
+            "رمز OTP code للتحقق: 482931 لا تشاركه",
+        )
+        assertFalse(sanitized.contains("482931"))
+        assertTrue(sanitized.contains("[OTP]"))
+    }
+
+    @Test
+    fun balanceLookupNeverConsumesNumbersFromFollowingLines() {
+        val sanitized = TextSanitizer.sanitize(
+            "الرصيد المتاح:\nبطاقة: 7271\nبمبلغ: 50 SAR",
+        )
+        assertFalse(sanitized.contains("7271"))
+        assertTrue(sanitized.contains("[CARD_LAST4]"))
+        assertTrue("transaction amount must not be relabeled as balance", sanitized.contains("50 SAR"))
+        assertFalse("no balance existed on the balance line", sanitized.contains("[BALANCE]"))
+    }
+
+    @Test
     fun personalNameReplaced() {
         val s = TextSanitizer.sanitize("Mr. Abdullah Al-Saud transferred money")
         assertTrue(s.contains("[NAME]"))

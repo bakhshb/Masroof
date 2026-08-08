@@ -27,6 +27,12 @@ object TextSanitizer {
     private val PAN = Pattern.compile("""\b(?:\d[ -]?){13,19}\b""")
     // Masked PAN: ****1234 or ********1234
     private val PAN_MASKED = Pattern.compile("""\*+[\s-]?\d{4}\b""")
+    private val CARD_LAST4_LABELED = Pattern.compile(
+        """(?i)((?:بطاقة|card)[^\r\n:]{0,24}:?\s*)\d{4}\b""",
+    )
+    private val ACCOUNT_LAST4_LABELED = Pattern.compile(
+        """(?i)((?:حساب|account|آيبان|ايبان|iban)[^\r\n:]{0,24}:?\s*)\d{4}\b""",
+    )
     // IBAN: SA + 22 digits / letters (very common).
     private val IBAN = Pattern.compile("""\bSA\d{2}\s?\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b""")
     // IBAN tolerant: any country prefix + letters/digits up to 34 chars.
@@ -58,12 +64,14 @@ object TextSanitizer {
      */
     fun sanitize(input: String?): String {
         if (input.isNullOrBlank()) return ""
-        var s = input
+        var s: String = input
 
         // PAN: 13..19 digit run, optionally with spaces or dashes between.
         // Replace with [CARD_LAST4 XXXX] keeping the trailing 4 digits.
         s = redactPan(s)
         s = PAN_MASKED.matcher(s).replaceAll("[CARD_LAST4]")
+        s = CARD_LAST4_LABELED.matcher(s).replaceAll("\$1[CARD_LAST4]")
+        s = ACCOUNT_LAST4_LABELED.matcher(s).replaceAll("\$1[ACCOUNT_LAST4]")
 
         // IBAN — keep masked.
         s = IBAN.matcher(s).replaceAll("[IBAN]")
@@ -95,25 +103,27 @@ object TextSanitizer {
      */
     private fun redactBalanceValues(s: String): String {
         val matcher = BALANCE_KEYWORD.matcher(s)
-        val sb = StringBuilder()
-        var lastEnd = 0
+        val sb = StringBuilder(s.length)
+        var cursor = 0
         while (matcher.find()) {
             val start = matcher.start()
             val end = matcher.end()
-            sb.append(s, lastEnd, start)
-            sb.append(s, start, end)
-            // Look for the next numeric run after the keyword.
-            val after = end
+            if (start < cursor) continue
+
+            appendSafeRange(sb, s, cursor, start)
+            appendSafeRange(sb, s, start, end)
+            val lineEnd = logicalLineEnd(s, end)
             val numMatcher = NUMERIC_RUN.matcher(s)
-            numMatcher.region(after, s.length)
+            numMatcher.region(end.coerceAtMost(lineEnd), lineEnd)
             if (numMatcher.find()) {
-                sb.append(" [BALANCE]")
-                lastEnd = numMatcher.end()
+                appendSafeRange(sb, s, end, numMatcher.start())
+                sb.append("[BALANCE]")
+                cursor = numMatcher.end()
             } else {
-                lastEnd = end
+                cursor = end
             }
         }
-        sb.append(s, lastEnd, s.length)
+        appendSafeRange(sb, s, cursor, s.length)
         return sb.toString()
     }
 
@@ -128,14 +138,17 @@ object TextSanitizer {
     private fun redactPan(s: String): String {
         val matcher = PAN.matcher(s)
         val sb = StringBuilder(s.length)
-        var lastEnd = 0
+        var cursor = 0
         while (matcher.find()) {
-            sb.append(s, lastEnd, matcher.start())
+            val start = matcher.start()
+            val end = matcher.end()
+            if (start < cursor) continue
+            appendSafeRange(sb, s, cursor, start)
             val raw = matcher.group().replace(Regex("[ -]"), "")
             sb.append("[CARD_LAST4 ").append(raw.takeLast(4)).append("]")
-            lastEnd = matcher.end()
+            cursor = end
         }
-        sb.append(s, lastEnd, s.length)
+        appendSafeRange(sb, s, cursor, s.length)
         return sb.toString()
     }
 
@@ -145,26 +158,56 @@ object TextSanitizer {
      */
     private fun redactOtp(s: String): String {
         val matcher = OTP_KEYWORD.matcher(s)
-        val sb = StringBuilder()
-        var lastEnd = 0
+        val sb = StringBuilder(s.length)
+        var cursor = 0
         while (matcher.find()) {
             val start = matcher.start()
             val end = matcher.end()
-            sb.append(s, lastEnd, start)
+            if (start < cursor) continue
+
+            appendSafeRange(sb, s, cursor, start)
             sb.append("[OTP]")
+            val lineEnd = logicalLineEnd(s, end)
             val numMatcher = OTP_DIGITS.matcher(s)
-            numMatcher.region(end, s.length)
+            numMatcher.region(end.coerceAtMost(lineEnd), lineEnd)
             if (numMatcher.find()) {
-                lastEnd = numMatcher.end()
+                cursor = numMatcher.end()
             } else {
-                lastEnd = end
+                cursor = end
             }
         }
-        sb.append(s, lastEnd, s.length)
-        return sb.toString()
+        appendSafeRange(sb, s, cursor, s.length)
+        return if (OTP_KEYWORD.matcher(s).find()) {
+            OTP_STANDALONE_LINE.matcher(sb.toString()).replaceAll("\$1[OTP]")
+        } else {
+            sb.toString()
+        }
     }
 
     private val OTP_DIGITS = Pattern.compile("""\d{4,8}\b""")
+    private val OTP_STANDALONE_LINE = Pattern.compile(
+        """(?m)(^|\R)\s*\d{4,8}\s*(?=$|\R)""",
+    )
+
+    private fun logicalLineEnd(s: String, from: Int): Int {
+        var index = from.coerceIn(0, s.length)
+        while (index < s.length && s[index] != '\n' && s[index] != '\r') index++
+        return index
+    }
+
+    /**
+     * Append only a validated monotonic range. Invalid diagnostic ranges are
+     * ignored rather than being allowed to abort an import scan.
+     */
+    private fun appendSafeRange(
+        target: StringBuilder,
+        source: String,
+        start: Int,
+        end: Int,
+    ) {
+        if (start < 0 || end < start || end > source.length) return
+        if (start != end) target.append(source, start, end)
+    }
 
     /**
      * Convenience: return the last 4 digits of an account number, or
