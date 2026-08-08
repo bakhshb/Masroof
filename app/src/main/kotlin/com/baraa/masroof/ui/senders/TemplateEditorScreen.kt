@@ -237,7 +237,6 @@ private fun TemplateEditorContent(
     // user can review and edit the capture without an extra tap. Existing
     // patterns (which already have a saved template) keep the preview-first
     // default to avoid a large text area on first open.
-    var showFullTemplate by remember(editorKey) { mutableStateOf(isNewDraft) }
     var showAdvanced by remember { mutableStateOf(false) }
     var showTypePicker by remember { mutableStateOf(false) }
     var editingFieldIndex by remember { mutableStateOf<Int?>(null) }
@@ -280,7 +279,50 @@ private fun TemplateEditorContent(
         }
     }
 
+    /**
+     * Ensure [fields] contains a definition for every {{TOKEN}} in [templateText].
+     * Auto-infers canonicalField from the token name, default placeholder token
+     * from the field type, and a sensible sourceLabel/role so the user only
+     * has to touch the template text itself to fix a capture mistake.
+     * Preserves any existing field definitions the user already configured.
+     */
+    fun autoSyncFieldsWithTemplate() {
+        val tokenRegex = Regex("""\{([A-Z][A-Z0-9_]*)\}""")
+        val templateTokens = tokenRegex.findAll(templateText).map { it.groupValues[1] }.toSet()
+        val definedTokens = fields.map { it.placeholderToken.trim().uppercase() }.toSet()
+        val missing = templateTokens - definedTokens
+        if (missing.isEmpty()) return
+        val additions = missing.map { token ->
+            val canonical = com.baraa.masroof.sms.TemplateResolutionService.fieldForPlaceholderToken(token)
+            val placeholder = if (token == com.baraa.masroof.sms.TemplateResolutionService
+                    .defaultPlaceholder(canonical)) token
+            else token
+            TemplateFieldDraft(
+                placeholderToken = placeholder,
+                canonicalField = canonical,
+                sourceLabel = placeholder,
+                role = when (canonical) {
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4,
+                -> com.baraa.masroof.data.db.PatternFieldRole.SOURCE
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4,
+                -> com.baraa.masroof.data.db.PatternFieldRole.DESTINATION
+                else -> com.baraa.masroof.data.db.PatternFieldRole.PRIMARY
+            },
+                valueType = com.baraa.masroof.sms.TemplateEditValidator.expectedValueTypeForUi(canonical),
+                required = canonical == com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT,
+            )
+        }
+        fields = fields + additions
+    }
+
     fun save(approve: Boolean) {
+        // Auto-sync field definitions with the (possibly user-edited) template
+        // so editing the template text alone is enough to fix a capture — the
+        // strict "missing field" error cannot fire on a template the user
+        // authored.
+        autoSyncFieldsWithTemplate()
         val value = draft()
         // Unedited auto-generated drafts (e.g. from PatternDraftFactory) are
         // engine-clean: every digit is already a placeholder. Only enforce the
@@ -404,20 +446,17 @@ private fun TemplateEditorContent(
             }
 
             EditorSection("بنية الرسالة") {
-                val preview = templateText.lineSequence().take(4).joinToString("\n").ifBlank { "—" }
-                Text(preview, style = FinancialTypography.metadata, maxLines = 4)
-                TextButton(onClick = { showFullTemplate = !showFullTemplate }) {
-                    Text(if (showFullTemplate) "إخفاء النص الكامل" else "عرض النص الكامل")
-                }
-                if (showFullTemplate) {
-                    OutlinedTextField(
-                        templateText,
-                        onValueChange = { templateText = it; templateEdited = true },
-                        label = { Text("نص بنية النمط") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                    )
-                }
+                // The template text is always directly editable as free text so
+                // any capture mistake (garbled merchant, missing field, extra
+                // line) is fixable from the app. Field definitions auto-sync
+                // with the template tokens on save (see save()).
+                OutlinedTextField(
+                    value = templateText,
+                    onValueChange = { templateText = it; templateEdited = true },
+                    label = { Text("نص بنية النمط (حر — عدّل مباشرة)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 6,
+                )
             }
 
             sanitizedExample?.takeIf { it.isNotBlank() }?.let { sample ->

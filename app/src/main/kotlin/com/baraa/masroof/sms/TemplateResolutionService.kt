@@ -544,6 +544,57 @@ object TemplateResolutionService {
         return ParsedIdentifierEvidence(type, last4, role, 95, "template:${field.placeholderToken}")
     }
 
+    /**
+     * Inverse of [defaultPlaceholder]: map a placeholder token (the
+     * uppercase identifier inside `{...}`) to its canonical field. Used by
+     * the editor to auto-sync field definitions when the user edits the
+     * template text directly.
+     */
+    fun fieldForPlaceholderToken(token: String): PatternCanonicalField {
+        val t = token.trim().uppercase(java.util.Locale.ROOT)
+        // Direct hits on the default token names.
+        for (entry in defaultPlaceholderEntries) {
+            if (entry.second == t) return entry.first
+        }
+        // Substring / name-based fallback for non-default tokens.
+        return when {
+            t.contains("MERCHANT") || t.contains("BENEFICIARY") || t == "BENEFICIARY" ->
+                if (t.contains("BENEFICIARY")) PatternCanonicalField.BENEFICIARY
+                else PatternCanonicalField.MERCHANT
+            t.contains("DATE") || t.contains("TIME") ->
+                if (t.contains("DATE")) PatternCanonicalField.TRANSACTION_DATE
+                else PatternCanonicalField.TRANSACTION_TIME
+            t.contains("AMOUNT") || t == "AMOUNT" -> PatternCanonicalField.TRANSACTION_AMOUNT
+            t.contains("BALANCE") || t == "AVAILABLE_BALANCE" -> PatternCanonicalField.AVAILABLE_BALANCE
+            t.contains("DUE") || t == "TOTAL_DUE" -> PatternCanonicalField.CARD_AMOUNT_DUE
+            t.contains("REFERENCE") || t.contains("REF") || t == "TRANSACTION_ID" ->
+                PatternCanonicalField.TRANSACTION_REFERENCE
+            t.contains("CURRENCY") -> PatternCanonicalField.CURRENCY
+            t.contains("CREDIT") && t.contains("CARD") -> PatternCanonicalField.CREDIT_CARD_LAST4
+            t.contains("DEBIT") || t.contains("MADA") -> PatternCanonicalField.DEBIT_CARD_LAST4
+            t.contains("WALLET") -> PatternCanonicalField.WALLET_LAST4
+            t.contains("IBAN") -> if (t.contains("SOURCE")) PatternCanonicalField.SOURCE_IBAN_LAST4
+                else if (t.contains("DESTINATION")) PatternCanonicalField.DESTINATION_IBAN_LAST4
+                else PatternCanonicalField.IBAN_LAST4
+            t.contains("ACCOUNT") -> if (t.contains("SOURCE")) PatternCanonicalField.SOURCE_ACCOUNT_LAST4
+                else if (t.contains("DESTINATION")) PatternCanonicalField.DESTINATION_ACCOUNT_LAST4
+                else PatternCanonicalField.ACCOUNT_LAST4
+            else -> PatternCanonicalField.MERCHANT  // safe generic fallback
+        }
+    }
+
+    private val defaultPlaceholderEntries: List<Pair<PatternCanonicalField, String>> = listOf(
+        PatternCanonicalField.TRANSACTION_AMOUNT to "AMOUNT",
+        PatternCanonicalField.CURRENCY to "CURRENCY",
+        PatternCanonicalField.MERCHANT to "MERCHANT",
+        PatternCanonicalField.BENEFICIARY to "BENEFICIARY",
+        PatternCanonicalField.TRANSACTION_DATE to "DATE",
+        PatternCanonicalField.TRANSACTION_TIME to "TIME",
+        PatternCanonicalField.AVAILABLE_BALANCE to "AVAILABLE_BALANCE",
+        PatternCanonicalField.CARD_AMOUNT_DUE to "TOTAL_DUE",
+        PatternCanonicalField.TRANSACTION_REFERENCE to "TRANSACTION_ID",
+    )
+
     fun defaultPlaceholder(field: PatternCanonicalField): String = when (field) {
         PatternCanonicalField.TRANSACTION_AMOUNT -> "AMOUNT"
         PatternCanonicalField.CURRENCY -> "CURRENCY"

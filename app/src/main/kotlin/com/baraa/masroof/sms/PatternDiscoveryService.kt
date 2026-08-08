@@ -680,8 +680,13 @@ object PatternDiscoveryService {
             PatternCanonicalField.TRANSACTION_AMOUNT,
             PatternCanonicalField.AVAILABLE_BALANCE,
             PatternCanonicalField.CARD_AMOUNT_DUE,
-            -> com.baraa.masroof.transaction.LineBasedFieldParser
-                .parseMoneyValue(v) != null
+            -> // Use the leading-money parser (same helper MessageTemplateEngine
+                // uses via replaceMoneyKeepingCurrency) so compact-English
+                // amount lines with trailing context (e.g. "of: 41.30 SAR At
+                // Merchant") still count as AMOUNT. The anchored parseMoneyValue
+                // rejected those because of the trailing merchant text.
+                com.baraa.masroof.transaction.LineBasedFieldParser
+                    .parseLeadingMoney(v) != null
             PatternCanonicalField.TRANSACTION_DATE,
             PatternCanonicalField.TRANSACTION_TIME,
             -> com.baraa.masroof.transaction.LineBasedFieldParser

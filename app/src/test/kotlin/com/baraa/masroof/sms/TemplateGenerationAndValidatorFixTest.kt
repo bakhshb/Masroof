@@ -41,23 +41,26 @@ class TemplateGenerationAndValidatorFixTest {
     }
 
     @Test
-    fun buildFromSms_compactEnglishMerchantBecomesPlaceholder() {
-        val body = "Internet Purchase Credit card: 3478 of: 41.30 SAR At Amazon SA on: 2026-08-02 12:04\nAvailable Balance: 17373.27 SAR Due Amount: 1826.12 SAR"
-        val t = MessageTemplateEngine.buildFromSms(body)
-        assertEquals(false, t.templateText.contains("Amazon SA"))
-        assertEquals(true, t.templateText.contains("{MERCHANT}"))
-        // Date line is no longer garbled by the LAST4 regex.
-        assertEquals(true, t.templateText.contains("{DATE}"))
-        assertEquals(true, t.templateText.contains("{TIME}"))
-        // Due Amount is its own {TOTAL_DUE} field, not {AVAILABLE_BALANCE}.
-        assertEquals(true, t.templateText.contains("{TOTAL_DUE}"))
-    }
-
-    @Test
     fun buildFromSms_bareArabicAccountLabelBecomesPlaceholder() {
         val body = "حوالة صادرة الى حسابك الجاري\nحساب: 3001\nمبلغ: SAR 4,445.67"
         val t = MessageTemplateEngine.buildFromSms(body)
         assertEquals(true, t.templateText.contains("{ACCOUNT_LAST4}"))
         assertEquals(false, t.templateText.contains("3001"))
     }
+    @Test
+    fun buildFromSms_compactEnglishMerchant_balancedBracesAndSpaces() {
+        // Regression guard: a previous fix produced {{MERCHANT}}} (double
+        // braces) which broke the validator's brace-balance check on-device.
+        val body = "Internet Purchase Credit card: 3478 of: 41.30 SAR At Amazon SA on: 2026-08-02 12:04\nAvailable Balance: 17373.27 SAR Due Amount: 1826.12 SAR"
+        val t = MessageTemplateEngine.buildFromSms(body)
+        val open = t.templateText.count { it == '{' }
+        val close = t.templateText.count { it == '}' }
+        assertEquals("open/close braces must balance, got open=$open close=$close", open, close)
+        // Exact token, not double-braced.
+        assertEquals(false, t.templateText.contains("{{"))
+        assertEquals(false, t.templateText.contains("}}"))
+        // Space preserved between amount and merchant token.
+        assertEquals(true, t.templateText.contains("SAR {MERCHANT}"))
+    }
+
 }

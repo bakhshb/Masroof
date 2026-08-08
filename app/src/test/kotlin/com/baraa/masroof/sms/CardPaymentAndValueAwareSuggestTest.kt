@@ -88,4 +88,20 @@ class CardPaymentAndValueAwareSuggestTest {
             },
         )
     }
+    @Test
+    fun valueAwareSuggestFields_compactEnglishAmountLineWithTrailingMerchant_suggestsAmount() {
+        // Regression guard: parseMoneyValue (anchored) rejected
+        // "41.30 SAR At Amazon SA" because of the trailing merchant, so the
+        // AMOUNT field was not suggested while the engine still inserted
+        // {AMOUNT}. parseLeadingMoney (unanchored) is what the engine uses
+        // and is what the value-aware suggester must mirror.
+        val body = "of: 41.30 SAR At Amazon SA"
+        val lines = LineBasedFieldParser.splitLines(body)
+        val fields = PatternDiscoveryService.suggestFields(lines)
+        assertTrue(
+            "AMOUNT must be suggested for a value the engine templatizes, got $fields",
+            fields.any { it.canonicalField == PatternCanonicalField.TRANSACTION_AMOUNT },
+        )
+    }
+
 }

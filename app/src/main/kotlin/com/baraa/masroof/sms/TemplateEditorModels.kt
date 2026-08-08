@@ -175,7 +175,7 @@ object TemplateEditValidator {
             if (field.sourceLabel.isBlank()) {
                 return error("أدخل تسمية مصدر للحقل ${field.placeholderToken}")
             }
-            val expected = expectedValueType(field.canonicalField)
+            val expected = expectedValueTypeForUi(field.canonicalField)
             if (field.valueType != expected) {
                 return error(
                     "الحقل ${field.placeholderToken} من النوع ${field.canonicalField.name} " +
@@ -216,7 +216,7 @@ object TemplateEditValidator {
     fun derivedDirection(type: TransactionType): MoneyFlowDirection =
         TransactionTypeTaxonomy.directionOf(type)
 
-    private fun expectedValueType(field: PatternCanonicalField): PatternValueType = when (field) {
+    fun expectedValueTypeForUi(field: PatternCanonicalField): PatternValueType = when (field) {
         PatternCanonicalField.TRANSACTION_AMOUNT,
         PatternCanonicalField.AVAILABLE_BALANCE,
         PatternCanonicalField.CARD_AMOUNT_DUE,

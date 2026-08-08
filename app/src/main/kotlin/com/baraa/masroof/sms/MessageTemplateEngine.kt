@@ -258,17 +258,19 @@ object MessageTemplateEngine {
      * unchanged when no merchant cue is present.
      */
     private fun extractCompactMerchantTail(value: String, put: () -> String): String {
-        val folded = MessageTypeCueCatalog.foldArabic(value)
-        val atIdx = folded.indexOf(" at ")
+        // Search the ORIGINAL value (case-insensitive) for the " at " cue so
+        // indices align with the unmodified string. foldArabic would collapse
+        // whitespace and break index correspondence.
+        val atIdx = value.indexOf(" at ", ignoreCase = true)
         if (atIdx < 0) return value
-        // foldArabic is character-for-character (lowercase + Arabic letter
-        // fold), so the index aligns with the original string.
         val merchant = value.substring(atIdx + 4).trim()
         if (merchant.isEmpty()) return value
-        put()  // registers the placeholder in the shared set
-        // Replace the merchant tail with the {MERCHANT} token so the merchant
-        // is captured per-SMS at match time instead of being baked literal.
-        return value.substring(0, atIdx) + "{" + put() + "}"
+        // Single put() call: put() returns the braced token ({MERCHANT}) and
+        // also registers it in the placeholders set as a side effect. Adding
+        // extra braces around the return value produced {{MERCHANT}}} which
+        // broke the validator's brace-balance check.
+        val token = put()
+        return value.substring(0, atIdx) + " " + token
     }
 
     private fun replaceMoneyKeepingCurrency(value: String, amountToken: () -> String): String {
