@@ -44,12 +44,16 @@ object SettingsDestinations {
     val bankMessages = SettingsDestination("settings/bank_messages", "رسائل البنوك", SettingsGroup.AccountsAndLinking)
     const val bankMessagesSenderRoute = "settings/bank_messages/sender/{senderProfileId}"
     const val bankMessagesTemplateRoute = "settings/bank_messages/template/{patternId}"
+    const val bankMessagesDraftRoute = "settings/bank_messages/draft"
 
     fun bankMessagesSender(senderProfileId: Long): String =
         "settings/bank_messages/sender/$senderProfileId"
 
     fun bankMessagesTemplate(patternId: Long): String =
         "settings/bank_messages/template/$patternId"
+
+    fun bankMessagesDraft(): String =
+        "settings/bank_messages/draft"
 
     // Diagnostics group
     val diagnostics = SettingsDestination("settings/diagnostics", "تشخيص التطبيق", SettingsGroup.Diagnostics)

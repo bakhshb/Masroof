@@ -138,7 +138,7 @@ class CandidatePatternWorkflowTest {
         val source = java.io.File(
             "/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/senders/TemplateEditorScreen.kt",
         ).readText()
-        assertTrue(source.contains("updateTemplate crashed"))
+        assertTrue(source.contains("save crashed"))
         assertTrue(source.contains("saving = false"))
         assertTrue(source.contains("finishAfterSave"))
     }

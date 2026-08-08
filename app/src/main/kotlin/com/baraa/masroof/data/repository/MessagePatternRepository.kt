@@ -493,6 +493,135 @@ class MessagePatternRepository(
         requireUnknownCandidate = true,
     )
 
+    /**
+     * Persist a brand-new pattern from an in-memory [TemplateEditDraft] whose
+     * `patternId == 0L` (built by [com.baraa.masroof.sms.PatternDraftFactory]).
+     *
+     * This is the manual-creation confirmation path: it does NOT create an
+     * UNKNOWN candidate first and then revise it. Exactly one row (plus its
+     * fields + anchors) is written, as APPROVED (when [approve]) or UNKNOWN.
+     * Returns [TemplateUpdateResult.Success] with the persisted pattern.
+     */
+    suspend fun createPatternFromDraft(
+        draft: com.baraa.masroof.sms.TemplateEditDraft,
+        approve: Boolean,
+    ): TemplateUpdateResult = withContext(Dispatchers.IO) {
+        val validation = com.baraa.masroof.sms.TemplateEditValidator.validate(draft)
+        if (validation is com.baraa.masroof.sms.TemplateEditValidation.Error) {
+            return@withContext TemplateUpdateResult.ValidationError(validation.messageAr)
+        }
+        if (draft.patternId != 0L) {
+            return@withContext TemplateUpdateResult.ValidationError(
+                "مسودة إنشاء جديدة لا يجب أن تحتوي معرّف نمط محفوظ مسبقًا",
+            )
+        }
+        try {
+            inTransaction {
+                val sender = senderProfileDao?.getById(draft.senderProfileId)
+                if (senderProfileDao != null && sender == null) {
+                    return@inTransaction TemplateUpdateResult.SenderNotFound
+                }
+                if (sender != null && !sender.active) {
+                    return@inTransaction TemplateUpdateResult.SenderInactive
+                }
+                val canonicalKey = com.baraa.masroof.sms.TemplateCanonicalizer.canonicalKey(
+                    draft.templateText.trim(),
+                    com.baraa.masroof.sms.SmsStructureNormalizer
+                        .signatureFromTemplate(draft.templateText.trim()),
+                    draft.transactionType.name,
+                )
+                val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                    draft.templateText.trim(),
+                    draft.transactionType.name,
+                )
+                val semanticKey =
+                    (semantic as? com.baraa.masroof.sms.SemanticSchemaResult.Safe)?.key
+                        ?: if (familyDao == null) {
+                            "legacy-create:${draft.transactionType.name}"
+                        } else {
+                            return@inTransaction TemplateUpdateResult.ValidationError(
+                                "تعذر تحديد الهوية المالية للقالب بشكل آمن",
+                            )
+                        }
+                val collision = definitionDao
+                    .getForSender(draft.senderProfileId)
+                    .firstOrNull { it.canonicalKey == canonicalKey && it.deprecatedAt == null }
+                if (collision != null) {
+                    return@inTransaction TemplateUpdateResult.CanonicalCollision(collision.id)
+                }
+                val status = if (approve) MessagePatternStatus.APPROVED else MessagePatternStatus.UNKNOWN
+                val targetFamilyId = getOrCreateFamily(
+                    senderProfileId = draft.senderProfileId,
+                    stableKey = semanticKey,
+                    displayName = draft.displayName.trim(),
+                    status = status,
+                )
+                val ts = now()
+                val newId = definitionDao.insert(
+                    MessagePatternDefinitionEntity(
+                        senderProfileId = draft.senderProfileId,
+                        familyId = targetFamilyId,
+                        userFriendlyName = draft.displayName.trim(),
+                        normalizedSignature = com.baraa.masroof.sms.SmsStructureNormalizer
+                            .signatureFromTemplate(draft.templateText.trim())
+                            .takeIf { it.isNotBlank() }
+                            ?: canonicalKey,
+                        canonicalKey = canonicalKey,
+                        lineageId = 0L,
+                        templateText = draft.templateText.trim(),
+                        transactionType = draft.transactionType.name,
+                        direction = com.baraa.masroof.transaction.TransactionTypeTaxonomy
+                            .directionStorageName(draft.direction),
+                        status = status,
+                        isActive = approve,
+                        version = 1,
+                        origin = com.baraa.masroof.data.db.PatternOrigin.USER_TRAINED,
+                        normalizationVersion = com.baraa.masroof.sms.NORMALIZATION_VERSION,
+                        confidence = 100,
+                        userConfirmed = approve,
+                        exampleCount = 1,
+                        activeFrom = if (approve) ts else null,
+                        deprecatedAt = null,
+                        createdAt = ts,
+                        updatedAt = ts,
+                    ),
+                )
+                val inserted = definitionDao.getById(newId)!!
+                if (inserted.lineageId == 0L) {
+                    definitionDao.update(inserted.copy(lineageId = newId))
+                }
+                persistDraftFields(newId, draft.fields)
+                persistAnchors(newId, draft.templateText)
+                if (approve) {
+                    definitionDao.getForSender(draft.senderProfileId)
+                        .filter {
+                            it.id != newId &&
+                                it.status == MessagePatternStatus.UNKNOWN &&
+                                it.deprecatedAt == null &&
+                                ((targetFamilyId != null && it.familyId == targetFamilyId) ||
+                                    it.canonicalKey == canonicalKey)
+                        }
+                        .forEach { sibling ->
+                            definitionDao.update(
+                                sibling.copy(
+                                    status = MessagePatternStatus.DEPRECATED,
+                                    isActive = false,
+                                    deprecatedAt = sibling.deprecatedAt ?: ts,
+                                    updatedAt = ts,
+                                ),
+                            )
+                        }
+                }
+                targetFamilyId?.let { refreshFamilyStatus(it) }
+                TemplateUpdateResult.Success(
+                    MessagePattern(definitionDao.getById(newId)!!, fieldDao.getForPattern(newId)),
+                )
+            }
+        } catch (e: Exception) {
+            TemplateUpdateResult.Failure(e.message ?: "تعذر حفظ النمط الجديد")
+        }
+    }
+
     private suspend fun updateTemplateInternal(
         draft: com.baraa.masroof.sms.TemplateEditDraft,
         requireUnknownCandidate: Boolean,

@@ -263,6 +263,9 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onTemplateClick = {
                         navController.navigate(SettingsDestinations.bankMessagesTemplate(it))
                     },
+                    onOpenDraftEditor = {
+                        navController.navigate(SettingsDestinations.bankMessagesDraft())
+                    },
                     onReturnToImport = {
                         if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {
                             navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
@@ -276,6 +279,18 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
             ) { entry ->
                 TemplateEditorScreen(
                     patternId = entry.arguments?.getLong("patternId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                    onReturnToImport = {
+                        if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {
+                            navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
+                        }
+                    },
+                )
+            }
+            composable(SettingsDestinations.bankMessagesDraftRoute) {
+                TemplateEditorScreen(
+                    patternId = 0L,
+                    draft = remember { com.baraa.masroof.ui.senders.PatternDraftHolder.consume() },
                     onBack = { navController.popBackStack() },
                     onReturnToImport = {
                         if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {

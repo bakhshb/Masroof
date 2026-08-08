@@ -2,6 +2,7 @@ package com.baraa.masroof.ui.senders
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,13 +10,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,11 +49,14 @@ import com.baraa.masroof.data.db.MessagePatternStatus
 import com.baraa.masroof.data.repository.MessagePattern
 import com.baraa.masroof.data.repository.SenderProfile
 import com.baraa.masroof.data.repository.TemplateStatusLabels
+import com.baraa.masroof.sms.FinancialMessageSummary
+import com.baraa.masroof.sms.PatternDraftFactory
 import com.baraa.masroof.sms.PatternDiscoveryService
 import com.baraa.masroof.sms.PatternFamilyRuntimeState
 import com.baraa.masroof.sms.PatternRuntimeEligibility
 import com.baraa.masroof.sms.SenderNormalizer
 import com.baraa.masroof.sms.SmsImportRange
+import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.sms.patternFamilyRuntimeState
 import com.baraa.masroof.transaction.TransactionType
 import java.time.LocalDate
@@ -106,59 +117,47 @@ private fun logPatternDiscovery(
     }
 }
 
-/**
- * DEBUG-safe, no-raw-SMS discovery summary for the "اكتشاف أنماط جديدة" action.
- * Surfaces the reconciling counts and, when any stage failed, the dominant
- * failing stage + exact exception class so the user (and support) can see
- * *why* messages were skipped instead of a single opaque number.
- */
-private fun buildDiscoveryResultMessage(
-    result: com.baraa.masroof.sms.PatternDiscoveryResult,
-    savedCount: Int,
-): String = buildString {
-    append("تم اكتشاف $savedCount أنماط من ${result.inputMessages} رسالة")
-    val excluded = result.skippedOtp + result.skippedNonFinancial + result.skippedBlank
-    if (excluded > 0) {
-        append(" — $excluded مستبعدة")
-    }
-    if (result.coreFailedMessages > 0) {
-        append(" — ${result.coreFailedMessages} فشلت")
-    }
-    if (result.coreFailedMessages > 0 || result.optionalStageFailureCount > 0) {
-        append("\nتشخيص الاكتشاف:")
-        result.failureBreakdown().forEach { b ->
-            val tag = if (b.optional) "(اختياري)" else ""
-            append("\n${b.stage.name} — ${b.count} ${b.exceptionClass}$tag")
-        }
-    }
-    if (!result.isReconciled()) {
-        append("\n⚠ عدم تطابق في العد")
-    }
-}
-
 @Composable
 fun SenderDetailsScreen(
     senderProfileId: Long,
     onBack: () -> Unit,
     onTemplateClick: (Long) -> Unit,
     onReturnToImport: (() -> Unit)? = null,
+    onOpenDraftEditor: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MasroofApplication
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val returnToImport by app.importSessionStore.returnToImportAfterTemplates
         .collectAsStateWithLifecycle(initialValue = false)
     var profile by remember(senderProfileId) { mutableStateOf<SenderProfile?>(null) }
     var patterns by remember(senderProfileId) { mutableStateOf<List<MessagePattern>>(emptyList()) }
     var tab by remember { mutableStateOf(SenderDetailsTab.TEMPLATES) }
-    var status by remember { mutableStateOf<String?>(null) }
     var expandedFamilyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var ignoreTarget by remember { mutableStateOf<MessagePattern?>(null) }
     var runningPatternAction by remember { mutableStateOf<String?>(null) }
-    var manualPickerBodies by remember {
-        mutableStateOf<List<com.baraa.masroof.sms.SmsMessage>>(emptyList())
+    var ignoreTarget by remember { mutableStateOf<MessagePattern?>(null) }
+
+    // Manual financial picker state.
+    var pickerSummaries by remember { mutableStateOf<List<FinancialMessageSummary>>(emptyList()) }
+    var pickerLoading by remember { mutableStateOf<Long?>(null) }
+    var pickerError by remember { mutableStateOf<String?>(null) }
+    var draftFailure by remember { mutableStateOf<String?>(null) }
+
+    // Zero-discovery diagnostic state.
+    var zeroDiscovery by remember { mutableStateOf<com.baraa.masroof.sms.PatternDiscoveryResult?>(null) }
+
+    fun showSnackbar(message: String, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = actionLabel,
+                duration = if (actionLabel != null) SnackbarDuration.Long else SnackbarDuration.Short,
+                withDismissAction = actionLabel == null,
+            )
+            if (result == SnackbarResult.ActionPerformed && onAction != null) onAction()
+        }
     }
-    var manualPickerError by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
@@ -179,7 +178,7 @@ fun SenderDetailsScreen(
                         "senderProfileId=$senderProfileId action=reload failure=${failure.javaClass.simpleName}",
                     )
                 }
-                status = "تعذر تحديث قائمة الأنماط"
+                showSnackbar("تعذر تحديث قائمة الأنماط")
             }
         }
     }
@@ -187,14 +186,13 @@ fun SenderDetailsScreen(
     fun launchPatternAction(
         actionName: String,
         failureMessage: String,
-        action: suspend () -> String,
+        action: suspend () -> Unit,
     ) {
         if (runningPatternAction != null) return
         scope.launch {
             runningPatternAction = actionName
-            status = null
             try {
-                status = action()
+                action()
                 reload()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -206,7 +204,7 @@ fun SenderDetailsScreen(
                         "senderProfileId=$senderProfileId action=$actionName failure=${failure.javaClass.simpleName}",
                     )
                 }
-                status = failureMessage
+                showSnackbar(failureMessage)
             } finally {
                 runningPatternAction = null
             }
@@ -215,7 +213,16 @@ fun SenderDetailsScreen(
 
     DisposableEffect(lifecycleOwner, senderProfileId) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) reload()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                reload()
+                PatternActionResultHolder.consume()?.let { result ->
+                    showSnackbar(
+                        message = result.message,
+                        actionLabel = result.reviewPatternId?.let { "مراجعة النمط" },
+                        onAction = result.reviewPatternId?.let { id -> { onTemplateClick(id) } },
+                    )
+                }
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         reload()
@@ -244,7 +251,10 @@ fun SenderDetailsScreen(
         }
     }
 
-    Scaffold(topBar = { MasroofTopAppBar(title, onBack = onBack) }) { padding ->
+    Scaffold(
+        topBar = { MasroofTopAppBar(title, onBack = onBack) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(Spacing.x4)
                 .verticalScroll(rememberScrollState()),
@@ -345,11 +355,10 @@ fun SenderDetailsScreen(
                                                                 senderProfileId,
                                                                 senderMessages,
                                                             )
-                                                        status = if (repair.rebuildSucceeded) {
-                                                            "تم تحديث النمط"
-                                                        } else {
-                                                            "تعذر التحديث تلقائيًا — حاول بعد توفر رسائل حديثة"
-                                                        }
+                                                        showSnackbar(
+                                                            if (repair.rebuildSucceeded) "تم تحديث النمط"
+                                                            else "تعذر التحديث تلقائيًا — حاول بعد توفر رسائل حديثة",
+                                                        )
                                                         app.importSessionStore.markTemplatesChanged()
                                                         reload()
                                                     }
@@ -370,7 +379,7 @@ fun SenderDetailsScreen(
                                                             MessagePatternStatus.IGNORED,
                                                         )
                                                         app.importSessionStore.markTemplatesChanged()
-                                                        status = "تم تعطيل النمط"
+                                                        showSnackbar("تم تعطيل النمط")
                                                         reload()
                                                     }
                                                 },
@@ -384,11 +393,8 @@ fun SenderDetailsScreen(
                 SenderDetailsTab.CANDIDATES -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
                         SecondaryButton(
-                            if (runningPatternAction == "rebuild") {
-                                "جارٍ إعادة البناء…"
-                            } else {
-                                "إعادة بناء الأنماط"
-                            },
+                            if (runningPatternAction == "rebuild") "جارٍ إعادة البناء…"
+                            else "إعادة بناء الأنماط",
                             enabled = runningPatternAction == null,
                             onClick = {
                                 launchPatternAction(
@@ -399,8 +405,7 @@ fun SenderDetailsScreen(
                                         SmsImportRange.lastDays(LocalDate.now(), 30),
                                     )
                                     val inbox = when (result) {
-                                        is com.baraa.masroof.sms.SmsInboxLoadResult.Success ->
-                                            result.messages
+                                        is com.baraa.masroof.sms.SmsInboxLoadResult.Success -> result.messages
                                         is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
                                             error("SMS_PERMISSION_DENIED")
                                         is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
@@ -413,20 +418,18 @@ fun SenderDetailsScreen(
                                         senderProfileId,
                                         senderMessages,
                                     )
-                                    summary.discovery?.let {
-                                        logPatternDiscovery(senderProfileId, it)
-                                    }
+                                    summary.discovery?.let { logPatternDiscovery(senderProfileId, it) }
                                     app.importSessionStore.markTemplatesChanged()
-                                    val failed = summary.discovery?.failedMessages ?: 0
-                                    buildString {
-                                        append("تم تحديث ${summary.rebuiltApprovedFamilies} أنماط معتمدة")
-                                        append(" — ${summary.newCandidateFamilies} أنماط جديدة تحتاج اعتماد")
-                                        if (summary.staleDeprecated > 0) {
-                                            append(" — ${summary.staleDeprecated} قديم تم تعطيله")
-                                        }
-                                        if (failed > 0) {
-                                            append(" — تم تجاوز $failed لتعذر تحليلها")
-                                        }
+                                    if (summary.discovery?.patterns.isNullOrEmpty() &&
+                                        senderMessages.isNotEmpty()
+                                    ) {
+                                        zeroDiscovery = summary.discovery
+                                    } else {
+                                        showSnackbar(
+                                            "تم تحديث ${summary.rebuiltApprovedFamilies} أنماط معتمدة — " +
+                                                "${summary.newCandidateFamilies} جديدة تحتاج اعتماد",
+                                        )
+                                        tab = SenderDetailsTab.CANDIDATES
                                     }
                                 }
                             },
@@ -434,12 +437,9 @@ fun SenderDetailsScreen(
                         )
                     }
                     Spacer(Modifier.height(Spacing.x2))
-                    SecondaryButton(
-                        if (runningPatternAction == "discover") {
-                            "جارٍ اكتشاف الأنماط…"
-                        } else {
-                            "اكتشاف أنماط جديدة من آخر 30 يومًا"
-                        },
+                    PrimaryButton(
+                        if (runningPatternAction == "discover") "جارٍ اكتشاف الأنماط…"
+                        else "اكتشاف أنماط جديدة من آخر 30 يومًا",
                         enabled = runningPatternAction == null,
                         onClick = {
                             launchPatternAction(
@@ -450,8 +450,7 @@ fun SenderDetailsScreen(
                                     SmsImportRange.lastDays(LocalDate.now(), 30),
                                 )
                                 val inbox = when (result) {
-                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Success ->
-                                        result.messages
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Success -> result.messages
                                     is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
                                         error("SMS_PERMISSION_DENIED")
                                     is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
@@ -465,29 +464,34 @@ fun SenderDetailsScreen(
                                         .map { it.definition }
                                 }
                                 val discovery = withContext(Dispatchers.Default) {
-                                    PatternDiscoveryService.discoverSafely(
-                                        senderMessages,
-                                        existing,
-                                    )
+                                    PatternDiscoveryService.discoverSafely(senderMessages, existing)
                                 }
                                 logPatternDiscovery(senderProfileId, discovery)
-                                val batch = app.messagePatternRepository.saveDiscoveredBatch(
-                                    senderProfileId = senderProfileId,
-                                    discovered = discovery.patterns,
-                                    status = MessagePatternStatus.UNKNOWN,
-                                )
-                                buildDiscoveryResultMessage(discovery, batch.savedCount)
+                                if (discovery.patterns.isEmpty()) {
+                                    if (senderMessages.isNotEmpty()) {
+                                        zeroDiscovery = discovery
+                                    } else {
+                                        showSnackbar("لا توجد رسائل حديثة لهذا المرسل")
+                                    }
+                                } else {
+                                    app.messagePatternRepository.saveDiscoveredBatch(
+                                        senderProfileId = senderProfileId,
+                                        discovered = discovery.patterns,
+                                        status = MessagePatternStatus.UNKNOWN,
+                                    )
+                                    app.importSessionStore.markTemplatesChanged()
+                                    tab = SenderDetailsTab.CANDIDATES
+                                    val families = candidateFamiliesCount(discovery.patterns)
+                                    showSnackbar("تم اكتشاف $families نمط — تحتاج اعتماد")
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(Spacing.x2))
                     SecondaryButton(
-                        if (runningPatternAction == "manual-load") {
-                            "جارٍ تحميل الرسائل…"
-                        } else {
-                            "إنشاء نمط من رسالة"
-                        },
+                        if (runningPatternAction == "manual-load") "جارٍ تحميل الرسائل…"
+                        else "إنشاء نمط من رسالة",
                         enabled = runningPatternAction == null,
                         onClick = {
                             launchPatternAction(
@@ -506,18 +510,14 @@ fun SenderDetailsScreen(
                                 }
                                 val senderMessages = inbox.filter {
                                     SenderNormalizer.normalize(it.sender) == profile?.normalizedSenderKey
-                                }.filterNot {
-                                    com.baraa.masroof.sms.SmsStructureNormalizer
-                                        .looksLikeOtpOrMarketing(it.body)
                                 }
-                                manualPickerBodies = senderMessages.take(40)
-                                manualPickerError = if (senderMessages.isEmpty()) {
+                                val summaries = senderMessages.mapNotNull { PatternDraftFactory.summarize(it) }
+                                pickerSummaries = summaries
+                                pickerError = if (summaries.isEmpty()) {
                                     "لا توجد رسائل مالية حديثة لهذا المرسل لإنشاء نمط منها."
                                 } else {
                                     null
                                 }
-                                if (senderMessages.isEmpty()) "لا توجد رسائل مالية حديثة"
-                                else "اختر رسالة لإنشاء نمط منها"
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -547,25 +547,11 @@ fun SenderDetailsScreen(
                                 CandidatePatternCard(
                                     pattern = pattern,
                                     senderLabel = profile?.displaySender.orEmpty(),
-                                    onApprove = {
-                                        scope.launch {
-                                            val approved = app.messagePatternRepository.approveCandidate(
-                                                pattern.definition.id,
-                                            )
-                                            android.util.Log.i(
-                                                "TemplateLifecycle",
-                                                "approved id=${approved?.definition?.id} status=${approved?.definition?.status} active=${approved?.definition?.isActive} key=${approved?.definition?.canonicalKey}",
-                                            )
-                                            app.importSessionStore.markTemplatesChanged()
-                                            status = "تم اعتماد النمط"
-                                            reload()
-                                        }
-                                    },
-                                    onEdit = { onTemplateClick(pattern.definition.id) },
+                                    onReview = { onTemplateClick(pattern.definition.id) },
                                     onIgnore = { ignoreTarget = pattern },
                                     onUseOnce = {
                                         app.importSessionStore.markUseOncePattern(pattern.definition.id)
-                                        status = "استخدام لمرة واحدة — ارجع للاستيراد لإعادة المطابقة دون حفظ قالب دائم."
+                                        showSnackbar("استخدام لمرة واحدة — ارجع للاستيراد لإعادة المطابقة دون حفظ قالب دائم.")
                                         if (returnToImport && onReturnToImport != null) {
                                             onReturnToImport()
                                         }
@@ -621,9 +607,6 @@ fun SenderDetailsScreen(
                     }
                 }
             }
-            status?.let {
-                Text(it, color = MaterialTheme.colorScheme.primary, style = FinancialTypography.metadata)
-            }
         }
     }
 
@@ -646,7 +629,7 @@ fun SenderDetailsScreen(
                                 MessagePatternStatus.IGNORED,
                             )
                             app.importSessionStore.markTemplatesChanged()
-                            status = "تم تجاهل النمط مستقبلاً"
+                            showSnackbar("تم تجاهل النمط مستقبلاً")
                             ignoreTarget = null
                             reload()
                         }
@@ -658,7 +641,7 @@ fun SenderDetailsScreen(
                     TextButton(onClick = { ignoreTarget = null }) { Text("إلغاء") }
                     TextButton(
                         onClick = {
-                            status = "تم تخطي هذا المرشح الآن — ما زال يحتاج اعتماد لاحقاً"
+                            showSnackbar("تم تخطي هذا المرشح الآن — ما زال يحتاج اعتماد لاحقاً")
                             ignoreTarget = null
                         },
                     ) { Text("هذه الرسائل فقط") }
@@ -667,39 +650,89 @@ fun SenderDetailsScreen(
         )
     }
 
-    if (manualPickerBodies.isNotEmpty() || manualPickerError != null) {
-        ManualPatternFromMessageDialog(
-            messages = manualPickerBodies,
-            error = manualPickerError,
+    // Financial picker dialog — compact summaries only, never raw SMS.
+    if (pickerSummaries.isNotEmpty() || pickerError != null) {
+        FinancialMessagePickerDialog(
+            summaries = pickerSummaries,
+            error = pickerError,
+            loadingSmsId = pickerLoading,
             onDismiss = {
-                manualPickerBodies = emptyList()
-                manualPickerError = null
+                pickerSummaries = emptyList()
+                pickerError = null
             },
-            onPick = { sms ->
+            onPick = { summary ->
+                if (pickerLoading != null) return@FinancialMessagePickerDialog
+                pickerLoading = summary.sms.id
                 scope.launch {
-                    try {
-                        val discovered = PatternDiscoveryService.discoverSafely(listOf(sms))
-                        val cluster = discovered.patterns.firstOrNull()
-                        if (cluster == null) {
-                            status = "تعذر إنشاء نمط من هذه الرسالة — جرّب رسالة أخرى"
-                        } else {
-                            app.messagePatternRepository.saveDiscovered(
-                                senderProfileId = senderProfileId,
-                                discovered = cluster,
-                                status = MessagePatternStatus.UNKNOWN,
-                            )
-                            app.importSessionStore.markTemplatesChanged()
-                            status = "تم إنشاء نمط مرشح — يحتاج اعتماد"
-                            reload()
+                    val result = PatternDraftFactory.fromSms(summary.sms, senderProfileId)
+                    pickerLoading = null
+                    when (result) {
+                        is com.baraa.masroof.sms.PatternDraftResult.Ready,
+                        is com.baraa.masroof.sms.PatternDraftResult.NeedsTypeSelection -> {
+                            val draft = when (result) {
+                                is com.baraa.masroof.sms.PatternDraftResult.Ready -> result.draft
+                                is com.baraa.masroof.sms.PatternDraftResult.NeedsTypeSelection ->
+                                    result.draft
+                                else -> error("unreachable")
+                            }
+                            PatternDraftHolder.set(draft)
+                            pickerSummaries = emptyList()
+                            pickerError = null
+                            onOpenDraftEditor()
                         }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Throwable) {
-                        if (failure is VirtualMachineError) throw failure
-                        status = "تعذر إنشاء نمط من هذه الرسالة. لم يتم حذف أي بيانات."
-                    } finally {
-                        manualPickerBodies = emptyList()
-                        manualPickerError = null
+                        is com.baraa.masroof.sms.PatternDraftResult.NonFinancial ->
+                            draftFailure = "هذه الرسالة غير مالية (${result.reason}) — اختر رسالة أخرى"
+                        is com.baraa.masroof.sms.PatternDraftResult.Failed ->
+                            draftFailure = "تعذر تحليل هذه الرسالة (${result.stage}) — اختر رسالة أخرى"
+                    }
+                }
+            },
+        )
+    }
+
+    // Immediate, blocking error for a message that could not become a draft.
+    draftFailure?.let { message ->
+        AlertDialog(
+            onDismissRequest = { draftFailure = null },
+            title = { Text("تعذر تحليل هذه الرسالة") },
+            text = { Text(message, style = FinancialTypography.metadata) },
+            confirmButton = {
+                TextButton(onClick = { draftFailure = null }) { Text("اختيار رسالة أخرى") }
+            },
+        )
+    }
+
+    // Zero-discovery diagnostic: financial SMS existed but no pattern could be built.
+    zeroDiscovery?.let { discovery ->
+        ZeroDiscoveryDialog(
+            result = discovery,
+            onDismiss = { zeroDiscovery = null },
+            onManualCreate = {
+                zeroDiscovery = null
+                // Trigger the manual picker the same way the button does.
+                launchPatternAction(
+                    actionName = "manual-load",
+                    failureMessage = "تعذر تحميل الرسائل. لم يتم حذف أي بيانات.",
+                ) {
+                    val result = app.smsRepository.loadInboxResult(
+                        SmsImportRange.lastDays(LocalDate.now(), 30),
+                    )
+                    val inbox = when (result) {
+                        is com.baraa.masroof.sms.SmsInboxLoadResult.Success -> result.messages
+                        is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
+                            error("SMS_PERMISSION_DENIED")
+                        is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
+                            error("SMS_LOAD_FAILED")
+                    }
+                    val senderMessages = inbox.filter {
+                        SenderNormalizer.normalize(it.sender) == profile?.normalizedSenderKey
+                    }
+                    val summaries = senderMessages.mapNotNull { PatternDraftFactory.summarize(it) }
+                    pickerSummaries = summaries
+                    pickerError = if (summaries.isEmpty()) {
+                        "لا توجد رسائل مالية حديثة لهذا المرسل لإنشاء نمط منها."
+                    } else {
+                        null
                     }
                 }
             },
@@ -707,58 +740,10 @@ fun SenderDetailsScreen(
     }
 }
 
-/**
- * Manual recovery/debug picker: shows a sender's recent financial (non-OTP)
- * SMS as sanitized previews only (never raw SMS). The user picks one message
- * and a single UNKNOWN candidate is built from it through the same
- * [PatternDiscoveryService] pipeline, then left under "تحتاج اعتماد".
- */
-@Composable
-private fun ManualPatternFromMessageDialog(
-    messages: List<com.baraa.masroof.sms.SmsMessage>,
-    error: String?,
-    onDismiss: () -> Unit,
-    onPick: (com.baraa.masroof.sms.SmsMessage) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("إنشاء نمط من رسالة") },
-        text = {
-            Column {
-                Text(
-                    "اختر رسالة مالية لإنشاء نمط مرشح منها. يظهر معاينة منقّحة فقط ولا تُحفظ الرسالة الخام.",
-                    style = FinancialTypography.metadata,
-                )
-                Spacer(Modifier.height(Spacing.x2))
-                if (error != null) {
-                    Text(error, style = FinancialTypography.metadata)
-                } else {
-                    messages.forEach { sms ->
-                        val preview = com.baraa.masroof.accounts.AccountSmsAnalyzer
-                            .safeSanitizedPreview(sms.body, maxChars = 120, preserveNewlines = false)
-                            ?: "(تعذرت المعاينة)"
-                        Surface(
-                            Modifier.fillMaxWidth().clickable { onPick(sms) },
-                            shape = FinancialShapes.medium,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                        ) {
-                            Text(
-                                preview.ifBlank { "(معاينة فارغة)" },
-                                style = FinancialTypography.metadata,
-                                modifier = Modifier.padding(Spacing.x2),
-                            )
-                        }
-                        Spacer(Modifier.height(Spacing.x1))
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
-        },
-    )
-}
+/** Distinct semantic families discovered, for the success snackbar. */
+private fun candidateFamiliesCount(
+    patterns: List<com.baraa.masroof.sms.DiscoveredMessagePattern>,
+): Int = patterns.count { !it.looksLikeOtpOrMarketing && !it.looksLikeNonFinancial }
 
 @Composable
 private fun SummaryValue(label: String, value: Int) {
@@ -816,8 +801,7 @@ private fun ApprovedTemplateCard(
 private fun CandidatePatternCard(
     pattern: MessagePattern,
     senderLabel: String,
-    onApprove: () -> Unit,
-    onEdit: () -> Unit,
+    onReview: () -> Unit,
     onIgnore: () -> Unit,
     onUseOnce: () -> Unit,
 ) {
@@ -862,8 +846,7 @@ private fun CandidatePatternCard(
                 Text(fields, style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.primary)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
-                PrimaryButton("اعتماد", onClick = onApprove)
-                SecondaryButton("تعديل", onClick = onEdit)
+                PrimaryButton("مراجعة واعتماد", onClick = onReview)
                 SecondaryButton("تجاهل", onClick = onIgnore)
             }
             TextButton(onClick = onUseOnce) {
@@ -871,4 +854,136 @@ private fun CandidatePatternCard(
             }
         }
     }
+}
+
+/**
+ * Proper financial-message picker: compact summaries only (never raw SMS),
+ * with OTP / non-financial / bank-service / maintenance messages excluded
+ * upstream by [PatternDraftFactory.summarize].
+ */
+@Composable
+private fun FinancialMessagePickerDialog(
+    summaries: List<FinancialMessageSummary>,
+    error: String?,
+    loadingSmsId: Long?,
+    onDismiss: () -> Unit,
+    onPick: (FinancialMessageSummary) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("إنشاء نمط من رسالة") },
+        text = {
+            Column {
+                Text(
+                    "اختر رسالة مالية لإنشاء نمط منها. تظهر ملخّص مختصر فقط ولا تُحفظ الرسالة الخام.",
+                    style = FinancialTypography.metadata,
+                )
+                Spacer(Modifier.height(Spacing.x2))
+                if (error != null) {
+                    Text(error, style = FinancialTypography.metadata)
+                } else {
+                    summaries.forEach { summary ->
+                        Surface(
+                            Modifier.fillMaxWidth().clickable { onPick(summary) },
+                            shape = FinancialShapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                        ) {
+                            Row(
+                                Modifier.padding(Spacing.x3),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.x2),
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(summary.typeLabel, style = FinancialTypography.merchant)
+                                    summary.merchantOrBeneficiary?.let {
+                                        Text(it, style = FinancialTypography.metadata)
+                                    }
+                                    val amountLine = buildString {
+                                        summary.amount?.let { append(it) }
+                                        summary.currency?.let {
+                                            if (isNotEmpty()) append(' ')
+                                            append(it)
+                                        }
+                                    }.ifBlank { null }?.let {
+                                        Text(it, style = FinancialTypography.metadata)
+                                    }
+                                    summary.date?.let { Text(it, style = FinancialTypography.metadata) }
+                                    summary.maskedLast4?.let {
+                                        Text(it, style = FinancialTypography.metadata)
+                                    }
+                                    if (summary.isUnclassifiedFinancial) {
+                                        Text(
+                                            "رسالة مالية غير مصنفة",
+                                            style = FinancialTypography.metadata,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                        )
+                                        summary.fallbackPreview?.takeIf { it.isNotBlank() }?.let {
+                                            Text(it, style = FinancialTypography.metadata)
+                                        }
+                                    }
+                                }
+                                if (loadingSmsId == summary.sms.id) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(Spacing.x1))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        },
+    )
+}
+
+/**
+ * Blocking diagnostic shown when discovery produced zero patterns despite
+ * financial SMS existing. Surfaces safe counts and the dominant failing
+ * stage + exception class (never raw SMS), and offers manual creation.
+ */
+@Composable
+private fun ZeroDiscoveryDialog(
+    result: com.baraa.masroof.sms.PatternDiscoveryResult,
+    onDismiss: () -> Unit,
+    onManualCreate: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعذر إنشاء الأنماط من الرسائل المالية") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+                val financialCandidates = result.inputMessages -
+                    result.skippedOtp - result.skippedNonFinancial - result.skippedBlank
+                Text("رسائل مالية محتملة: $financialCandidates", style = FinancialTypography.metadata)
+                Text("تمت معالجتها: ${result.processedMessages}", style = FinancialTypography.metadata)
+                Text("فشلت (مراحل أساسية): ${result.coreFailedMessages}", style = FinancialTypography.metadata)
+                if (result.coreFailedMessages > 0 || result.optionalStageFailureCount > 0) {
+                    Spacer(Modifier.height(Spacing.x1))
+                    Text("التشخيص:", style = FinancialTypography.merchant)
+                    result.failureBreakdown().forEach { b ->
+                        val tag = if (b.optional) " (اختياري)" else ""
+                        Text(
+                            "${b.stage.name} — ${b.count} ${b.exceptionClass}$tag",
+                            style = FinancialTypography.metadata,
+                        )
+                    }
+                }
+                if (!result.isReconciled()) {
+                    Text("⚠ عدم تطابق في العد", style = FinancialTypography.metadata)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onManualCreate) { Text("إنشاء نمط يدوي") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إغلاق") }
+        },
+    )
 }

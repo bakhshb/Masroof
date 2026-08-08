@@ -70,7 +70,19 @@ fun TemplateEditorScreen(
     patternId: Long,
     onBack: () -> Unit,
     onReturnToImport: (() -> Unit)? = null,
+    draft: com.baraa.masroof.sms.PatternDraft? = null,
 ) {
+    // Draft path (manual creation): no Room row exists yet. Skip the lookup and
+    // present the in-memory draft directly; nothing is persisted until the user
+    // confirms in the editor.
+    if (patternId == 0L && draft != null) {
+        ManualTemplateEditor(
+            draft = draft,
+            onBack = onBack,
+            onReturnToImport = onReturnToImport,
+        )
+        return
+    }
     val app = LocalContext.current.applicationContext as MasroofApplication
     var pattern by remember(patternId) { mutableStateOf<MessagePattern?>(null) }
     var missing by remember(patternId) { mutableStateOf(false) }
@@ -92,6 +104,37 @@ fun TemplateEditorScreen(
     }
 }
 
+/**
+ * Manual-creation editor entry: presents an UNPERSISTED [com.baraa.masroof.sms.PatternDraft]
+ * built by [com.baraa.masroof.sms.PatternDraftFactory]. The user reviews the
+ * template/fields/type and confirms. Only then is exactly one pattern row
+ * written via [MessagePatternRepository.createPatternFromDraft] — never an
+ * UNKNOWN-then-revision double write.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualTemplateEditor(
+    draft: com.baraa.masroof.sms.PatternDraft,
+    onBack: () -> Unit,
+    onReturnToImport: (() -> Unit)? = null,
+) {
+    val app = LocalContext.current.applicationContext as MasroofApplication
+    val returnToImport = app.importSessionStore.isReturnToImportActive()
+    TemplateEditorContent(
+        editorKey = "draft-${draft.bodyHash}",
+        initialDraft = draft.templateEditDraft,
+        sanitizedExample = draft.sanitizedExample,
+        senderLabel = null,
+        isNewDraft = true,
+        returnToImport = returnToImport,
+        onBack = onBack,
+        onReturnToImport = onReturnToImport,
+        onSave = { currentDraft, approve ->
+            app.messagePatternRepository.createPatternFromDraft(currentDraft, approve)
+        },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LoadedTemplateEditor(
@@ -100,26 +143,19 @@ private fun LoadedTemplateEditor(
     onReturnToImport: (() -> Unit)? = null,
 ) {
     val app = LocalContext.current.applicationContext as MasroofApplication
-    val scope = rememberCoroutineScope()
     val returnToImport = app.importSessionStore.isReturnToImportActive()
     val def = pattern.definition
     val initialType = TransactionTypeTaxonomy.parse(def.transactionType) ?: TransactionType.OTHER_FINANCIAL
-    var displayName by remember(def.id) { mutableStateOf(def.userFriendlyName) }
-    var selectedType by remember(def.id) { mutableStateOf(initialType) }
-    var direction by remember(def.id) {
-        mutableStateOf(TransactionTypeTaxonomy.parseDirection(def.direction, initialType))
-    }
-    var templateText by remember(def.id) { mutableStateOf(def.templateText.orEmpty()) }
-    var status by remember(def.id) { mutableStateOf(def.status) }
-    var active by remember(def.id) { mutableStateOf(def.isActive) }
-    var saving by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var showFullTemplate by remember { mutableStateOf(false) }
-    var showAdvanced by remember { mutableStateOf(false) }
-    var showTypePicker by remember { mutableStateOf(false) }
-    var editingFieldIndex by remember { mutableStateOf<Int?>(null) }
-    var fields by remember(def.id, pattern.fields) {
-        mutableStateOf(pattern.fields.map {
+    val initialDraft = TemplateEditDraft(
+        patternId = def.id,
+        senderProfileId = def.senderProfileId,
+        displayName = def.userFriendlyName,
+        transactionType = initialType,
+        direction = TransactionTypeTaxonomy.parseDirection(def.direction, initialType),
+        templateText = def.templateText.orEmpty(),
+        status = def.status,
+        active = def.isActive,
+        fields = pattern.fields.map {
             TemplateFieldDraft(
                 placeholderToken = it.placeholderToken.ifBlank {
                     com.baraa.masroof.sms.TemplateResolutionService.defaultPlaceholder(it.canonicalField)
@@ -130,12 +166,75 @@ private fun LoadedTemplateEditor(
                 valueType = it.valueType,
                 required = it.required,
             )
-        })
+        },
+    )
+    TemplateEditorContent(
+        editorKey = def.id,
+        initialDraft = initialDraft,
+        sanitizedExample = null,
+        senderLabel = null,
+        isNewDraft = false,
+        returnToImport = returnToImport,
+        onBack = onBack,
+        onReturnToImport = onReturnToImport,
+        onSave = { currentDraft, approve ->
+            if (approve) {
+                app.messagePatternRepository.saveAndApproveEditedCandidate(currentDraft)
+            } else {
+                app.messagePatternRepository.updateTemplate(currentDraft)
+            }
+        },
+    )
+}
+
+/**
+ * Shared editor form for both the existing-pattern edit path and the manual
+ * draft-creation path. Holds the editable state, validates, and delegates
+ * persistence to [onSave] so the two paths share ONE confirmation screen
+ * without duplicating the form.
+ *
+ * For a new manual draft ([isNewDraft] = true) nothing is persisted until the
+ * user presses a save button; [onSave] then writes exactly one row via
+ * [MessagePatternRepository.createPatternFromDraft].
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TemplateEditorContent(
+    editorKey: Any,
+    initialDraft: TemplateEditDraft,
+    sanitizedExample: String?,
+    senderLabel: String?,
+    isNewDraft: Boolean,
+    returnToImport: Boolean,
+    onBack: () -> Unit,
+    onReturnToImport: (() -> Unit)?,
+    onSave: suspend (
+        currentDraft: TemplateEditDraft,
+        approve: Boolean,
+    ) -> MessagePatternRepository.TemplateUpdateResult,
+) {
+    val app = LocalContext.current.applicationContext as MasroofApplication
+    val scope = rememberCoroutineScope()
+    val isUnknownCandidate = isNewDraft || initialDraft.status == MessagePatternStatus.UNKNOWN
+    var displayName by remember(editorKey) { mutableStateOf(initialDraft.displayName) }
+    var selectedType by remember(editorKey) { mutableStateOf(initialDraft.transactionType) }
+    var direction by remember(editorKey) { mutableStateOf(initialDraft.direction) }
+    var templateText by remember(editorKey) { mutableStateOf(initialDraft.templateText) }
+    var status by remember(editorKey) { mutableStateOf(initialDraft.status) }
+    var active by remember(editorKey) { mutableStateOf(initialDraft.active) }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var showFullTemplate by remember { mutableStateOf(false) }
+    var showAdvanced by remember { mutableStateOf(false) }
+    var showTypePicker by remember { mutableStateOf(false) }
+    var editingFieldIndex by remember { mutableStateOf<Int?>(null) }
+    var fields by remember(editorKey, initialDraft.fields) {
+        mutableStateOf(initialDraft.fields)
     }
 
     fun draft() = TemplateEditDraft(
-        patternId = def.id,
-        senderProfileId = def.senderProfileId,
+        patternId = initialDraft.patternId,
+        senderProfileId = initialDraft.senderProfileId,
         displayName = displayName,
         transactionType = selectedType,
         direction = direction,
@@ -145,9 +244,18 @@ private fun LoadedTemplateEditor(
         fields = fields,
     )
 
-    fun finishAfterSave(savedPatternId: Long? = null) {
+    fun finishAfterSave(savedPatternId: Long?, approve: Boolean) {
         try {
             app.importSessionStore.markTemplatesChanged()
+            if (!returnToImport) {
+                val message = when {
+                    isNewDraft && approve -> "تم اعتماد النمط وسيُستخدم في الاستيراد"
+                    isNewDraft && !approve -> "تم إنشاء النمط كمرشح — يحتاج اعتماد"
+                    approve -> "تم اعتماد النمط وسيُستخدم في الاستيراد"
+                    else -> "تم حفظ التغييرات"
+                }
+                PatternActionResultHolder.set(message, reviewPatternId = savedPatternId)
+            }
             if (returnToImport && onReturnToImport != null) {
                 onReturnToImport()
             } else {
@@ -159,7 +267,7 @@ private fun LoadedTemplateEditor(
         }
     }
 
-    fun save(approveCandidate: Boolean = false) {
+    fun save(approve: Boolean) {
         val value = draft()
         when (val validation = TemplateEditValidator.validate(value)) {
             is TemplateEditValidation.Error -> error = validation.messageAr
@@ -167,16 +275,12 @@ private fun LoadedTemplateEditor(
                 saving = true
                 error = null
                 try {
-                    val repositoryResult = if (approveCandidate) {
-                        app.messagePatternRepository.saveAndApproveEditedCandidate(value)
-                    } else {
-                        app.messagePatternRepository.updateTemplate(value)
-                    }
-                    when (val result = repositoryResult) {
+                    val result = onSave(value, approve)
+                    when (result) {
                         is MessagePatternRepository.TemplateUpdateResult.Success -> {
                             val newId = result.pattern.definition.id
                             saving = false
-                            finishAfterSave(newId)
+                            finishAfterSave(newId, approve)
                             return@launch
                         }
                         is MessagePatternRepository.TemplateUpdateResult.ValidationError ->
@@ -193,7 +297,7 @@ private fun LoadedTemplateEditor(
                             error = result.messageAr
                     }
                 } catch (t: Throwable) {
-                    android.util.Log.e("TemplateEditor", "updateTemplate crashed", t)
+                    android.util.Log.e("TemplateEditor", "save crashed", t)
                     error = "تعذر حفظ النمط: ${t.message ?: t.javaClass.simpleName}"
                 }
                 saving = false
@@ -204,10 +308,10 @@ private fun LoadedTemplateEditor(
     Scaffold(
         topBar = {
             MasroofTopAppBar(
-                title = "تعديل النمط",
+                title = if (isNewDraft) "إنشاء نمط" else "تعديل النمط",
                 onBack = onBack,
                 actions = {
-                    IconButton(onClick = { save() }, enabled = !saving) {
+                    IconButton(onClick = { save(approve = false) }, enabled = !saving) {
                         Icon(Icons.Filled.Save, contentDescription = "حفظ")
                     }
                 },
@@ -230,6 +334,11 @@ private fun LoadedTemplateEditor(
                         Modifier.padding(Spacing.x3),
                         style = FinancialTypography.metadata,
                     )
+                }
+            }
+            senderLabel?.takeIf { it.isNotBlank() }?.let {
+                EditorSection("المرسل") {
+                    Text(it, style = FinancialTypography.metadata)
                 }
             }
             EditorSection("المعلومات الأساسية") {
@@ -288,6 +397,12 @@ private fun LoadedTemplateEditor(
                 }
             }
 
+            sanitizedExample?.takeIf { it.isNotBlank() }?.let { sample ->
+                EditorSection("مثال منقّح") {
+                    Text(sample, style = FinancialTypography.metadata, maxLines = 6)
+                }
+            }
+
             EditorSection("الحقول المكتشفة") {
                 fields.forEachIndexed { index, field ->
                     FieldSummaryRow(
@@ -306,48 +421,50 @@ private fun LoadedTemplateEditor(
                 }) { Text("إضافة حقل") }
             }
 
-            TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                Text(if (showAdvanced) "إخفاء الخيارات المتقدمة" else "خيارات متقدمة")
-            }
-            if (showAdvanced) {
-                EditorSection("خيارات المطابقة") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(active, onCheckedChange = { active = it })
-                        Text("نشط ويُستخدم عند استيراد الرسائل")
-                    }
+            if (!isNewDraft) {
+                TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                    Text(if (showAdvanced) "إخفاء الخيارات المتقدمة" else "خيارات متقدمة")
                 }
-                EditorSection("الحالة") {
-                    MessagePatternStatus.entries.forEach { item ->
-                        FilterChip(
-                            selected = status == item,
-                            onClick = {
-                                status = item
-                                if (item != MessagePatternStatus.APPROVED) active = false
-                            },
-                            label = { Text(TransactionTypeVisuals.statusLabel(item)) },
-                        )
+                if (showAdvanced) {
+                    EditorSection("خيارات المطابقة") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(active, onCheckedChange = { active = it })
+                            Text("نشط ويُستخدم عند استيراد الرسائل")
+                        }
+                    }
+                    EditorSection("الحالة") {
+                        MessagePatternStatus.entries.forEach { item ->
+                            FilterChip(
+                                selected = status == item,
+                                onClick = {
+                                    status = item
+                                    if (item != MessagePatternStatus.APPROVED) active = false
+                                },
+                                label = { Text(TransactionTypeVisuals.statusLabel(item)) },
+                            )
+                        }
                     }
                 }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (def.status == MessagePatternStatus.UNKNOWN) {
+            if (isUnknownCandidate) {
                 PrimaryButton(
                     label = if (saving) "جارٍ الحفظ…" else "حفظ واعتماد",
                     enabled = !saving,
-                    onClick = { save(approveCandidate = true) },
+                    onClick = { save(approve = true) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 SecondaryButton(
-                    label = "حفظ كمسودة",
+                    label = "حفظ كمرشح",
                     enabled = !saving,
-                    onClick = { save(approveCandidate = false) },
+                    onClick = { save(approve = false) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 PrimaryButton(
                     label = if (saving) "جارٍ الحفظ…" else "حفظ التغييرات",
                     enabled = !saving,
-                    onClick = { save() },
+                    onClick = { save(approve = false) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -402,7 +519,6 @@ private fun LoadedTemplateEditor(
         }
     }
 }
-
 @Composable
 private fun EditorSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
