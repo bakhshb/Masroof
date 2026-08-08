@@ -229,12 +229,9 @@ class TemplateDrivenImportTest {
     }
 
     @Test
-    fun signatureOnlyRowsMatchBySignatureLookup() {
-        // Legacy signature-only rows (no templateText) are matched by
-        // signature equality with the runtime canonical signature. Field
-        // extraction needs a template; the signature hit returns the matched
-        // pattern so the import flow can route the message through account
-        // matching and review instead of dropping it.
+    fun signatureOnlyRowsAreNotRuntimeEligible() {
+        // Legacy signature-only rows remain history, but cannot parse current
+        // SMS because runtime eligibility requires a usable template.
         val signatureOnly = approvedPattern().copy(
             definition = approvedPattern().definition.copy(
                 templateText = null,
@@ -242,7 +239,7 @@ class TemplateDrivenImportTest {
             ),
         )
         val outcome = TemplateResolutionService.resolve("AlRajhi", posBody, 1L, listOf(signatureOnly))
-        assertTrue(outcome is TemplateResolutionResult.Matched)
+        assertTrue(outcome is TemplateResolutionResult.Unmatched)
     }
 
     @Test

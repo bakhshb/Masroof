@@ -41,8 +41,11 @@ import com.baraa.masroof.data.repository.MessagePattern
 import com.baraa.masroof.data.repository.SenderProfile
 import com.baraa.masroof.data.repository.TemplateStatusLabels
 import com.baraa.masroof.sms.PatternDiscoveryService
+import com.baraa.masroof.sms.PatternFamilyRuntimeState
+import com.baraa.masroof.sms.PatternRuntimeEligibility
 import com.baraa.masroof.sms.SenderNormalizer
 import com.baraa.masroof.sms.SmsImportRange
+import com.baraa.masroof.sms.patternFamilyRuntimeState
 import com.baraa.masroof.transaction.TransactionType
 import java.time.LocalDate
 import com.baraa.masroof.transaction.TransactionTypeTaxonomy
@@ -69,6 +72,13 @@ private enum class SenderDetailsTab {
     CANDIDATES,
     MESSAGES,
 }
+
+internal fun senderPatternFamilyStatusAr(variants: List<MessagePattern>): String =
+    when (patternFamilyRuntimeState(variants)) {
+        PatternFamilyRuntimeState.APPROVED_CURRENT -> "معتمد"
+        PatternFamilyRuntimeState.APPROVED_STALE -> "نمط قديم — يحتاج إعادة بناء"
+        PatternFamilyRuntimeState.NOT_APPROVED -> "يحتاج اعتماد"
+    }
 
 @Composable
 fun SenderDetailsScreen(
@@ -117,6 +127,12 @@ fun SenderDetailsScreen(
         TemplateStatusLabels.isCandidate(it.definition.status) &&
             !it.definition.templateText.isNullOrBlank()
     }
+    val approvedFamilies = approvedTemplates.groupBy {
+        it.family?.id ?: -it.definition.id
+    }
+    val currentApprovedFamilyCount = approvedFamilies.values.count {
+        patternFamilyRuntimeState(it) == PatternFamilyRuntimeState.APPROVED_CURRENT
+    }
     val messageCount = patterns.sumOf { it.definition.exampleCount.coerceAtLeast(0) }
 
     LaunchedEffect(candidatePatterns.size, returnToImport) {
@@ -157,7 +173,7 @@ fun SenderDetailsScreen(
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SummaryValue(label = "قالب معتمد", value = approvedTemplates.size)
+                SummaryValue(label = "قالب معتمد", value = currentApprovedFamilyCount)
                 SummaryValue(label = "رسالة", value = messageCount)
                 SummaryValue(label = "نمط يحتاج اعتماد", value = candidatePatterns.size)
             }
@@ -184,12 +200,13 @@ fun SenderDetailsScreen(
                     if (approvedTemplates.isEmpty()) {
                         Text("لا توجد قوالب معتمدة بعد.", style = FinancialTypography.metadata)
                     } else {
-                        approvedTemplates.groupBy { it.family?.id ?: -it.definition.id }
+                        approvedFamilies
                             .toSortedMap()
                             .forEach { (familyId, variants) ->
                                 val familyName = variants.first().family?.displayName
                                     ?: variants.first().definition.userFriendlyName
                                 val messages = variants.sumOf { it.definition.exampleCount }
+                                val runtimeState = patternFamilyRuntimeState(variants)
                                 Surface(
                                     Modifier.fillMaxWidth().clickable {
                                         expandedFamilyIds = if (familyId in expandedFamilyIds) {
@@ -202,11 +219,44 @@ fun SenderDetailsScreen(
                                     Column(Modifier.padding(Spacing.x3)) {
                                         Text(familyName, style = FinancialTypography.merchant)
                                         Text(
-                                            "$messages رسالة · معتمد",
+                                            "$messages رسالة · ${senderPatternFamilyStatusAr(variants)}",
                                             style = FinancialTypography.metadata,
                                         )
-                                        if (familyId in expandedFamilyIds) {
-                                            val pattern = variants.maxBy { it.definition.version }
+                                        if (runtimeState == PatternFamilyRuntimeState.APPROVED_STALE) {
+                                            SecondaryButton(
+                                                "تحديث النمط",
+                                                onClick = {
+                                                    scope.launch {
+                                                        val result = app.smsRepository.loadInboxResult(
+                                                            SmsImportRange.lastDays(LocalDate.now(), 30),
+                                                        )
+                                                        val inbox = (
+                                                            result as? com.baraa.masroof.sms.SmsInboxLoadResult.Success
+                                                            )?.messages.orEmpty()
+                                                        val senderMessages = inbox.filter {
+                                                            SenderNormalizer.normalize(it.sender) ==
+                                                                profile?.normalizedSenderKey
+                                                        }
+                                                        val repair = app.messagePatternRepository
+                                                            .rebuildStaleForSender(
+                                                                senderProfileId,
+                                                                senderMessages,
+                                                            )
+                                                        status = if (repair.rebuildSucceeded) {
+                                                            "تم تحديث النمط"
+                                                        } else {
+                                                            "تعذر التحديث تلقائيًا — حاول بعد توفر رسائل حديثة"
+                                                        }
+                                                        app.importSessionStore.markTemplatesChanged()
+                                                        reload()
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        } else if (familyId in expandedFamilyIds) {
+                                            val pattern = variants
+                                                .filter(PatternRuntimeEligibility::isEligible)
+                                                .maxBy { it.definition.version }
                                             ApprovedTemplateCard(
                                                 pattern = pattern,
                                                 onEdit = { onTemplateClick(pattern.definition.id) },
@@ -366,7 +416,16 @@ fun SenderDetailsScreen(
                                         style = FinancialTypography.merchant,
                                     )
                                     Text(
-                                        "${pattern.definition.exampleCount} رسالة · ${TemplateStatusLabels.statusAr(pattern.definition.status)}",
+                                        "${pattern.definition.exampleCount} رسالة · ${
+                                            if (
+                                                pattern.definition.status == MessagePatternStatus.APPROVED &&
+                                                !PatternRuntimeEligibility.isEligible(pattern)
+                                            ) {
+                                                "يحتاج تحديث"
+                                            } else {
+                                                TemplateStatusLabels.statusAr(pattern.definition.status)
+                                            }
+                                        }",
                                         style = FinancialTypography.metadata,
                                     )
                                 }

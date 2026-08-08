@@ -8,7 +8,10 @@ object MessagePatternMatcher {
     fun isIgnored(body: String?, patterns: List<MessagePattern>): Boolean =
         patterns
             .asSequence()
-            .filter { it.definition.status == MessagePatternStatus.IGNORED }
+            .filter {
+                it.definition.status == MessagePatternStatus.IGNORED &&
+                    PatternRuntimeEligibility.isEligibleForUseOnce(it.definition)
+            }
             .any { pattern ->
                 TemplateMatcher.matches(pattern.definition.templateText, body, pattern.anchors)
             }

@@ -241,18 +241,21 @@ object PatternDiscoveryService {
         if (existing.isEmpty()) return null
         existing.firstOrNull {
             it.canonicalKey.isNotBlank() && it.canonicalKey == canonicalKey &&
-                it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                it.deprecatedAt == null && it.isActive
+                PatternRuntimeEligibility.isEligible(it)
         }?.let { return it }
-        existing.firstOrNull { it.canonicalKey.isNotBlank() && it.canonicalKey == canonicalKey }
+        existing.firstOrNull {
+            it.canonicalKey.isNotBlank() && it.canonicalKey == canonicalKey &&
+                (
+                    it.status != com.baraa.masroof.data.db.MessagePatternStatus.APPROVED ||
+                        PatternRuntimeEligibility.isEligible(it)
+                    )
+        }
             ?.let { return it }
         if (!sourceBody.isNullOrBlank()) {
             val sourceSemantic = SemanticPatternSchemaNormalizer.fromBody(sourceBody)
             if (sourceSemantic is SemanticSchemaResult.Safe) {
                 val semanticHits = existing.filter {
-                    it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                        it.deprecatedAt == null &&
-                        it.isActive &&
+                    PatternRuntimeEligibility.isEligible(it) &&
                         SemanticPatternSchemaNormalizer.fromTemplate(
                             it.templateText,
                             it.transactionType,
@@ -263,13 +266,12 @@ object PatternDiscoveryService {
                 if (semanticHits.map { it.id }.distinct().size == 1) return semanticHits.single()
             }
             existing.firstOrNull {
-                it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                    it.deprecatedAt == null &&
-                    it.isActive &&
+                PatternRuntimeEligibility.isEligible(it) &&
                     !it.templateText.isNullOrBlank() &&
                     TemplateMatcher.matches(it.templateText, sourceBody)
             }?.let { return it }
             existing.firstOrNull {
+                it.status != com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
                 !it.templateText.isNullOrBlank() &&
                     MessageTemplateEngine.matches(it.templateText, sourceBody)
             }?.let { return it }

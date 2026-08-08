@@ -63,9 +63,9 @@ fun BankMessagesScreen(
             profile.id to SenderStats(
                 familyCount = variants.map { it.family?.id ?: -it.definition.id }.distinct().size,
                 messageCount = variants.sumOf { it.definition.exampleCount },
-                approvedFamilyCount = variants.filter {
-                    it.definition.status == MessagePatternStatus.APPROVED && it.definition.isActive
-                }.map { it.family?.id ?: -it.definition.id }.distinct().size,
+                approvedFamilyCount = variants
+                    .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
+                    .map { it.family?.id ?: -it.definition.id }.distinct().size,
             )
         }
     }

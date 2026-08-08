@@ -68,11 +68,7 @@ class MessagePatternRepository(
         withContext(Dispatchers.IO) {
             toPatterns(
                 definitionDao.getForSender(senderProfileId)
-                    .filter {
-                        it.status == MessagePatternStatus.APPROVED &&
-                            it.isActive &&
-                            it.normalizationVersion == NORMALIZATION_VERSION
-                    },
+                    .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible),
             )
         }
 
@@ -604,7 +600,10 @@ class MessagePatternRepository(
                 val existing = definitionDao.getForSender(senderProfileId)
                 // Preserve incompatible rows for audit while excluding them from matching.
                 for (def in existing) {
-                    if (def.normalizationVersion != NORMALIZATION_VERSION) {
+                    if (
+                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(def) ==
+                        com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+                    ) {
                         definitionDao.update(
                             def.copy(
                                 status = MessagePatternStatus.DEPRECATED,
@@ -634,13 +633,120 @@ class MessagePatternRepository(
                         it.exactVariants.ifEmpty { listOf(it) }.size
                     },
                     staleDeprecated = existing.count {
-                        it.normalizationVersion != NORMALIZATION_VERSION
+                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
+                            com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
                     },
                 )
             }
         }
 
     data class RebuildSummary(val rebuiltVariants: Int, val staleDeprecated: Int)
+
+    data class StalePatternRepairResult(
+        val rebuildAttempted: Boolean,
+        val rebuildSucceeded: Boolean,
+        val staleApprovedPatterns: Int,
+        val rebuiltVariants: Int,
+        val patternsAfterReload: List<MessagePattern>,
+    )
+
+    /**
+     * Refresh only stale APPROVED semantics represented by this scan.
+     * Unobserved families and all financial records remain untouched.
+     */
+    suspend fun rebuildStaleForSender(
+        senderProfileId: Long,
+        messages: List<SmsMessage>,
+    ): StalePatternRepairResult = withContext(Dispatchers.IO) {
+        inTransaction {
+            val existing = definitionDao.getForSender(senderProfileId)
+            val staleApproved = existing.filter {
+                com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
+                    com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+            }
+            if (staleApproved.isEmpty()) {
+                return@inTransaction StalePatternRepairResult(
+                    rebuildAttempted = false,
+                    rebuildSucceeded = true,
+                    staleApprovedPatterns = 0,
+                    rebuiltVariants = 0,
+                    patternsAfterReload = toPatterns(existing),
+                )
+            }
+
+            val staleSemanticKeys = staleApproved.mapNotNull { definition ->
+                (
+                    com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                        definition.templateText,
+                        definition.transactionType,
+                    ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                    )?.key
+            }.toSet()
+            val repairable = PatternDiscoveryService.discover(messages, existing)
+                .filter {
+                    !it.looksLikeOtpOrMarketing &&
+                        !it.looksLikeNonFinancial &&
+                        it.familyKey in staleSemanticKeys
+                }
+            for (cluster in repairable) {
+                saveDiscovered(
+                    senderProfileId = senderProfileId,
+                    discovered = cluster,
+                    status = MessagePatternStatus.APPROVED,
+                    replaceExampleCount = true,
+                )
+            }
+            val repairedTargetKeys = repairable.map { it.familyKey }.toSet()
+            val ts = now()
+            staleApproved.forEach { stale ->
+                val staleKey = (
+                    com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                        stale.templateText,
+                        stale.transactionType,
+                    ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                    )?.key
+                val currentRow = definitionDao.getById(stale.id) ?: return@forEach
+                if (
+                    staleKey in repairedTargetKeys &&
+                    com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(currentRow) ==
+                    com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+                ) {
+                    definitionDao.update(
+                        currentRow.copy(
+                            status = MessagePatternStatus.DEPRECATED,
+                            isActive = false,
+                            deprecatedAt = currentRow.deprecatedAt ?: ts,
+                            updatedAt = ts,
+                        ),
+                    )
+                }
+            }
+
+            val reloaded = definitionDao.getForSender(senderProfileId)
+            val repairedKeys = reloaded
+                .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
+                .mapNotNull { definition ->
+                    (
+                        com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                            definition.templateText,
+                            definition.transactionType,
+                        ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                        )?.key
+                }
+                .toSet()
+            StalePatternRepairResult(
+                rebuildAttempted = true,
+                rebuildSucceeded = staleSemanticKeys.intersect(
+                    repairable.map { it.familyKey }.toSet(),
+                ).all { it in repairedKeys } && repairable.isNotEmpty(),
+                staleApprovedPatterns = staleApproved.size,
+                rebuiltVariants = repairable.sumOf {
+                    it.exactVariants.ifEmpty { listOf(it) }.size
+                },
+                patternsAfterReload = toPatterns(reloaded),
+            )
+        }
+    }
 
     suspend fun ensureUnknown(
         senderProfileId: Long,
@@ -676,9 +782,7 @@ class MessagePatternRepository(
         val semanticKey = (semanticResult as? com.baraa.masroof.sms.SemanticSchemaResult.Safe)?.key
         if (semanticKey != null) {
             val semanticApproved = definitionDao.getForSender(senderProfileId).filter { candidate ->
-                candidate.status == MessagePatternStatus.APPROVED &&
-                    candidate.isActive &&
-                    candidate.deprecatedAt == null &&
+                com.baraa.masroof.sms.PatternRuntimeEligibility.isEligible(candidate) &&
                     (
                         com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
                             candidate.templateText,
@@ -879,7 +983,8 @@ class MessagePatternRepository(
         val family = familyDao?.getById(familyId) ?: return
         val variants = definitionDao.getForFamily(familyId)
         val status = when {
-            variants.any { it.status == MessagePatternStatus.APPROVED && it.isActive } -> MessagePatternStatus.APPROVED
+            variants.any(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible) ->
+                MessagePatternStatus.APPROVED
             variants.any { it.status == MessagePatternStatus.UNKNOWN } -> MessagePatternStatus.UNKNOWN
             variants.any { it.status == MessagePatternStatus.IGNORED } -> MessagePatternStatus.IGNORED
             else -> MessagePatternStatus.DEPRECATED

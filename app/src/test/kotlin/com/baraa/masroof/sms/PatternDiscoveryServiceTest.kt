@@ -68,7 +68,10 @@ class PatternDiscoveryServiceTest {
             normalizedSignature = fromSaved.signature,
             canonicalKey = TemplateCanonicalizer.canonicalKey(fromSaved.templateText, fromSaved.signature),
             templateText = fromSaved.templateText,
+            transactionType = fromSaved.transactionType?.name,
             status = MessagePatternStatus.APPROVED,
+            isActive = true,
+            normalizationVersion = NORMALIZATION_VERSION,
             createdAt = 0L,
             updatedAt = 0L,
         )

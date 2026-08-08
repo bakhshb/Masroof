@@ -50,6 +50,19 @@ enum class SmsImportCommitMode {
     ALL,
 }
 
+internal fun runtimeEligibleApprovedBySemanticKey(
+    definitions: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity>,
+): Map<String, com.baraa.masroof.data.db.MessagePatternDefinitionEntity> =
+    definitions
+        .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
+        .mapNotNull { approved ->
+            val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer
+                .fromTemplate(approved.templateText, approved.transactionType)
+                as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+            semantic?.key?.let { it to approved }
+        }
+        .toMap()
+
 enum class ImportDisposition {
     READY, NEEDS_ACCOUNT, NEEDS_CONFIRMATION, NEEDS_INSTITUTION, UNPARSED,
     EXACT_DUPLICATE, POSSIBLE_DUPLICATE, BEFORE_TRACKING_START, UNREGISTERED_SENDER, IGNORED,
@@ -659,8 +672,18 @@ class SmsImportOrchestrator(
             val approvedTemplatesLoaded: Int,
             var messagesEnteringMatcher: Int = 0,
             var matched: Int = 0,
+            var exactMatches: Int = 0,
+            var semanticMatches: Int = 0,
             var unmatched: Int = 0,
             var ambiguous: Int = 0,
+        )
+        data class SenderRepairDiagnostic(
+            val totalPatterns: Int,
+            val runtimeEligiblePatterns: Int,
+            val staleApprovedPatterns: Int,
+            val rebuildAttempted: Boolean,
+            val rebuildSucceeded: Boolean,
+            val patternsAfterReload: Int,
         )
         data class UnmatchedGroupAccum(
             var count: Int,
@@ -686,6 +709,10 @@ class SmsImportOrchestrator(
         val skipBuckets = linkedMapOf<Pair<String, ScanPreview.SkipReason>, ScanPreview.SkipAccum>()
         val senderTemplateDiag = mutableMapOf<String, Pair<Long?, Int>>() // key → (profileId, approvedCount)
         val patternsBySender = mutableMapOf<Long, List<MessagePattern>>()
+        val senderRepairDiagnostics = mutableMapOf<Long, SenderRepairDiagnostic>()
+        val messagesBySenderKey = messages.groupBy {
+            SenderNormalizer.normalize(it.sender).orEmpty()
+        }
         fun bumpSkip(sender: String?, reason: ScanPreview.SkipReason, body: String?, timestamp: Long) {
             val key = (sender?.trim().orEmpty().ifBlank { "—" }) to reason
             val acc = skipBuckets.getOrPut(key) { ScanPreview.SkipAccum() }
@@ -763,7 +790,32 @@ class SmsImportOrchestrator(
                 }
                 val definitionPatterns = if (messagePatternRepository != null) {
                     patternsBySender[profile.id] ?: runCatching {
-                        messagePatternRepository.getForSender(profile.id)
+                        val loaded = messagePatternRepository.getForSender(profile.id)
+                        val eligible = loaded.count(
+                            com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible,
+                        )
+                        val stale = loaded.count {
+                            com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
+                                com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+                        }
+                        val repair = if (stale > 0) {
+                            messagePatternRepository.rebuildStaleForSender(
+                                profile.id,
+                                messagesBySenderKey[senderKey].orEmpty(),
+                            )
+                        } else {
+                            null
+                        }
+                        val after = repair?.patternsAfterReload ?: loaded
+                        senderRepairDiagnostics[profile.id] = SenderRepairDiagnostic(
+                            totalPatterns = loaded.size,
+                            runtimeEligiblePatterns = eligible,
+                            staleApprovedPatterns = stale,
+                            rebuildAttempted = repair?.rebuildAttempted == true,
+                            rebuildSucceeded = repair?.rebuildSucceeded == true,
+                            patternsAfterReload = after.size,
+                        )
+                        after
                     }.getOrElse { emptyList() }.also {
                         patternsBySender[profile.id] = it
                     }
@@ -771,17 +823,14 @@ class SmsImportOrchestrator(
                     emptyList()
                 }
                 if (senderKey.isNotBlank() && senderKey !in senderTemplateDiag) {
-                    val approved = definitionPatterns.count {
-                        it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                            it.definition.isActive
-                    }
-                    senderTemplateDiag[senderKey] = profile?.id to approved
+                    val approved = definitionPatterns.count(
+                        com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible,
+                    )
+                    senderTemplateDiag[senderKey] = profile.id to approved
                 }
 
                 // IGNORED patterns are an explicit pre-template exclusion (not OTP).
-                if (profile != null &&
-                    com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)
-                ) {
+                if (com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)) {
                     ignoredPattern++
                     nonFinancial++
                     bumpSkip(sms.sender, ScanPreview.SkipReason.NON_FINANCIAL, sms.body, sms.timestamp)
@@ -955,6 +1004,13 @@ class SmsImportOrchestrator(
                             com.baraa.masroof.data.db.MessagePatternStatus.APPROVED
                         ) {
                             senderStats.matched++
+                            when (outcome.matchTier) {
+                                com.baraa.masroof.sms.PatternMatchTier.EXACT_STRUCTURE ->
+                                    senderStats.exactMatches++
+                                com.baraa.masroof.sms.PatternMatchTier.SEMANTIC_SCHEMA ->
+                                    senderStats.semanticMatches++
+                                else -> Unit
+                            }
                         } else {
                             senderStats.unmatched++
                         }
@@ -1107,6 +1163,22 @@ class SmsImportOrchestrator(
                     "${it.templateId}:${it.transactionType}:${it.successfulMatches}/${it.currentCandidateMessages}"
                 }}",
             )
+            senderRepairDiagnostics.forEach { (senderProfileId, repair) ->
+                val coverage = senderCoverage[senderProfileId]
+                android.util.Log.d(
+                    "PatternLifecycle",
+                    "sender=${coverage?.normalizedSender.orEmpty()} " +
+                        "totalPatterns=${repair.totalPatterns} " +
+                        "runtimeEligiblePatterns=${repair.runtimeEligiblePatterns} " +
+                        "staleApprovedPatterns=${repair.staleApprovedPatterns} " +
+                        "rebuildAttempted=${repair.rebuildAttempted} " +
+                        "rebuildSucceeded=${repair.rebuildSucceeded} " +
+                        "patternsAfterReload=${repair.patternsAfterReload} " +
+                        "exactMatches=${coverage?.exactMatches ?: 0} " +
+                        "semanticMatches=${coverage?.semanticMatches ?: 0} " +
+                        "unmatched=${coverage?.unmatched ?: 0}",
+                )
+            }
         }
 
         val patternGateMessageCount = unmatchedTemplates + ambiguousTemplates + extractionFailed
@@ -1227,19 +1299,8 @@ class SmsImportOrchestrator(
                 val profile = senderProfileRepository?.findByRawSender(smsForSender.first().sender)
                     ?: return@forEach
                 val existing = repo?.getForSender(profile.id)?.map { it.definition }.orEmpty()
-                val approvedByKey = existing
-                    .filter {
-                        it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                            it.deprecatedAt == null &&
-                            it.isActive
-                    }
-                    .mapNotNull { approved ->
-                        val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer
-                            .fromTemplate(approved.templateText, approved.transactionType)
-                            as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
-                        semantic?.key?.let { it to approved }
-                    }
-                    .toMap()
+                val approvedByKey = runtimeEligibleApprovedBySemanticKey(existing)
+                val eligibleApprovedIds = approvedByKey.values.mapTo(mutableSetOf()) { it.id }
 
                 val discovered = PatternDiscoveryService.discover(smsForSender, existing)
                     .filter { !it.looksLikeOtpOrMarketing && !it.looksLikeNonFinancial }
@@ -1251,9 +1312,7 @@ class SmsImportOrchestrator(
                         key.isNotBlank() -> approvedByKey[key]
                         else -> null
                     } ?: existing.firstOrNull { approved ->
-                        approved.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
-                            approved.deprecatedAt == null &&
-                            approved.isActive &&
+                        com.baraa.masroof.sms.PatternRuntimeEligibility.isEligible(approved) &&
                             !approved.templateText.isNullOrBlank() &&
                             (
                                 (!cluster.templateText.isNullOrBlank() &&
@@ -1269,8 +1328,7 @@ class SmsImportOrchestrator(
                                 )
                     }
                     if (approvedHit != null ||
-                        cluster.matchedPatternStatus ==
-                        com.baraa.masroof.data.db.MessagePatternStatus.APPROVED
+                        cluster.matchedPatternId in eligibleApprovedIds
                     ) {
                         android.util.Log.i(
                             "SmsImport",

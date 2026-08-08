@@ -106,17 +106,18 @@ object TemplateResolutionService {
     ): ApprovedTemplateMatchDiagnostics {
         val attempts = patterns.map { pattern ->
             val definition = pattern.definition
-            val approved = definition.status == MessagePatternStatus.APPROVED
             val useOnce = definition.id in allowOncePatternIds
-            val versionOk = definition.normalizationVersion == NORMALIZATION_VERSION
-            val failure = when {
-                !approved && !useOnce -> "NOT_APPROVED"
-                !definition.isActive && !useOnce -> "INACTIVE"
-                definition.deprecatedAt != null -> "DEPRECATED"
-                !versionOk -> "STALE_NORMALIZATION"
-                definition.templateText.isNullOrBlank() -> "MISSING_TEMPLATE_TEXT"
-                else -> null
+            val eligibility = if (useOnce) {
+                PatternRuntimeEligibility.evaluate(
+                    definition,
+                    allowUnapprovedInactive = true,
+                )
+            } else {
+                PatternRuntimeEligibility.evaluate(definition)
             }
+            val failure = eligibility.takeUnless {
+                it == PatternRuntimeEligibilityResult.ELIGIBLE
+            }?.name
             ApprovedTemplateMatchAttempt(
                 templateId = definition.id,
                 displayName = definition.userFriendlyName,
@@ -188,17 +189,21 @@ object TemplateResolutionService {
         }
         val effective = patterns.filter { pattern ->
             val definition = pattern.definition
-            val versionOk = definition.normalizationVersion == NORMALIZATION_VERSION
-            val approved = versionOk &&
-                definition.status == MessagePatternStatus.APPROVED &&
-                definition.isActive &&
-                definition.deprecatedAt == null
+            val approved = PatternRuntimeEligibility.isEligible(definition)
             val useOnce = definition.id in allowOncePatternIds &&
-                definition.deprecatedAt == null &&
-                !definition.templateText.isNullOrBlank()
+                PatternRuntimeEligibility.isEligibleForUseOnce(definition)
             approved || useOnce
         }
         if (effective.isEmpty()) {
+            if (patterns.any {
+                    PatternRuntimeEligibility.evaluate(it) ==
+                        PatternRuntimeEligibilityResult.INVALID_TRANSACTION_TYPE
+                }
+            ) {
+                return TemplateResolutionResult.Unmatched(
+                    TemplateResolutionResult.Unmatched.Reason.INVALID_TEMPLATE,
+                )
+            }
             return TemplateResolutionResult.Unmatched(
                 TemplateResolutionResult.Unmatched.Reason.NO_APPROVED_TEMPLATES,
             )
@@ -213,9 +218,6 @@ object TemplateResolutionService {
         val runtimeSignature = SmsStructureNormalizer.signatureFromBody(body)
         val signatureHits: List<Pair<MessagePattern, TemplateMatcher.MatchResult>> =
             effective.mapNotNull { pattern ->
-                if (TransactionType.values().none { it.name == pattern.definition.transactionType }) {
-                    return@mapNotNull null
-                }
                 val signature = pattern.definition.normalizedSignature
                     .substringBefore("#revision:")
                 if (signature.isBlank() ||
@@ -262,12 +264,9 @@ object TemplateResolutionService {
         // Step 2: legacy signature-only patterns (no templateText). These
         // rows exist from migrations 17→21 and match purely by signature.
         val legacySignatureHit: MessagePattern? = effective.firstOrNull { pattern ->
-            val validType = TransactionType.values().any {
-                it.name == pattern.definition.transactionType
-            }
             val signature = pattern.definition.normalizedSignature
                 .substringBefore("#revision:")
-            validType && signature == runtimeSignature &&
+            signature == runtimeSignature &&
                 pattern.definition.templateText.isNullOrBlank()
         }
         if (legacySignatureHit != null) {

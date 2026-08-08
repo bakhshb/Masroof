@@ -278,7 +278,7 @@ fun SenderPatternSummaryStep(
     var patterns by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(state.selectedSenderProfileId) {
         patterns = app.messagePatternRepository.getForSender(state.selectedSenderProfileId)
-            .filter { it.definition.status == MessagePatternStatus.APPROVED }
+            .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
             .map { it.definition.userFriendlyName }
     }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {

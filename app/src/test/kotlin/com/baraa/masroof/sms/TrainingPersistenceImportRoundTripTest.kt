@@ -242,6 +242,8 @@ class TrainingPersistenceImportRoundTripTest {
             looksLikeOtpOrMarketing = false,
             templateText = built.templateText,
             placeholders = built.placeholders,
+            transactionTypeName = built.transactionType?.name,
+            direction = built.direction,
         )
     }
 

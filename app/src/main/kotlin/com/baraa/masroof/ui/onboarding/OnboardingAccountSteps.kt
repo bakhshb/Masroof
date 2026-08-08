@@ -221,7 +221,7 @@ fun IdentifiersStep(
     }
     LaunchedEffect(state.selectedSenderProfileId) {
         val patterns = app.messagePatternRepository.getForSender(state.selectedSenderProfileId)
-            .filter { it.definition.status == MessagePatternStatus.APPROVED }
+            .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
         val fromTemplates = patterns.flatMap { p ->
             val t = p.definition.templateText.orEmpty()
             listOfNotNull(
