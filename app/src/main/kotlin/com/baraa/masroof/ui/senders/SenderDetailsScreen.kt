@@ -91,14 +91,48 @@ private fun logPatternDiscovery(
         "PatternDiscovery",
         "senderProfileId=$senderProfileId inputMessages=${result.inputMessages} " +
             "processedMessages=${result.processedMessages} skippedOtp=${result.skippedOtp} " +
-            "skippedNonFinancial=${result.skippedNonFinancial} failedMessages=${result.failedMessages}",
+            "skippedNonFinancial=${result.skippedNonFinancial} " +
+            "coreFailed=${result.coreFailedMessages} " +
+            "optionalStageFailures=${result.optionalStageFailureCount} " +
+            "reconciled=${result.isReconciled()}",
     )
-    result.failures.forEach { failure ->
+    result.failureBreakdown().forEach { breakdown ->
         android.util.Log.w(
             "PatternDiscovery",
-            "smsId=${failure.smsId ?: 0L} bodyHash=${failure.bodyHash} " +
-                "stage=${failure.stage} exception=${failure.exceptionClass}",
+            "stage=${breakdown.stage} exception=${breakdown.exceptionClass} " +
+                "count=${breakdown.count} optional=${breakdown.optional} " +
+                "sampleHashes=${breakdown.sampleBodyHashes}",
         )
+    }
+}
+
+/**
+ * DEBUG-safe, no-raw-SMS discovery summary for the "اكتشاف أنماط جديدة" action.
+ * Surfaces the reconciling counts and, when any stage failed, the dominant
+ * failing stage + exact exception class so the user (and support) can see
+ * *why* messages were skipped instead of a single opaque number.
+ */
+private fun buildDiscoveryResultMessage(
+    result: com.baraa.masroof.sms.PatternDiscoveryResult,
+    savedCount: Int,
+): String = buildString {
+    append("تم اكتشاف $savedCount أنماط من ${result.inputMessages} رسالة")
+    val excluded = result.skippedOtp + result.skippedNonFinancial + result.skippedBlank
+    if (excluded > 0) {
+        append(" — $excluded مستبعدة")
+    }
+    if (result.coreFailedMessages > 0) {
+        append(" — ${result.coreFailedMessages} فشلت")
+    }
+    if (result.coreFailedMessages > 0 || result.optionalStageFailureCount > 0) {
+        append("\nتشخيص الاكتشاف:")
+        result.failureBreakdown().forEach { b ->
+            val tag = if (b.optional) "(اختياري)" else ""
+            append("\n${b.stage.name} — ${b.count} ${b.exceptionClass}$tag")
+        }
+    }
+    if (!result.isReconciled()) {
+        append("\n⚠ عدم تطابق في العد")
     }
 }
 
@@ -121,6 +155,10 @@ fun SenderDetailsScreen(
     var expandedFamilyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var ignoreTarget by remember { mutableStateOf<MessagePattern?>(null) }
     var runningPatternAction by remember { mutableStateOf<String?>(null) }
+    var manualPickerBodies by remember {
+        mutableStateOf<List<com.baraa.masroof.sms.SmsMessage>>(emptyList())
+    }
+    var manualPickerError by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
@@ -438,13 +476,48 @@ fun SenderDetailsScreen(
                                     discovered = discovery.patterns,
                                     status = MessagePatternStatus.UNKNOWN,
                                 )
-                                "تم اكتشاف ${batch.savedCount} أنماط من " +
-                                    "${discovery.inputMessages} رسالة" +
-                                    if (discovery.failedMessages > 0) {
-                                        " — تم تجاوز ${discovery.failedMessages} لتعذر تحليلها"
-                                    } else {
-                                        ""
-                                    }
+                                buildDiscoveryResultMessage(discovery, batch.savedCount)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(Spacing.x2))
+                    SecondaryButton(
+                        if (runningPatternAction == "manual-load") {
+                            "جارٍ تحميل الرسائل…"
+                        } else {
+                            "إنشاء نمط من رسالة"
+                        },
+                        enabled = runningPatternAction == null,
+                        onClick = {
+                            launchPatternAction(
+                                actionName = "manual-load",
+                                failureMessage = "تعذر تحميل الرسائل. لم يتم حذف أي بيانات.",
+                            ) {
+                                val result = app.smsRepository.loadInboxResult(
+                                    SmsImportRange.lastDays(LocalDate.now(), 30),
+                                )
+                                val inbox = when (result) {
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Success -> result.messages
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
+                                        error("SMS_PERMISSION_DENIED")
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
+                                        error("SMS_LOAD_FAILED")
+                                }
+                                val senderMessages = inbox.filter {
+                                    SenderNormalizer.normalize(it.sender) == profile?.normalizedSenderKey
+                                }.filterNot {
+                                    com.baraa.masroof.sms.SmsStructureNormalizer
+                                        .looksLikeOtpOrMarketing(it.body)
+                                }
+                                manualPickerBodies = senderMessages.take(40)
+                                manualPickerError = if (senderMessages.isEmpty()) {
+                                    "لا توجد رسائل مالية حديثة لهذا المرسل لإنشاء نمط منها."
+                                } else {
+                                    null
+                                }
+                                if (senderMessages.isEmpty()) "لا توجد رسائل مالية حديثة"
+                                else "اختر رسالة لإنشاء نمط منها"
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -593,6 +666,98 @@ fun SenderDetailsScreen(
             },
         )
     }
+
+    if (manualPickerBodies.isNotEmpty() || manualPickerError != null) {
+        ManualPatternFromMessageDialog(
+            messages = manualPickerBodies,
+            error = manualPickerError,
+            onDismiss = {
+                manualPickerBodies = emptyList()
+                manualPickerError = null
+            },
+            onPick = { sms ->
+                scope.launch {
+                    try {
+                        val discovered = PatternDiscoveryService.discoverSafely(listOf(sms))
+                        val cluster = discovered.patterns.firstOrNull()
+                        if (cluster == null) {
+                            status = "تعذر إنشاء نمط من هذه الرسالة — جرّب رسالة أخرى"
+                        } else {
+                            app.messagePatternRepository.saveDiscovered(
+                                senderProfileId = senderProfileId,
+                                discovered = cluster,
+                                status = MessagePatternStatus.UNKNOWN,
+                            )
+                            app.importSessionStore.markTemplatesChanged()
+                            status = "تم إنشاء نمط مرشح — يحتاج اعتماد"
+                            reload()
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Throwable) {
+                        if (failure is VirtualMachineError) throw failure
+                        status = "تعذر إنشاء نمط من هذه الرسالة. لم يتم حذف أي بيانات."
+                    } finally {
+                        manualPickerBodies = emptyList()
+                        manualPickerError = null
+                    }
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Manual recovery/debug picker: shows a sender's recent financial (non-OTP)
+ * SMS as sanitized previews only (never raw SMS). The user picks one message
+ * and a single UNKNOWN candidate is built from it through the same
+ * [PatternDiscoveryService] pipeline, then left under "تحتاج اعتماد".
+ */
+@Composable
+private fun ManualPatternFromMessageDialog(
+    messages: List<com.baraa.masroof.sms.SmsMessage>,
+    error: String?,
+    onDismiss: () -> Unit,
+    onPick: (com.baraa.masroof.sms.SmsMessage) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("إنشاء نمط من رسالة") },
+        text = {
+            Column {
+                Text(
+                    "اختر رسالة مالية لإنشاء نمط مرشح منها. يظهر معاينة منقّحة فقط ولا تُحفظ الرسالة الخام.",
+                    style = FinancialTypography.metadata,
+                )
+                Spacer(Modifier.height(Spacing.x2))
+                if (error != null) {
+                    Text(error, style = FinancialTypography.metadata)
+                } else {
+                    messages.forEach { sms ->
+                        val preview = com.baraa.masroof.accounts.AccountSmsAnalyzer
+                            .safeSanitizedPreview(sms.body, maxChars = 120, preserveNewlines = false)
+                            ?: "(تعذرت المعاينة)"
+                        Surface(
+                            Modifier.fillMaxWidth().clickable { onPick(sms) },
+                            shape = FinancialShapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                        ) {
+                            Text(
+                                preview.ifBlank { "(معاينة فارغة)" },
+                                style = FinancialTypography.metadata,
+                                modifier = Modifier.padding(Spacing.x2),
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.x1))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        },
+    )
 }
 
 @Composable

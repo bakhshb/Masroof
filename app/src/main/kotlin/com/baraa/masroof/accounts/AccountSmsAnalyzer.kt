@@ -58,6 +58,20 @@ object AccountSmsAnalyzer {
         return if (maxChars <= 0 || safe.length <= maxChars) safe else safe.take(maxChars)
     }
 
+    /**
+     * Non-throwing wrapper around [sanitizedPreview]. Privacy/UI metadata only.
+     *
+     * - catches every non-fatal exception and returns null on failure
+     * - NEVER returns the raw SMS as a fallback
+     * - a null result means "no sanitized sample"; it must never block pattern
+     *   creation and must never be counted as a discarded message
+     */
+    fun safeSanitizedPreview(
+        body: String?,
+        maxChars: Int = 400,
+        preserveNewlines: Boolean = true,
+    ): String? = runCatching { sanitizedPreview(body, maxChars, preserveNewlines) }.getOrNull()
+
     fun analyze(
         message: SmsMessage,
         accountType: AccountType,

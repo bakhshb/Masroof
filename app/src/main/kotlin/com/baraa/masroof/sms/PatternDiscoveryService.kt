@@ -37,6 +37,64 @@ data class PatternDiscoveryResult(
     val failedMessages: Int,
     val failures: List<PatternDiscoveryFailure>,
     val skippedBlank: Int = 0,
+    /**
+     * Failures from OPTIONAL enrichment stages only (sanitized preview,
+     * display fingerprint, suggested-field enrichment). These NEVER block a
+     * pattern from being created and are NOT counted in [failedMessages].
+     */
+    val optionalStageFailures: List<PatternDiscoveryFailure> = emptyList(),
+) {
+    /** CORE failures only — messages that could not become a pattern. */
+    val coreFailedMessages: Int get() = failures.size
+
+    /** OPTIONAL enrichment failures — never blocked a pattern. */
+    val optionalStageFailureCount: Int get() = optionalStageFailures.size
+
+    /**
+     * Reconciling invariant — every input message is accounted for exactly once:
+     *   input == processed + skippedOtp + skippedNonFinancial + skippedBlank + coreFailed
+     * Optional enrichment failures are deliberately excluded because they
+     * never discard a message.
+     */
+    fun isReconciled(): Boolean =
+        inputMessages == processedMessages + skippedOtp + skippedNonFinancial +
+            skippedBlank + failedMessages
+
+    /**
+     * DEBUG-safe aggregation of every failure (core + optional) by
+     * [PatternDiscoveryStage] + exception class. Never includes raw SMS —
+     * only short body hashes (first 3 per group) so the dominant failing
+     * stage and exact exception class can be surfaced to the user.
+     */
+    fun failureBreakdown(): List<StageFailureBreakdown> {
+        val tagged = failures.map { false to it } + optionalStageFailures.map { true to it }
+        return tagged.groupBy { (optional, f) -> Triple(f.stage, f.exceptionClass, optional) }
+            .map { (key, list) ->
+                StageFailureBreakdown(
+                    stage = key.first,
+                    exceptionClass = key.second,
+                    count = list.size,
+                    optional = key.third,
+                    sampleBodyHashes = list.map { it.second.bodyHash }.distinct().take(3),
+                )
+            }
+            .sortedWith(
+                compareBy<StageFailureBreakdown> { it.optional }
+                    .thenBy { it.stage.name }
+                    .thenByDescending { it.count },
+            )
+    }
+}
+
+/** DEBUG-safe per-stage failure aggregation (no raw SMS). */
+data class StageFailureBreakdown(
+    val stage: PatternDiscoveryStage,
+    val exceptionClass: String,
+    val count: Int,
+    /** True for OPTIONAL enrichment-stage failures that never blocked a pattern. */
+    val optional: Boolean,
+    /** First 3 short body hashes for this group (never raw SMS). */
+    val sampleBodyHashes: List<String>,
 )
 
 data class DiscoveredMessagePattern(
@@ -88,6 +146,29 @@ data class SuggestedPatternField(
 )
 
 /**
+ * Optional enrichment stages for [PatternDiscoveryService.discoverSafely].
+ *
+ * These stages produce display metadata only (sanitized preview, display-name
+ * fingerprint, suggested fields). A failure in any of them must NEVER discard
+ * an otherwise valid financial SMS — the caller wraps each in a non-throwing
+ * handler and records an [PatternDiscoveryFailure] into
+ * [PatternDiscoveryResult.optionalStageFailures] instead.
+ *
+ * Defaults call the real production functions. Tests inject throwing
+ * overrides to verify the non-fatal contract without depending on a
+ * specific real-world input that happens to throw.
+ */
+data class OptionalDiscoveryStages(
+    val sanitizedPreview: (String) -> String? = { body -> AccountSmsAnalyzer.safeSanitizedPreview(body) },
+    val fingerprint: (String) -> SemanticPatternCanonicalizer.Fingerprint =
+        SemanticPatternCanonicalizer::fromBody,
+    val suggestFields: (List<com.baraa.masroof.transaction.ParsedLine>) -> List<SuggestedPatternField> =
+        { lines -> PatternDiscoveryService.suggestFields(lines.map { it.label }) },
+) {
+    companion object { val DEFAULT = OptionalDiscoveryStages() }
+}
+
+/**
  * Discovers exact structures first, then groups safe equivalents by semantic
  * identity. The returned list is user-visible semantic patterns; exact
  * structures remain available in [DiscoveredMessagePattern.exactVariants].
@@ -108,6 +189,13 @@ object PatternDiscoveryService {
         messages: List<SmsMessage>,
         existingPatterns: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity>,
         beforeStage: (SmsMessage, PatternDiscoveryStage) -> Unit,
+    ): PatternDiscoveryResult = discoverSafely(messages, existingPatterns, beforeStage, OptionalDiscoveryStages.DEFAULT)
+
+    internal fun discoverSafely(
+        messages: List<SmsMessage>,
+        existingPatterns: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity> = emptyList(),
+        beforeStage: (SmsMessage, PatternDiscoveryStage) -> Unit = { _, _ -> },
+        optionalStages: OptionalDiscoveryStages = OptionalDiscoveryStages.DEFAULT,
     ): PatternDiscoveryResult {
         data class Acc(
             val canonicalKey: String,
@@ -131,6 +219,7 @@ object PatternDiscoveryService {
         )
         val buckets = linkedMapOf<String, Acc>()
         val failures = mutableListOf<PatternDiscoveryFailure>()
+        val optionalStageFailures = mutableListOf<PatternDiscoveryFailure>()
         var processedMessages = 0
         var skippedOtp = 0
         var skippedNonFinancial = 0
@@ -142,6 +231,7 @@ object PatternDiscoveryService {
                 continue
             }
             try {
+                // CORE — OTP / non-financial classification.
                 val looksOtp = discoveryStage(sms, PatternDiscoveryStage.TYPE_CUE, beforeStage) {
                     SmsStructureNormalizer.looksLikeOtpOrMarketing(body)
                 }
@@ -159,16 +249,19 @@ object PatternDiscoveryService {
                     skippedNonFinancial++
                     continue
                 }
+                // CORE — deterministic structural template + signature.
                 val built = discoveryStage(sms, PatternDiscoveryStage.TEMPLATE_BUILD, beforeStage) {
                     MessageTemplateEngine.buildFromSms(body)
                 }
-                val fingerprint = discoveryStage(
-                    sms,
-                    PatternDiscoveryStage.SEMANTIC_FINGERPRINT,
-                    beforeStage,
-                ) {
-                    SemanticPatternCanonicalizer.fromBody(body)
-                }
+                // OPTIONAL — display-name fingerprint + channel/slot metadata.
+                val fingerprint = optionalStage(
+                    sms, body, PatternDiscoveryStage.SEMANTIC_FINGERPRINT, beforeStage, optionalStageFailures,
+                ) { optionalStages.fingerprint(body) }
+                val displayName = fingerprint?.displayNameAr
+                    ?: cue.displayNameAr.ifBlank { "نمط رسالة" }
+                val observedChannels = fingerprint?.observedChannels ?: emptySet()
+                val optionalSlots = fingerprint?.optionalSlots ?: emptySet()
+                // CORE — canonical variant identity.
                 val canonicalKey = discoveryStage(
                     sms,
                     PatternDiscoveryStage.CANONICAL_KEY,
@@ -176,23 +269,23 @@ object PatternDiscoveryService {
                 ) {
                     TemplateCanonicalizer.canonicalKey(built.templateText, built.signature)
                 }
-                val sample = discoveryStage(
-                    sms,
-                    PatternDiscoveryStage.SANITIZED_PREVIEW,
-                    beforeStage,
-                ) {
-                    AccountSmsAnalyzer.sanitizedPreview(
-                        body,
-                        maxChars = 400,
-                        preserveNewlines = true,
-                    )
+                // OPTIONAL — sanitized preview (privacy/UI metadata only).
+                val sample = optionalStage(
+                    sms, body, PatternDiscoveryStage.SANITIZED_PREVIEW, beforeStage, optionalStageFailures,
+                ) { optionalStages.sanitizedPreview(body) }
+                // OPTIONAL — suggested-field enrichment.
+                val lines = optionalStage(
+                    sms, body, PatternDiscoveryStage.LINE_PARSE, beforeStage, optionalStageFailures,
+                ) { LineBasedFieldParser.splitLines(body) }
+                val suggested = if (lines != null) {
+                    optionalStage(
+                        sms, body, PatternDiscoveryStage.LINE_PARSE, beforeStage, optionalStageFailures,
+                    ) { optionalStages.suggestFields(lines) } ?: emptyList()
+                } else {
+                    emptyList()
                 }
-                val lines = discoveryStage(sms, PatternDiscoveryStage.LINE_PARSE, beforeStage) {
-                    LineBasedFieldParser.splitLines(body)
-                }
-                val suggested = discoveryStage(sms, PatternDiscoveryStage.LINE_PARSE, beforeStage) {
-                    suggestFields(lines.map { it.label })
-                }
+                // CORE — semantic family identity. Ambiguity produces a
+                // review: candidate (never a throw, never a disappearance).
                 val familyKey = discoveryStage(
                     sms,
                     PatternDiscoveryStage.SEMANTIC_SCHEMA,
@@ -215,7 +308,7 @@ object PatternDiscoveryService {
                     Acc(
                         canonicalKey = canonicalKey,
                         signature = built.signature,
-                        nameHint = fingerprint.displayNameAr,
+                        nameHint = displayName,
                         typeKey = cue.typeToken,
                         transactionTypeName = built.transactionType?.name ?: cue.transactionType?.name,
                         direction = built.direction ?: cue.direction,
@@ -228,8 +321,8 @@ object PatternDiscoveryService {
                     )
                 }
                 acc.count++
-                acc.observedChannels += fingerprint.observedChannels
-                acc.optionalSlots += fingerprint.optionalSlots.map { it.name }
+                acc.observedChannels += observedChannels
+                acc.optionalSlots += optionalSlots.map { it.name }
                 acc.suggestedFields += suggested
                 if (acc.matchedPatternId == null && matched != null) {
                     acc.matchedPatternId = matched.id
@@ -245,34 +338,17 @@ object PatternDiscoveryService {
                     acc.placeholders = built.placeholders
                     acc.familyKey = familyKey
                 }
-                if (sms.timestamp >= acc.latest) {
-                    acc.latest = sms.timestamp
-                    if (acc.samples.size < 3) acc.samples += sample
-                } else if (acc.samples.size < 3) {
-                    acc.samples += sample
-                }
+                if (sms.timestamp >= acc.latest) acc.latest = sms.timestamp
+                if (sample != null && acc.samples.size < 3) acc.samples += sample
                 processedMessages++
             } catch (fatal: VirtualMachineError) {
                 throw fatal
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: DiscoveryStageException) {
-                failures += PatternDiscoveryFailure(
-                    smsId = sms.id.takeIf { it > 0L },
-                    senderHash = sms.sender?.takeIf { it.isNotBlank() }?.let(::safeHash),
-                    bodyHash = safeHash(body),
-                    stage = failure.stage,
-                    exceptionClass = failure.cause?.javaClass?.simpleName
-                        ?: failure.javaClass.simpleName,
-                )
+                failures += failureOf(sms, body, failure.stage, failure.cause ?: failure)
             } catch (failure: Throwable) {
-                failures += PatternDiscoveryFailure(
-                    smsId = sms.id.takeIf { it > 0L },
-                    senderHash = sms.sender?.takeIf { it.isNotBlank() }?.let(::safeHash),
-                    bodyHash = safeHash(body),
-                    stage = PatternDiscoveryStage.SEMANTIC_SCHEMA,
-                    exceptionClass = failure.javaClass.simpleName,
-                )
+                failures += failureOf(sms, body, PatternDiscoveryStage.SEMANTIC_SCHEMA, failure)
             }
         }
         val exactPatterns = buckets.values
@@ -341,6 +417,7 @@ object PatternDiscoveryService {
             failedMessages = failures.size,
             failures = failures,
             skippedBlank = skippedBlank,
+            optionalStageFailures = optionalStageFailures,
         )
     }
 
@@ -366,6 +443,44 @@ object PatternDiscoveryService {
     } catch (failure: Throwable) {
         throw DiscoveryStageException(stage, failure)
     }
+
+    /**
+     * Non-fatal OPTIONAL enrichment stage. Any failure is recorded into
+     * [failuresSink] (which becomes [PatternDiscoveryResult.optionalStageFailures])
+     * and null is returned. The SMS continues through CORE stages and still
+     * produces a pattern. Never returns raw SMS as a fallback.
+     */
+    private inline fun <T> optionalStage(
+        sms: SmsMessage,
+        body: String,
+        stage: PatternDiscoveryStage,
+        beforeStage: (SmsMessage, PatternDiscoveryStage) -> Unit,
+        failuresSink: MutableList<PatternDiscoveryFailure>,
+        block: () -> T,
+    ): T? = try {
+        beforeStage(sms, stage)
+        block()
+    } catch (fatal: VirtualMachineError) {
+        throw fatal
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        failuresSink += failureOf(sms, body, stage, failure)
+        null
+    }
+
+    private fun failureOf(
+        sms: SmsMessage,
+        body: String,
+        stage: PatternDiscoveryStage,
+        cause: Throwable,
+    ): PatternDiscoveryFailure = PatternDiscoveryFailure(
+        smsId = sms.id.takeIf { it > 0L },
+        senderHash = sms.sender?.takeIf { it.isNotBlank() }?.let(::safeHash),
+        bodyHash = safeHash(body),
+        stage = stage,
+        exceptionClass = cause.javaClass.simpleName.ifBlank { cause.javaClass.name },
+    )
 
     private fun safeHash(value: String): String = runCatching {
         MessageDigest.getInstance("SHA-256")
