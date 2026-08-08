@@ -64,7 +64,7 @@ object CanonicalPatternFieldClassifier {
         isIban(n) && ("من" in n || "source" in n || "خصم" in n)
 
     private fun isDestinationIban(n: String) =
-        isIban(n) && ("الي" in n || "destination" in n || "مستفيد" in n)
+        isIban(n) && ("الي" in n || "destination" in n || "مستفيد" in n || "البديل" in n)
 
     private fun isIban(n: String) = "ايبان" in n || "iban" in n
 
@@ -72,7 +72,8 @@ object CanonicalPatternFieldClassifier {
         "محفظه" in n || ("wallet" in n && "card" !in n)
 
     private fun isSourceAccount(n: String) =
-        "من حساب" in n || "خصمت من" in n || "خصم من" in n ||
+        n == "من" || "من حساب" in n || "خصمت من" in n || "خصم من" in n ||
+            "حساب المرسل" in n || "sender account" in n || "account of sender" in n ||
             "source account" in n || "debited from account" in n
 
     private fun isDestinationAccount(n: String) =

@@ -48,7 +48,9 @@ object CanonicalSmsFieldExtractor {
                 when (field) {
                     PatternCanonicalField.TRANSACTION_AMOUNT -> {
                         val exact = Regex("^${Regex.escape(line.label)}$", RegexOption.IGNORE_CASE)
-                        val parsed = LineBasedFieldParser.parseLabeledMoneyField(listOf(line), listOf(exact))
+                        val parsed =
+                            LineBasedFieldParser.parseLabeledMoneyField(listOf(line), listOf(exact))
+                                ?: LineBasedFieldParser.parseLeadingMoney(line.value)?.first
                         if (parsed != null) {
                             amount = amount ?: parsed
                             values.putIfAbsent(field, parsed.toPlainString())
@@ -93,6 +95,16 @@ object CanonicalSmsFieldExtractor {
                     else -> if (line.value.isNotBlank()) values.putIfAbsent(field, line.value.trim())
                 }
             }
+            // Ambiguous bare "إلى"/"الى" (folds to "الي"): the label alone cannot
+            // tell account from beneficiary, so the classifier keeps it as
+            // BENEFICIARY (preserving a generalizing template/signature). When
+            // the value is a 4-digit last4 it is the destination account; extract
+            // it here (value-aware, like the rest of this extractor).
+            if (normalizedLabelIs(line.label, "الي")) {
+                LineBasedFieldParser.lastFourFromValue(line.value)?.let {
+                    values.putIfAbsent(PatternCanonicalField.DESTINATION_ACCOUNT_LAST4, it)
+                }
+            }
         }
         if (amount == null) {
             amount = LineBasedFieldParser.parseTransactionAmount(lines)
@@ -102,6 +114,12 @@ object CanonicalSmsFieldExtractor {
         }
         return CanonicalSmsFields(values, amount, currency, date, time)
     }
+
+    private fun normalizedLabelIs(rawLabel: String, expected: String): Boolean =
+        CanonicalMessageNormalizer.normalizeLabel(rawLabel)
+            .replace(Regex("""[\p{P}\p{S}]+"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim() == expected
 
     private fun parseCurrency(raw: String): Currency? {
         val n = raw.uppercase(Locale.ROOT)

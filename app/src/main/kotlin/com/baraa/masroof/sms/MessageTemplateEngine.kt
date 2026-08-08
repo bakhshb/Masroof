@@ -132,7 +132,7 @@ object MessageTemplateEngine {
         "CREDIT_CARD_LAST4", "DEBIT_CARD_LAST4", "ACCOUNT_LAST4",
         "IBAN_LAST4", "WALLET_LAST4",
         -> """\d{4}"""
-        "TRANSACTION_ID" -> """[A-Za-z0-9\-]{4,}"""
+        "TRANSACTION_ID" -> """[A-Za-z0-9\-_/]{4,}"""
         "MERCHANT", "BENEFICIARY", "BANK_NAME" -> """.{1,120}?"""
         else -> """.{0,120}?"""
     }.let { "(?:$it)" }

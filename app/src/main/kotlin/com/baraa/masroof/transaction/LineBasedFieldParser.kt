@@ -48,6 +48,10 @@ object LineBasedFieldParser {
         """^([A-Z]{2,3})?\s*([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*([A-Z]{2,3})?$""",
         RegexOption.IGNORE_CASE,
     )
+    private val LEADING_MONEY_REGEX = Regex(
+        """^\s*(?:([A-Z]{2,3})\s*)?([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*(?:([A-Z]{2,3}))?""",
+        RegexOption.IGNORE_CASE,
+    )
     private val TIME_REGEX = Regex("""(\d{1,2}):(\d{2})(?::(\d{2}))?""")
     private val DATE_REGEX = listOf(Regex("""(\d{4})[/-](\d{1,2})[/-](\d{1,2})"""), Regex("""(\d{1,2})[/-](\d{1,2})[/-](\d{4})"""))
 
@@ -134,7 +138,9 @@ object LineBasedFieldParser {
     fun parseTransactionAmount(lines: List<ParsedLine>): BigDecimal? {
         for (line in lines) {
             if (!MonetaryFieldClassifier.isTransactionAmount(line.label)) continue
-            val parsed = parseMoney(line.value)?.first
+            // Amount-labeled values may carry trailing context (e.g. compact
+            // English "of: 41.30 SAR At Merchant"); parse the LEADING money.
+            val parsed = parseLeadingMoney(line.value)?.first
             if (parsed != null && parsed.signum() > 0) return parsed
         }
         return null
@@ -155,6 +161,24 @@ object LineBasedFieldParser {
     }
 
     fun parseMoneyValue(value: String): BigDecimal? = parseMoney(value)?.first
+
+    /**
+     * Parse the money at the START of [value] (with optional leading/trailing
+     * currency code), allowing trailing context such as a merchant name in a
+     * compact English SMS ("41.30 SAR At Merchant"). Only safe to call on a
+     * value whose label is already known to be a transaction amount; never
+     * use on balance/due lines.
+     */
+    fun parseLeadingMoney(value: String): Pair<BigDecimal, String?>? {
+        val trimmed = BankTextNormalizer.normalizeForParsing(value).trim()
+        if (trimmed.isEmpty()) return null
+        val match = LEADING_MONEY_REGEX.find(trimmed) ?: return null
+        val prefix = match.groupValues[1].takeIf { it.isNotEmpty() } ?: ""
+        val amountText = match.groupValues[2].replace(",", "")
+        val suffix = match.groupValues[3].takeIf { it.isNotEmpty() } ?: ""
+        val amount = runCatching { BigDecimal(amountText) }.getOrNull() ?: return null
+        return amount to (prefix.ifEmpty { suffix })
+    }
 
     fun parseLastFourField(lines: List<ParsedLine>): String? {
         for (line in lines) {

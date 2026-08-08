@@ -210,7 +210,7 @@ object TemplateMatcher {
         "CREDIT_CARD_LAST4", "DEBIT_CARD_LAST4", "ACCOUNT_LAST4",
         "IBAN_LAST4", "WALLET_LAST4", "SOURCE_ACCOUNT_LAST4", "DESTINATION_ACCOUNT_LAST4",
         -> """(?:[*xX•\-\s]*)?\d{4}"""
-        "TRANSACTION_ID", "REFERENCE" -> """[A-Za-z0-9\-/]{4,}"""
+        "TRANSACTION_ID", "REFERENCE" -> """[A-Za-z0-9\-_/]{4,}"""
         "MERCHANT", "BENEFICIARY", "COUNTERPARTY", "BANK_NAME" -> """.{1,120}?"""
         else -> """.{0,120}?"""
     }

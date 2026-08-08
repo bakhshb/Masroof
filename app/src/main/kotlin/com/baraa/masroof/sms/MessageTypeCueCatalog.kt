@@ -78,7 +78,7 @@ object MessageTypeCueCatalog {
         Rule(
             listOf(
                 "حوالة صادرة بين حساباتك", "حوالة واردة بين حساباتك", "حوالة بين حساباتك",
-                "حوالة واردة داخلية", "حوالة صادرة داخلية", "حوالة داخلية",
+                "حوالة داخلية",
                 "تحويل داخلي", "تحويل بين حساباتي", "بين حساباتك", "بين حساباتي",
                 "internal transfer",
             ),
@@ -116,6 +116,7 @@ object MessageTypeCueCatalog {
         Rule(
             listOf(
                 "شراء عبر الإنترنت", "شراء عبر الانترنت", "online purchase", "online_purchase",
+                "internet purchase",
             ),
             "شراء عبر الإنترنت", TransactionType.ONLINE_PURCHASE, MoneyFlowDirection.OUTFLOW, "TYPE:ONLINE_PURCHASE",
         ),
