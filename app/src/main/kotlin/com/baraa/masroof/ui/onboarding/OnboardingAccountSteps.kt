@@ -24,11 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.MasroofApplication
-import com.baraa.masroof.data.db.AccountIdentifierType
-import com.baraa.masroof.data.repository.IdentifierForm
-import com.baraa.masroof.ledger.AccountIdentifierCompatibility
 import com.baraa.masroof.transaction.AccountLiquidityDefaults
-import com.baraa.masroof.transaction.AccountNature
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
 import com.baraa.masroof.ui.theme.CalendarDateField
@@ -49,11 +45,6 @@ fun AccountSetupStep(
     var typeExpanded by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
-    val identifierType = remember(state.accountType) {
-        com.baraa.masroof.data.repository.AccountIdentifierRepository
-            .defaultIdentifierTypeFor(state.accountType)
-            ?: AccountIdentifierType.ACCOUNT_LAST4
-    }
     LaunchedEffect(state.createdAccountId) {
         if (state.createdAccountId > 0L) {
             val existing = app.financialAccountRepository.getById(state.createdAccountId)
@@ -163,7 +154,10 @@ fun AccountSetupStep(
         OutlinedTextField(
             value = state.lastFour,
             onValueChange = {
-                if (it.length <= 4 && it.all(Char::isDigit)) state.lastFour = it
+                if (it.length <= 4 && it.all(Char::isDigit)) {
+                    state.lastFour = it
+                    state.identifierConfirmed = false
+                }
             },
             label = { Text("آخر 4 أرقام (اختياري)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -183,68 +177,17 @@ fun AccountSetupStep(
                 scope.launch {
                     saving = true
                     error = null
-                    val balance = runCatching { BigDecimal(state.openingBalance) }.getOrNull()
-                    if (balance == null || balance.signum() < 0) {
-                        error = "رصيد غير صالح"
-                        saving = false
-                        return@launch
-                    }
-                    val openingDate = state.trackingDate
-                        .atStartOfDay(java.time.ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
-                    if (
-                        state.lastFour.length == 4 &&
-                        !AccountIdentifierCompatibility.isCompatibleTyped(state.accountType, identifierType)
-                    ) {
-                        error = "نوع المعرف غير متوافق مع نوع الحساب"
-                        saving = false
-                        return@launch
-                    }
                     runCatching {
-                        persistAccountOnce(
+                        createOrUpdateOnboardingAccount(
                             state = state,
                             repository = repository,
-                            accountExists = { id ->
-                                app.financialAccountRepository.getById(id) != null
-                            },
-                            createAccount = {
-                                app.financialAccountRepository.add(
-                                    displayName = state.displayName.trim(),
-                                    accountType = state.accountType,
-                                    institutionName = state.institution.trim().takeIf { it.isNotBlank() },
-                                    accountNature = AccountNature.defaultNatureFor(state.accountType),
-                                    currency = state.currency,
-                                    openingBalance = balance,
-                                    openingBalanceDate = openingDate,
-                                    includeInNetWorth = state.includeNetWorth,
-                                    includeInLiquidity = state.includeLiquidity,
-                                )
-                            },
-                            saveOptionalIdentifier = { id ->
-                                if (state.lastFour.length == 4) {
-                                    val outcome = app.accountIdentifierRepository.addOrUpdate(
-                                        id,
-                                        IdentifierForm(identifierType, "معرف الحساب", state.lastFour),
-                                    )
-                                    check(
-                                        outcome.result !=
-                                            com.baraa.masroof.data.repository.IdentifierAddResult.Rejected,
-                                    ) {
-                                        outcome.message ?: "identifier rejected"
-                                    }
-                                    state.identifierConfirmed = true
-                                }
-                            },
+                            financialAccountRepository = app.financialAccountRepository,
+                            accountIdentifierRepository = app.accountIdentifierRepository,
                         )
                     }.onSuccess {
                         onContinue()
-                    }.onFailure {
-                        error = if (state.createdAccountId > 0L) {
-                            "تم حفظ الحساب، لكن تعذر حفظ المعرف الاختياري"
-                        } else {
-                            "تعذر حفظ الحساب"
-                        }
+                    }.onFailure { failure ->
+                        error = failure.message ?: "تعذر حفظ الحساب"
                     }
                     saving = false
                 }
