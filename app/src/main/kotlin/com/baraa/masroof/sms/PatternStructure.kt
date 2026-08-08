@@ -134,5 +134,10 @@ object PatternStructure {
             .toList()
 
     private val SEPARATORS = listOf("：", ":", "=")
-    private val PLACEHOLDER = Regex("""\{([^{}]+)}""")
+    // Android's java.util.regex (ICU) rejects the unescaped trailing '}' here
+    // (bare '{'/'}' outside a quantifier is a syntax error on the device runtime
+    // even though the JVM reference regex tolerates it). Escaping the closing
+    // brace makes the pattern compile on both engines; the matched language
+    // is unchanged (still literal '{<chars without { or }>}').
+    private val PLACEHOLDER = Regex("""\{([^{}]+)\}""")
 }

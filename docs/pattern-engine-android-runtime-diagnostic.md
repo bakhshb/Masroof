@@ -203,3 +203,92 @@ at <ClassName.methodName>(file:line)
 Send that line back. It is exactly the missing/erroneous class FQN that
 the fix needs to target. No parsing, matching, semantic, data, or UI
 changes will be made speculatively.
+---
+
+## Resolution
+
+The on-device diagnostic captured:
+
+- **Missing/erroneous class:** `com.baraa.masroof.sms.PatternStructure`
+- **Root cause:** `ExceptionInInitializerError: PatternSyntaxException: Syntax
+  error in regexp pattern near index 11`
+- **First relevant frame:** `CanonicalMessageNormalizer.normalizeParsed`
+  (kt:140) → `normalizeFromLines` (kt:131) → `normalizeBody` (kt:86)
+
+Android's `java.util.regex` (ICU) rejects the regex
+
+```kotlin
+private val PLACEHOLDER = Regex("""\{([^{}]+)}""")
+```
+
+because the trailing bare `}` (index 10) is not a valid brace outside a
+quantifier on the device runtime (JVM tolerates it; Android ICU does not).
+`PatternStructure` is loaded for the first time from
+`CanonicalMessageNormalizer.normalizeParsed` → `PatternStructure
+.isOptionalContextAnchor(...)` (the only call path that first touches
+`PatternStructure` in `buildFromSms`). The failed `<clinit>` marks the
+class as `Erroneous`; the first SMS throws `ExceptionInInitializerError`,
+every subsequent SMS throws `NoClassDefFoundError` — matching the observed
+"196 / NoClassDefFoundError" stream.
+
+### Fix
+
+Escape the trailing `}` so the pattern compiles on both engines (the
+matched language is unchanged):
+
+```kotlin
+// PatternStructure.kt
+private val PLACEHOLDER = Regex("""\{([^{}]+)\}""")     // was: }""")
+```
+
+The same non-portable regex existed as a latent bug in
+`TemplateEditValidator.placeholderPattern` (`TemplateEditorModels.kt`).
+It was not loaded by discovery (so it did not crash the current flow)
+but would have crashed the moment the user opened the template editor on
+the device. Fixed identically:
+
+```kotlin
+// TemplateEditorModels.kt
+private val placeholderPattern = Regex("""\{([^{}]+)\}""")  // was: }""")
+```
+
+Other placeholder regexes were already portable
+(`CanonicalMessageNormalizer.PLACEHOLDER_REGEX` and
+`TemplateMatcher.PLACEHOLDER` both already escaped the closing brace).
+
+### Verification (server side)
+
+```
+./gradlew clean test assembleDebug lintDebug :app:compileDebugAndroidTestKotlin
+  → 1916 tests, 0 failures, 0 errors; lint 0 errors, 298 pre-existing warnings
+```
+
+No parsing / matching / semantic / corpus / data / UI change. Only the
+closing brace of two regex literals is now escaped. The matched set of
+strings is identical.
+
+### Clean debug APK SHA-256 (installable as update over the existing app)
+
+```
+3fc12c557f3cc187d9b89d2d89f94ff6c97ec136aa73248a6f8ffdf23924e3e2  app-debug.apk
+```
+
+androidTest APK SHA-256 (unchanged, test code unchanged):
+
+```
+0f1cf5f6b189b75bc005d91c459844d63db71c96a5e3e8ed9ceb2359e0f0c316  app-debug-androidTest.apk
+```
+
+### On-device verification (next install)
+
+Install the debug APK `3fc12c55…`. The next "اكتشاف أنماط جديدة" run will
+no longer surface `TEMPLATE_BUILD — NoClassDefFoundError`; instead
+`MessageTemplateEngine.buildFromSms` returns a built template and
+discovery proceeds. The `PatternEngineAndroidRuntimeSmokeTest` (already in
+the androidTest APK) will now pass on a connected device:
+
+```
+./gradlew :app:connectedDebugAndroidTest
+```
+
+User data untouched. No destructive migration.

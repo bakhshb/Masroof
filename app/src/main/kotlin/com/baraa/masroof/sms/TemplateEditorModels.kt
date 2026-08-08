@@ -37,7 +37,8 @@ sealed class TemplateEditValidation {
 
 object TemplateEditValidator {
     private val tokenPattern = Regex("""[A-Z][A-Z0-9_]*""")
-    private val placeholderPattern = Regex("""\{([^{}]+)}""")
+    // Escaped closing brace for Android ICU regex portability (see PatternStructure.PLACEHOLDER).
+    private val placeholderPattern = Regex("""\{([^{}]+)\}""")
     private val suspiciousDigitRun = Regex("""(?:[0-9٠-٩][\s-]?){6,}""")
 
     fun validate(draft: TemplateEditDraft): TemplateEditValidation {
