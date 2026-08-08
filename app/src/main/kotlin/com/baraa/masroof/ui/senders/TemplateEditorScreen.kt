@@ -233,7 +233,11 @@ private fun TemplateEditorContent(
     var active by remember(editorKey) { mutableStateOf(initialDraft.active) }
     var saving by remember { mutableStateOf(false) }
     var errorState by remember { mutableStateOf<EditorError?>(null) }
-    var showFullTemplate by remember { mutableStateOf(false) }
+    // New (auto-generated) drafts surface the full template text so the
+    // user can review and edit the capture without an extra tap. Existing
+    // patterns (which already have a saved template) keep the preview-first
+    // default to avoid a large text area on first open.
+    var showFullTemplate by remember(editorKey) { mutableStateOf(isNewDraft) }
     var showAdvanced by remember { mutableStateOf(false) }
     var showTypePicker by remember { mutableStateOf(false) }
     var editingFieldIndex by remember { mutableStateOf<Int?>(null) }

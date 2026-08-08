@@ -201,8 +201,8 @@ object PatternDraftFactory {
     }
 
     private fun buildFieldDrafts(body: String): List<TemplateFieldDraft> {
-        val labels = LineBasedFieldParser.splitLines(body).map { it.label }
-        val suggested = PatternDiscoveryService.suggestFields(labels)
+        val lines = LineBasedFieldParser.splitLines(body)
+        val suggested = PatternDiscoveryService.suggestFields(lines)
         return suggested.map { field ->
             val token = TemplateResolutionService.defaultPlaceholder(field.canonicalField)
             TemplateFieldDraft(

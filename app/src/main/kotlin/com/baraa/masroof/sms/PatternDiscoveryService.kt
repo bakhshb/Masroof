@@ -182,7 +182,7 @@ data class OptionalDiscoveryStages(
     val fingerprint: (String) -> SemanticPatternCanonicalizer.Fingerprint =
         SemanticPatternCanonicalizer::fromBody,
     val suggestFields: (List<com.baraa.masroof.transaction.ParsedLine>) -> List<SuggestedPatternField> =
-        { lines -> PatternDiscoveryService.suggestFields(lines.map { it.label }) },
+        { lines -> PatternDiscoveryService.suggestFields(lines) },
 ) {
     companion object { val DEFAULT = OptionalDiscoveryStages() }
 }
@@ -615,6 +615,38 @@ object PatternDiscoveryService {
         return null
     }
 
+    /**
+     * Value-aware field suggester. Each candidate field is only emitted when
+     * the line value actually fits the canonical shape (a 4-digit for any *_LAST4
+     * field, a money literal for AMOUNT / AVAILABLE_BALANCE / CARD_AMOUNT_DUE,
+     * a date or time for DATE / TIME, …). This keeps the suggested fields in
+     * lock-step with the placeholders MessageTemplateEngine actually inserts
+     * (the engine only writes a `{*_LAST4}` token when the value contains a
+     * 4-digit, an `{AMOUNT}` when the value parses as money, etc.), so the
+     * template ↔ fields contract holds automatically — patterns that need two
+     * last4s (card payment: card last4 + source-account last4) work, and
+     * lines whose label happens to match a field type but whose value is the
+     * type-indicator word (e.g. `بطاقة إئتمانية: تسديد` where the value
+     * `تسديد` is not a 4-digit) no longer produce a spurious unused field.
+     */
+    fun suggestFields(lines: List<com.baraa.masroof.transaction.ParsedLine>): List<SuggestedPatternField> {
+        val out = linkedMapOf<Pair<PatternCanonicalField, String>, SuggestedPatternField>()
+        for (line in lines) {
+            val label = line.label
+            val value = line.value
+            val normalized = CanonicalMessageNormalizer.normalizeLabel(label)
+            for (canonical in CanonicalPatternFieldClassifier.classify(label)) {
+                if (!isValueSuitableFor(canonical, value)) continue
+                val mapped = fieldFor(canonical, label.trim())
+                out.putIfAbsent(canonical to normalized, mapped)
+            }
+        }
+        return out.values.toList()
+    }
+
+    /** Back-compat overload: label-only suggester (no value gate). Prefer the
+     *  value-aware [suggestFields] overload; this is kept so legacy callers
+     *  still compile and behaves like the previous implementation. */
     fun suggestFields(labels: Collection<String>): List<SuggestedPatternField> {
         val out = linkedMapOf<Pair<PatternCanonicalField, String>, SuggestedPatternField>()
         for (label in labels) {
@@ -625,6 +657,40 @@ object PatternDiscoveryService {
             }
         }
         return out.values.toList()
+    }
+
+    private fun isValueSuitableFor(
+        canonical: PatternCanonicalField,
+        value: String,
+    ): Boolean {
+        val v = value.trim()
+        if (v.isEmpty()) return false
+        return when (canonical) {
+            PatternCanonicalField.CREDIT_CARD_LAST4,
+            PatternCanonicalField.DEBIT_CARD_LAST4,
+            PatternCanonicalField.ACCOUNT_LAST4,
+            PatternCanonicalField.SOURCE_ACCOUNT_LAST4,
+            PatternCanonicalField.DESTINATION_ACCOUNT_LAST4,
+            PatternCanonicalField.IBAN_LAST4,
+            PatternCanonicalField.SOURCE_IBAN_LAST4,
+            PatternCanonicalField.DESTINATION_IBAN_LAST4,
+            PatternCanonicalField.WALLET_LAST4,
+            -> com.baraa.masroof.transaction.LineBasedFieldParser
+                .lastFourFromValue(v) != null
+            PatternCanonicalField.TRANSACTION_AMOUNT,
+            PatternCanonicalField.AVAILABLE_BALANCE,
+            PatternCanonicalField.CARD_AMOUNT_DUE,
+            -> com.baraa.masroof.transaction.LineBasedFieldParser
+                .parseMoneyValue(v) != null
+            PatternCanonicalField.TRANSACTION_DATE,
+            PatternCanonicalField.TRANSACTION_TIME,
+            -> com.baraa.masroof.transaction.LineBasedFieldParser
+                .parseDateTimeField(listOf(com.baraa.masroof.transaction.ParsedLine("", v)))
+                .let { (d, t) -> d != null || t != null }
+            PatternCanonicalField.CURRENCY -> v.contains("SAR") || v.contains("USD") ||
+                v.contains("EUR") || v.contains("SR") || v.contains("ريال") || v.contains("ر.س")
+            else -> true  // text fields (MERCHANT, BENEFICIARY, REFERENCE, BANK, CHANNEL)
+        }
     }
 
     private fun fieldFor(canonical: PatternCanonicalField, label: String): SuggestedPatternField {
