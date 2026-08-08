@@ -26,8 +26,10 @@ data class DiscoveredMessagePattern(
     val placeholders: List<String> = emptyList(),
     /** Stable exact structural identity for this PatternVariant. */
     val canonicalKey: String = "",
-    /** Structural logical grouping key for its PatternFamily, never a transaction type. */
+    /** Versioned semantic identity for its user-visible PatternFamily. */
     val familyKey: String = "",
+    /** Exact structural observations retained below this semantic pattern. */
+    val exactVariants: List<DiscoveredMessagePattern> = emptyList(),
     /** Id of an already-saved pattern this cluster matches, or null when new. */
     val matchedPatternId: Long? = null,
     /** Status of the matched saved pattern (APPROVED / IGNORED / …), or null. */
@@ -55,8 +57,9 @@ data class SuggestedPatternField(
 )
 
 /**
- * Clusters inbox SMS for one sender by exact normalized PatternVariant identity.
- * Family assignment is separate and never merges structural variants.
+ * Discovers exact structures first, then groups safe equivalents by semantic
+ * identity. The returned list is user-visible semantic patterns; exact
+ * structures remain available in [DiscoveredMessagePattern.exactVariants].
  */
 object PatternDiscoveryService {
 
@@ -146,7 +149,7 @@ object PatternDiscoveryService {
                 }
             }
         }
-        return buckets.values
+        val exactPatterns = buckets.values
             .map { acc ->
                 val matched = matchExisting(acc.canonicalKey, acc.sourceBody, existingPatterns)
                 val looksOtp = acc.otpHits * 2 >= acc.count && acc.count > 0
@@ -166,10 +169,10 @@ object PatternDiscoveryService {
                     templateText = acc.templateText,
                     placeholders = acc.placeholders,
                     canonicalKey = acc.canonicalKey,
-                    familyKey = PatternStructure.familyKey(
-                        CanonicalMessageNormalizer.normalizeTemplate(acc.templateText),
-                        TransactionTypeTaxonomy.parse(acc.transactionTypeName),
-                        acc.channel,
+                    familyKey = semanticKey(
+                        templateText = acc.templateText,
+                        transactionTypeName = acc.transactionTypeName,
+                        exactFallback = acc.canonicalKey,
                     ),
                     matchedPatternId = matched?.id,
                     matchedPatternStatus = matched?.status,
@@ -180,10 +183,53 @@ object PatternDiscoveryService {
                     looksLikeNonFinancial = looksNonFin || looksOtp,
                 )
             }
+        return exactPatterns
+            .groupBy { it.familyKey }
+            .values
+            .map { variants ->
+                val representative = variants.maxWithOrNull(
+                    compareBy<DiscoveredMessagePattern> { it.messageCount }
+                        .thenBy { it.latestTimestamp },
+                ) ?: variants.first()
+                representative.copy(
+                    messageCount = variants.sumOf { it.messageCount },
+                    latestTimestamp = variants.maxOf { it.latestTimestamp },
+                    sanitizedSamples = variants.flatMap { it.sanitizedSamples }.distinct().take(3),
+                    suggestedFields = variants.flatMap { it.suggestedFields }
+                        .distinctBy { it.canonicalField to CanonicalMessageNormalizer.normalizeLabel(it.sourceLabel) },
+                    looksLikeOtpOrMarketing = variants.all { it.looksLikeOtpOrMarketing },
+                    looksLikeNonFinancial = variants.all { it.looksLikeNonFinancial },
+                    observedChannels = variants.flatMap { it.observedChannels }.distinct(),
+                    optionalSlots = variants.flatMap { it.optionalSlots }.distinct(),
+                    matchedPatternId = variants.firstNotNullOfOrNull { it.matchedPatternId },
+                    matchedPatternStatus = variants.mapNotNull { it.matchedPatternStatus }
+                        .minByOrNull { statusPriority(it) },
+                    exactVariants = variants.map { it.copy(exactVariants = emptyList()) },
+                )
+            }
             .sortedWith(
                 compareByDescending<DiscoveredMessagePattern> { it.messageCount }
                     .thenByDescending { it.latestTimestamp },
             )
+    }
+
+    private fun semanticKey(
+        templateText: String,
+        transactionTypeName: String?,
+        exactFallback: String,
+    ): String = when (
+        val result = SemanticPatternSchemaNormalizer.fromTemplate(templateText, transactionTypeName)
+    ) {
+        is SemanticSchemaResult.Safe -> result.key
+        is SemanticSchemaResult.NonFinancial -> "non-financial|$exactFallback"
+        is SemanticSchemaResult.Ambiguous -> "review:${result.reason}|$exactFallback"
+    }
+
+    private fun statusPriority(status: com.baraa.masroof.data.db.MessagePatternStatus): Int = when (status) {
+        com.baraa.masroof.data.db.MessagePatternStatus.APPROVED -> 0
+        com.baraa.masroof.data.db.MessagePatternStatus.UNKNOWN -> 1
+        com.baraa.masroof.data.db.MessagePatternStatus.IGNORED -> 2
+        com.baraa.masroof.data.db.MessagePatternStatus.DEPRECATED -> 3
     }
 
     /** A cluster matches a saved pattern only by exact structure or template instance. */
@@ -201,6 +247,21 @@ object PatternDiscoveryService {
         existing.firstOrNull { it.canonicalKey.isNotBlank() && it.canonicalKey == canonicalKey }
             ?.let { return it }
         if (!sourceBody.isNullOrBlank()) {
+            val sourceSemantic = SemanticPatternSchemaNormalizer.fromBody(sourceBody)
+            if (sourceSemantic is SemanticSchemaResult.Safe) {
+                val semanticHits = existing.filter {
+                    it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
+                        it.deprecatedAt == null &&
+                        it.isActive &&
+                        SemanticPatternSchemaNormalizer.fromTemplate(
+                            it.templateText,
+                            it.transactionType,
+                        ).let { saved ->
+                            saved is SemanticSchemaResult.Safe && saved.key == sourceSemantic.key
+                        }
+                }
+                if (semanticHits.map { it.id }.distinct().size == 1) return semanticHits.single()
+            }
             existing.firstOrNull {
                 it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
                     it.deprecatedAt == null &&
@@ -217,73 +278,55 @@ object PatternDiscoveryService {
     }
 
     fun suggestFields(labels: Collection<String>): List<SuggestedPatternField> {
-        val out = linkedMapOf<String, SuggestedPatternField>()
+        val out = linkedMapOf<Pair<PatternCanonicalField, String>, SuggestedPatternField>()
         for (label in labels) {
-            val mapped = mapLabel(label) ?: continue
-            out.putIfAbsent(label.trim().lowercase(), mapped.copy(sourceLabel = label.trim()))
+            val normalized = CanonicalMessageNormalizer.normalizeLabel(label)
+            for (canonical in CanonicalPatternFieldClassifier.classify(label)) {
+                val mapped = fieldFor(canonical, label.trim())
+                out.putIfAbsent(canonical to normalized, mapped)
+            }
         }
         return out.values.toList()
     }
 
-    private fun mapLabel(label: String): SuggestedPatternField? {
-        val l = label.trim()
-        val lower = l.lowercase(LocaleOrRoot())
-        fun field(
-            c: PatternCanonicalField,
-            vt: PatternValueType,
-            role: PatternFieldRole = PatternFieldRole.PRIMARY,
-            required: Boolean = false,
-        ) = SuggestedPatternField(c, l, vt, role, required)
-
-        // Money roles first via shared classifier — never map Due Amount via a
-        // bare "amount" substring to TRANSACTION_AMOUNT.
-        when (com.baraa.masroof.transaction.MonetaryFieldClassifier.classify(l)) {
-            com.baraa.masroof.transaction.MonetaryRole.TRANSACTION_AMOUNT ->
-                return field(PatternCanonicalField.TRANSACTION_AMOUNT, PatternValueType.MONEY, required = true)
-            com.baraa.masroof.transaction.MonetaryRole.AVAILABLE_BALANCE ->
-                return field(PatternCanonicalField.AVAILABLE_BALANCE, PatternValueType.MONEY)
-            com.baraa.masroof.transaction.MonetaryRole.TOTAL_DUE,
-            com.baraa.masroof.transaction.MonetaryRole.OUTSTANDING_BALANCE,
-            -> return field(PatternCanonicalField.CARD_AMOUNT_DUE, PatternValueType.MONEY)
-            com.baraa.masroof.transaction.MonetaryRole.CREDIT_LIMIT ->
-                return field(PatternCanonicalField.CARD_AMOUNT_DUE, PatternValueType.MONEY)
-            com.baraa.masroof.transaction.MonetaryRole.FEE,
-            com.baraa.masroof.transaction.MonetaryRole.TAX,
-            com.baraa.masroof.transaction.MonetaryRole.CASHBACK,
-            com.baraa.masroof.transaction.MonetaryRole.OTHER_INFORMATIONAL_AMOUNT,
-            -> return null
-            com.baraa.masroof.transaction.MonetaryRole.UNKNOWN -> Unit
+    private fun fieldFor(canonical: PatternCanonicalField, label: String): SuggestedPatternField {
+        val valueType = when (canonical) {
+            PatternCanonicalField.TRANSACTION_AMOUNT,
+            PatternCanonicalField.AVAILABLE_BALANCE,
+            PatternCanonicalField.CARD_AMOUNT_DUE,
+            -> PatternValueType.MONEY
+            PatternCanonicalField.TRANSACTION_DATE -> PatternValueType.DATE
+            PatternCanonicalField.TRANSACTION_TIME -> PatternValueType.TIME
+            PatternCanonicalField.CURRENCY -> PatternValueType.CURRENCY_CODE
+            PatternCanonicalField.TRANSACTION_REFERENCE -> PatternValueType.REFERENCE
+            PatternCanonicalField.MERCHANT,
+            PatternCanonicalField.BENEFICIARY,
+            PatternCanonicalField.SOURCE_INSTITUTION,
+            PatternCanonicalField.DESTINATION_INSTITUTION,
+            PatternCanonicalField.CHANNEL,
+            -> PatternValueType.TEXT
+            else -> PatternValueType.LAST4
         }
-
-        return when {
-            lower.contains("بطاقة ائتمان") || lower.contains("ائتمانية") || lower.contains("credit card") ->
-                field(PatternCanonicalField.CREDIT_CARD_LAST4, PatternValueType.LAST4)
-            lower.contains("مدى") || lower.contains("debit") || lower.contains("بطاقة خصم") ->
-                field(PatternCanonicalField.DEBIT_CARD_LAST4, PatternValueType.LAST4)
-            lower.contains("آيبان") || lower.contains("iban") ->
-                field(PatternCanonicalField.IBAN_LAST4, PatternValueType.LAST4)
-            lower.contains("إلى حساب") || lower.contains("حساب المستفيد") ||
-                lower.contains("destination") ->
-                field(PatternCanonicalField.DESTINATION_ACCOUNT_LAST4, PatternValueType.LAST4, PatternFieldRole.DESTINATION)
-            lower.contains("من حساب") || lower.contains("خصمت من") || lower.contains("source") ->
-                field(PatternCanonicalField.SOURCE_ACCOUNT_LAST4, PatternValueType.LAST4, PatternFieldRole.SOURCE)
-            lower.contains("حساب") || lower.contains("account") || lower.contains("بطاقة") ||
-                lower.contains("card") ->
-                field(PatternCanonicalField.ACCOUNT_LAST4, PatternValueType.LAST4)
-            lower == "at" || lower == "لدى" || lower == "ل" ||
-                lower.contains("merchant") || lower.contains("تاجر") ->
-                field(PatternCanonicalField.MERCHANT, PatternValueType.TEXT)
-            lower.contains("مرجع") || lower.contains("reference") || lower.contains("ref") ->
-                field(PatternCanonicalField.TRANSACTION_REFERENCE, PatternValueType.REFERENCE)
-            lower.contains("وقت") || lower.contains("time") || lower == "في" || lower == "on" ->
-                field(PatternCanonicalField.TRANSACTION_TIME, PatternValueType.TIME)
-            lower.contains("تاريخ") || lower.contains("date") ->
-                field(PatternCanonicalField.TRANSACTION_DATE, PatternValueType.DATE)
-            lower.contains("عملة") || lower.contains("currency") ->
-                field(PatternCanonicalField.CURRENCY, PatternValueType.CURRENCY_CODE)
-            else -> null
+        val role = when (canonical) {
+            PatternCanonicalField.SOURCE_ACCOUNT_LAST4,
+            PatternCanonicalField.SOURCE_IBAN_LAST4,
+            PatternCanonicalField.SOURCE_INSTITUTION,
+            -> PatternFieldRole.SOURCE
+            PatternCanonicalField.DESTINATION_ACCOUNT_LAST4,
+            PatternCanonicalField.DESTINATION_IBAN_LAST4,
+            PatternCanonicalField.DESTINATION_INSTITUTION,
+            -> PatternFieldRole.DESTINATION
+            PatternCanonicalField.AVAILABLE_BALANCE,
+            PatternCanonicalField.CARD_AMOUNT_DUE,
+            -> PatternFieldRole.CONTEXT
+            else -> PatternFieldRole.PRIMARY
         }
+        return SuggestedPatternField(
+            canonicalField = canonical,
+            sourceLabel = label,
+            valueType = valueType,
+            role = role,
+            required = canonical == PatternCanonicalField.TRANSACTION_AMOUNT,
+        )
     }
-
-    private fun LocaleOrRoot(): java.util.Locale = java.util.Locale.ROOT
 }

@@ -42,6 +42,8 @@ enum class SmsImportMode { REGISTERED_ACCOUNTS_ONLY, DISCOVER_NEW_SENDERS }
  */
 enum class SmsImportCommitMode {
     READY_ONLY,
+    /** Persist only UNKNOWN semantic pattern candidates; never transactions. */
+    PATTERN_CANDIDATES_ONLY,
     /** Message-review rows only (account link / classification) — not template gates. */
     MESSAGE_REVIEW_ONLY,
     REVIEW_CANDIDATES,
@@ -683,6 +685,7 @@ class SmsImportOrchestrator(
         val batchTimestampsByKey = mutableMapOf<String, MutableList<Long>>()
         val skipBuckets = linkedMapOf<Pair<String, ScanPreview.SkipReason>, ScanPreview.SkipAccum>()
         val senderTemplateDiag = mutableMapOf<String, Pair<Long?, Int>>() // key → (profileId, approvedCount)
+        val patternsBySender = mutableMapOf<Long, List<MessagePattern>>()
         fun bumpSkip(sender: String?, reason: ScanPreview.SkipReason, body: String?, timestamp: Long) {
             val key = (sender?.trim().orEmpty().ifBlank { "—" }) to reason
             val acc = skipBuckets.getOrPut(key) { ScanPreview.SkipAccum() }
@@ -759,8 +762,11 @@ class SmsImportOrchestrator(
                     continue
                 }
                 val definitionPatterns = if (messagePatternRepository != null) {
-                    runCatching { messagePatternRepository.getForSender(profile.id) }
-                        .getOrElse { emptyList() }
+                    patternsBySender[profile.id] ?: runCatching {
+                        messagePatternRepository.getForSender(profile.id)
+                    }.getOrElse { emptyList() }.also {
+                        patternsBySender[profile.id] = it
+                    }
                 } else {
                     emptyList()
                 }
@@ -932,14 +938,6 @@ class SmsImportOrchestrator(
                                         .sanitizeTemplateLine(best?.match?.failedBodyLine)}",
                             )
                         }
-                        messagePatternRepository?.ensureUnknown(
-                            senderProfileId = profile.id,
-                            signature = matchDiagnostics.smsStructuralSignature,
-                            friendlyName = SmsStructureNormalizer.friendlyNameHint(sms.body),
-                            templateText = com.baraa.masroof.sms.MessageTemplateEngine
-                                .buildFromSms(sms.body).templateText,
-                            body = sms.body,
-                        )
                         bumpSkip(sms.sender, ScanPreview.SkipReason.UNKNOWN_PATTERN, sms.body, sms.timestamp)
                         items += reviewItem(sms, ImportDisposition.UNMATCHED_TEMPLATE)
                     }
@@ -1235,13 +1233,19 @@ class SmsImportOrchestrator(
                             it.deprecatedAt == null &&
                             it.isActive
                     }
-                    .associateBy { it.canonicalKey }
+                    .mapNotNull { approved ->
+                        val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer
+                            .fromTemplate(approved.templateText, approved.transactionType)
+                            as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                        semantic?.key?.let { it to approved }
+                    }
+                    .toMap()
 
                 val discovered = PatternDiscoveryService.discover(smsForSender, existing)
                     .filter { !it.looksLikeOtpOrMarketing && !it.looksLikeNonFinancial }
 
                 for (cluster in discovered) {
-                    val key = cluster.canonicalKey.ifBlank { cluster.signature }
+                    val key = cluster.familyKey.ifBlank { cluster.canonicalKey.ifBlank { cluster.signature } }
                     val sampleBody = smsForSender.firstOrNull()?.body
                     val approvedHit = when {
                         key.isNotBlank() -> approvedByKey[key]
@@ -1299,7 +1303,7 @@ class SmsImportOrchestrator(
                                 cluster.matchedPatternStatus ==
                                 com.baraa.masroof.data.db.MessagePatternStatus.UNKNOWN ->
                                 "existing_unknown_candidate"
-                            else -> "no_approved_template_for_structure"
+                            else -> "no_approved_template_for_semantic_schema"
                         },
                     )
                 }
@@ -1359,6 +1363,8 @@ class SmsImportOrchestrator(
         fun acceptDisposition(disposition: ImportDisposition): Boolean = when (mode) {
             SmsImportCommitMode.ALL -> true
             SmsImportCommitMode.READY_ONLY -> disposition == ImportDisposition.READY
+            SmsImportCommitMode.PATTERN_CANDIDATES_ONLY ->
+                disposition == ImportDisposition.UNMATCHED_TEMPLATE
             SmsImportCommitMode.REVIEW_CANDIDATES ->
                 ScanPreview.isReviewDisposition(disposition) ||
                     disposition == ImportDisposition.BEFORE_TRACKING_START
@@ -1752,14 +1758,6 @@ class SmsImportOrchestrator(
     ): SmsImportResult {
         if (messages.isEmpty()) return SmsImportResult.Empty
         val preview = scan(messages, trackingStartDate)
-        if (preview.recognizedTransactions == 0) return SmsImportResult(
-            scannedMessages = preview.scannedMessages,
-            recognizedTransactions = 0,
-            unparsedMessages = preview.unparsedMessages,
-            nonFinancialMessages = preview.nonFinancialMessages,
-            trackingStartDateHint = trackingStartDate,
-            importedAt = nowProvider(),
-        )
         return commit(preview, trackingStartDate, messages)
     }
 

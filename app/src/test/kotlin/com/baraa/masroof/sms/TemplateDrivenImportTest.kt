@@ -257,7 +257,7 @@ class TemplateDrivenImportTest {
     }
 
     @Test
-    fun ambiguousDistinctTemplatesGoToReview() {
+    fun semanticTypeSelectsPurchaseInsteadOfConflictingStrictTemplate() {
         val purchase = approvedPattern(
             id = 1,
             canonicalKey = "TYPE:POS_PURCHASE|CREDIT_CARD_LAST4|MERCHANT|AMOUNT|DATETIME",
@@ -271,8 +271,10 @@ class TemplateDrivenImportTest {
             canonicalKey = "TYPE:TRANSFER_OUT|CREDIT_CARD_LAST4|MERCHANT|AMOUNT|DATETIME",
         )
         val outcome = TemplateResolutionService.resolve("AlRajhi", posBody, null, listOf(purchase, other))
-        assertTrue(outcome is TemplateResolutionResult.Ambiguous)
-        assertEquals(2, (outcome as TemplateResolutionResult.Ambiguous).candidates.size)
+        assertTrue(outcome is TemplateResolutionResult.Matched)
+        outcome as TemplateResolutionResult.Matched
+        assertEquals(TransactionType.PURCHASE, outcome.parsed.transactionType)
+        assertEquals(PatternMatchTier.SEMANTIC_SCHEMA, outcome.matchTier)
     }
 
     @Test

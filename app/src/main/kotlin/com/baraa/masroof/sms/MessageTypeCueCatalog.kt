@@ -97,6 +97,10 @@ object MessageTypeCueCatalog {
             "تحويل وارد", TransactionType.TRANSFER_IN, MoneyFlowDirection.INFLOW, "TYPE:TRANSFER_IN",
         ),
         Rule(
+            listOf("استرداد", "مسترد", "refund", "reversed transaction"),
+            "استرداد", TransactionType.REFUND, MoneyFlowDirection.INFLOW, "TYPE:REFUND",
+        ),
+        Rule(
             listOf(
                 "شراء عبر الإنترنت", "شراء عبر الانترنت", "online purchase", "online_purchase",
             ),
@@ -119,16 +123,12 @@ object MessageTypeCueCatalog {
             "إيداع", TransactionType.OTHER_FINANCIAL, MoneyFlowDirection.INFLOW, "TYPE:DEPOSIT",
         ),
         Rule(
-            listOf("سداد فاتورة", "سداد فاتوره", "دفع فاتورة", "bill payment", "sadad", "سداد"),
-            "سداد فاتورة", TransactionType.BILL_PAYMENT, MoneyFlowDirection.OUTFLOW, "TYPE:BILL_PAYMENT",
-        ),
-        Rule(
             listOf("سداد بطاقة ائتمانية", "سداد بطاقة", "card payment", "credit card payment"),
             "سداد بطاقة", TransactionType.CARD_PAYMENT, MoneyFlowDirection.OUTFLOW, "TYPE:CARD_PAYMENT",
         ),
         Rule(
-            listOf("استرداد", "مسترد", "refund", "reversed transaction"),
-            "استرداد", TransactionType.REFUND, MoneyFlowDirection.INFLOW, "TYPE:REFUND",
+            listOf("سداد فاتورة", "سداد فاتوره", "دفع فاتورة", "bill payment", "sadad", "سداد"),
+            "سداد فاتورة", TransactionType.BILL_PAYMENT, MoneyFlowDirection.OUTFLOW, "TYPE:BILL_PAYMENT",
         ),
         Rule(
             listOf("رسوم", "bank fee", "service charge", "fee"),

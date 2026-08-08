@@ -19,8 +19,9 @@ object TemplateCanonicalizer {
         templateText: String?,
         signature: String,
         transactionTypeName: String? = null,
-    ): String = signature.takeIf { it.isNotBlank() }
-        ?: SmsStructureNormalizer.signatureFromTemplate(templateText)
+    ): String = templateText?.takeIf { it.isNotBlank() }
+        ?.let(SmsStructureNormalizer::signatureFromTemplate)
+        ?: signature
 
     fun canonicalKeyFromBody(body: String?): String =
         SmsStructureNormalizer.signatureFromBody(body)

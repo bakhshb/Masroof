@@ -173,31 +173,30 @@ object CanonicalMessageNormalizer {
         if (monetaryRole == com.baraa.masroof.transaction.MonetaryRole.TRANSACTION_AMOUNT) {
             return ValueToken.MONEY
         }
-        // Card / account / IBAN labels → LAST4 / IBAN_LAST4.
-        if (com.baraa.masroof.transaction.LineBasedFieldParser.cardLabelRegex().matches(rawLabel) ||
-            rawLabel.contains("بطاقة مدى رقم") || rawLabel.contains("بطاقة مدى")
-        ) {
-            return ValueToken.LAST4
-        }
-        if (com.baraa.masroof.transaction.LineBasedFieldParser.accountLabelRegex().matches(rawLabel)) {
-            return ValueToken.LAST4
-        }
-        if (rawLabel.contains("ايبان") || rawLabel.contains("iban") || rawLabel.contains("آيبان")) {
-            return ValueToken.IBAN_LAST4
-        }
-        // Datetime label → DATETIME.
-        if (rawLabel == "في" || rawLabel == "on" || rawLabel.contains("وقت") || rawLabel.contains("تاريخ") ||
-            rawLabel.contains("time") || rawLabel.contains("date")
-        ) {
-            return ValueToken.DATETIME
-        }
-        if (rawLabel.contains("مرجع") || rawLabel.contains("reference") || rawLabel == "ref" ||
-            rawLabel.contains("رقم العملية") || rawLabel.contains("رقم المعاملة")
-        ) {
+        val fields = CanonicalPatternFieldClassifier.classify(rawLabel)
+        if (fields.any {
+                it == com.baraa.masroof.data.db.PatternCanonicalField.IBAN_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4
+            }
+        ) return ValueToken.IBAN_LAST4
+        if (fields.any {
+                it == com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.DEBIT_CARD_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.ACCOUNT_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4
+            }
+        ) return ValueToken.LAST4
+        if (
+            com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE in fields ||
+            com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_TIME in fields
+        ) return ValueToken.DATETIME
+        if (com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_REFERENCE in fields) {
             return ValueToken.REFERENCE
         }
-        // Currency-only label (rare).
-        if (rawLabel.contains("عملة") || rawLabel.contains("currency")) return ValueToken.CURRENCY
+        if (com.baraa.masroof.data.db.PatternCanonicalField.CURRENCY in fields) return ValueToken.CURRENCY
         // Anything else is treated as free text (merchant, beneficiary, bank name…).
         return ValueToken.TEXT
     }

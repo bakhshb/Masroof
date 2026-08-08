@@ -25,6 +25,8 @@ import com.baraa.masroof.sms.SuggestedPatternField
 import com.baraa.masroof.transaction.LineBasedFieldParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class MessagePattern(
@@ -44,6 +46,7 @@ class MessagePatternRepository(
     private val anchorDao: PatternVariantAnchorDao? = null,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
+    private val unknownMutex = Mutex()
     constructor(
         definitionDao: MessagePatternDefinitionDao,
         fieldDao: PatternFieldDefinitionDao,
@@ -221,7 +224,24 @@ class MessagePatternRepository(
         origin: PatternOrigin = PatternOrigin.USER_TRAINED,
         userConfirmed: Boolean = status == MessagePatternStatus.APPROVED ||
             status == MessagePatternStatus.IGNORED,
+        replaceExampleCount: Boolean = false,
     ): MessagePattern = withContext(Dispatchers.IO) {
+        if (discovered.exactVariants.isNotEmpty()) {
+            val saved = discovered.exactVariants.map { variant ->
+                saveDiscovered(
+                    senderProfileId = senderProfileId,
+                    discovered = variant.copy(familyKey = discovered.familyKey),
+                    status = status,
+                    userFriendlyName = userFriendlyName ?: discovered.friendlyNameHint,
+                    fields = variant.suggestedFields,
+                    origin = origin,
+                    userConfirmed = userConfirmed,
+                    replaceExampleCount = replaceExampleCount,
+                )
+            }
+            return@withContext saved.firstOrNull()
+                ?: error("Semantic discovery contained no exact variants")
+        }
         // Canonical signature is recomputed through the production normalizer so
         // training and import share one deterministic identity source.
         val canonicalSignature = SmsStructureNormalizer.signatureFromTemplate(discovered.templateText)
@@ -282,7 +302,12 @@ class MessagePatternRepository(
         } else {
             // Explicit user decisions win: never downgrade a confirmed status
             // via a non-confirmed (e.g. UNKNOWN) save.
-            val effectiveStatus = if (!userConfirmed && existing.userConfirmed) existing.status else status
+            val effectiveStatus = when {
+                existing.userConfirmed && existing.status == MessagePatternStatus.IGNORED ->
+                    MessagePatternStatus.IGNORED
+                !userConfirmed && existing.userConfirmed -> existing.status
+                else -> status
+            }
             val updated = existing.copy(
                 familyId = existing.familyId ?: familyId,
                 userFriendlyName = userFriendlyName ?: existing.userFriendlyName,
@@ -296,12 +321,20 @@ class MessagePatternRepository(
                 status = effectiveStatus,
                 isActive = effectiveStatus == MessagePatternStatus.APPROVED,
                 userConfirmed = userConfirmed || existing.userConfirmed,
-                exampleCount = existing.exampleCount + discovered.messageCount,
+                exampleCount = if (replaceExampleCount) {
+                    discovered.messageCount
+                } else {
+                    existing.exampleCount + discovered.messageCount
+                },
                 activeFrom = when {
                     effectiveStatus == MessagePatternStatus.APPROVED && existing.activeFrom == null -> ts
                     else -> existing.activeFrom
                 },
-                deprecatedAt = if (effectiveStatus == MessagePatternStatus.DEPRECATED) ts else existing.deprecatedAt,
+                deprecatedAt = when (effectiveStatus) {
+                    MessagePatternStatus.APPROVED -> null
+                    MessagePatternStatus.DEPRECATED -> existing.deprecatedAt ?: ts
+                    else -> existing.deprecatedAt
+                },
                 updatedAt = ts,
                 confidence = if (userConfirmed) 100 else existing.confidence,
             )
@@ -319,27 +352,39 @@ class MessagePatternRepository(
     suspend fun setStatus(patternId: Long, status: MessagePatternStatus) = withContext(Dispatchers.IO) {
         val existing = definitionDao.getById(patternId) ?: return@withContext
         val ts = now()
-        definitionDao.update(
-            existing.copy(
+        val familyVariants = existing.familyId?.let { definitionDao.getForFamily(it) }
+            .orEmpty()
+            .ifEmpty { listOf(existing) }
+        for (variant in familyVariants) {
+            definitionDao.update(
+                variant.copy(
                 status = status,
                 isActive = status == MessagePatternStatus.APPROVED,
                 userConfirmed = true,
                 activeFrom = if (status == MessagePatternStatus.APPROVED) {
-                    existing.activeFrom ?: ts
+                    variant.activeFrom ?: ts
                 } else {
-                    existing.activeFrom
+                    variant.activeFrom
                 },
-                deprecatedAt = if (status == MessagePatternStatus.DEPRECATED) ts else existing.deprecatedAt,
+                deprecatedAt = when (status) {
+                    MessagePatternStatus.APPROVED -> null
+                    MessagePatternStatus.DEPRECATED -> ts
+                    else -> variant.deprecatedAt
+                },
                 updatedAt = ts,
                 confidence = 100,
             ),
-        )
+            )
+        }
         existing.familyId?.let { refreshFamilyStatus(it) }
         // Approving consolidates equivalent UNKNOWN candidates for the same family.
         if (status == MessagePatternStatus.APPROVED && existing.canonicalKey.isNotBlank()) {
             val siblings = definitionDao.getForSender(existing.senderProfileId).filter {
                 it.id != existing.id &&
-                    it.canonicalKey == existing.canonicalKey &&
+                    (
+                        (existing.familyId != null && it.familyId == existing.familyId) ||
+                            it.canonicalKey == existing.canonicalKey
+                        ) &&
                     it.status == MessagePatternStatus.UNKNOWN &&
                     it.deprecatedAt == null
             }
@@ -411,6 +456,25 @@ class MessagePatternRepository(
                         existing.normalizedSignature,
                         draft.transactionType.name,
                     )
+                    val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                        draft.templateText.trim(),
+                        draft.transactionType.name,
+                    )
+                    val semanticKey =
+                        (semantic as? com.baraa.masroof.sms.SemanticSchemaResult.Safe)?.key
+                            ?: if (familyDao == null) {
+                                "legacy-edit:${existing.familyId ?: existing.id}"
+                            } else {
+                                return@inTransaction TemplateUpdateResult.ValidationError(
+                                    "تعذر تحديد الهوية المالية للقالب بشكل آمن",
+                                )
+                            }
+                    val targetFamilyId = getOrCreateFamily(
+                        senderProfileId = draft.senderProfileId,
+                        stableKey = semanticKey,
+                        displayName = draft.displayName.trim(),
+                        status = draft.status,
+                    ) ?: existing.familyId
                     val collision = definitionDao.getForSender(draft.senderProfileId).firstOrNull {
                         it.canonicalKey == canonicalKey &&
                             (it.lineageId.takeIf { id -> id > 0L } ?: it.id) != lineageId
@@ -427,6 +491,7 @@ class MessagePatternRepository(
                         existing.copy(
                             id = 0L,
                             senderProfileId = draft.senderProfileId,
+                            familyId = targetFamilyId,
                             userFriendlyName = draft.displayName.trim(),
                             normalizedSignature = revisionSignature(
                                 existing.normalizedSignature,
@@ -472,10 +537,17 @@ class MessagePatternRepository(
                 val nextVersion = (definitionDao.getByLineage(lineageId).maxOfOrNull { it.version }
                     ?: existing.version) + 1
                 val ts = now()
+                val targetFamilyId = getOrCreateFamily(
+                    senderProfileId = existing.senderProfileId,
+                    stableKey = "review:non-financial:$lineageId",
+                    displayName = existing.userFriendlyName,
+                    status = MessagePatternStatus.UNKNOWN,
+                ) ?: existing.familyId
                 definitionDao.update(existing.copy(deprecatedAt = ts, updatedAt = ts))
                 val newId = definitionDao.insert(
                     existing.copy(
                         id = 0L,
+                        familyId = targetFamilyId,
                         normalizedSignature = revisionSignature(
                             existing.normalizedSignature,
                             lineageId,
@@ -525,29 +597,48 @@ class MessagePatternRepository(
      * No financial records — transactions, journals, postings — are
      * touched. Patterns are interpretation configuration.
      */
-    suspend fun rebuildForSender(senderProfileId: Long, messages: List<SmsMessage>) = withContext(Dispatchers.IO) {
-        val ts = now()
-        val existing = definitionDao.getForSender(senderProfileId)
-        // Mark incompatible rows as STALE: they survive in the DB but
-        // cannot match. They can be reviewed and re-derived from inbox data.
-        for (def in existing) {
-            if (def.normalizationVersion != NORMALIZATION_VERSION) {
-                definitionDao.update(
-                    def.copy(
-                        deprecatedAt = def.deprecatedAt ?: ts,
-                        updatedAt = ts,
-                    ),
+    suspend fun rebuildForSender(senderProfileId: Long, messages: List<SmsMessage>) =
+        withContext(Dispatchers.IO) {
+            inTransaction {
+                val ts = now()
+                val existing = definitionDao.getForSender(senderProfileId)
+                // Preserve incompatible rows for audit while excluding them from matching.
+                for (def in existing) {
+                    if (def.normalizationVersion != NORMALIZATION_VERSION) {
+                        definitionDao.update(
+                            def.copy(
+                                status = MessagePatternStatus.DEPRECATED,
+                                isActive = false,
+                                deprecatedAt = def.deprecatedAt ?: ts,
+                                updatedAt = ts,
+                            ),
+                        )
+                    }
+                }
+                val clusters = PatternDiscoveryService.discover(messages, existing)
+                    .filterNot {
+                        it.looksLikeOtpOrMarketing ||
+                            it.looksLikeNonFinancial ||
+                            it.familyKey.startsWith("review:")
+                    }
+                for (cluster in clusters) {
+                    saveDiscovered(
+                        senderProfileId,
+                        cluster,
+                        MessagePatternStatus.APPROVED,
+                        replaceExampleCount = true,
+                    )
+                }
+                RebuildSummary(
+                    rebuiltVariants = clusters.sumOf {
+                        it.exactVariants.ifEmpty { listOf(it) }.size
+                    },
+                    staleDeprecated = existing.count {
+                        it.normalizationVersion != NORMALIZATION_VERSION
+                    },
                 )
             }
         }
-        val clusters = PatternDiscoveryService.discover(messages, existing)
-        for (cluster in clusters.filterNot { it.looksLikeOtpOrMarketing }) {
-            saveDiscovered(senderProfileId, cluster, MessagePatternStatus.APPROVED)
-        }
-        val rebuilt = clusters.size
-        val stale = existing.count { it.normalizationVersion != NORMALIZATION_VERSION }
-        RebuildSummary(rebuiltVariants = rebuilt, staleDeprecated = stale)
-    }
 
     data class RebuildSummary(val rebuiltVariants: Int, val staleDeprecated: Int)
 
@@ -558,14 +649,74 @@ class MessagePatternRepository(
         templateText: String? = null,
         body: String? = null,
     ): MessagePattern = withContext(Dispatchers.IO) {
+        unknownMutex.withLock {
+            inTransaction {
+                ensureUnknownLocked(senderProfileId, signature, friendlyName, templateText, body)
+            }
+        }
+    }
+
+    private suspend fun ensureUnknownLocked(
+        senderProfileId: Long,
+        signature: String,
+        friendlyName: String,
+        templateText: String?,
+        body: String?,
+    ): MessagePattern {
         val built = MessageTemplateEngine.buildFromSms(body ?: templateText)
         val effectiveTemplate = templateText ?: built.templateText.takeIf { it.isNotBlank() }
+        val semanticResult = if (!body.isNullOrBlank()) {
+            com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromBody(body)
+        } else {
+            com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                effectiveTemplate,
+                built.transactionType?.name,
+            )
+        }
+        val semanticKey = (semanticResult as? com.baraa.masroof.sms.SemanticSchemaResult.Safe)?.key
+        if (semanticKey != null) {
+            val semanticApproved = definitionDao.getForSender(senderProfileId).filter { candidate ->
+                candidate.status == MessagePatternStatus.APPROVED &&
+                    candidate.isActive &&
+                    candidate.deprecatedAt == null &&
+                    (
+                        com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                            candidate.templateText,
+                            candidate.transactionType,
+                        ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                        )?.key == semanticKey
+            }.groupBy { it.familyId ?: -it.id }
+            if (semanticApproved.size == 1) {
+                val approved = semanticApproved.values.single().maxBy { it.version }
+                val updated = approved.copy(
+                    exampleCount = approved.exampleCount + 1,
+                    updatedAt = now(),
+                )
+                definitionDao.update(updated)
+                return toPattern(updated)
+            }
+            val semanticFamily = familyDao?.findByStableKey(senderProfileId, semanticKey)
+            if (semanticFamily != null) {
+                val candidate = definitionDao.getForFamily(semanticFamily.id)
+                    .filter { it.status == MessagePatternStatus.UNKNOWN && it.deprecatedAt == null }
+                    .maxByOrNull { it.updatedAt }
+                if (candidate != null) {
+                    val updated = candidate.copy(
+                        exampleCount = candidate.exampleCount + 1,
+                        updatedAt = now(),
+                    )
+                    definitionDao.update(updated)
+                    return toPattern(updated)
+                }
+            }
+        }
         // Re-derive canonical signature through the production normalizer so
         // the unknown candidate matches the deterministic identity of any
         // existing approved pattern that was trained on the same structure.
         val canonicalSignature = SmsStructureNormalizer.signatureFromBody(body)
             .takeIf { it.isNotBlank() }
             ?: SmsStructureNormalizer.signatureFromTemplate(effectiveTemplate)
+                .takeIf { it.isNotBlank() }
             ?: signature
         val canonicalKey = canonicalSignature
         val existing = definitionDao.findByCanonicalKey(senderProfileId, canonicalKey)
@@ -579,15 +730,10 @@ class MessagePatternRepository(
                 updatedAt = now(),
             )
             definitionDao.update(updated)
-            return@withContext toPattern(updated)
+            return toPattern(updated)
         }
         val ts = now()
-        val familyStableKey = run {
-            val structure = CanonicalMessageNormalizer.normalizeTemplate(effectiveTemplate)
-            val type = com.baraa.masroof.transaction.TransactionTypeTaxonomy
-                .parse(built.transactionType?.name)
-            PatternStructure.familyKey(structure, type, built.channel)
-        }
+        val familyStableKey = semanticKey ?: "review:${canonicalSignature}"
         val familyId = getOrCreateFamily(
             senderProfileId,
             familyStableKey,
@@ -625,7 +771,7 @@ class MessagePatternRepository(
             built.placeholders,
         )
         persistAnchors(id, effectiveTemplate)
-        toPattern(definitionDao.getById(id)!!)
+        return toPattern(definitionDao.getById(id)!!)
     }
 
     /** Any-status template match: covers UNKNOWN rows the importable matcher skips. */

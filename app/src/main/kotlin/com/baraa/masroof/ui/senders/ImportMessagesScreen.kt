@@ -288,7 +288,8 @@ internal fun mapImportCommitResult(
         raw = result,
     )
     // Review path may only persist UNKNOWN patterns (no transaction rows yet).
-    mode == SmsImportCommitMode.REVIEW_CANDIDATES -> ImportExecutionResult.Success(
+    mode == SmsImportCommitMode.REVIEW_CANDIDATES ||
+        mode == SmsImportCommitMode.PATTERN_CANDIDATES_ONLY -> ImportExecutionResult.Success(
         importedCount = 0,
         linkedCount = 0,
         postedCount = 0,
@@ -449,8 +450,23 @@ fun ImportMessagesScreen(
     }
 
     fun openPatternApprovalFromImport() {
-        app.importSessionStore.beginTemplateApprovalFromImport()
-        onBankMessages()
+        val preview = scanPreview ?: return
+        scope.launch {
+            reprocessingTemplates = true
+            try {
+                app.importOrchestrator.commit(
+                    scanPreview = preview,
+                    trackingStartDate = openingBalanceDate,
+                    importedSms = lastLoadedMessages,
+                    mode = SmsImportCommitMode.PATTERN_CANDIDATES_ONLY,
+                    allowOncePatternIds = app.importSessionStore.useOncePatternIds.value,
+                )
+                app.importSessionStore.beginTemplateApprovalFromImport()
+                onBankMessages()
+            } finally {
+                reprocessingTemplates = false
+            }
+        }
     }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

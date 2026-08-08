@@ -58,17 +58,16 @@ object PatternStructure {
         structure: CanonicalMessageNormalizer.CanonicalMessageStructure,
     ): PaymentInstrument {
         for (line in structure.lines) {
-            when (line.valueToken) {
-                CanonicalMessageNormalizer.ValueToken.IBAN_LAST4 -> return PaymentInstrument.IBAN
-                CanonicalMessageNormalizer.ValueToken.LAST4 -> {
-                    val label = line.label
-                    if ("ائتمان" in label || "credit" in label) return PaymentInstrument.CREDIT_CARD
-                    if ("مدى" in label || "debit" in label) return PaymentInstrument.DEBIT_CARD
-                    if ("محفظه" in label || "محفظة" in label || "wallet" in label) return PaymentInstrument.WALLET
-                    if ("حساب" in label || "account" in label) return PaymentInstrument.ACCOUNT
-                    return PaymentInstrument.ACCOUNT
-                }
-                else -> continue
+            val fields = CanonicalPatternFieldClassifier.classify(line.originalLabel)
+            when {
+                com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 in fields ->
+                    return PaymentInstrument.CREDIT_CARD
+                com.baraa.masroof.data.db.PatternCanonicalField.DEBIT_CARD_LAST4 in fields ->
+                    return PaymentInstrument.DEBIT_CARD
+                com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4 in fields ->
+                    return PaymentInstrument.WALLET
+                fields.any { "IBAN" in it.name } -> return PaymentInstrument.IBAN
+                fields.any { "ACCOUNT_LAST4" in it.name } -> return PaymentInstrument.ACCOUNT
             }
         }
         return PaymentInstrument.UNKNOWN

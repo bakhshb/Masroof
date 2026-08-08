@@ -279,7 +279,7 @@ class TrainingPersistenceImportRoundTripTest {
 }
 
 /** In-memory DAO stubs that match the production repository contract. */
-private class RoundTripPatternDefinitionDao :
+internal class RoundTripPatternDefinitionDao :
     com.baraa.masroof.data.db.MessagePatternDefinitionDao {
     private val rows = mutableListOf<MessagePatternDefinitionEntity>()
     private var nextId = 1L
@@ -375,7 +375,7 @@ private class RoundTripPatternDefinitionDao :
         }
 }
 
-private class RoundTripPatternFieldDao : PatternFieldDefinitionDao {
+internal class RoundTripPatternFieldDao : PatternFieldDefinitionDao {
     private val rows = mutableListOf<PatternFieldDefinitionEntity>()
     private var nextId = 1L
 
@@ -397,7 +397,7 @@ private class RoundTripPatternFieldDao : PatternFieldDefinitionDao {
     }
 }
 
-private class RoundTripFamilyDao : com.baraa.masroof.data.db.MessagePatternFamilyDao {
+internal class RoundTripFamilyDao : com.baraa.masroof.data.db.MessagePatternFamilyDao {
     private val rows = mutableListOf<MessagePatternFamilyEntity>()
     private var nextId = 1L
 
@@ -430,7 +430,7 @@ private class RoundTripFamilyDao : com.baraa.masroof.data.db.MessagePatternFamil
         rows.firstOrNull { it.senderProfileId == senderProfileId && it.stableKey == stableKey }
 }
 
-private class RoundTripAnchorDao : PatternVariantAnchorDao {
+internal class RoundTripAnchorDao : PatternVariantAnchorDao {
     private val rows = mutableListOf<PatternVariantAnchorEntity>()
     private var nextId = 1L
 

@@ -153,46 +153,32 @@ object SemanticPatternCanonicalizer {
         cores: MutableSet<CoreSlot>,
         optionals: MutableSet<OptionalSlot>,
     ) {
-        val moneyRole = MonetaryFieldClassifier.classify(label)
-        when (moneyRole) {
-            MonetaryRole.TRANSACTION_AMOUNT -> {
-                cores += CoreSlot.AMOUNT
-                return
-            }
-            MonetaryRole.AVAILABLE_BALANCE -> {
-                optionals += OptionalSlot.AVAILABLE_BALANCE
-                return
-            }
-            MonetaryRole.TOTAL_DUE, MonetaryRole.OUTSTANDING_BALANCE -> {
-                optionals += OptionalSlot.TOTAL_DUE
-                return
-            }
-            MonetaryRole.CREDIT_LIMIT -> {
-                optionals += OptionalSlot.CREDIT_LIMIT
-                return
-            }
+        when (CanonicalPatternFieldClassifier.monetaryRole(label)) {
+            MonetaryRole.AVAILABLE_BALANCE -> optionals += OptionalSlot.AVAILABLE_BALANCE
+            MonetaryRole.TOTAL_DUE, MonetaryRole.OUTSTANDING_BALANCE -> optionals += OptionalSlot.TOTAL_DUE
+            MonetaryRole.CREDIT_LIMIT -> optionals += OptionalSlot.CREDIT_LIMIT
             else -> Unit
         }
-
-        val folded = MessageTypeCueCatalog.foldArabic(label)
-        when {
-            isCreditCardLabel(folded) -> cores += CoreSlot.CREDIT_CARD_LAST4
-            isDebitCardLabel(folded) -> cores += CoreSlot.DEBIT_CARD_LAST4
-            isIbanLabel(folded) -> cores += CoreSlot.IBAN_LAST4
-            isWalletLabel(folded) -> cores += CoreSlot.WALLET_LAST4
-            isSourceAccountLabel(folded) -> cores += CoreSlot.SOURCE_ACCOUNT
-            isDestinationAccountLabel(folded) -> cores += CoreSlot.DESTINATION_ACCOUNT
-            isAccountLabel(folded) -> cores += CoreSlot.ACCOUNT_LAST4
-            isMerchantLabel(folded) -> cores += CoreSlot.MERCHANT
-            isBeneficiaryLabel(folded) -> cores += CoreSlot.BENEFICIARY
-            isDatetimeLabel(folded) -> cores += CoreSlot.DATETIME
-            isReferenceLabel(folded) -> cores += CoreSlot.REFERENCE
-            else -> {
-                // Unlabeled type header — ignore for slots.
-                val cue = MessageTypeCueCatalog.detectFromFragment(label)
-                if (cue != null && value.isBlank()) return
-                // Free-text value with letters under an unknown label: treat as merchant-like
-                // only when the label itself is a known merchant synonym (already handled).
+        for (field in CanonicalPatternFieldClassifier.classify(label)) {
+            when (field) {
+                com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT -> cores += CoreSlot.AMOUNT
+                com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 -> cores += CoreSlot.CREDIT_CARD_LAST4
+                com.baraa.masroof.data.db.PatternCanonicalField.DEBIT_CARD_LAST4 -> cores += CoreSlot.DEBIT_CARD_LAST4
+                com.baraa.masroof.data.db.PatternCanonicalField.ACCOUNT_LAST4 -> cores += CoreSlot.ACCOUNT_LAST4
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4 -> cores += CoreSlot.SOURCE_ACCOUNT
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4 -> cores += CoreSlot.DESTINATION_ACCOUNT
+                com.baraa.masroof.data.db.PatternCanonicalField.IBAN_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4,
+                -> cores += CoreSlot.IBAN_LAST4
+                com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4 -> cores += CoreSlot.WALLET_LAST4
+                com.baraa.masroof.data.db.PatternCanonicalField.MERCHANT -> cores += CoreSlot.MERCHANT
+                com.baraa.masroof.data.db.PatternCanonicalField.BENEFICIARY -> cores += CoreSlot.BENEFICIARY
+                com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE,
+                com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_TIME,
+                -> cores += CoreSlot.DATETIME
+                com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_REFERENCE -> cores += CoreSlot.REFERENCE
+                else -> Unit
             }
         }
     }

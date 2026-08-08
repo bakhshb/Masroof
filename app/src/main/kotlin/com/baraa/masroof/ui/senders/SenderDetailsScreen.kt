@@ -202,32 +202,26 @@ fun SenderDetailsScreen(
                                     Column(Modifier.padding(Spacing.x3)) {
                                         Text(familyName, style = FinancialTypography.merchant)
                                         Text(
-                                            "$messages رسالة · ${variants.size} صيغة · معتمد",
+                                            "$messages رسالة · معتمد",
                                             style = FinancialTypography.metadata,
                                         )
                                         if (familyId in expandedFamilyIds) {
-                                            variants.sortedByDescending { it.definition.exampleCount }.forEachIndexed { index, pattern ->
-                                                Text(
-                                                    "الصيغة ${index + 1} — ${pattern.definition.exampleCount} رسالة",
-                                                    style = FinancialTypography.metadata,
-                                                    modifier = Modifier.padding(top = Spacing.x2),
-                                                )
-                                                ApprovedTemplateCard(
-                                                    pattern = pattern,
-                                                    onEdit = { onTemplateClick(pattern.definition.id) },
-                                                    onDisable = {
-                                                        scope.launch {
-                                                            app.messagePatternRepository.setStatus(
-                                                                pattern.definition.id,
-                                                                MessagePatternStatus.IGNORED,
-                                                            )
-                                                            app.importSessionStore.markTemplatesChanged()
-                                                            status = "تم تعطيل الصيغة"
-                                                            reload()
-                                                        }
-                                                    },
-                                                )
-                                            }
+                                            val pattern = variants.maxBy { it.definition.version }
+                                            ApprovedTemplateCard(
+                                                pattern = pattern,
+                                                onEdit = { onTemplateClick(pattern.definition.id) },
+                                                onDisable = {
+                                                    scope.launch {
+                                                        app.messagePatternRepository.setStatus(
+                                                            pattern.definition.id,
+                                                            MessagePatternStatus.IGNORED,
+                                                        )
+                                                        app.importSessionStore.markTemplatesChanged()
+                                                        status = "تم تعطيل النمط"
+                                                        reload()
+                                                    }
+                                                },
+                                            )
                                         }
                                     }
                                 }
@@ -297,13 +291,22 @@ fun SenderDetailsScreen(
                             style = FinancialTypography.metadata,
                         )
                     } else {
+                        val candidateFamilies = candidatePatterns.groupBy {
+                            it.family?.id ?: -it.definition.id
+                        }
                         Text(
-                            "${candidatePatterns.size} نمطاً مرشحاً — لم تُعتمد بعد ولا تُستخدم في الاستيراد.",
+                            "${candidateFamilies.size} نمطاً مرشحاً — لم تُعتمد بعد ولا تُستخدم في الاستيراد.",
                             style = FinancialTypography.metadata,
                         )
-                        candidatePatterns
-                            .sortedByDescending { it.definition.exampleCount }
-                            .forEach { pattern ->
+                        candidateFamilies.values
+                            .sortedByDescending { rows -> rows.sumOf { it.definition.exampleCount } }
+                            .forEach { rows ->
+                                val base = rows.maxBy { it.definition.version }
+                                val pattern = base.copy(
+                                    definition = base.definition.copy(
+                                        exampleCount = rows.sumOf { it.definition.exampleCount },
+                                    ),
+                                )
                                 CandidatePatternCard(
                                     pattern = pattern,
                                     senderLabel = profile?.displaySender.orEmpty(),

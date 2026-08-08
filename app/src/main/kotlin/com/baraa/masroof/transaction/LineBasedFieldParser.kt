@@ -14,11 +14,11 @@ data class ParsedLine(val label: String, val value: String)
 object LineBasedFieldParser {
     private const val LINE_BREAK_REGEX = "[\n\r]+"
     private const val LABEL_SEPARATORS = ":：:：=: =|:"
-    private val AMOUNT_LABEL_REGEX = Regex("""^(بمبلغ|بقيمة|مبلغ|Amount|Transaction Amount|Purchase Amount|Transfer Amount|Payment Amount|Debited Amount|Credited Amount|Withdrawal Amount|مبلغ العملية|قيمة العملية|قيمة الشراء|قيمة التحويل|مبلغ التحويل|قيمة السحب|مبلغ السحب|المبلغ المخصوم|المبلغ المحول|المبلغ المستقطع|قيمة الخصم|مبلغ الخصم|قيمة الشحن|مبلغ الشحن|القيمة|of|القسط)$""", RegexOption.IGNORE_CASE)
+    private val AMOUNT_LABEL_REGEX = Regex("""^(بمبلغ|بقيمة|مبلغ|المبلغ|Amount|Transaction Amount|Purchase Amount|Transfer Amount|Payment Amount|Debited Amount|Credited Amount|Withdrawal Amount|مبلغ العملية|قيمة العملية|قيمة الشراء|قيمة التحويل|مبلغ التحويل|قيمة السحب|مبلغ السحب|المبلغ المخصوم|المبلغ المحول|المبلغ المستقطع|قيمة الخصم|مبلغ الخصم|قيمة الشحن|مبلغ الشحن|القيمة|of|القسط)$""", RegexOption.IGNORE_CASE)
     private val AMOUNT_LABELS = listOf(
         "Amount", "Transaction Amount", "Purchase Amount", "Transfer Amount", "Payment Amount",
         "Debited Amount", "Credited Amount", "Withdrawal Amount",
-        "بمبلغ", "بقيمة", "مبلغ", "مبلغ العملية", "قيمة العملية", "قيمة الشراء", "قيمة التحويل",
+        "بمبلغ", "بقيمة", "مبلغ", "المبلغ", "مبلغ العملية", "قيمة العملية", "قيمة الشراء", "قيمة التحويل",
         "مبلغ التحويل", "قيمة السحب", "مبلغ السحب", "المبلغ المخصوم", "المبلغ المحول",
         "المبلغ المستقطع", "قيمة الخصم", "مبلغ الخصم", "قيمة الشحن", "مبلغ الشحن",
         "القيمة",
@@ -44,7 +44,10 @@ object LineBasedFieldParser {
         RegexOption.IGNORE_CASE,
     )
     private val CARD_DIGIT_REGEX = Regex("""^\*+(\d{4})$|^\d{4}$""")
-    private val MONEY_REGEX = Regex("""^([A-Z]{2,3})?\s*([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*([A-Z]{2,3})?$""")
+    private val MONEY_REGEX = Regex(
+        """^([A-Z]{2,3})?\s*([-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?)\s*([A-Z]{2,3})?$""",
+        RegexOption.IGNORE_CASE,
+    )
     private val TIME_REGEX = Regex("""(\d{1,2}):(\d{2})(?::(\d{2}))?""")
     private val DATE_REGEX = listOf(Regex("""(\d{4})[/-](\d{1,2})[/-](\d{1,2})"""), Regex("""(\d{1,2})[/-](\d{1,2})[/-](\d{4})"""))
 
@@ -54,7 +57,7 @@ object LineBasedFieldParser {
      * before `Available Balance`; word-boundary `at`/`of`/`on`).
      */
     private val INLINE_FIELD_MARKER = Regex(
-        """(?i)(Available Balance is|Available Balance|Due Amount|Amount Due|Total Amount Due|Current Balance|Credit Card|Debit Card|\bat|\bof|\bon)\s*:""",
+        """(?i)(Available Balance is|Available Balance|Due Amount|Amount Due|Total Amount Due|Current Balance|Credit Card|Debit Card|بطاقة ائتمانية|بطاقة مدى رقم|بطاقة مدى|بمبلغ|المبلغ|مبلغ العملية|قيمة العملية|\bat|\bof|\bon)\s*:""",
     )
 
     fun splitLines(body: String): List<ParsedLine> {
@@ -128,6 +131,15 @@ object LineBasedFieldParser {
         return null
     }
 
+    fun parseTransactionAmount(lines: List<ParsedLine>): BigDecimal? {
+        for (line in lines) {
+            if (!MonetaryFieldClassifier.isTransactionAmount(line.label)) continue
+            val parsed = parseMoney(line.value)?.first
+            if (parsed != null && parsed.signum() > 0) return parsed
+        }
+        return null
+    }
+
     fun parseLabeledMoneyFieldExact(lines: List<ParsedLine>, vararg exactLabels: String): BigDecimal? {
         val compiled = exactLabels.map { Regex(Regex.escape(it)) }
         return parseLabeledMoneyField(lines, compiled)
@@ -141,6 +153,8 @@ object LineBasedFieldParser {
         }
         return null
     }
+
+    fun parseMoneyValue(value: String): BigDecimal? = parseMoney(value)?.first
 
     fun parseLastFourField(lines: List<ParsedLine>): String? {
         for (line in lines) {

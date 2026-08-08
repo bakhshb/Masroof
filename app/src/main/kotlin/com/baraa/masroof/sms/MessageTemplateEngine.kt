@@ -143,6 +143,7 @@ object MessageTemplateEngine {
         placeholders: MutableSet<String>,
     ): String {
         val foldedLabel = MessageTypeCueCatalog.foldArabic(label)
+        val canonicalFields = CanonicalPatternFieldClassifier.classify(label)
         var remaining = value
         val controlled = MessageTypeCueCatalog.detectFromFragment(value)
         if (controlled != null && controlled.typeToken != "TYPE:UNKNOWN" &&
@@ -158,36 +159,43 @@ object MessageTemplateEngine {
         }
 
         when {
-            "مستحق" in foldedLabel || "due" in foldedLabel -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.CARD_AMOUNT_DUE in canonicalFields -> {
                 remaining = replaceMoneyKeepingCurrency(remaining) { put("TOTAL_DUE") }
             }
-            MessageTypeCueCatalog.isOptionalContextLabel(label) ||
-                "رصيد" in foldedLabel || "balance" in foldedLabel -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.AVAILABLE_BALANCE in canonicalFields -> {
                 remaining = replaceMoneyKeepingCurrency(remaining) { put("AVAILABLE_BALANCE") }
             }
-            MessageTypeCueCatalog.isAmountLikeLabel(label) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT in canonicalFields -> {
                 remaining = replaceMoneyKeepingCurrency(remaining) { put("AMOUNT") }
             }
-            isCreditCardLabel(foldedLabel) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("CREDIT_CARD_LAST4") }
             }
-            isDebitCardLabel(foldedLabel) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.DEBIT_CARD_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("DEBIT_CARD_LAST4") }
             }
-            isIbanLabel(foldedLabel) -> {
+            canonicalFields.any {
+                it == com.baraa.masroof.data.db.PatternCanonicalField.IBAN_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4
+            } -> {
                 remaining = LAST4.replace(remaining) { put("IBAN_LAST4") }
             }
-            isWalletLabel(foldedLabel) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("WALLET_LAST4") }
             }
-            isAccountLabel(foldedLabel) || MessageTypeCueCatalog.isLast4LikeLabel(label) -> {
+            canonicalFields.any {
+                it == com.baraa.masroof.data.db.PatternCanonicalField.ACCOUNT_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4 ||
+                    it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4
+            } -> {
                 remaining = LAST4.replace(remaining) { put("ACCOUNT_LAST4") }
             }
-            isMerchantLabel(foldedLabel) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.MERCHANT in canonicalFields -> {
                 placeholders += "MERCHANT"
                 remaining = "{MERCHANT}"
             }
-            isBeneficiaryLabel(foldedLabel) -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.BENEFICIARY in canonicalFields -> {
                 placeholders += "BENEFICIARY"
                 remaining = "{BENEFICIARY}"
             }
@@ -195,7 +203,7 @@ object MessageTemplateEngine {
                 placeholders += "BANK_NAME"
                 remaining = "{BANK_NAME}"
             }
-            "مرجع" in foldedLabel || "reference" in foldedLabel || "ref" in foldedLabel -> {
+            com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_REFERENCE in canonicalFields -> {
                 remaining = if (LONG_REF.containsMatchIn(remaining)) {
                     LONG_REF.replace(remaining) { put("TRANSACTION_ID") }
                 } else {
@@ -203,26 +211,18 @@ object MessageTemplateEngine {
                     "{TRANSACTION_ID}"
                 }
             }
-            foldedLabel == "في" || foldedLabel == "on" ||
-                "وقت" in foldedLabel || "تاريخ" in foldedLabel ||
-                "time" in foldedLabel || "date" in foldedLabel -> {
-                remaining = TIME.replace(remaining) { put("TIME") }
-                remaining = DATE.replace(remaining) { put("DATE") }
+            com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE in canonicalFields ||
+                com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_TIME in canonicalFields -> {
+                if (com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_TIME in canonicalFields) {
+                    remaining = TIME.replace(remaining) { put("TIME") }
+                }
+                if (com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE in canonicalFields) {
+                    remaining = DATE.replace(remaining) { put("DATE") }
+                }
             }
             else -> {
-                // Generic: tokenize money/date/time/last4 carefully — never every number as AMOUNT.
-                if (MONEY_NUM.containsMatchIn(remaining) && CURRENCY_TOKEN.containsMatchIn(remaining)) {
-                    remaining = replaceMoneyKeepingCurrency(remaining) { put("AMOUNT") }
-                } else {
-                    remaining = TIME.replace(remaining) { put("TIME") }
-                    remaining = DATE.replace(remaining) { put("DATE") }
-                    if (LAST4.containsMatchIn(remaining) && remaining.trim().length <= 8) {
-                        remaining = LAST4.replace(remaining) { put("ACCOUNT_LAST4") }
-                    } else if (remaining.isNotBlank() && remaining.any { it.isLetter() }) {
-                        placeholders += "MERCHANT"
-                        remaining = "{MERCHANT}"
-                    }
-                }
+                // Unknown labels remain literal. Arbitrary numbers must never
+                // become transaction amounts or account identifiers.
             }
         }
         return remaining.trim()

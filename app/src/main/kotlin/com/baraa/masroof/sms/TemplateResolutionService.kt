@@ -26,6 +26,7 @@ sealed class TemplateResolutionResult {
         val parsed: ParsedTransaction,
         val extractedValues: Map<String, String>,
         val score: Int,
+        val matchTier: PatternMatchTier = PatternMatchTier.STRICT_TEMPLATE,
     ) : TemplateResolutionResult()
 
     data class Unmatched(val reason: Reason = Reason.NO_APPROVED_MATCH) : TemplateResolutionResult() {
@@ -39,6 +40,14 @@ sealed class TemplateResolutionResult {
     }
 
     data class Ambiguous(val candidates: List<MessagePattern>) : TemplateResolutionResult()
+}
+
+enum class PatternMatchTier {
+    EXACT_STRUCTURE,
+    SEMANTIC_SCHEMA,
+    STRICT_TEMPLATE,
+    UNMATCHED,
+    AMBIGUOUS,
 }
 
 data class ApprovedTemplateMatchAttempt(
@@ -60,6 +69,10 @@ data class ApprovedTemplateMatchAttempt(
 data class ApprovedTemplateMatchDiagnostics(
     val smsStructuralSignature: String,
     val attempts: List<ApprovedTemplateMatchAttempt>,
+    val semanticPatternKey: String? = null,
+    val matchedPatternId: Long? = null,
+    val matchTier: PatternMatchTier = PatternMatchTier.UNMATCHED,
+    val rejectionReason: String? = null,
 ) {
     val primaryFailure: String
         get() {
@@ -128,9 +141,37 @@ object TemplateResolutionService {
                 },
             )
         }
-        return ApprovedTemplateMatchDiagnostics(
-            smsStructuralSignature = SmsStructureNormalizer.signatureFromBody(body.orEmpty()),
+        val exactSignature = SmsStructureNormalizer.signatureFromBody(body.orEmpty())
+        val eligiblePatterns = patterns.filter { pattern ->
+            attempts.firstOrNull { it.templateId == pattern.definition.id }?.eligible == true
+        }
+        val exact = eligiblePatterns.filter {
+            it.definition.normalizedSignature.substringBefore("#revision:") == exactSignature
+        }
+        val runtimeSemantic =
+            SemanticPatternSchemaNormalizer.fromBody(body) as? SemanticSchemaResult.Safe
+        val semantic = runtimeSemantic?.let { runtime ->
+            eligiblePatterns.filter { semanticKey(it) == runtime.key }
+        }.orEmpty()
+        val strict = attempts.filter { it.eligible && it.match?.matched == true }
+        val selected = when {
+            exact.isNotEmpty() -> exact.maxBy { it.definition.version }.definition.id to
+                PatternMatchTier.EXACT_STRUCTURE
+            semantic.isNotEmpty() -> semantic.maxBy { it.definition.version }.definition.id to
+                PatternMatchTier.SEMANTIC_SCHEMA
+            strict.isNotEmpty() -> strict.maxBy { it.match?.score ?: 0 }.templateId to
+                PatternMatchTier.STRICT_TEMPLATE
+            else -> null
+        }
+        val diagnostics = ApprovedTemplateMatchDiagnostics(
+            smsStructuralSignature = exactSignature,
             attempts = attempts,
+            semanticPatternKey = runtimeSemantic?.key,
+            matchedPatternId = selected?.first,
+            matchTier = selected?.second ?: PatternMatchTier.UNMATCHED,
+        )
+        return diagnostics.copy(
+            rejectionReason = if (selected == null) diagnostics.primaryFailure else null,
         )
     }
 
@@ -172,6 +213,9 @@ object TemplateResolutionService {
         val runtimeSignature = SmsStructureNormalizer.signatureFromBody(body)
         val signatureHits: List<Pair<MessagePattern, TemplateMatcher.MatchResult>> =
             effective.mapNotNull { pattern ->
+                if (TransactionType.values().none { it.name == pattern.definition.transactionType }) {
+                    return@mapNotNull null
+                }
                 val signature = pattern.definition.normalizedSignature
                     .substringBefore("#revision:")
                 if (signature.isBlank() ||
@@ -195,29 +239,35 @@ object TemplateResolutionService {
                     null
                 }
             }
-        if (signatureHits.size > 1) {
+        val exactFamilies = signatureHits.groupBy { semanticKey(it.first) ?: "variant:${it.first.definition.id}" }
+        if (exactFamilies.size > 1) {
             // Two distinct templates with the same canonical signature are a
             // real conflict. Surface as AMBIGUOUS so the user resolves it,
             // not as a hidden highest-score guess.
             return TemplateResolutionResult.Ambiguous(signatureHits.map { it.first })
         }
-        if (signatureHits.size == 1) {
-            val pair = signatureHits.single()
+        if (signatureHits.isNotEmpty()) {
+            val pair = exactFamilies.values.single()
+                .maxBy { it.first.definition.version }
             val parsed = extract(sender, body, smsTimestampMillis, pair.first, pair.second.values)
             return TemplateResolutionResult.Matched(
                 pair.first,
                 parsed,
                 pair.second.values,
                 pair.second.score,
+                PatternMatchTier.EXACT_STRUCTURE,
             )
         }
 
         // Step 2: legacy signature-only patterns (no templateText). These
         // rows exist from migrations 17→21 and match purely by signature.
         val legacySignatureHit: MessagePattern? = effective.firstOrNull { pattern ->
+            val validType = TransactionType.values().any {
+                it.name == pattern.definition.transactionType
+            }
             val signature = pattern.definition.normalizedSignature
                 .substringBefore("#revision:")
-            signature == runtimeSignature &&
+            validType && signature == runtimeSignature &&
                 pattern.definition.templateText.isNullOrBlank()
         }
         if (legacySignatureHit != null) {
@@ -233,7 +283,37 @@ object TemplateResolutionService {
                 parsed,
                 emptyMap(),
                 score = 100,
+                matchTier = PatternMatchTier.EXACT_STRUCTURE,
             )
+        }
+
+        // Step 2: semantic schema. Equivalent labels/order/layout resolve to
+        // one approved family; extraction is performed from the raw SMS.
+        val runtimeSemantic = SemanticPatternSchemaNormalizer.fromBody(body)
+        if (runtimeSemantic is SemanticSchemaResult.Safe) {
+            val semanticHits = effective.filter {
+                semanticKey(it) == runtimeSemantic.key
+            }.groupBy { it.definition.familyId ?: -it.definition.id }
+            if (semanticHits.size > 1) {
+                return TemplateResolutionResult.Ambiguous(semanticHits.values.flatten())
+            }
+            if (semanticHits.size == 1) {
+                val familyPatterns = semanticHits.values.single()
+                val pattern = familyPatterns.maxWith(
+                    compareBy<MessagePattern> { it.definition.version }
+                        .thenBy { it.definition.id },
+                )
+                val extracted = CanonicalSmsFieldExtractor.extract(body)
+                val values = extracted.placeholderValues()
+                val parsed = extract(sender, body, smsTimestampMillis, pattern, values)
+                return TemplateResolutionResult.Matched(
+                    pattern = pattern,
+                    parsed = parsed,
+                    extractedValues = values,
+                    score = 90,
+                    matchTier = PatternMatchTier.SEMANTIC_SCHEMA,
+                )
+            }
         }
 
         // Step 3: template-only matching (anchors + regex). Used when no
@@ -267,7 +347,29 @@ object TemplateResolutionService {
         }
         val best = ranked.first()
         val parsed = extract(sender, body, smsTimestampMillis, best.first, best.second.values)
-        return TemplateResolutionResult.Matched(best.first, parsed, best.second.values, best.second.score)
+        return TemplateResolutionResult.Matched(
+            best.first,
+            parsed,
+            best.second.values,
+            best.second.score,
+            PatternMatchTier.STRICT_TEMPLATE,
+        )
+    }
+
+    private fun semanticKey(pattern: MessagePattern): String? {
+        if (
+            !pattern.definition.transactionType.isNullOrBlank() &&
+            TransactionType.values().none { it.name == pattern.definition.transactionType }
+        ) {
+            return null
+        }
+        pattern.family?.stableKey?.takeIf { it.startsWith("semantic-v") }?.let { return it }
+        return (
+            SemanticPatternSchemaNormalizer.fromTemplate(
+                pattern.definition.templateText,
+                pattern.definition.transactionType,
+            ) as? SemanticSchemaResult.Safe
+            )?.key
     }
 
     private fun syntheticMatchResult(

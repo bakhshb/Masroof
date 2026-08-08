@@ -25,6 +25,7 @@ class Migration28To29InstrumentedTest {
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
         MasroofDatabase::class.java,
+        emptyList(),
         FrameworkSQLiteOpenHelperFactory(),
     )
 
@@ -51,7 +52,7 @@ class Migration28To29InstrumentedTest {
             )
         }
 
-        helper.runMigrationsAndValidate(TEST_DB, 29, MasroofDatabase.MIGRATION_28_29).apply {
+        helper.runMigrationsAndValidate(TEST_DB, 29, true, MasroofDatabase.MIGRATION_28_29).apply {
             // Variant preserved.
             val variantCount = query("SELECT COUNT(*) FROM message_pattern_definitions").use {
                 it.moveToFirst()
@@ -103,7 +104,7 @@ class Migration28To29InstrumentedTest {
                     "'APPROVED', 1, 1, 'USER_TRAINED', 100, 1, 1, NULL, NULL, 0, 0)",
             )
         }
-        helper.runMigrationsAndValidate(TEST_DB, 29, MasroffMigration).apply {
+        helper.runMigrationsAndValidate(TEST_DB, 29, true, MasroffMigration).apply {
             val variantCount = query("SELECT COUNT(*) FROM message_pattern_definitions").use {
                 it.moveToFirst()
                 it.getLong(0)

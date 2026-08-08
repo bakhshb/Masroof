@@ -51,6 +51,7 @@ object MonetaryFieldClassifier {
         "credited amount",
         "withdrawal amount",
         "بمبلغ",
+        "المبلغ",
         "بقيمة",
         "مبلغ",
         "مبلغ العملية",

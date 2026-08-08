@@ -30,9 +30,12 @@ class PatternFamilyVariantArchitectureTest {
             ),
         )
 
-        assertEquals(2, discovered.size)
-        assertEquals(1, discovered.map { it.familyKey }.distinct().size)
-        assertNotEquals(discovered[0].canonicalKey, discovered[1].canonicalKey)
+        assertEquals(1, discovered.size)
+        assertEquals(2, discovered.single().exactVariants.size)
+        assertEquals(
+            2,
+            discovered.single().exactVariants.map { it.canonicalKey }.distinct().size,
+        )
     }
 
     @Test
