@@ -91,16 +91,14 @@ class PatternDiscoveryServiceTest {
     }
 
     @Test
-    fun otpMessagesAreClassifiedSeparatelyNotMixedWithTransactions() {
+    fun otpMessagesAreSkippedBeforeTemplateConstruction() {
         val otp = "رمز التحقق: 123456 لا تشاركه مع أحد"
-        val clusters = PatternDiscoveryService.discover(
+        val result = PatternDiscoveryService.discoverSafely(
             listOf(sms(1, purchaseA), sms(2, otp)),
         )
-        assertEquals(2, clusters.size)
-        val otpCluster = clusters.first { it.looksLikeOtpOrMarketing }
-        val txCluster = clusters.first { !it.looksLikeOtpOrMarketing }
-        assertEquals(1, otpCluster.messageCount)
-        assertEquals(1, txCluster.messageCount)
+        assertEquals(1, result.patterns.size)
+        assertEquals(1, result.skippedOtp)
+        assertEquals(1, result.processedMessages)
     }
 
     @Test
@@ -190,10 +188,33 @@ class PatternDiscoveryServiceTest {
         """.trimIndent()
         val cue = MessageTypeCueCatalog.detect(body)
         assertEquals(TransactionType.NON_FINANCIAL, cue.transactionType)
-        val clusters = PatternDiscoveryService.discover(listOf(sms(1, body)))
-        assertTrue(clusters.single().looksLikeNonFinancial)
-        val partition = com.baraa.masroof.ui.senders.PatternReviewState.partition(clusters)
-        assertEquals(1, partition.excluded.size)
-        assertTrue(partition.needsPattern.isEmpty())
+        val result = PatternDiscoveryService.discoverSafely(listOf(sms(1, body)))
+        assertTrue(result.patterns.isEmpty())
+        assertEquals(1, result.skippedNonFinancial)
+    }
+
+    @Test
+    fun oneFailedMessageDoesNotAbortLargeDiscoveryBatch() {
+        val messages = buildList {
+            repeat(75) { add(sms((it + 1).toLong(), purchaseA.replace("StoreOne", "Store$it"))) }
+            repeat(50) { add(sms((it + 76).toLong(), transfer.replace("500.00", "${500 + it}.00"))) }
+            repeat(24) { add(sms((it + 126).toLong(), "رمز التحقق: 1234 لا تشاركه مع أحد")) }
+            add(sms(150, "مبلغ:\u0000:\uD800"))
+        }
+        val result = PatternDiscoveryService.discoverSafely(
+            messages,
+            emptyList(),
+        ) { message, stage ->
+            if (message.id == 150L && stage == PatternDiscoveryStage.TEMPLATE_BUILD) {
+                error("injected malformed message")
+            }
+        }
+
+        assertEquals(150, result.inputMessages)
+        assertEquals(1, result.failedMessages)
+        assertEquals(24, result.skippedOtp)
+        assertEquals(PatternDiscoveryStage.TEMPLATE_BUILD, result.failures.single().stage)
+        assertTrue(result.patterns.isNotEmpty())
+        assertTrue(result.processedMessages > 0)
     }
 }

@@ -35,6 +35,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.data.db.MessagePatternStatus
 import com.baraa.masroof.data.repository.MessagePattern
@@ -57,6 +58,7 @@ import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -80,6 +82,26 @@ internal fun senderPatternFamilyStatusAr(variants: List<MessagePattern>): String
         PatternFamilyRuntimeState.NOT_APPROVED -> "يحتاج اعتماد"
     }
 
+private fun logPatternDiscovery(
+    senderProfileId: Long,
+    result: com.baraa.masroof.sms.PatternDiscoveryResult,
+) {
+    if (!BuildConfig.DEBUG) return
+    android.util.Log.d(
+        "PatternDiscovery",
+        "senderProfileId=$senderProfileId inputMessages=${result.inputMessages} " +
+            "processedMessages=${result.processedMessages} skippedOtp=${result.skippedOtp} " +
+            "skippedNonFinancial=${result.skippedNonFinancial} failedMessages=${result.failedMessages}",
+    )
+    result.failures.forEach { failure ->
+        android.util.Log.w(
+            "PatternDiscovery",
+            "smsId=${failure.smsId ?: 0L} bodyHash=${failure.bodyHash} " +
+                "stage=${failure.stage} exception=${failure.exceptionClass}",
+        )
+    }
+}
+
 @Composable
 fun SenderDetailsScreen(
     senderProfileId: Long,
@@ -98,15 +120,58 @@ fun SenderDetailsScreen(
     var status by remember { mutableStateOf<String?>(null) }
     var expandedFamilyIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var ignoreTarget by remember { mutableStateOf<MessagePattern?>(null) }
+    var runningPatternAction by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
-            profile = withContext(Dispatchers.IO) {
-                app.senderProfileRepository.getById(senderProfileId)
+            try {
+                profile = withContext(Dispatchers.IO) {
+                    app.senderProfileRepository.getById(senderProfileId)
+                }
+                patterns = withContext(Dispatchers.IO) {
+                    app.messagePatternRepository.getForSender(senderProfileId)
+                }.filter { it.definition.deprecatedAt == null }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                if (failure is VirtualMachineError) throw failure
+                if (BuildConfig.DEBUG) {
+                    android.util.Log.e(
+                        "PatternDiscovery",
+                        "senderProfileId=$senderProfileId action=reload failure=${failure.javaClass.simpleName}",
+                    )
+                }
+                status = "تعذر تحديث قائمة الأنماط"
             }
-            patterns = withContext(Dispatchers.IO) {
-                app.messagePatternRepository.getForSender(senderProfileId)
-            }.filter { it.definition.deprecatedAt == null }
+        }
+    }
+
+    fun launchPatternAction(
+        actionName: String,
+        failureMessage: String,
+        action: suspend () -> String,
+    ) {
+        if (runningPatternAction != null) return
+        scope.launch {
+            runningPatternAction = actionName
+            status = null
+            try {
+                status = action()
+                reload()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                if (failure is VirtualMachineError) throw failure
+                if (BuildConfig.DEBUG) {
+                    android.util.Log.e(
+                        "PatternDiscovery",
+                        "senderProfileId=$senderProfileId action=$actionName failure=${failure.javaClass.simpleName}",
+                    )
+                }
+                status = failureMessage
+            } finally {
+                runningPatternAction = null
+            }
         }
     }
 
@@ -281,14 +346,28 @@ fun SenderDetailsScreen(
                 SenderDetailsTab.CANDIDATES -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
                         SecondaryButton(
-                            "إعادة بناء الأنماط",
+                            if (runningPatternAction == "rebuild") {
+                                "جارٍ إعادة البناء…"
+                            } else {
+                                "إعادة بناء الأنماط"
+                            },
+                            enabled = runningPatternAction == null,
                             onClick = {
-                                scope.launch {
+                                launchPatternAction(
+                                    actionName = "rebuild",
+                                    failureMessage = "تعذر إعادة بناء الأنماط. لم يتم حذف أي بيانات.",
+                                ) {
                                     val result = app.smsRepository.loadInboxResult(
                                         SmsImportRange.lastDays(LocalDate.now(), 30),
                                     )
-                                    val inbox = (result as? com.baraa.masroof.sms.SmsInboxLoadResult.Success)
-                                        ?.messages.orEmpty()
+                                    val inbox = when (result) {
+                                        is com.baraa.masroof.sms.SmsInboxLoadResult.Success ->
+                                            result.messages
+                                        is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
+                                            error("SMS_PERMISSION_DENIED")
+                                        is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
+                                            error("SMS_LOAD_FAILED")
+                                    }
                                     val senderMessages = inbox.filter {
                                         SenderNormalizer.normalize(it.sender) == profile?.normalizedSenderKey
                                     }
@@ -296,9 +375,18 @@ fun SenderDetailsScreen(
                                         senderProfileId,
                                         senderMessages,
                                     )
+                                    summary.discovery?.let {
+                                        logPatternDiscovery(senderProfileId, it)
+                                    }
                                     app.importSessionStore.markTemplatesChanged()
-                                    status = "أعيد بناء ${summary.rebuiltVariants} صيغة — ${summary.staleDeprecated} قديم تم تعطيله"
-                                    reload()
+                                    val failed = summary.discovery?.failedMessages ?: 0
+                                    "أعيد بناء ${summary.rebuiltVariants} صيغة — " +
+                                        "${summary.staleDeprecated} قديم تم تعطيله" +
+                                        if (failed > 0) {
+                                            " — تم تجاوز $failed لتعذر تحليلها"
+                                        } else {
+                                            ""
+                                        }
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -306,31 +394,54 @@ fun SenderDetailsScreen(
                     }
                     Spacer(Modifier.height(Spacing.x2))
                     SecondaryButton(
-                        "اكتشاف أنماط جديدة من آخر 30 يومًا",
+                        if (runningPatternAction == "discover") {
+                            "جارٍ اكتشاف الأنماط…"
+                        } else {
+                            "اكتشاف أنماط جديدة من آخر 30 يومًا"
+                        },
+                        enabled = runningPatternAction == null,
                         onClick = {
-                            scope.launch {
+                            launchPatternAction(
+                                actionName = "discover",
+                                failureMessage = "تعذر حفظ الأنماط. لم يتم حذف أي بيانات.",
+                            ) {
                                 val result = app.smsRepository.loadInboxResult(
                                     SmsImportRange.lastDays(LocalDate.now(), 30),
                                 )
-                                val inbox = (result as? com.baraa.masroof.sms.SmsInboxLoadResult.Success)
-                                    ?.messages.orEmpty()
+                                val inbox = when (result) {
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Success ->
+                                        result.messages
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
+                                        error("SMS_PERMISSION_DENIED")
+                                    is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
+                                        error("SMS_LOAD_FAILED")
+                                }
                                 val senderMessages = inbox.filter {
                                     SenderNormalizer.normalize(it.sender) == profile?.normalizedSenderKey
                                 }
-                                val discovered = PatternDiscoveryService.discover(
-                                    senderMessages,
+                                val existing = withContext(Dispatchers.IO) {
                                     app.messagePatternRepository.getForSender(senderProfileId)
-                                        .map { it.definition },
-                                )
-                                discovered.filterNot { it.looksLikeOtpOrMarketing }.forEach { cluster ->
-                                    app.messagePatternRepository.saveDiscovered(
-                                        senderProfileId,
-                                        cluster,
-                                        MessagePatternStatus.UNKNOWN,
+                                        .map { it.definition }
+                                }
+                                val discovery = withContext(Dispatchers.Default) {
+                                    PatternDiscoveryService.discoverSafely(
+                                        senderMessages,
+                                        existing,
                                     )
                                 }
-                                status = "تم اكتشاف ${discovered.size} صيغة للمراجعة"
-                                reload()
+                                logPatternDiscovery(senderProfileId, discovery)
+                                val batch = app.messagePatternRepository.saveDiscoveredBatch(
+                                    senderProfileId = senderProfileId,
+                                    discovered = discovery.patterns,
+                                    status = MessagePatternStatus.UNKNOWN,
+                                )
+                                "تم اكتشاف ${batch.savedCount} أنماط من " +
+                                    "${discovery.inputMessages} رسالة" +
+                                    if (discovery.failedMessages > 0) {
+                                        " — تم تجاوز ${discovery.failedMessages} لتعذر تحليلها"
+                                    } else {
+                                        ""
+                                    }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

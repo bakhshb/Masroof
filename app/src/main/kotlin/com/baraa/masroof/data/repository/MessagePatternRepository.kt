@@ -222,9 +222,32 @@ class MessagePatternRepository(
             status == MessagePatternStatus.IGNORED,
         replaceExampleCount: Boolean = false,
     ): MessagePattern = withContext(Dispatchers.IO) {
+        saveDiscoveredInternal(
+            senderProfileId = senderProfileId,
+            discovered = discovered,
+            status = status,
+            userFriendlyName = userFriendlyName,
+            fields = fields,
+            origin = origin,
+            userConfirmed = userConfirmed,
+            replaceExampleCount = replaceExampleCount,
+        )
+    }
+
+    private suspend fun saveDiscoveredInternal(
+        senderProfileId: Long,
+        discovered: DiscoveredMessagePattern,
+        status: MessagePatternStatus,
+        userFriendlyName: String? = null,
+        fields: List<SuggestedPatternField> = discovered.suggestedFields,
+        origin: PatternOrigin = PatternOrigin.USER_TRAINED,
+        userConfirmed: Boolean = status == MessagePatternStatus.APPROVED ||
+            status == MessagePatternStatus.IGNORED,
+        replaceExampleCount: Boolean = false,
+    ): MessagePattern {
         if (discovered.exactVariants.isNotEmpty()) {
             val saved = discovered.exactVariants.map { variant ->
-                saveDiscovered(
+                saveDiscoveredInternal(
                     senderProfileId = senderProfileId,
                     discovered = variant.copy(familyKey = discovered.familyKey),
                     status = status,
@@ -235,7 +258,7 @@ class MessagePatternRepository(
                     replaceExampleCount = replaceExampleCount,
                 )
             }
-            return@withContext saved.firstOrNull()
+            return saved.firstOrNull()
                 ?: error("Semantic discovery contained no exact variants")
         }
         // Canonical signature is recomputed through the production normalizer so
@@ -258,7 +281,7 @@ class MessagePatternRepository(
         )
         val existing = definitionDao.findByCanonicalKey(senderProfileId, canonicalKey)
         val ts = now()
-        if (existing == null) {
+        return if (existing == null) {
             val id = definitionDao.insert(
                 MessagePatternDefinitionEntity(
                     senderProfileId = senderProfileId,
@@ -342,6 +365,35 @@ class MessagePatternRepository(
                 persistAnchors(existing.id, updated.templateText)
             }
             toPattern(updated)
+        }
+    }
+
+    data class DiscoveredBatchSaveSummary(
+        val discoveredCount: Int,
+        val savedCount: Int,
+        val failedCount: Int,
+    )
+
+    suspend fun saveDiscoveredBatch(
+        senderProfileId: Long,
+        discovered: List<DiscoveredMessagePattern>,
+        status: MessagePatternStatus,
+        replaceExampleCount: Boolean = false,
+    ): DiscoveredBatchSaveSummary = withContext(Dispatchers.IO) {
+        inTransaction {
+            discovered.forEach { cluster ->
+                saveDiscoveredInternal(
+                    senderProfileId = senderProfileId,
+                    discovered = cluster,
+                    status = status,
+                    replaceExampleCount = replaceExampleCount,
+                )
+            }
+            DiscoveredBatchSaveSummary(
+                discoveredCount = discovered.size,
+                savedCount = discovered.size,
+                failedCount = 0,
+            )
         }
     }
 
@@ -643,62 +695,90 @@ class MessagePatternRepository(
      */
     /**
      * Rebuild all APPROVED patterns for one sender under the current
-     * canonical normalizer. Stale rows (normalizationVersion older than
-     * the current [NORMALIZATION_VERSION]) are marked DEPRECATED so the
-     * matcher excludes them, then fresh variants are re-derived from the
-     * sender's recent inbox SMS and saved with the current version stamp.
+     * canonical normalizer. Fresh variants are fully derived before opening
+     * the transaction, then persisted before obsolete stale rows are
+     * deprecated. Any persistence failure rolls the whole rebuild back.
      *
      * No financial records — transactions, journals, postings — are
      * touched. Patterns are interpretation configuration.
      */
-    suspend fun rebuildForSender(senderProfileId: Long, messages: List<SmsMessage>) =
-        withContext(Dispatchers.IO) {
+    suspend fun rebuildForSender(
+        senderProfileId: Long,
+        messages: List<SmsMessage>,
+    ): RebuildSummary {
+        val existing = withContext(Dispatchers.IO) {
+            definitionDao.getForSender(senderProfileId)
+        }
+        val discovery = withContext(Dispatchers.Default) {
+            PatternDiscoveryService.discoverSafely(messages, existing)
+        }
+        val clusters = discovery.patterns.filterNot {
+            it.looksLikeOtpOrMarketing ||
+                it.looksLikeNonFinancial ||
+                it.familyKey.startsWith("review:")
+        }
+        if (clusters.isEmpty()) {
+            return RebuildSummary(
+                rebuiltVariants = 0,
+                staleDeprecated = 0,
+                discovery = discovery,
+            )
+        }
+        return withContext(Dispatchers.IO) {
             inTransaction {
                 val ts = now()
-                val existing = definitionDao.getForSender(senderProfileId)
-                // Preserve incompatible rows for audit while excluding them from matching.
-                for (def in existing) {
-                    if (
-                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(def) ==
-                        com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
-                    ) {
-                        definitionDao.update(
-                            def.copy(
-                                status = MessagePatternStatus.DEPRECATED,
-                                isActive = false,
-                                deprecatedAt = def.deprecatedAt ?: ts,
-                                updatedAt = ts,
-                            ),
-                        )
-                    }
-                }
-                val clusters = PatternDiscoveryService.discover(messages, existing)
-                    .filterNot {
-                        it.looksLikeOtpOrMarketing ||
-                            it.looksLikeNonFinancial ||
-                            it.familyKey.startsWith("review:")
-                    }
                 for (cluster in clusters) {
-                    saveDiscovered(
+                    saveDiscoveredInternal(
                         senderProfileId,
                         cluster,
                         MessagePatternStatus.APPROVED,
                         replaceExampleCount = true,
                     )
                 }
+                val rebuiltFamilyKeys = clusters.map { it.familyKey }.toSet()
+                var staleDeprecated = 0
+                for (original in existing) {
+                    val originalFamilyKey = runCatching {
+                        (
+                            com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                                original.templateText,
+                                original.transactionType,
+                            ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                            )?.key
+                    }.getOrNull()
+                    val current = definitionDao.getById(original.id) ?: continue
+                    if (
+                        originalFamilyKey in rebuiltFamilyKeys &&
+                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(current) ==
+                        com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+                    ) {
+                        definitionDao.update(
+                            current.copy(
+                                status = MessagePatternStatus.DEPRECATED,
+                                isActive = false,
+                                deprecatedAt = current.deprecatedAt ?: ts,
+                                updatedAt = ts,
+                            ),
+                        )
+                        staleDeprecated++
+                    }
+                }
                 RebuildSummary(
                     rebuiltVariants = clusters.sumOf {
                         it.exactVariants.ifEmpty { listOf(it) }.size
                     },
-                    staleDeprecated = existing.count {
-                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
-                            com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
-                    },
+                    staleDeprecated = staleDeprecated,
+                    discovery = discovery,
                 )
             }
         }
+    }
 
-    data class RebuildSummary(val rebuiltVariants: Int, val staleDeprecated: Int)
+    data class RebuildSummary(
+        val rebuiltVariants: Int,
+        val staleDeprecated: Int,
+        val discovery: com.baraa.masroof.sms.PatternDiscoveryResult? = null,
+    )
 
     data class StalePatternRepairResult(
         val rebuildAttempted: Boolean,
@@ -715,94 +795,107 @@ class MessagePatternRepository(
     suspend fun rebuildStaleForSender(
         senderProfileId: Long,
         messages: List<SmsMessage>,
-    ): StalePatternRepairResult = withContext(Dispatchers.IO) {
-        inTransaction {
-            val existing = definitionDao.getForSender(senderProfileId)
-            val staleApproved = existing.filter {
-                com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
-                    com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
-            }
-            if (staleApproved.isEmpty()) {
-                return@inTransaction StalePatternRepairResult(
-                    rebuildAttempted = false,
-                    rebuildSucceeded = true,
-                    staleApprovedPatterns = 0,
-                    rebuiltVariants = 0,
-                    patternsAfterReload = toPatterns(existing),
-                )
-            }
-
-            val staleSemanticKeys = staleApproved.mapNotNull { definition ->
+    ): StalePatternRepairResult {
+        val existing = withContext(Dispatchers.IO) {
+            definitionDao.getForSender(senderProfileId)
+        }
+        val staleApproved = existing.filter {
+            com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(it) ==
+                com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+        }
+        if (staleApproved.isEmpty()) {
+            return StalePatternRepairResult(
+                rebuildAttempted = false,
+                rebuildSucceeded = true,
+                staleApprovedPatterns = 0,
+                rebuiltVariants = 0,
+                patternsAfterReload = withContext(Dispatchers.IO) { toPatterns(existing) },
+            )
+        }
+        val staleKeysById = staleApproved.mapNotNull { definition ->
+            runCatching {
                 (
                     com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
                         definition.templateText,
                         definition.transactionType,
                     ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
                     )?.key
-            }.toSet()
-            val repairable = PatternDiscoveryService.discover(messages, existing)
-                .filter {
-                    !it.looksLikeOtpOrMarketing &&
-                        !it.looksLikeNonFinancial &&
-                        it.familyKey in staleSemanticKeys
-                }
-            for (cluster in repairable) {
-                saveDiscovered(
-                    senderProfileId = senderProfileId,
-                    discovered = cluster,
-                    status = MessagePatternStatus.APPROVED,
-                    replaceExampleCount = true,
-                )
-            }
-            val repairedTargetKeys = repairable.map { it.familyKey }.toSet()
-            val ts = now()
-            staleApproved.forEach { stale ->
-                val staleKey = (
-                    com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
-                        stale.templateText,
-                        stale.transactionType,
-                    ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
-                    )?.key
-                val currentRow = definitionDao.getById(stale.id) ?: return@forEach
-                if (
-                    staleKey in repairedTargetKeys &&
-                    com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(currentRow) ==
-                    com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
-                ) {
-                    definitionDao.update(
-                        currentRow.copy(
-                            status = MessagePatternStatus.DEPRECATED,
-                            isActive = false,
-                            deprecatedAt = currentRow.deprecatedAt ?: ts,
-                            updatedAt = ts,
-                        ),
+            }.getOrNull()?.let { definition.id to it }
+        }.toMap()
+        val staleSemanticKeys = staleKeysById.values.toSet()
+        val discovery = withContext(Dispatchers.Default) {
+            PatternDiscoveryService.discoverSafely(messages, existing)
+        }
+        val repairable = discovery.patterns.filter {
+            !it.looksLikeOtpOrMarketing &&
+                !it.looksLikeNonFinancial &&
+                it.familyKey in staleSemanticKeys
+        }
+        if (repairable.isEmpty()) {
+            return StalePatternRepairResult(
+                rebuildAttempted = true,
+                rebuildSucceeded = false,
+                staleApprovedPatterns = staleApproved.size,
+                rebuiltVariants = 0,
+                patternsAfterReload = withContext(Dispatchers.IO) { toPatterns(existing) },
+            )
+        }
+        return withContext(Dispatchers.IO) {
+            inTransaction {
+                for (cluster in repairable) {
+                    saveDiscoveredInternal(
+                        senderProfileId = senderProfileId,
+                        discovered = cluster,
+                        status = MessagePatternStatus.APPROVED,
+                        replaceExampleCount = true,
                     )
                 }
-            }
-
-            val reloaded = definitionDao.getForSender(senderProfileId)
-            val repairedKeys = reloaded
-                .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
-                .mapNotNull { definition ->
-                    (
-                        com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
-                            definition.templateText,
-                            definition.transactionType,
-                        ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
-                        )?.key
+                val repairedTargetKeys = repairable.map { it.familyKey }.toSet()
+                val ts = now()
+                staleApproved.forEach { stale ->
+                    val staleKey = staleKeysById[stale.id]
+                    val currentRow = definitionDao.getById(stale.id) ?: return@forEach
+                    if (
+                        staleKey in repairedTargetKeys &&
+                        com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(currentRow) ==
+                        com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
+                    ) {
+                        definitionDao.update(
+                            currentRow.copy(
+                                status = MessagePatternStatus.DEPRECATED,
+                                isActive = false,
+                                deprecatedAt = currentRow.deprecatedAt ?: ts,
+                                updatedAt = ts,
+                            ),
+                        )
+                    }
                 }
-                .toSet()
-            StalePatternRepairResult(
-                rebuildAttempted = true,
-                rebuildSucceeded = staleSemanticKeys.intersect(
-                    repairable.map { it.familyKey }.toSet(),
-                ).all { it in repairedKeys } && repairable.isNotEmpty(),
-                staleApprovedPatterns = staleApproved.size,
-                rebuiltVariants = repairable.sumOf {
-                    it.exactVariants.ifEmpty { listOf(it) }.size
-                },
-                patternsAfterReload = toPatterns(reloaded),
-            )
+                val reloaded = definitionDao.getForSender(senderProfileId)
+                val repairedKeys = reloaded
+                    .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
+                    .mapNotNull { definition ->
+                        runCatching {
+                            (
+                                com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                                    definition.templateText,
+                                    definition.transactionType,
+                                ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+                                )?.key
+                        }.getOrNull()
+                    }
+                    .toSet()
+                StalePatternRepairResult(
+                    rebuildAttempted = true,
+                    rebuildSucceeded = staleSemanticKeys.intersect(
+                        repairable.map { it.familyKey }.toSet(),
+                    ).all { it in repairedKeys },
+                    staleApprovedPatterns = staleApproved.size,
+                    rebuiltVariants = repairable.sumOf {
+                        it.exactVariants.ifEmpty { listOf(it) }.size
+                    },
+                    patternsAfterReload = toPatterns(reloaded),
+                )
+            }
         }
     }
 

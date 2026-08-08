@@ -1,6 +1,7 @@
 package com.baraa.masroof.sms
 
 import com.baraa.masroof.data.db.MessagePatternStatus
+import com.baraa.masroof.data.db.MessagePatternDefinitionEntity
 import com.baraa.masroof.data.repository.MessagePatternRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -9,6 +10,115 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TrainingPersistenceImportSemanticRoundTripTest {
+    @Test
+    fun rebuildWithNoUsableClustersPreservesExistingStaleApprovedPattern() = runBlocking {
+        val definitions = RoundTripPatternDefinitionDao()
+        val staleId = definitions.insert(
+            MessagePatternDefinitionEntity(
+                senderProfileId = 1L,
+                userFriendlyName = "نمط قائم",
+                normalizedSignature = "stale-signature",
+                canonicalKey = "stale-key",
+                templateText = "شراء\nالمبلغ: {AMOUNT} SAR",
+                transactionType = com.baraa.masroof.transaction.TransactionType.PURCHASE.name,
+                status = MessagePatternStatus.APPROVED,
+                isActive = true,
+                normalizationVersion = NORMALIZATION_VERSION - 1,
+                createdAt = 1L,
+                updatedAt = 1L,
+            ),
+        )
+        val repo = MessagePatternRepository(
+            definitions,
+            RoundTripPatternFieldDao(),
+            null,
+            null,
+            RoundTripFamilyDao(),
+            RoundTripAnchorDao(),
+        )
+
+        val summary = repo.rebuildForSender(
+            1L,
+            listOf(SmsMessage(1L, "BANK", "رمز التحقق: 1234 لا تشاركه", 1L)),
+        )
+
+        val preserved = definitions.getById(staleId)!!
+        assertEquals(0, summary.rebuiltVariants)
+        assertEquals(0, summary.staleDeprecated)
+        assertEquals(MessagePatternStatus.APPROVED, preserved.status)
+        assertTrue(preserved.isActive)
+    }
+
+    @Test
+    fun rebuildingDifferentFamilyDoesNotDeprecUnrepresentedStalePattern() = runBlocking {
+        val definitions = RoundTripPatternDefinitionDao()
+        val staleId = definitions.insert(
+            MessagePatternDefinitionEntity(
+                senderProfileId = 1L,
+                userFriendlyName = "شراء قائم",
+                normalizedSignature = "stale-purchase",
+                canonicalKey = "stale-purchase",
+                templateText = "شراء\nالمبلغ: {AMOUNT} SAR",
+                transactionType = com.baraa.masroof.transaction.TransactionType.PURCHASE.name,
+                status = MessagePatternStatus.APPROVED,
+                isActive = true,
+                normalizationVersion = NORMALIZATION_VERSION - 1,
+                createdAt = 1L,
+                updatedAt = 1L,
+            ),
+        )
+        val repo = MessagePatternRepository(
+            definitions,
+            RoundTripPatternFieldDao(),
+            null,
+            null,
+            RoundTripFamilyDao(),
+            RoundTripAnchorDao(),
+        )
+        val transferOnly = SmsMessage(
+            1L,
+            "BANK",
+            "تحويل صادر\nمن حساب: 1111\nالمبلغ: 500 SAR",
+            1L,
+        )
+
+        repo.rebuildForSender(1L, listOf(transferOnly))
+
+        val preserved = definitions.getById(staleId)!!
+        assertEquals(MessagePatternStatus.APPROVED, preserved.status)
+        assertTrue(preserved.isActive)
+    }
+
+    @Test
+    fun rebuildLargeMixedBatchSavesValidPatternsWithoutThrowing() = runBlocking {
+        val definitions = RoundTripPatternDefinitionDao()
+        val repo = MessagePatternRepository(
+            definitions,
+            RoundTripPatternFieldDao(),
+            null,
+            null,
+            RoundTripFamilyDao(),
+            RoundTripAnchorDao(),
+        )
+        val messages = buildList {
+            repeat(100) { index ->
+                add(SmsMessage(index + 1L, "BANK", layout(index + 1), index + 1L))
+            }
+            repeat(25) { index ->
+                add(SmsMessage(index + 101L, "BANK", "رمز التحقق: 1234 لا تشاركه", index + 101L))
+            }
+            repeat(25) { index ->
+                add(SmsMessage(index + 126L, "BANK", "رسالة غير معروفة $index", index + 126L))
+            }
+        }
+
+        val summary = repo.rebuildForSender(1L, messages)
+
+        assertTrue(summary.rebuiltVariants > 0)
+        assertEquals(25, summary.discovery?.skippedOtp)
+        assertTrue(repo.getForSender(1L).isNotEmpty())
+    }
+
     @Test
     fun rebuildForSenderTwiceKeepsSameSemanticPatternAndCounts() = runBlocking {
         val repo = MessagePatternRepository(

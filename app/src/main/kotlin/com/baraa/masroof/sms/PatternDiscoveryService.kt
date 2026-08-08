@@ -7,6 +7,37 @@ import com.baraa.masroof.data.db.PatternFieldRole
 import com.baraa.masroof.data.db.PatternValueType
 import com.baraa.masroof.transaction.LineBasedFieldParser
 import com.baraa.masroof.transaction.TransactionTypeTaxonomy
+import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
+
+enum class PatternDiscoveryStage {
+    TEMPLATE_BUILD,
+    TYPE_CUE,
+    SEMANTIC_FINGERPRINT,
+    CANONICAL_KEY,
+    SANITIZED_PREVIEW,
+    LINE_PARSE,
+    SEMANTIC_SCHEMA,
+}
+
+data class PatternDiscoveryFailure(
+    val smsId: Long?,
+    val senderHash: String?,
+    val bodyHash: String,
+    val stage: PatternDiscoveryStage,
+    val exceptionClass: String,
+)
+
+data class PatternDiscoveryResult(
+    val patterns: List<DiscoveredMessagePattern>,
+    val inputMessages: Int,
+    val processedMessages: Int,
+    val skippedOtp: Int,
+    val skippedNonFinancial: Int,
+    val failedMessages: Int,
+    val failures: List<PatternDiscoveryFailure>,
+    val skippedBlank: Int = 0,
+)
 
 data class DiscoveredMessagePattern(
     val signature: String,
@@ -66,16 +97,25 @@ object PatternDiscoveryService {
     fun discover(
         messages: List<SmsMessage>,
         existingPatterns: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity> = emptyList(),
-    ): List<DiscoveredMessagePattern> {
+    ): List<DiscoveredMessagePattern> = discoverSafely(messages, existingPatterns).patterns
+
+    fun discoverSafely(
+        messages: List<SmsMessage>,
+        existingPatterns: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity> = emptyList(),
+    ): PatternDiscoveryResult = discoverSafely(messages, existingPatterns) { _, _ -> }
+
+    internal fun discoverSafely(
+        messages: List<SmsMessage>,
+        existingPatterns: List<com.baraa.masroof.data.db.MessagePatternDefinitionEntity>,
+        beforeStage: (SmsMessage, PatternDiscoveryStage) -> Unit,
+    ): PatternDiscoveryResult {
         data class Acc(
             val canonicalKey: String,
             var signature: String,
             var count: Int = 0,
             var latest: Long = 0L,
             val samples: MutableList<String> = mutableListOf(),
-            val labelHits: MutableMap<String, Int> = linkedMapOf(),
-            var otpHits: Int = 0,
-            var nonFinancialHits: Int = 0,
+            val suggestedFields: MutableList<SuggestedPatternField> = mutableListOf(),
             var nameHint: String = "نمط رسالة",
             var typeKey: String = "TYPE:UNKNOWN",
             var transactionTypeName: String? = null,
@@ -83,85 +123,170 @@ object PatternDiscoveryService {
             var channel: String? = null,
             var templateText: String = "",
             var placeholders: List<String> = emptyList(),
-            var sourceBody: String? = null,
+            var matchedPatternId: Long? = null,
+            var matchedPatternStatus: com.baraa.masroof.data.db.MessagePatternStatus? = null,
+            var familyKey: String = "",
             val observedChannels: MutableSet<String> = linkedSetOf(),
             val optionalSlots: MutableSet<String> = linkedSetOf(),
         )
         val buckets = linkedMapOf<String, Acc>()
+        val failures = mutableListOf<PatternDiscoveryFailure>()
+        var processedMessages = 0
+        var skippedOtp = 0
+        var skippedNonFinancial = 0
+        var skippedBlank = 0
         for (sms in messages) {
             val body = sms.body.orEmpty()
-            if (body.isBlank()) continue
-            val built = MessageTemplateEngine.buildFromSms(body)
-            val cue = MessageTypeCueCatalog.detect(body)
-            val fingerprint = SemanticPatternCanonicalizer.fromBody(body)
-            val canonicalKey = TemplateCanonicalizer.canonicalKey(built.templateText, built.signature)
-            val acc = buckets.getOrPut(canonicalKey) {
-                Acc(
-                    canonicalKey = canonicalKey,
-                    signature = built.signature,
-                    nameHint = fingerprint.displayNameAr,
-                    typeKey = cue.typeToken,
-                    transactionTypeName = built.transactionType?.name ?: cue.transactionType?.name,
-                    direction = built.direction ?: cue.direction,
-                    channel = null, // wallet is metadata, not cluster identity
-                    templateText = built.templateText,
-                    placeholders = built.placeholders,
-                    sourceBody = body,
-                )
+            if (body.isBlank()) {
+                skippedBlank++
+                continue
             }
-            acc.count++
-            acc.observedChannels += fingerprint.observedChannels
-            acc.optionalSlots += fingerprint.optionalSlots.map { it.name }
-            // Prefer the richest template (most optional placeholders) as exemplar.
-            if (built.templateText.lines().size > acc.templateText.lines().size) {
-                acc.templateText = built.templateText
-                acc.placeholders = built.placeholders
-                acc.sourceBody = body
-                acc.signature = built.signature
-            } else if (acc.templateText.isBlank()) {
-                acc.templateText = built.templateText
-                acc.placeholders = built.placeholders
-                acc.sourceBody = body
-            }
-            val sample = AccountSmsAnalyzer.sanitizedPreview(
-                body,
-                maxChars = 400,
-                preserveNewlines = true,
-            )
-            if (sms.timestamp >= acc.latest) {
-                acc.latest = sms.timestamp
-                if (acc.samples.size < 3) {
+            try {
+                val looksOtp = discoveryStage(sms, PatternDiscoveryStage.TYPE_CUE, beforeStage) {
+                    SmsStructureNormalizer.looksLikeOtpOrMarketing(body)
+                }
+                if (looksOtp) {
+                    skippedOtp++
+                    continue
+                }
+                val cue = discoveryStage(sms, PatternDiscoveryStage.TYPE_CUE, beforeStage) {
+                    MessageTypeCueCatalog.detect(body)
+                }
+                if (
+                    cue.transactionType == com.baraa.masroof.transaction.TransactionType.NON_FINANCIAL ||
+                    MessageTypeCueCatalog.isNonFinancialCue(body)
+                ) {
+                    skippedNonFinancial++
+                    continue
+                }
+                val built = discoveryStage(sms, PatternDiscoveryStage.TEMPLATE_BUILD, beforeStage) {
+                    MessageTemplateEngine.buildFromSms(body)
+                }
+                val fingerprint = discoveryStage(
+                    sms,
+                    PatternDiscoveryStage.SEMANTIC_FINGERPRINT,
+                    beforeStage,
+                ) {
+                    SemanticPatternCanonicalizer.fromBody(body)
+                }
+                val canonicalKey = discoveryStage(
+                    sms,
+                    PatternDiscoveryStage.CANONICAL_KEY,
+                    beforeStage,
+                ) {
+                    TemplateCanonicalizer.canonicalKey(built.templateText, built.signature)
+                }
+                val sample = discoveryStage(
+                    sms,
+                    PatternDiscoveryStage.SANITIZED_PREVIEW,
+                    beforeStage,
+                ) {
+                    AccountSmsAnalyzer.sanitizedPreview(
+                        body,
+                        maxChars = 400,
+                        preserveNewlines = true,
+                    )
+                }
+                val lines = discoveryStage(sms, PatternDiscoveryStage.LINE_PARSE, beforeStage) {
+                    LineBasedFieldParser.splitLines(body)
+                }
+                val suggested = discoveryStage(sms, PatternDiscoveryStage.LINE_PARSE, beforeStage) {
+                    suggestFields(lines.map { it.label })
+                }
+                val familyKey = discoveryStage(
+                    sms,
+                    PatternDiscoveryStage.SEMANTIC_SCHEMA,
+                    beforeStage,
+                ) {
+                    semanticKey(
+                        templateText = built.templateText,
+                        transactionTypeName = built.transactionType?.name ?: cue.transactionType?.name,
+                        exactFallback = canonicalKey,
+                    )
+                }
+                val matched = discoveryStage(
+                    sms,
+                    PatternDiscoveryStage.SEMANTIC_SCHEMA,
+                    beforeStage,
+                ) {
+                    matchExisting(canonicalKey, body, existingPatterns)
+                }
+                val acc = buckets.getOrPut(canonicalKey) {
+                    Acc(
+                        canonicalKey = canonicalKey,
+                        signature = built.signature,
+                        nameHint = fingerprint.displayNameAr,
+                        typeKey = cue.typeToken,
+                        transactionTypeName = built.transactionType?.name ?: cue.transactionType?.name,
+                        direction = built.direction ?: cue.direction,
+                        channel = null,
+                        templateText = built.templateText,
+                        placeholders = built.placeholders,
+                        matchedPatternId = matched?.id,
+                        matchedPatternStatus = matched?.status,
+                        familyKey = familyKey,
+                    )
+                }
+                acc.count++
+                acc.observedChannels += fingerprint.observedChannels
+                acc.optionalSlots += fingerprint.optionalSlots.map { it.name }
+                acc.suggestedFields += suggested
+                if (acc.matchedPatternId == null && matched != null) {
+                    acc.matchedPatternId = matched.id
+                    acc.matchedPatternStatus = matched.status
+                }
+                if (built.templateText.lines().size > acc.templateText.lines().size) {
+                    acc.templateText = built.templateText
+                    acc.placeholders = built.placeholders
+                    acc.signature = built.signature
+                    acc.familyKey = familyKey
+                } else if (acc.templateText.isBlank()) {
+                    acc.templateText = built.templateText
+                    acc.placeholders = built.placeholders
+                    acc.familyKey = familyKey
+                }
+                if (sms.timestamp >= acc.latest) {
+                    acc.latest = sms.timestamp
+                    if (acc.samples.size < 3) acc.samples += sample
+                } else if (acc.samples.size < 3) {
                     acc.samples += sample
                 }
-            } else if (acc.samples.size < 3) {
-                acc.samples += sample
-            }
-            if (SmsStructureNormalizer.looksLikeOtpOrMarketing(body)) acc.otpHits++
-            if (MessageTypeCueCatalog.isNonFinancialCue(body) ||
-                cue.transactionType == com.baraa.masroof.transaction.TransactionType.NON_FINANCIAL
-            ) {
-                acc.nonFinancialHits++
-            }
-            for (line in LineBasedFieldParser.splitLines(body)) {
-                val label = line.label.trim()
-                if (label.isNotEmpty()) {
-                    acc.labelHits[label] = (acc.labelHits[label] ?: 0) + 1
-                }
+                processedMessages++
+            } catch (fatal: VirtualMachineError) {
+                throw fatal
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: DiscoveryStageException) {
+                failures += PatternDiscoveryFailure(
+                    smsId = sms.id.takeIf { it > 0L },
+                    senderHash = sms.sender?.takeIf { it.isNotBlank() }?.let(::safeHash),
+                    bodyHash = safeHash(body),
+                    stage = failure.stage,
+                    exceptionClass = failure.cause?.javaClass?.simpleName
+                        ?: failure.javaClass.simpleName,
+                )
+            } catch (failure: Throwable) {
+                failures += PatternDiscoveryFailure(
+                    smsId = sms.id.takeIf { it > 0L },
+                    senderHash = sms.sender?.takeIf { it.isNotBlank() }?.let(::safeHash),
+                    bodyHash = safeHash(body),
+                    stage = PatternDiscoveryStage.SEMANTIC_SCHEMA,
+                    exceptionClass = failure.javaClass.simpleName,
+                )
             }
         }
         val exactPatterns = buckets.values
             .map { acc ->
-                val matched = matchExisting(acc.canonicalKey, acc.sourceBody, existingPatterns)
-                val looksOtp = acc.otpHits * 2 >= acc.count && acc.count > 0
-                val looksNonFin = acc.nonFinancialHits * 2 >= acc.count && acc.count > 0
                 DiscoveredMessagePattern(
                     signature = acc.signature,
                     friendlyNameHint = acc.nameHint,
                     messageCount = acc.count,
                     latestTimestamp = acc.latest,
                     sanitizedSamples = acc.samples.distinct().take(3),
-                    suggestedFields = suggestFields(acc.labelHits.keys),
-                    looksLikeOtpOrMarketing = looksOtp,
+                    suggestedFields = acc.suggestedFields.distinctBy {
+                        it.canonicalField to CanonicalMessageNormalizer.normalizeLabel(it.sourceLabel)
+                    },
+                    looksLikeOtpOrMarketing = false,
                     typeKey = acc.typeKey,
                     transactionTypeName = acc.transactionTypeName,
                     direction = acc.direction,
@@ -169,21 +294,17 @@ object PatternDiscoveryService {
                     templateText = acc.templateText,
                     placeholders = acc.placeholders,
                     canonicalKey = acc.canonicalKey,
-                    familyKey = semanticKey(
-                        templateText = acc.templateText,
-                        transactionTypeName = acc.transactionTypeName,
-                        exactFallback = acc.canonicalKey,
-                    ),
-                    matchedPatternId = matched?.id,
-                    matchedPatternStatus = matched?.status,
+                    familyKey = acc.familyKey,
+                    matchedPatternId = acc.matchedPatternId,
+                    matchedPatternStatus = acc.matchedPatternStatus,
                     observedChannels = acc.observedChannels.toList(),
                     optionalSlots = acc.optionalSlots.toList(),
                     discoveryConfidence = com.baraa.masroof.transaction.TransactionTypeTaxonomy
                         .discoveryConfidence(acc.count),
-                    looksLikeNonFinancial = looksNonFin || looksOtp,
+                    looksLikeNonFinancial = false,
                 )
             }
-        return exactPatterns
+        val patterns = exactPatterns
             .groupBy { it.familyKey }
             .values
             .map { variants ->
@@ -211,6 +332,48 @@ object PatternDiscoveryService {
                 compareByDescending<DiscoveredMessagePattern> { it.messageCount }
                     .thenByDescending { it.latestTimestamp },
             )
+        return PatternDiscoveryResult(
+            patterns = patterns,
+            inputMessages = messages.size,
+            processedMessages = processedMessages,
+            skippedOtp = skippedOtp,
+            skippedNonFinancial = skippedNonFinancial,
+            failedMessages = failures.size,
+            failures = failures,
+            skippedBlank = skippedBlank,
+        )
+    }
+
+    private class DiscoveryStageException(
+        val stage: PatternDiscoveryStage,
+        cause: Throwable,
+    ) : RuntimeException(cause)
+
+    private inline fun <T> discoveryStage(
+        sms: SmsMessage,
+        stage: PatternDiscoveryStage,
+        beforeStage: (SmsMessage, PatternDiscoveryStage) -> Unit,
+        block: () -> T,
+    ): T = try {
+        beforeStage(sms, stage)
+        block()
+    } catch (fatal: VirtualMachineError) {
+        throw fatal
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: DiscoveryStageException) {
+        throw failure
+    } catch (failure: Throwable) {
+        throw DiscoveryStageException(stage, failure)
+    }
+
+    private fun safeHash(value: String): String = runCatching {
+        MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+            .take(12)
+    }.getOrElse {
+        value.hashCode().toUInt().toString(16).padStart(8, '0').take(12)
     }
 
     private fun semanticKey(
