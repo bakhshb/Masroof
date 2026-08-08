@@ -30,6 +30,11 @@ import kotlinx.coroutines.withContext
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+internal fun reviewQueueVisibleCount(
+    persistedActionable: Int,
+    sessionMessageReview: Int,
+): Int = persistedActionable + sessionMessageReview
+
 /** Active review queue: Room-backed rows + optional in-memory import session. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +95,7 @@ fun ReviewQueueScreen(
     fun materializeSessionMessageReview() {
         val session = importSession ?: return
         if (sessionMessageReview.isEmpty() || materializing) return
+        val useOncePatternIds = app.importSessionStore.useOncePatternIds.value
         materializing = true
         materializeError = null
         scope.launch {
@@ -100,6 +106,7 @@ fun ReviewQueueScreen(
                         trackingStartDate = session.trackingStartDate,
                         importedSms = session.messages,
                         mode = com.baraa.masroof.data.repository.SmsImportCommitMode.MESSAGE_REVIEW_ONLY,
+                        allowOncePatternIds = useOncePatternIds,
                     )
                 }
             }
@@ -111,7 +118,12 @@ fun ReviewQueueScreen(
             outcome.onSuccess { result ->
                 // Refresh session counters from a re-scan without clearing navigation state.
                 val refreshed = withContext(Dispatchers.IO) {
-                    app.importOrchestrator.scan(session.messages, session.trackingStartDate, session.mode)
+                    app.importOrchestrator.scan(
+                        session.messages,
+                        session.trackingStartDate,
+                        session.mode,
+                        allowOncePatternIds = useOncePatternIds,
+                    )
                 }
                 app.importSessionStore.replace(session.withPreview(refreshed))
                 if (result.importedTransactions == 0 && result.needsReviewTransactions == 0) {
@@ -205,8 +217,34 @@ fun ReviewQueueScreen(
                 contentPadding = PaddingValues(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (sessionMessageReview.isNotEmpty()) {
+                    item {
+                        Text("الفحص الحالي", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "${sessionMessageReview.size} رسالة تحتاج مراجعة قبل الحفظ.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        materializeError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error)
+                        }
+                        PrimaryButton(
+                            label = if (materializing) {
+                                "جارٍ الحفظ…"
+                            } else {
+                                "حفظ ${sessionMessageReview.size} في قائمة المراجعة"
+                            },
+                            enabled = !materializing,
+                            onClick = { materializeSessionMessageReview() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    }
+                }
                 item {
-                    Text("مراجعة ${actionable.size} عملية", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "قائمة المراجعة المحفوظة (${actionable.size})",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                     Text(
                         "اختر نوع العملية ثم الحساب. الاقتراحات من أنماط الرسائل وتأكيداتك السابقة — بدون نموذج ذكاء.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -1072,9 +1072,25 @@ private fun ScanResultsCard(
     val ready = preview.readyCount
     Surface(modifier = Modifier.fillMaxWidth(), shape = FinancialShapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
-            Text("تم فحص ${preview.scannedMessages} رسالة", style = FinancialTypography.merchant)
+            Text("مسار الفحص", style = FinancialTypography.merchant)
+            BulletRow("رسائل مقروءة", "${preview.scannedMessages}")
+            BulletRow("رموز تحقق / تأكيد هوية مستبعدة", "${preview.otpOrAuthMessages}")
+            BulletRow("رسائل من مرسل غير مسجل", "${preview.unregisteredSenderMessages}")
+            preview.filterFunnel?.let { funnel ->
+                BulletRow("دخلت مطابقة الأنماط", "${funnel.templateInput}")
+                BulletRow("طابقت نمطاً", "${funnel.templateMatched}")
+            }
+            BulletRow("لم تطابق نمطاً", "${preview.unmatchedTemplateMessages}")
+            if (preview.ambiguousTemplateMessages > 0) {
+                BulletRow("مطابقة غامضة", "${preview.ambiguousTemplateMessages}")
+            }
+            BulletRow("فشل استخراج البيانات", "${preview.extractionFailedMessages}")
+            BulletRow("عمليات مالية معروفة", "${preview.recognizedTransactions}")
+            BulletRow("مكررة", "${preview.duplicate}")
+            BulletRow("تحتاج مراجعة", "${preview.messageReviewCount}")
+            BulletRow("أقدم من تاريخ الرصيد الافتتاحي", "${preview.beforeTrackingStartCount}")
             BulletRow("جاهزة للاستيراد", "$ready")
-            BulletRow("رسائل تحتاج مراجعة", "${preview.messageReviewCount}")
+            Text("الأنماط", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             BulletRow(
                 "أنماط تحتاج اعتماد",
                 "${preview.patternsNeedingApproval}",
@@ -1086,20 +1102,9 @@ private fun ScanResultsCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            val actuallyExcluded = preview.otpOrAuthMessages + preview.nonFinancial
-            if (actuallyExcluded > 0) {
-                BulletRow("مستبعدة فعلياً", "$actuallyExcluded")
+            if (preview.nonFinancial > 0) {
+                BulletRow("غير مالية / متجاهلة", "${preview.nonFinancial}")
             }
-            Text("تفاصيل الفحص", style = FinancialTypography.supportingLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            BulletRow("رموز تحقق / تأكيد هوية", "${preview.otpOrAuthMessages}")
-            BulletRow("مرسلون غير مسجلين", "${preview.unregisteredSenderMessages}")
-            BulletRow("غير مالية / متجاهلة", "${preview.nonFinancial}")
-            BulletRow("غير مطابقة لنمط", "${preview.unmatchedTemplateMessages}")
-            BulletRow("مطابقة غامضة", "${preview.ambiguousTemplateMessages}")
-            BulletRow("فشل استخراج البيانات", "${preview.extractionFailedMessages}")
-            BulletRow("مكررة", "${preview.duplicate}")
-            BulletRow("العمليات المالية المكتشفة", "${preview.recognizedTransactions}")
-            BulletRow("أقدم من تاريخ الرصيد الافتتاحي", "${preview.beforeTrackingStartCount}")
             if (com.baraa.masroof.BuildConfig.DEBUG) {
                 androidx.compose.material3.TextButton(
                     onClick = { showMatcherDiagnostics = !showMatcherDiagnostics },
@@ -1210,6 +1215,12 @@ private fun SkippedMessagesCard(
     onTeach: () -> Unit = onAccounts,
 ) {
     val context = LocalContext.current
+    var showUnregistered by remember { mutableStateOf(false) }
+    val unregisteredGroups = preview.unregisteredSenderGroups.ifEmpty {
+        preview.skippedSenders.filter {
+            it.reason == ScanPreview.SkipReason.UNREGISTERED_SENDER
+        }
+    }
     SectionHeader("رسائل لم تُستورد")
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1223,7 +1234,48 @@ private fun SkippedMessagesCard(
                 style = FinancialTypography.metadata,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            preview.skippedSenders.forEach { group ->
+            if (unregisteredGroups.isNotEmpty()) {
+                SecondaryButton(
+                    label = if (showUnregistered) {
+                        "إخفاء المرسلين غير المسجلين"
+                    } else {
+                        "عرض المرسلين غير المسجلين (${preview.unregisteredSenderMessages})"
+                    },
+                    onClick = { showUnregistered = !showUnregistered },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (showUnregistered) {
+                    unregisteredGroups.forEach { group ->
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
+                            Text(
+                                "${group.senderDisplay} • ${group.messageCount} رسالة",
+                                style = FinancialTypography.merchant,
+                            )
+                            if (group.latestTimestamp > 0L) {
+                                val latest = java.time.Instant.ofEpochMilli(group.latestTimestamp)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate()
+                                Text(
+                                    "آخر رسالة: $latest",
+                                    style = FinancialTypography.metadata,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            SecondaryButton(
+                                "ربط المرسل بحساب",
+                                onClick = {
+                                    ImportSessionHints.setPreferredSender(group.senderDisplay)
+                                    onAccounts()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+            preview.skippedSenders
+                .filter { it.reason != ScanPreview.SkipReason.UNREGISTERED_SENDER }
+                .forEach { group ->
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
                     Text("${group.senderDisplay} • ${group.messageCount}", style = FinancialTypography.merchant)
                     Text(group.reasonAr, style = FinancialTypography.metadata)
@@ -1241,16 +1293,7 @@ private fun SkippedMessagesCard(
                         )
                     }
                     when (group.reason) {
-                        ScanPreview.SkipReason.UNREGISTERED_SENDER -> {
-                            SecondaryButton(
-                                "ربط «${group.senderDisplay}» بحساب",
-                                onClick = {
-                                    ImportSessionHints.setPreferredSender(group.senderDisplay)
-                                    onAccounts()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
+                        ScanPreview.SkipReason.UNREGISTERED_SENDER -> Unit
                         ScanPreview.SkipReason.NO_AMOUNT,
                         ScanPreview.SkipReason.TEMPLATE_EXTRACTION_FAILED -> {
                             if (!group.redactedSample.isNullOrBlank()) {

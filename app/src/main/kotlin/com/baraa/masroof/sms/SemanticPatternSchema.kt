@@ -7,7 +7,7 @@ import com.baraa.masroof.transaction.MonetaryRole
 import com.baraa.masroof.transaction.TransactionType
 import com.baraa.masroof.transaction.TransactionTypeTaxonomy
 
-const val SEMANTIC_SCHEMA_VERSION: Int = 1
+const val SEMANTIC_SCHEMA_VERSION: Int = 2
 
 /**
  * One shared, deterministic label -> canonical role classifier.
@@ -196,14 +196,22 @@ object SemanticPatternSchemaNormalizer {
         val observed = structure.lines
             .flatMap { CanonicalPatternFieldClassifier.classify(it.originalLabel) }
             .toSet()
-        val instrument = paymentInstrument(observed)
-            ?: return SemanticSchemaResult.Ambiguous("CONFLICTING_PAYMENT_INSTRUMENT")
+        val instrument = if (type in ROUTING_FIELD_TYPES) {
+            SemanticPaymentInstrument.UNKNOWN
+        } else {
+            paymentInstrument(observed)
+                ?: return SemanticSchemaResult.Ambiguous("CONFLICTING_PAYMENT_INSTRUMENT")
+        }
         if (type in PURCHASE_TYPES && instrument == SemanticPaymentInstrument.UNKNOWN) {
             return SemanticSchemaResult.Ambiguous("UNKNOWN_PAYMENT_INSTRUMENT")
         }
 
         val required = setOf(PatternCanonicalField.TRANSACTION_AMOUNT)
-        val structural = observed - NON_IDENTITY_FIELDS
+        val structural = if (type in ROUTING_FIELD_TYPES) {
+            emptySet()
+        } else {
+            observed - NON_IDENTITY_FIELDS
+        }
         return SemanticSchemaResult.Safe(
             SemanticPatternSchema(
                 transactionType = type,
@@ -231,6 +239,11 @@ object SemanticPatternSchemaNormalizer {
     }
 
     private val PURCHASE_TYPES = setOf(TransactionType.PURCHASE, TransactionType.ONLINE_PURCHASE)
+    private val ROUTING_FIELD_TYPES = setOf(
+        TransactionType.SALARY,
+        TransactionType.TRANSFER_IN,
+        TransactionType.TRANSFER_OUT,
+    )
     private val ACCOUNT_FIELDS = setOf(
         PatternCanonicalField.ACCOUNT_LAST4,
         PatternCanonicalField.SOURCE_ACCOUNT_LAST4,

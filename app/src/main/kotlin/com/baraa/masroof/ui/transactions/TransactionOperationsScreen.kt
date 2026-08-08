@@ -1,6 +1,8 @@
 package com.baraa.masroof.ui.transactions
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -36,6 +38,7 @@ import java.time.LocalDate
 fun TransactionOperationsScreen(
     onOpenImport: () -> Unit = {},
     onOpenReview: () -> Unit = {},
+    onTransactionClick: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
@@ -73,6 +76,18 @@ fun TransactionOperationsScreen(
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
             OutlinedTextField(state.query, { state.query = it; if (it.isEmpty()) debouncedQuery = "" }, label = { Text("بحث") }, modifier = Modifier.fillMaxWidth(), trailingIcon = { if (state.query.isNotEmpty()) IconButton(onClick = { state.query = ""; debouncedQuery = "" }) { Icon(Icons.Filled.Close, "مسح") } })
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                TransactionSort.entries.forEach { sort ->
+                    FilterChip(
+                        selected = state.sort == sort,
+                        onClick = { state.sort = sort },
+                        label = { Text(sortLabel(sort)) },
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = state.needsReview, onClick = { state.needsReview = !state.needsReview }, label = { Text("يحتاج مراجعة") })
                 FilterChip(selected = state.unlinked, onClick = { state.unlinked = !state.unlinked }, label = { Text("غير مرتبط") })
@@ -90,6 +105,7 @@ fun TransactionOperationsScreen(
                         categories = categories,
                         showAdvanced = showAdvanced,
                         onOpenReview = onOpenReview,
+                        onOpenDetails = { onTransactionClick(tx.id) },
                         onCorrect = {
                             scope.launch {
                                 correctionError = null
@@ -175,6 +191,7 @@ private fun ReviewCard(
     categories: List<com.baraa.masroof.data.db.Category>,
     showAdvanced: Boolean,
     onOpenReview: () -> Unit,
+    onOpenDetails: () -> Unit,
     onCorrect: () -> Unit,
 ) {
     val accountName = accounts.firstOrNull { it.id == transaction.sourceAccountId || it.id == transaction.destinationAccountId }?.displayName
@@ -191,7 +208,7 @@ private fun ReviewCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        onClick = { if (needsAction) onOpenReview() },
+        onClick = onOpenDetails,
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -217,6 +234,13 @@ private fun ReviewCard(
             }
         }
     }
+}
+
+private fun sortLabel(sort: TransactionSort): String = when (sort) {
+    TransactionSort.NEWEST -> "الأحدث"
+    TransactionSort.OLDEST -> "الأقدم"
+    TransactionSort.AMOUNT_HIGH_TO_LOW -> "المبلغ: الأعلى"
+    TransactionSort.AMOUNT_LOW_TO_HIGH -> "المبلغ: الأقل"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

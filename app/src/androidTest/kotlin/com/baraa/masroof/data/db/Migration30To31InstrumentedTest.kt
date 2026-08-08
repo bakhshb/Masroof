@@ -1,6 +1,7 @@
 package com.baraa.masroof.data.db
 
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -11,7 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class Migration29To30InstrumentedTest {
+class Migration30To31InstrumentedTest {
     @get:Rule
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
@@ -21,42 +22,40 @@ class Migration29To30InstrumentedTest {
     )
 
     @Test
-    fun equivalentVariantsMergeIntoOneSemanticFamilyWithoutDeletingRows() {
-        helper.createDatabase(DB, 29).apply {
+    fun salaryRoutingVariantsMergeWithoutDeletingDefinitionsOrCounts() {
+        helper.createDatabase(DB, 30).apply {
+            execSQL("INSERT INTO sender_profiles VALUES (1,'BankX','bankx',NULL,NULL,1,0,0)")
             execSQL(
-                "INSERT INTO sender_profiles VALUES (1,'BankX','bankx',NULL,NULL,1,0,0)",
+                "INSERT INTO message_pattern_families VALUES " +
+                    "(1,1,'semantic-v1|salary-beneficiary','Salary A','APPROVED',0,0)",
             )
             execSQL(
-                "INSERT INTO message_pattern_families VALUES (1,1,'old-a','POS A','APPROVED',0,0)",
+                "INSERT INTO message_pattern_families VALUES " +
+                    "(2,1,'semantic-v1|salary-account','Salary B','UNKNOWN',0,0)",
             )
-            execSQL(
-                "INSERT INTO message_pattern_families VALUES (2,1,'old-b','POS B','UNKNOWN',0,0)",
-            )
-            insertVariant(
+            insertSalaryVariant(
                 id = 1,
                 familyId = 1,
-                signature = "a",
-                template = "شراء عبر نقاط البيع\nلدى: {MERCHANT}\nبمبلغ: {AMOUNT} SAR\nبطاقة مدى: {DEBIT_CARD_LAST4}",
-                count = 28,
+                template = "حوالة واردة راتب\nمبلغ: {AMOUNT} SAR\nاسم المرسل: {BENEFICIARY}",
+                count = 9,
                 status = "APPROVED",
             )
-            insertVariant(
+            insertSalaryVariant(
                 id = 2,
                 familyId = 2,
-                signature = "b",
-                template = "شراء عبر نقاط البيع\nالتاجر: {MERCHANT}\nالمبلغ: {AMOUNT} SAR\nبطاقة مدى رقم: {DEBIT_CARD_LAST4}",
-                count = 16,
+                template = "حوالة واردة راتب\nمبلغ: {AMOUNT} SAR\nإلى حساب: {ACCOUNT_LAST4}",
+                count = 4,
                 status = "UNKNOWN",
             )
             close()
         }
 
-        helper.runMigrationsAndValidate(DB, 30, true, MasroofDatabase.MIGRATION_29_30).apply {
+        helper.runMigrationsAndValidate(DB, 31, true, MasroofDatabase.MIGRATION_30_31).apply {
             val familyCount = query("SELECT COUNT(*) FROM message_pattern_families").use {
                 it.moveToFirst()
                 it.getLong(0)
             }
-            val variantCount = query("SELECT COUNT(*) FROM message_pattern_definitions").use {
+            val definitionCount = query("SELECT COUNT(*) FROM message_pattern_definitions").use {
                 it.moveToFirst()
                 it.getLong(0)
             }
@@ -69,17 +68,16 @@ class Migration29To30InstrumentedTest {
                 it.getString(0)
             }
             assertEquals(1L, familyCount)
-            assertEquals(2L, variantCount)
-            assertEquals(44L, totalExamples)
-            assertTrue(key.startsWith("semantic-v2|PURCHASE|OUTFLOW|DEBIT_CARD|"))
+            assertEquals(2L, definitionCount)
+            assertEquals(13L, totalExamples)
+            assertTrue(key.startsWith("semantic-v2|SALARY|INFLOW|UNKNOWN|"))
             close()
         }
     }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertVariant(
+    private fun SupportSQLiteDatabase.insertSalaryVariant(
         id: Long,
         familyId: Long,
-        signature: String,
         template: String,
         count: Int,
         status: String,
@@ -91,15 +89,14 @@ class Migration29To30InstrumentedTest {
                 lineageId,templateText,transactionType,direction,channel,status,version,isActive,
                 origin,confidence,userConfirmed,exampleCount,normalizationVersion,activeFrom,
                 deprecatedAt,createdAt,updatedAt
-            ) VALUES (?,?,?,'شراء عبر نقاط البيع',?,?,?,?,'PURCHASE','OUTFLOW',NULL,?,1,?,
+            ) VALUES (?,1,?,'راتب',?,?,?,?,'SALARY','INFLOW',NULL,?,1,?,
                       'USER_TRAINED',100,1,?,2,NULL,NULL,0,0)
             """.trimIndent(),
             arrayOf(
                 id,
-                1L,
                 familyId,
-                signature,
-                signature,
+                "salary-$id",
+                "salary-$id",
                 id,
                 template,
                 status,
@@ -110,6 +107,6 @@ class Migration29To30InstrumentedTest {
     }
 
     private companion object {
-        const val DB = "migration-test-30.db"
+        const val DB = "migration-test-31.db"
     }
 }

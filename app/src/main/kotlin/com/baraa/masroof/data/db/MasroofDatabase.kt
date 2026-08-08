@@ -37,7 +37,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MessagePatternFamilyEntity::class,
         PatternVariantAnchorEntity::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -1716,7 +1716,7 @@ abstract class MasroofDatabase : RoomDatabase() {
         }
 
         /**
-         * v29 -> v30 re-keys user-visible families with semantic-v1.
+         * v29 -> v30 re-keys user-visible families with semantic identity.
          *
          * Definitions, fields, anchors, revisions, counts, and approval state
          * are preserved. Only family rows and definition.familyId links change.
@@ -1832,6 +1832,119 @@ abstract class MasroofDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Re-key semantic families after introducing transaction-type-aware
+         * salary and transfer identity. Definitions and their example counts
+         * are preserved; only obsolete family metadata is consolidated.
+         */
+        val MIGRATION_30_31: Migration = object : Migration(30, 31) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                data class Variant(
+                    val id: Long,
+                    val senderId: Long,
+                    val oldFamilyId: Long?,
+                    val name: String,
+                    val status: String,
+                    val template: String?,
+                    val type: String?,
+                    val createdAt: Long,
+                    val updatedAt: Long,
+                )
+
+                val variants = mutableListOf<Variant>()
+                db.query(
+                    """
+                    SELECT id, senderProfileId, familyId, userFriendlyName, status,
+                           templateText, transactionType, createdAt, updatedAt
+                    FROM message_pattern_definitions
+                    ORDER BY id
+                    """.trimIndent(),
+                ).use { c ->
+                    while (c.moveToNext()) {
+                        variants += Variant(
+                            id = c.getLong(0),
+                            senderId = c.getLong(1),
+                            oldFamilyId = if (c.isNull(2)) null else c.getLong(2),
+                            name = c.getString(3).orEmpty(),
+                            status = c.getString(4),
+                            template = if (c.isNull(5)) null else c.getString(5),
+                            type = if (c.isNull(6)) null else c.getString(6),
+                            createdAt = c.getLong(7),
+                            updatedAt = c.getLong(8),
+                        )
+                    }
+                }
+
+                db.execSQL(
+                    "UPDATE message_pattern_families " +
+                        "SET stableKey = 'legacy-v30-family:' || id",
+                )
+
+                data class SemanticGroup(val senderId: Long, val key: String)
+                val groupForVariant = linkedMapOf<Long, SemanticGroup>()
+                variants.forEach { variant ->
+                    val semantic = com.baraa.masroof.sms.SemanticPatternSchemaNormalizer
+                        .fromTemplate(variant.template, variant.type)
+                    val key = when (semantic) {
+                        is com.baraa.masroof.sms.SemanticSchemaResult.Safe -> semantic.key
+                        is com.baraa.masroof.sms.SemanticSchemaResult.NonFinancial ->
+                            "review:non-financial:${variant.oldFamilyId ?: variant.id}"
+                        is com.baraa.masroof.sms.SemanticSchemaResult.Ambiguous ->
+                            "review:legacy:${semantic.reason}:${variant.oldFamilyId ?: variant.id}"
+                    }
+                    groupForVariant[variant.id] = SemanticGroup(variant.senderId, key)
+                }
+
+                val familyByGroup = linkedMapOf<SemanticGroup, Long>()
+                groupForVariant.values.distinct().forEach { group ->
+                    val members = variants.filter { groupForVariant[it.id] == group }
+                    val status = when {
+                        members.any { it.status == "APPROVED" } -> "APPROVED"
+                        members.any { it.status == "UNKNOWN" } -> "UNKNOWN"
+                        members.any { it.status == "IGNORED" } -> "IGNORED"
+                        else -> "DEPRECATED"
+                    }
+                    val representative = members.minBy { it.id }
+                    db.execSQL(
+                        """
+                        INSERT INTO message_pattern_families
+                            (senderProfileId, stableKey, displayName, status, createdAt, updatedAt)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """.trimIndent(),
+                        arrayOf(
+                            group.senderId,
+                            group.key,
+                            representative.name.ifBlank { "نمط رسالة" },
+                            status,
+                            members.minOf { it.createdAt },
+                            members.maxOf { it.updatedAt },
+                        ),
+                    )
+                    val familyId = db.query(
+                        """
+                        SELECT id FROM message_pattern_families
+                        WHERE senderProfileId = ? AND stableKey = ?
+                        LIMIT 1
+                        """.trimIndent(),
+                        arrayOf<Any>(group.senderId, group.key),
+                    ).use { c -> check(c.moveToFirst()); c.getLong(0) }
+                    familyByGroup[group] = familyId
+                }
+
+                variants.forEach { variant ->
+                    val familyId = familyByGroup.getValue(groupForVariant.getValue(variant.id))
+                    db.execSQL(
+                        "UPDATE message_pattern_definitions SET familyId = ? WHERE id = ?",
+                        arrayOf(familyId, variant.id),
+                    )
+                }
+                db.execSQL(
+                    "DELETE FROM message_pattern_families " +
+                        "WHERE stableKey LIKE 'legacy-v30-family:%'",
+                )
+            }
+        }
+
         /** All migrations in version order. New migrations go at the end. */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
@@ -1863,6 +1976,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_27_28,
             MIGRATION_28_29,
             MIGRATION_29_30,
+            MIGRATION_30_31,
         )
 
         private fun semanticFamilyKey(

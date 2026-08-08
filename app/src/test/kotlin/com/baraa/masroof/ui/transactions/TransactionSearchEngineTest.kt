@@ -36,10 +36,10 @@ class TransactionSearchEngineTest {
         val found = TransactionSearchEngine.search(list, listOf(account(1)), categories, TransactionFilter(query = "حساب 1"))
         assertEquals(1, found.size)
     }
-    @Test fun rawSmsIsExcluded() {
-        val list = listOf(tx(1, rawSms = "RAW-SECRET-PROMO-9988"))
-        val found = TransactionSearchEngine.search(list, emptyList(), emptyMap(), TransactionFilter(query = "PROMO"))
-        assertEquals(0, found.size)
+    @Test fun senderOrInstitutionSearchMatches() {
+        val list = listOf(tx(1, rawSms = "JAZIRA-BANK"))
+        val found = TransactionSearchEngine.search(list, emptyList(), emptyMap(), TransactionFilter(query = "jazira"))
+        assertEquals(1, found.size)
     }
     @Test fun combinedFiltersCombine() {
         val list = listOf(tx(1, treatment = FinancialTreatment.EXPENSE, status = TransactionPostingStatus.NEEDS_REVIEW), tx(2, treatment = FinancialTreatment.INCOME))
@@ -69,5 +69,50 @@ class TransactionSearchEngineTest {
         val list = listOf(tx(1, merchant = "STARBUCKS"), tx(2, merchant = "MCDONALDS"), tx(3, merchant = "CARREFOUR"))
         val found = TransactionSearchEngine.search(list, emptyList(), emptyMap(), TransactionFilter(query = "STARBUCKS"))
         assertEquals(1, found.size)
+    }
+
+    @Test fun newestSortUsesFinancialDateThenId() {
+        val old = tx(9).copy(transactionDate = LocalDate.now().minusDays(1))
+        val newestLowId = tx(1).copy(transactionDate = LocalDate.now())
+        val newestHighId = tx(2).copy(transactionDate = LocalDate.now())
+        val found = TransactionSearchEngine.search(
+            listOf(old, newestLowId, newestHighId),
+            emptyList(),
+            emptyMap(),
+            TransactionFilter(sort = TransactionSort.NEWEST),
+        )
+        assertEquals(listOf(2L, 1L, 9L), found.map { it.id })
+    }
+
+    @Test fun explicitAmountSortsAreAppliedAfterFiltering() {
+        val low = tx(1, merchant = "متجر").copy(amount = BigDecimal.ONE)
+        val high = tx(2, merchant = "متجر").copy(amount = BigDecimal("100"))
+        val descending = TransactionSearchEngine.search(
+            listOf(low, high),
+            emptyList(),
+            emptyMap(),
+            TransactionFilter(query = "متجر", sort = TransactionSort.AMOUNT_HIGH_TO_LOW),
+        )
+        assertEquals(listOf(2L, 1L), descending.map { it.id })
+    }
+
+    @Test fun normalizedSearchIncludesSenderFriendlyTypeLast4AndAmount() {
+        val row = tx(1, rawSms = "مصرف الجزيرة").copy(
+            accountOrCardLastFourDigits = "1234",
+            amount = BigDecimal("10000"),
+            transactionType = TransactionType.PURCHASE,
+        )
+        listOf("الجزيره", "شراء", "1234", "10000").forEach { query ->
+            assertEquals(
+                query,
+                1,
+                TransactionSearchEngine.search(
+                    listOf(row),
+                    emptyList(),
+                    emptyMap(),
+                    TransactionFilter(query = query),
+                ).size,
+            )
+        }
     }
 }

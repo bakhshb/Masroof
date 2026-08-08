@@ -40,6 +40,7 @@ import com.baraa.masroof.ui.senders.TemplateEditorScreen
 import com.baraa.masroof.ui.settings.AutoSmsImportSettingsScreen
 import com.baraa.masroof.ui.settings.NotificationsSettingsScreen
 import com.baraa.masroof.ui.transactions.TransactionOperationsScreen
+import com.baraa.masroof.ui.transactions.TransactionDetailScreen
 import com.baraa.masroof.ui.transactions.ReviewQueueScreen
 import com.baraa.masroof.ui.settings.SettingsDestination
 import com.baraa.masroof.ui.settings.SettingsDestinations
@@ -72,7 +73,11 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     currentRoute == route -> true
                     // The import screen is logically part of the
                     // TRANSACTIONS tab; keep it highlighted.
-                    (currentRoute == ImportMessagesRoute || currentRoute == ReviewQueueRoute) && entry == PrimaryTab.TRANSACTIONS -> true
+                    (
+                        currentRoute == ImportMessagesRoute ||
+                            currentRoute == ReviewQueueRoute ||
+                            currentRoute == TransactionDetailRoute
+                        ) && entry == PrimaryTab.TRANSACTIONS -> true
                     else -> false
                 }
                 NavigationBarItem(
@@ -118,12 +123,26 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onBankMessages = {
                         navController.navigate(SettingsDestinations.bankMessages.route) { launchSingleTop = true }
                     },
+                    onTransactionClick = { id -> navController.navigate(transactionDetailRoute(id)) },
                 )
             }
             composable("primary/TRANSACTIONS") {
                 TransactionOperationsScreen(
                     onOpenImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
                     onOpenReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
+                    onTransactionClick = { id -> navController.navigate(transactionDetailRoute(id)) },
+                )
+            }
+            composable(
+                route = TransactionDetailRoute,
+                arguments = listOf(navArgument("transactionId") { type = NavType.LongType }),
+            ) { backStackEntry ->
+                TransactionDetailScreen(
+                    transactionId = backStackEntry.arguments?.getLong("transactionId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                    onOpenReview = {
+                        navController.navigate(ReviewQueueRoute) { launchSingleTop = true }
+                    },
                 )
             }
             composable(ImportMessagesRoute) {
@@ -306,6 +325,8 @@ private fun SettingsDestination.routeKey(): String = route
 /** Stable top-level route for the SMS import flow. */
 const val ImportMessagesRoute: String = AppRoutes.IMPORT
 const val ReviewQueueRoute: String = AppRoutes.REVIEW
+const val TransactionDetailRoute: String = "operations/transaction/{transactionId}"
+fun transactionDetailRoute(transactionId: Long): String = "operations/transaction/$transactionId"
 
 /**
  * Switch to a primary bottom-nav tab. Pops the import / settings stack

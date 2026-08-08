@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -405,6 +406,63 @@ class MessagePatternRepositoryDedupTest {
         )
         val result = repo.updateTemplate(draft)
         assertTrue(result is MessagePatternRepository.TemplateUpdateResult.ValidationError)
+    }
+
+    @Test
+    fun saveAndApproveEditedUnknownSalaryReturnsEligibleCurrentRevision() = runBlocking {
+        val defs = FakePatternDefinitionDao()
+        val fields = FakePatternFieldDao()
+        val repo = MessagePatternRepository(defs, fields) { 3_000L }
+        val body = "حوالة واردة راتب\nمبلغ: 10000 SAR"
+        val candidate = repo.saveDiscovered(
+            1L,
+            discovered(body),
+            MessagePatternStatus.UNKNOWN,
+        )
+        val draft = com.baraa.masroof.sms.TemplateEditDraft(
+            patternId = candidate.definition.id,
+            senderProfileId = 1L,
+            displayName = "راتب",
+            transactionType = com.baraa.masroof.transaction.TransactionType.SALARY,
+            direction = com.baraa.masroof.transaction.MoneyFlowDirection.INFLOW,
+            templateText = "حوالة واردة راتب\nمبلغ: {AMOUNT} SAR",
+            status = MessagePatternStatus.UNKNOWN,
+            active = false,
+            fields = listOf(
+                com.baraa.masroof.sms.TemplateFieldDraft(
+                    placeholderToken = "AMOUNT",
+                    canonicalField = PatternCanonicalField.TRANSACTION_AMOUNT,
+                    sourceLabel = "مبلغ",
+                    role = PatternFieldRole.PRIMARY,
+                    valueType = PatternValueType.MONEY,
+                    required = true,
+                ),
+            ),
+        )
+
+        val result = repo.saveAndApproveEditedCandidate(draft)
+
+        assertTrue(result is MessagePatternRepository.TemplateUpdateResult.Success)
+        val approved = (result as MessagePatternRepository.TemplateUpdateResult.Success).pattern
+        assertEquals(MessagePatternStatus.APPROVED, approved.definition.status)
+        assertTrue(approved.definition.isActive)
+        assertEquals(
+            com.baraa.masroof.sms.NORMALIZATION_VERSION,
+            approved.definition.normalizationVersion,
+        )
+        assertTrue(com.baraa.masroof.sms.PatternRuntimeEligibility.isEligible(approved.definition))
+        val old = defs.rows.first { it.id == candidate.definition.id }
+        assertEquals(MessagePatternStatus.DEPRECATED, old.status)
+        assertFalse(old.isActive)
+        assertEquals(candidate.definition.id, approved.definition.lineageId)
+        assertTrue(
+            com.baraa.masroof.sms.TemplateResolutionService.resolve(
+                "BANK",
+                body,
+                1L,
+                listOf(approved),
+            ) is com.baraa.masroof.sms.TemplateResolutionResult.Matched,
+        )
     }
 
     @Test

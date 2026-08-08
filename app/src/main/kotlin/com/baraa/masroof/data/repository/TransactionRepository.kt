@@ -4,6 +4,7 @@ import com.baraa.masroof.data.db.TransactionDao
 import com.baraa.masroof.data.db.TransactionEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 /**
  * Repository contract for the local `transactions` table.
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 interface TransactionRepository {
     fun observeAll(): Flow<List<TransactionEntity>>
+    fun observeById(id: Long): Flow<TransactionEntity?>
     fun observeCount(): Flow<Int>
     suspend fun getAllNewestFirst(): List<TransactionEntity>
     suspend fun getById(id: Long): TransactionEntity?
@@ -31,6 +33,7 @@ interface TransactionRepository {
 /** Room-backed implementation. */
 class RoomTransactionRepository(private val dao: TransactionDao) : TransactionRepository {
     override fun observeAll(): Flow<List<TransactionEntity>> = dao.observeAll()
+    override fun observeById(id: Long): Flow<TransactionEntity?> = dao.observeById(id)
     override fun observeCount(): Flow<Int> = dao.observeCount()
     override suspend fun getAllNewestFirst(): List<TransactionEntity> = dao.getAllNewestFirst()
     override suspend fun getById(id: Long): TransactionEntity? = dao.getById(id)
@@ -59,19 +62,17 @@ class RoomTransactionRepository(private val dao: TransactionDao) : TransactionRe
 class FakeTransactionRepository : TransactionRepository {
 
     private val rows: MutableList<TransactionEntity> = mutableListOf()
-    private val flows: MutableList<MutableList<TransactionEntity>> = mutableListOf()
+    private val state = MutableStateFlow<List<TransactionEntity>>(emptyList())
 
     private fun snapshot(): List<TransactionEntity> = rows.sortedByDescending { it.smsTimestamp }
 
     private fun publish() {
-        val snap = snapshot()
-        for (f in flows) {
-            f.clear()
-            f.addAll(snap)
-        }
+        state.value = snapshot()
     }
 
-    override fun observeAll(): Flow<List<TransactionEntity>> = kotlinx.coroutines.flow.MutableStateFlow(snapshot())
+    override fun observeAll(): Flow<List<TransactionEntity>> = state
+    override fun observeById(id: Long): Flow<TransactionEntity?> =
+        state.map { rows -> rows.firstOrNull { it.id == id } }
 
     override fun observeCount(): Flow<Int> = kotlinx.coroutines.flow.MutableStateFlow(rows.size)
 

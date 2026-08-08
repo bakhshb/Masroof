@@ -110,14 +110,29 @@ object PatternStructure {
     fun legacyStructuralFamilyKey(templateText: String?, signature: String): String =
         signature.substringBefore("#revision:")
 
-    fun anchorsFromTemplate(templateText: String?): List<Pair<String, Boolean>> =
+    fun anchorsFromTemplate(
+        templateText: String?,
+        requiredByPlaceholder: Map<String, Boolean> = emptyMap(),
+    ): List<Pair<String, Boolean>> =
         templateText.orEmpty().lineSequence()
-            .map { labelOf(it) }
-            .map(::normalizeAnchor)
-            .filter { it.isNotBlank() }
-            .distinct()
-            .map { it to !isOptionalContextAnchor(it) }
+            .map { line ->
+                val anchor = normalizeAnchor(labelOf(line))
+                val placeholders = PLACEHOLDER.findAll(line)
+                    .map { it.groupValues[1].trim().uppercase() }
+                    .toList()
+                val required = when {
+                    isOptionalContextAnchor(anchor) -> false
+                    placeholders.isEmpty() -> true
+                    placeholders.any { requiredByPlaceholder[it] == true } -> true
+                    placeholders.all { requiredByPlaceholder[it] == false } -> false
+                    else -> true
+                }
+                anchor to required
+            }
+            .filter { it.first.isNotBlank() }
+            .distinctBy { it.first }
             .toList()
 
     private val SEPARATORS = listOf("：", ":", "=")
+    private val PLACEHOLDER = Regex("""\{([^{}]+)}""")
 }

@@ -5,6 +5,14 @@ import com.baraa.masroof.data.db.TransactionEntity
 import com.baraa.masroof.ledger.TransactionPostingStatus
 import com.baraa.masroof.transaction.FinancialTreatment
 import java.time.LocalDate
+import java.time.ZoneId
+
+enum class TransactionSort {
+    NEWEST,
+    OLDEST,
+    AMOUNT_HIGH_TO_LOW,
+    AMOUNT_LOW_TO_HIGH,
+}
 
 /** Filter selection is captured as an immutable model so it can be saved and compared. */
 data class TransactionFilter(
@@ -24,6 +32,7 @@ data class TransactionFilter(
     val accountId: Long? = null,
     val categoryId: Long? = null,
     val postingStatuses: Set<TransactionPostingStatus> = emptySet(),
+    val sort: TransactionSort = TransactionSort.NEWEST,
 ) {
     val isEmpty: Boolean get() = query.isBlank() && fromDate == null && toDate == null && needsReview.not() && unlinked.not() &&
         unclassified.not() && expenses.not() && income.not() && internalTransfers.not() && investments.not() &&
@@ -32,8 +41,10 @@ data class TransactionFilter(
 
 object TransactionSearchEngine {
     fun search(transactions: List<TransactionEntity>, accounts: List<FinancialAccount>, categoriesById: Map<Long, String>, filter: TransactionFilter): List<TransactionEntity> {
-        val needle = filter.query.trim()
-        return transactions.filter { tx -> matches(tx, accounts, categoriesById, filter, needle) }
+        val needle = normalizeSearch(filter.query)
+        return transactions
+            .filter { tx -> matches(tx, accounts, categoriesById, filter, needle) }
+            .let { sort(it, filter.sort) }
     }
 
     private fun matches(transaction: TransactionEntity, accounts: List<FinancialAccount>, categoriesById: Map<Long, String>, filter: TransactionFilter, needle: String): Boolean {
@@ -56,12 +67,62 @@ object TransactionSearchEngine {
         }
         if (filter.categoryId != null && transaction.categoryId != filter.categoryId) return false
         if (needle.isNotEmpty()) {
-            val merchant = transaction.merchantOrBeneficiary?.lowercase().orEmpty()
-            val category = categoriesById[transaction.categoryId]?.lowercase().orEmpty()
-            val accountName = accounts.firstOrNull { it.id == transaction.sourceAccountId || it.id == transaction.destinationAccountId }?.displayName?.lowercase().orEmpty()
-            val description = transaction.transactionType.name.lowercase()
-            if (!needle.lowercase().let { merchant.contains(it) || category.contains(it) || accountName.contains(it) || description.contains(it) }) return false
+            val accountNames = accounts.filter {
+                it.id == transaction.sourceAccountId || it.id == transaction.destinationAccountId
+            }.joinToString(" ") { it.displayName }
+            val searchable = listOfNotNull(
+                transaction.merchantOrBeneficiary,
+                com.baraa.masroof.ui.TransactionTypeVisuals.label(transaction.transactionType),
+                transaction.transactionType.name,
+                transaction.originalSender,
+                accountNames,
+                categoriesById[transaction.categoryId],
+                transaction.accountOrCardLastFourDigits?.let { "••••$it $it" },
+                transaction.amount?.stripTrailingZeros()?.toPlainString(),
+            ).joinToString(" ")
+            if (!normalizeSearch(searchable).contains(needle)) return false
         }
         return true
     }
+
+    private fun sort(
+        transactions: List<TransactionEntity>,
+        sort: TransactionSort,
+    ): List<TransactionEntity> = when (sort) {
+        TransactionSort.NEWEST -> transactions.sortedWith(
+            compareByDescending<TransactionEntity>(::effectiveFinancialTime)
+                .thenByDescending { it.id },
+        )
+        TransactionSort.OLDEST -> transactions.sortedWith(
+            compareBy<TransactionEntity>(::effectiveFinancialTime)
+                .thenBy { it.id },
+        )
+        TransactionSort.AMOUNT_HIGH_TO_LOW -> transactions.sortedWith(
+            compareByDescending<TransactionEntity> { it.amount }
+                .thenByDescending(::effectiveFinancialTime)
+                .thenByDescending { it.id },
+        )
+        TransactionSort.AMOUNT_LOW_TO_HIGH -> transactions.sortedWith(
+            compareBy<TransactionEntity, java.math.BigDecimal?>(nullsLast()) { it.amount }
+                .thenByDescending(::effectiveFinancialTime)
+                .thenByDescending { it.id },
+        )
+    }
+
+    internal fun effectiveFinancialTime(transaction: TransactionEntity): Long {
+        val date = transaction.transactionDate ?: return transaction.smsTimestamp
+        return date.atTime(transaction.transactionTime ?: java.time.LocalTime.MIN)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    }
+
+    internal fun normalizeSearch(value: String): String = value
+        .lowercase()
+        .replace(Regex("[أإآ]"), "ا")
+        .replace('ى', 'ي')
+        .replace('ة', 'ه')
+        .replace(Regex("[\\u064B-\\u065F\\u0670]"), "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
 }

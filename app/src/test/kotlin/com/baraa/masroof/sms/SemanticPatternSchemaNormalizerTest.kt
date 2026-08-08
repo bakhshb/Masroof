@@ -67,6 +67,43 @@ class SemanticPatternSchemaNormalizerTest {
     }
 
     @Test
+    fun salaryRoutingFieldsDoNotChangeIdentity() {
+        val base = "حوالة واردة راتب\nمبلغ: {AMOUNT} SAR"
+        val withBeneficiary = "$base\nاسم المرسل: {BENEFICIARY}"
+        val withAccount = "$withBeneficiary\nإلى حساب: {ACCOUNT_LAST4}"
+        assertEquals(templateKey(base, TransactionType.SALARY), templateKey(withBeneficiary, TransactionType.SALARY))
+        assertEquals(templateKey(base, TransactionType.SALARY), templateKey(withAccount, TransactionType.SALARY))
+    }
+
+    @Test
+    fun transferAccountAndIbanCanCoexist() {
+        val outgoing = """
+            حوالة صادرة
+            المبلغ: {AMOUNT} SAR
+            من حساب: {ACCOUNT_LAST4}
+            إلى آيبان: {IBAN_LAST4}
+        """.trimIndent()
+        val incoming = """
+            حوالة واردة
+            المبلغ: {AMOUNT} SAR
+            إلى حساب: {ACCOUNT_LAST4}
+            اسم المرسل: {BENEFICIARY}
+        """.trimIndent()
+        assertTrue(
+            SemanticPatternSchemaNormalizer.fromTemplate(
+                outgoing,
+                TransactionType.TRANSFER_OUT.name,
+            ) is SemanticSchemaResult.Safe,
+        )
+        assertTrue(
+            SemanticPatternSchemaNormalizer.fromTemplate(
+                incoming,
+                TransactionType.TRANSFER_IN.name,
+            ) is SemanticSchemaResult.Safe,
+        )
+    }
+
+    @Test
     fun purchaseAndRefundRemainDifferent() {
         assertNotEquals(key(posA), key(posA.replace("شراء عبر نقاط البيع", "استرداد عملية شراء")))
     }
@@ -88,7 +125,7 @@ class SemanticPatternSchemaNormalizerTest {
             built.transactionType?.name,
         ) as SemanticSchemaResult.Safe
         assertEquals(body.key, template.key)
-        assertTrue(body.key.startsWith("semantic-v1|"))
+        assertTrue(body.key.startsWith("semantic-v2|"))
     }
 
     @Test
@@ -167,6 +204,9 @@ class SemanticPatternSchemaNormalizerTest {
 
     private fun key(body: String): String =
         (SemanticPatternSchemaNormalizer.fromBody(body) as SemanticSchemaResult.Safe).key
+
+    private fun templateKey(template: String, type: TransactionType): String =
+        (SemanticPatternSchemaNormalizer.fromTemplate(template, type.name) as SemanticSchemaResult.Safe).key
 
     private companion object {
         const val posA = """

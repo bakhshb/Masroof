@@ -60,6 +60,8 @@ import com.baraa.masroof.ui.TransactionTypeVisuals
 import com.baraa.masroof.ui.theme.FinancialShapes
 import com.baraa.masroof.ui.theme.FinancialTypography
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
+import com.baraa.masroof.ui.theme.PrimaryButton
+import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
@@ -157,7 +159,7 @@ private fun LoadedTemplateEditor(
         }
     }
 
-    fun save() {
+    fun save(approveCandidate: Boolean = false) {
         val value = draft()
         when (val validation = TemplateEditValidator.validate(value)) {
             is TemplateEditValidation.Error -> error = validation.messageAr
@@ -165,7 +167,12 @@ private fun LoadedTemplateEditor(
                 saving = true
                 error = null
                 try {
-                    when (val result = app.messagePatternRepository.updateTemplate(value)) {
+                    val repositoryResult = if (approveCandidate) {
+                        app.messagePatternRepository.saveAndApproveEditedCandidate(value)
+                    } else {
+                        app.messagePatternRepository.updateTemplate(value)
+                    }
+                    when (val result = repositoryResult) {
                         is MessagePatternRepository.TemplateUpdateResult.Success -> {
                             val newId = result.pattern.definition.id
                             saving = false
@@ -323,6 +330,27 @@ private fun LoadedTemplateEditor(
                 }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (def.status == MessagePatternStatus.UNKNOWN) {
+                PrimaryButton(
+                    label = if (saving) "جارٍ الحفظ…" else "حفظ واعتماد",
+                    enabled = !saving,
+                    onClick = { save(approveCandidate = true) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SecondaryButton(
+                    label = "حفظ كمسودة",
+                    enabled = !saving,
+                    onClick = { save(approveCandidate = false) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                PrimaryButton(
+                    label = if (saving) "جارٍ الحفظ…" else "حفظ التغييرات",
+                    enabled = !saving,
+                    onClick = { save() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 

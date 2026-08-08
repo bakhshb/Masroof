@@ -128,6 +128,11 @@ class ImportFlowAndHomeNavigationTest {
         assertEquals(HomeNavStrategy.Action.POP_BACK_TO_HOME, HomeNavStrategy.fromImportOrReview.action)
     }
 
+    @Test fun transactionClicksUseDedicatedDetailRoute() {
+        assertEquals("operations/transaction/42", transactionDetailRoute(42L))
+        assertEquals("operations/transaction/{transactionId}", TransactionDetailRoute)
+    }
+
     @Test fun dashboardAndAccountScreenShowSameBalance() {
         // Both pull from the same AccountBalanceService.balances(...)
         // call against the same posted-journal Flow. This contract

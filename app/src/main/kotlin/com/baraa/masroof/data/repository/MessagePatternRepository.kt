@@ -429,6 +429,22 @@ class MessagePatternRepository(
      * never rewrites posted journals or historical transaction rows.
      */
     suspend fun updateTemplate(draft: com.baraa.masroof.sms.TemplateEditDraft): TemplateUpdateResult =
+        updateTemplateInternal(draft, requireUnknownCandidate = false)
+
+    suspend fun saveAndApproveEditedCandidate(
+        draft: com.baraa.masroof.sms.TemplateEditDraft,
+    ): TemplateUpdateResult = updateTemplateInternal(
+        draft.copy(
+            status = MessagePatternStatus.APPROVED,
+            active = true,
+        ),
+        requireUnknownCandidate = true,
+    )
+
+    private suspend fun updateTemplateInternal(
+        draft: com.baraa.masroof.sms.TemplateEditDraft,
+        requireUnknownCandidate: Boolean,
+    ): TemplateUpdateResult =
         withContext(Dispatchers.IO) {
             val validation = com.baraa.masroof.sms.TemplateEditValidator.validate(draft)
             if (validation is com.baraa.masroof.sms.TemplateEditValidation.Error) {
@@ -438,6 +454,14 @@ class MessagePatternRepository(
                 inTransaction {
                     val existing = definitionDao.getById(draft.patternId)
                         ?: return@inTransaction TemplateUpdateResult.NotFound
+                    if (
+                        requireUnknownCandidate &&
+                        existing.status != MessagePatternStatus.UNKNOWN
+                    ) {
+                        return@inTransaction TemplateUpdateResult.ValidationError(
+                            "هذا النمط لم يعد مرشحًا بانتظار الاعتماد",
+                        )
+                    }
                     val sender = senderProfileDao?.getById(draft.senderProfileId)
                     if (senderProfileDao != null && sender == null) {
                         return@inTransaction TemplateUpdateResult.SenderNotFound
@@ -482,7 +506,14 @@ class MessagePatternRepository(
                     val ts = now()
                     val nextVersion = (definitionDao.getByLineage(lineageId).maxOfOrNull { it.version }
                         ?: existing.version) + 1
-                    definitionDao.update(existing.copy(deprecatedAt = ts, updatedAt = ts))
+                    definitionDao.update(
+                        existing.copy(
+                            status = MessagePatternStatus.DEPRECATED,
+                            isActive = false,
+                            deprecatedAt = ts,
+                            updatedAt = ts,
+                        ),
+                    )
                     val newId = definitionDao.insert(
                         existing.copy(
                             id = 0L,
@@ -503,6 +534,7 @@ class MessagePatternRepository(
                             status = draft.status,
                             version = nextVersion,
                             isActive = draft.active,
+                            normalizationVersion = NORMALIZATION_VERSION,
                             userConfirmed = true,
                             activeFrom = ts,
                             deprecatedAt = null,
@@ -512,6 +544,32 @@ class MessagePatternRepository(
                         ),
                     )
                     persistDraftFields(newId, draft.fields)
+                    persistAnchors(newId, draft.templateText)
+                    if (requireUnknownCandidate) {
+                        definitionDao.getForSender(draft.senderProfileId)
+                            .filter {
+                                it.id != newId &&
+                                    it.status == MessagePatternStatus.UNKNOWN &&
+                                    (
+                                        (targetFamilyId != null && it.familyId == targetFamilyId) ||
+                                            it.canonicalKey == canonicalKey
+                                        )
+                            }
+                            .forEach { sibling ->
+                                definitionDao.update(
+                                    sibling.copy(
+                                        status = MessagePatternStatus.DEPRECATED,
+                                        isActive = false,
+                                        deprecatedAt = sibling.deprecatedAt ?: ts,
+                                        updatedAt = ts,
+                                    ),
+                                )
+                            }
+                    }
+                    existing.familyId
+                        ?.takeIf { it != targetFamilyId }
+                        ?.let { refreshFamilyStatus(it) }
+                    targetFamilyId?.let { refreshFamilyStatus(it) }
                     TemplateUpdateResult.Success(
                         MessagePattern(definitionDao.getById(newId)!!, fieldDao.getForPattern(newId)),
                     )
@@ -994,7 +1052,14 @@ class MessagePatternRepository(
 
     private suspend fun persistAnchors(variantId: Long, templateText: String?) {
         val dao = anchorDao ?: return
-        val anchors = PatternStructure.anchorsFromTemplate(templateText)
+        val requiredByPlaceholder = fieldDao.getForPattern(variantId)
+            .associate { field ->
+                field.placeholderToken.trim().uppercase() to field.required
+            }
+        val anchors = PatternStructure.anchorsFromTemplate(
+            templateText,
+            requiredByPlaceholder,
+        )
             .map { (anchor, required) ->
                 PatternVariantAnchorEntity(
                     variantId = variantId,

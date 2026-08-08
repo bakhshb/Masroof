@@ -361,6 +361,8 @@ data class ScanPreview(
     val discoveredSenders: List<DiscoveredSender> = emptyList(),
     /** Aggregated skips (no SMS bodies) for «رسائل لم تُستورد». */
     val skippedSenders: List<SkippedSenderGroup> = emptyList(),
+    /** Complete sender/count/date groups for unregistered messages; never contains SMS bodies. */
+    val unregisteredSenderGroups: List<SkippedSenderGroup> = emptyList(),
     /** Stage funnel for diagnostics (raw count is independent of templates). */
     val filterFunnel: ScanFilterFunnel? = null,
     /** True when READ_SMS was missing — never present this as an empty inbox. */
@@ -542,6 +544,25 @@ data class ScanPreview(
                         .thenBy { it.senderDisplay },
                 )
                 .take(MAX_SKIPPED_GROUPS)
+
+        fun aggregateUnregisteredSenders(
+            buckets: Map<Pair<String, SkipReason>, SkipAccum>,
+        ): List<SkippedSenderGroup> =
+            buckets
+                .filterKeys { it.second == SkipReason.UNREGISTERED_SENDER }
+                .map { (key, acc) ->
+                    SkippedSenderGroup(
+                        senderDisplay = key.first,
+                        reason = key.second,
+                        messageCount = acc.count,
+                        redactedSample = null,
+                        latestTimestamp = acc.latestTimestamp,
+                    )
+                }
+                .sortedWith(
+                    compareByDescending<SkippedSenderGroup> { it.messageCount }
+                        .thenBy { it.senderDisplay },
+                )
     }
 }
 
@@ -629,6 +650,14 @@ class SmsImportOrchestrator(
                 unregisteredSenderMessages = messages.count { SenderNormalizer.normalize(it.sender) !in authorizedSenders },
                 otpOrAuthMessages = otpCount,
                 discoveredSenders = discoveries,
+                unregisteredSenderGroups = discoveries.map {
+                    ScanPreview.SkippedSenderGroup(
+                        senderDisplay = it.sender,
+                        reason = ScanPreview.SkipReason.UNREGISTERED_SENDER,
+                        messageCount = it.messageCount,
+                        latestTimestamp = it.latestTimestamp,
+                    )
+                },
                 filterFunnel = ScanFilterFunnel(
                     rawSms = rawSms,
                     afterOtpFilter = rawSms - otpCount,
@@ -1271,6 +1300,7 @@ class SmsImportOrchestrator(
             },
             perTransaction = items,
             skippedSenders = ScanPreview.aggregateSkipped(skipBuckets),
+            unregisteredSenderGroups = ScanPreview.aggregateUnregisteredSenders(skipBuckets),
             filterFunnel = funnel,
             scanError = engineSetupError?.let { "تعذر تجهيز محرك الاستخراج: $it — الرسائل بلا قالب ما زالت ظاهرة للمراجعة" },
         )

@@ -21,12 +21,13 @@ class TransactionOpsState {
     var accountId: Long? = null
     var categoryId: Long? = null
     var postingStatuses: Set<TransactionPostingStatus> = emptySet()
+    var sort by mutableStateOf(TransactionSort.NEWEST)
 
     val isEmpty: Boolean get() = query.isBlank() && fromDate == null && toDate == null && !needsReview && !unlinked && !unclassified && !expenses && !income && !internalTransfers && !investments && !cardPayments && !refunds && !bankFees && accountId == null && categoryId == null && postingStatuses.isEmpty()
 
-    fun reset() { query = ""; fromDate = null; toDate = null; needsReview = false; unlinked = false; unclassified = false; expenses = false; income = false; internalTransfers = false; investments = false; cardPayments = false; refunds = false; bankFees = false; accountId = null; categoryId = null; postingStatuses = emptySet() }
+    fun reset() { query = ""; fromDate = null; toDate = null; needsReview = false; unlinked = false; unclassified = false; expenses = false; income = false; internalTransfers = false; investments = false; cardPayments = false; refunds = false; bankFees = false; accountId = null; categoryId = null; postingStatuses = emptySet(); sort = TransactionSort.NEWEST }
     fun snapshot() { /* already tracked via mutableState */ }
-    fun toFilter() = TransactionFilter(query = query, fromDate = fromDate, toDate = toDate, needsReview = needsReview, unlinked = unlinked, unclassified = unclassified, expenses = expenses, income = income, internalTransfers = internalTransfers, investments = investments, cardPayments = cardPayments, refunds = refunds, bankFees = bankFees, accountId = accountId, categoryId = categoryId, postingStatuses = postingStatuses)
+    fun toFilter() = TransactionFilter(query = query, fromDate = fromDate, toDate = toDate, needsReview = needsReview, unlinked = unlinked, unclassified = unclassified, expenses = expenses, income = income, internalTransfers = internalTransfers, investments = investments, cardPayments = cardPayments, refunds = refunds, bankFees = bankFees, accountId = accountId, categoryId = categoryId, postingStatuses = postingStatuses, sort = sort)
 }
 
 private fun <T> mutableStateOf(value: T) = androidx.compose.runtime.mutableStateOf(value)
@@ -42,6 +43,7 @@ val TransactionOpsStateSaver: Saver<TransactionOpsState, Any> = Saver(
             "investments" to state.investments, "cardPayments" to state.cardPayments, "refunds" to state.refunds,
             "bankFees" to state.bankFees, "accountId" to state.accountId, "categoryId" to state.categoryId,
             "postingStatuses" to state.postingStatuses.map { it.name },
+            "sort" to state.sort.name,
         )
     },
     restore = { map ->
@@ -63,6 +65,9 @@ val TransactionOpsStateSaver: Saver<TransactionOpsState, Any> = Saver(
             accountId = (m["accountId"] as? Long)
             categoryId = (m["categoryId"] as? Long)
             postingStatuses = ((m["postingStatuses"] as? List<String>) ?: emptyList()).mapNotNull { runCatching { TransactionPostingStatus.valueOf(it) }.getOrNull() }.toSet()
+            sort = (m["sort"] as? String)?.let {
+                runCatching { TransactionSort.valueOf(it) }.getOrNull()
+            } ?: TransactionSort.NEWEST
         }
     },
 )

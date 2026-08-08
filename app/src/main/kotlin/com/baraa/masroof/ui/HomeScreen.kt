@@ -81,6 +81,7 @@ fun HomeScreen(
     onShowAllTransactions: () -> Unit = {},
     onOpenReview: () -> Unit = {},
     onBankMessages: () -> Unit = {},
+    onTransactionClick: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
@@ -120,7 +121,13 @@ fun HomeScreen(
     val journals = remember(monthHistory) { monthHistory?.daily?.values?.toList().orEmpty() }
 
     val identifiersByAccount = remember(identifiers) { identifiers.groupBy { it.accountId } }
-    val recent = remember(transactions) { transactions.sortedByDescending { it.smsTimestamp }.take(5) }
+    val recent = remember(transactions) {
+        transactions.sortedWith(
+            compareByDescending<com.baraa.masroof.data.db.TransactionEntity> {
+                com.baraa.masroof.ui.transactions.TransactionSearchEngine.effectiveFinancialTime(it)
+            }.thenByDescending { it.id },
+        ).take(5)
+    }
 
     val reviewCount = remember(transactions) { transactions.count { it.needsReview } }
     val beforeTrackingCount = remember(transactions) { transactions.count { it.exclusionReason?.contains("بداية المتابعة") == true } }
@@ -354,7 +361,7 @@ fun HomeScreen(
             items(recent, key = { it.id }) { tx ->
                 TransactionRow(
                     presentation = tx.toPresentation(identifiers = identifiersByAccount[resolveAccountId(tx, accounts)] ?: emptyList()),
-                    onClick = onOpenReview,
+                    onClick = { onTransactionClick(tx.id) },
                 )
             }
         }
@@ -409,7 +416,7 @@ fun HomeScreen(
                                 ),
                                 onClick = {
                                     selectedDay = null
-                                    onOpenReview()
+                                    onTransactionClick(tx.id)
                                 },
                             )
                         }
