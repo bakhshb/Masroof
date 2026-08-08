@@ -4,10 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.Saver
-import com.baraa.masroof.onboarding.OnboardingImportPreview
-import com.baraa.masroof.onboarding.OnboardingLinkPreview
-import com.baraa.masroof.onboarding.PatternMatchCounts
-import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.Currency
 import java.time.LocalDate
@@ -23,8 +19,6 @@ class UiOnboardingState internal constructor(
     var accountType by mutableStateOf(AccountType.BANK_ACCOUNT)
     var displayName by mutableStateOf("")
     var institution by mutableStateOf("")
-    var patternSourceProfileId by mutableStateOf(0L)
-    var patternSourceLabel by mutableStateOf("")
     var lastFour by mutableStateOf("")
     var identifierConfirmed by mutableStateOf(false)
     var openingBalance by mutableStateOf("0")
@@ -34,28 +28,17 @@ class UiOnboardingState internal constructor(
     var selectedSenderProfileId by mutableStateOf(0L)
     var selectedSenderKey by mutableStateOf("")
     var selectedSenderDisplay by mutableStateOf("")
-    var selectedSmsBody by mutableStateOf<String?>(null)
-    var draftTemplate by mutableStateOf("")
-    var draftPlaceholders by mutableStateOf<List<String>>(emptyList())
-    var draftSignature by mutableStateOf("")
-    var draftFriendlyName by mutableStateOf("")
-    var lastPatternCounts by mutableStateOf<PatternMatchCounts?>(null)
-    var senderInbox by mutableStateOf<List<SmsMessage>>(emptyList())
-    var importPreview by mutableStateOf<OnboardingImportPreview?>(null)
-    var linkPreview by mutableStateOf<OnboardingLinkPreview?>(null)
     var createdAccountId by mutableStateOf(0L)
-    var importStatus by mutableStateOf<String?>(null)
 }
 
 data class OnboardingDraft(
+    val onboardingVersion: Int = CURRENT_ONBOARDING_VERSION,
     val step: OnboardingStep = OnboardingStep.WELCOME,
     val option: StartDateOption = StartDateOption.TODAY,
     val trackingDate: LocalDate = LocalDate.now(),
     val accountType: AccountType = AccountType.BANK_ACCOUNT,
     val displayName: String = "",
     val institution: String = "",
-    val patternSourceProfileId: Long = 0L,
-    val patternSourceLabel: String = "",
     val lastFour: String = "",
     val identifierConfirmed: Boolean = false,
     val openingBalance: String = "0",
@@ -69,14 +52,13 @@ data class OnboardingDraft(
 )
 
 internal fun UiOnboardingState.toDraft() = OnboardingDraft(
+    onboardingVersion = CURRENT_ONBOARDING_VERSION,
     step = step,
     option = option,
     trackingDate = trackingDate,
     accountType = accountType,
     displayName = displayName,
     institution = institution,
-    patternSourceProfileId = patternSourceProfileId,
-    patternSourceLabel = patternSourceLabel,
     lastFour = lastFour,
     identifierConfirmed = identifierConfirmed,
     openingBalance = openingBalance,
@@ -96,8 +78,6 @@ internal fun UiOnboardingState.restoreDraft(draft: OnboardingDraft) {
     accountType = draft.accountType
     displayName = draft.displayName
     institution = draft.institution
-    patternSourceProfileId = draft.patternSourceProfileId
-    patternSourceLabel = draft.patternSourceLabel
     lastFour = draft.lastFour
     identifierConfirmed = draft.identifierConfirmed
     openingBalance = draft.openingBalance
@@ -113,14 +93,13 @@ internal fun UiOnboardingState.restoreDraft(draft: OnboardingDraft) {
 val OnboardingSaver: Saver<UiOnboardingState, Any> = Saver(
     save = { state ->
         mapOf(
+            "onboardingVersion" to CURRENT_ONBOARDING_VERSION,
             "step" to state.step.name,
             "option" to state.option.name,
             "date" to state.trackingDate.toString(),
             "type" to state.accountType.name,
             "name" to state.displayName,
             "institution" to state.institution,
-            "patternSourceProfileId" to state.patternSourceProfileId,
-            "patternSourceLabel" to state.patternSourceLabel,
             "lastFour" to state.lastFour,
             "identifierConfirmed" to state.identifierConfirmed,
             "openingBalance" to state.openingBalance,
@@ -137,14 +116,20 @@ val OnboardingSaver: Saver<UiOnboardingState, Any> = Saver(
         @Suppress("UNCHECKED_CAST")
         val m = map as Map<String, Any?>
         UiOnboardingState(restoredFromSaver = true).apply {
-            step = mapPersistedStepName(m["step"] as? String) ?: OnboardingStep.WELCOME
+            val version = (m["onboardingVersion"] as? Number)?.toInt() ?: 2
+            val restoredAccountId = (m["createdAccountId"] as? Number)?.toLong() ?: 0L
+            val restoredSenderId = (m["selectedSenderProfileId"] as? Number)?.toLong() ?: 0L
+            step = mapPersistedStepName(
+                m["step"] as? String,
+                version,
+                restoredAccountId,
+                restoredSenderId,
+            ) ?: OnboardingStep.WELCOME
             option = runCatching { StartDateOption.valueOf(m["option"] as String) }.getOrDefault(StartDateOption.TODAY)
             trackingDate = runCatching { LocalDate.parse(m["date"] as String) }.getOrDefault(LocalDate.now())
             accountType = runCatching { AccountType.valueOf(m["type"] as String) }.getOrDefault(AccountType.BANK_ACCOUNT)
             displayName = m["name"] as? String ?: ""
             institution = m["institution"] as? String ?: ""
-            patternSourceProfileId = (m["patternSourceProfileId"] as? Number)?.toLong() ?: 0L
-            patternSourceLabel = m["patternSourceLabel"] as? String ?: ""
             lastFour = m["lastFour"] as? String ?: ""
             identifierConfirmed = m["identifierConfirmed"] as? Boolean ?: false
             openingBalance = m["openingBalance"] as? String ?: "0"
@@ -154,7 +139,7 @@ val OnboardingSaver: Saver<UiOnboardingState, Any> = Saver(
             selectedSenderProfileId = (m["selectedSenderProfileId"] as? Number)?.toLong() ?: 0L
             selectedSenderKey = m["selectedSenderKey"] as? String ?: ""
             selectedSenderDisplay = m["selectedSenderDisplay"] as? String ?: ""
-            createdAccountId = (m["createdAccountId"] as? Number)?.toLong() ?: 0L
+            createdAccountId = restoredAccountId
         }
     },
 )

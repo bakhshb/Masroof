@@ -3,163 +3,109 @@ package com.baraa.masroof.ui.onboarding
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Unit tests for the [OnboardingRepository] production contract (v2 pattern-first).
- */
 class OnboardingRepositoryTest {
     @Test
-    fun freshInstallationOpensOnboarding() = runBlocking {
+    fun freshInstallationIsPendingAndUsesVersionThree() {
         val repo = TestOnboardingRepository()
-        assertTrue("Fresh install must yield Pending", repo.snapshot() is OnboardingState.Pending)
-        assertFalse("Fresh install must not be Completed", repo.isCompleted())
+        assertTrue(repo.snapshot() is OnboardingState.Pending)
+        assertFalse(repo.isCompleted())
+        assertEquals(3, CURRENT_ONBOARDING_VERSION)
     }
 
     @Test
-    fun completingOnboardingPersistsState() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markStepCompleted(OnboardingStep.WELCOME)
-        repo.markStepCompleted(OnboardingStep.PERMISSION)
-        repo.markStepCompleted(OnboardingStep.SELECT_SENDER)
-        repo.markStepCompleted(OnboardingStep.CREATE_PATTERN)
-        repo.markStepCompleted(OnboardingStep.ACCOUNT)
-        repo.markStepCompleted(OnboardingStep.IDENTIFIERS)
-        repo.markStepCompleted(OnboardingStep.IMPORT)
+    fun minimalFlowOrderIsStable() {
+        assertEquals(OnboardingStep.ACCOUNT, nextOnboardingStep(OnboardingStep.WELCOME))
+        assertEquals(OnboardingStep.SELECT_SENDER, nextOnboardingStep(OnboardingStep.ACCOUNT))
+        assertEquals(OnboardingStep.COMPLETION, nextOnboardingStep(OnboardingStep.SELECT_SENDER))
+        assertEquals(OnboardingStep.SELECT_SENDER, previousOnboardingStep(OnboardingStep.COMPLETION))
+    }
+
+    @Test
+    fun oldRemovedStepWithoutAccountMigratesToAccount() {
+        assertEquals(
+            OnboardingStep.ACCOUNT,
+            mapPersistedStepName("CREATE_PATTERN", onboardingVersion = 2),
+        )
+        assertEquals(
+            OnboardingStep.ACCOUNT,
+            mapPersistedStepName("IMPORT_PREVIEW", onboardingVersion = 2),
+        )
+    }
+
+    @Test
+    fun oldRemovedStepWithAccountMigratesToSenderSelection() {
+        assertEquals(
+            OnboardingStep.SELECT_SENDER,
+            mapPersistedStepName(
+                "CREATE_PATTERN",
+                onboardingVersion = 2,
+                createdAccountId = 17L,
+            ),
+        )
+    }
+
+    @Test
+    fun oldPostAccountDraftWithSenderCanResumeAtCompletion() {
+        assertEquals(
+            OnboardingStep.COMPLETION,
+            mapPersistedStepName(
+                "IMPORT",
+                onboardingVersion = 2,
+                createdAccountId = 17L,
+                selectedSenderProfileId = 8L,
+            ),
+        )
+    }
+
+    @Test
+    fun removedOrUnknownCurrentStepNeverUsesOrdinalRestoration() {
+        assertEquals(
+            OnboardingStep.ACCOUNT,
+            mapPersistedStepName("CREATE_PATTERN", onboardingVersion = 3),
+        )
+        assertEquals(OnboardingStep.ACCOUNT, mapPersistedStepName("BOGUS", onboardingVersion = 3))
+        assertNull(mapPersistedStepName(null))
+    }
+
+    @Test
+    fun processDraftKeepsCreatedAccountIdForReuse() {
+        val draft = OnboardingDraft(
+            step = OnboardingStep.SELECT_SENDER,
+            displayName = "حساب يومي",
+            createdAccountId = 99L,
+        )
+        val repo = TestOnboardingRepository(initialDraft = draft)
+        assertEquals(99L, repo.loadDraft()?.createdAccountId)
+        assertEquals(OnboardingStep.SELECT_SENDER, repo.loadDraft()?.step)
+    }
+
+    @Test
+    fun completionClearsDraftAndIsIdempotent() = runBlocking {
+        val repo = TestOnboardingRepository(
+            initialDraft = OnboardingDraft(
+                step = OnboardingStep.COMPLETION,
+                createdAccountId = 1L,
+            ),
+        )
         repo.markCompleted()
-        assertTrue("markCompleted must persist the flag", repo.isCompleted())
+        repo.markCompleted()
+        assertTrue(repo.isCompleted())
+        assertNull(repo.loadDraft())
     }
 
     @Test
-    fun completedOnboardingSurvivesProcessDeath() = runBlocking {
-        val backingStore = TestOnboardingRepository()
-        backingStore.markCompleted()
-        val resumed = TestOnboardingRepository(initial = backingStore.snapshot())
-        assertTrue(resumed.isCompleted())
-    }
-
-    @Test
-    fun completedUsersAreNotForcedThroughV2Wizard() = runBlocking {
-        val completedV1 = OnboardingState.Completed(
+    fun completedLegacyUsersNeverBecomePending() {
+        val completed = OnboardingState.Completed(
             onboardingVersion = 1,
             completedAt = 1L,
-            smsPermissionGranted = true,
+            smsPermissionGranted = false,
         )
-        val repo = TestOnboardingRepository(initial = completedV1)
+        val repo = TestOnboardingRepository(initial = completed)
         assertTrue(repo.isCompleted())
-        assertEquals(1, (repo.snapshot() as OnboardingState.Completed).onboardingVersion)
-        assertEquals(2, CURRENT_ONBOARDING_VERSION)
-    }
-
-    @Test
-    fun permissionRevokedAfterCompletedOnboardingDoesNotReopenIntroduction() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markCompleted()
-        assertTrue(repo.isCompleted())
-        val state = repo.snapshot() as OnboardingState.Completed
-        assertEquals(CURRENT_ONBOARDING_VERSION, state.onboardingVersion)
-    }
-
-    @Test
-    fun partialOnboardingResumesAtTheCorrectStep() = runBlocking {
-        val backingStore = TestOnboardingRepository()
-        backingStore.markStepCompleted(OnboardingStep.WELCOME)
-        backingStore.markStepCompleted(OnboardingStep.PERMISSION)
-        val resumed = TestOnboardingRepository(initial = backingStore.snapshot())
-        val s = resumed.snapshot() as OnboardingState.Pending
-        assertEquals(OnboardingStep.PERMISSION, s.lastCompletedStep)
-        assertEquals(OnboardingStep.SELECT_SENDER, nextOnboardingStep(s.lastCompletedStep!!))
-    }
-
-    @Test
-    fun draftSurvivesRepositoryRecreationAndRestoresCurrentStep() = runBlocking {
-        val draft = OnboardingDraft(
-            step = OnboardingStep.ACCOUNT,
-            selectedSenderProfileId = 7L,
-            selectedSenderKey = "sender-key",
-            selectedSenderDisplay = "مرسل تجريبي",
-            displayName = "حساب تجريبي",
-            patternSourceProfileId = 7L,
-            openingBalance = "10.00",
-        )
-        val backingStore = TestOnboardingRepository()
-        backingStore.saveDraft(draft)
-        val resumed = TestOnboardingRepository(
-            initial = backingStore.snapshot(),
-            initialDraft = backingStore.loadDraft(),
-        )
-
-        assertEquals(draft, resumed.loadDraft())
-        assertEquals(OnboardingStep.ACCOUNT, resumed.loadDraft()?.step)
-    }
-
-    @Test
-    fun completingOnboardingClearsProcessDeathDraft() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.saveDraft(OnboardingDraft(step = OnboardingStep.IMPORT))
-        repo.markCompleted()
-        assertEquals(null, repo.loadDraft())
-    }
-
-    @Test
-    fun backNavigationDoesNotRegressLastCompletedStep() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markStepCompleted(OnboardingStep.ACCOUNT)
-        repo.markStepCompleted(OnboardingStep.SELECT_SENDER)
-
-        val pending = repo.snapshot() as OnboardingState.Pending
-        assertEquals(OnboardingStep.ACCOUNT, pending.lastCompletedStep)
-        assertEquals(OnboardingStep.IDENTIFIERS, nextOnboardingStep(pending.lastCompletedStep!!))
-    }
-
-    @Test
-    fun v1PersistedStepsRemapSafely() {
-        assertEquals(OnboardingStep.SELECT_SENDER, mapPersistedStepName("START_DATE", onboardingVersion = 1))
-        assertEquals(OnboardingStep.SELECT_SENDER, mapPersistedStepName("ACCOUNT", onboardingVersion = 1))
-        assertEquals(OnboardingStep.SELECT_SENDER, mapPersistedStepName("OPENING_BALANCE", onboardingVersion = 1))
-        assertEquals(OnboardingStep.ACCOUNT, mapPersistedStepName("ACCOUNT", onboardingVersion = 2))
-        assertEquals(OnboardingStep.CREATE_PATTERN, mapPersistedStepName("CREATE_PATTERN", onboardingVersion = 2))
-        assertEquals(OnboardingStep.WELCOME, mapPersistedStepName("BOGUS", onboardingVersion = 2))
-        assertEquals(null, mapPersistedStepName(null))
-    }
-
-    @Test
-    fun resettingOnboardingDoesNotMarkItCompleted() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markCompleted()
-        assertTrue(repo.isCompleted())
-        repo.resetOnboarding()
-        assertFalse("resetOnboarding must clear the completed flag", repo.isCompleted())
-    }
-
-    @Test
-    fun markCompletedIsIdempotent() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markCompleted()
-        repo.markCompleted()
-        repo.markCompleted()
-        assertTrue(repo.isCompleted())
-    }
-
-    @Test
-    fun onboardingVersionConstantMatchesProduction() {
-        assertEquals(2, CURRENT_ONBOARDING_VERSION)
-    }
-
-    @Test
-    fun resettingOnboardingDoesNotDeleteAccounts() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markCompleted()
-        repo.resetOnboarding()
-        assertFalse(repo.isCompleted())
-    }
-
-    @Test
-    fun flowEmitsCompletedStateAfterMarkCompleted() = runBlocking {
-        val repo = TestOnboardingRepository()
-        repo.markCompleted()
-        val emitted = repo.snapshot()
-        assertTrue("Flow must emit Completed after markCompleted", emitted is OnboardingState.Completed)
+        assertTrue(repo.snapshot() is OnboardingState.Completed)
     }
 }

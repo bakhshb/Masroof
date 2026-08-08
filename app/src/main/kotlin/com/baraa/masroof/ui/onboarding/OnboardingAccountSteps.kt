@@ -25,9 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.data.db.AccountIdentifierType
-import com.baraa.masroof.data.db.MessagePatternStatus
 import com.baraa.masroof.data.repository.IdentifierForm
-import com.baraa.masroof.data.repository.SenderProfile
 import com.baraa.masroof.ledger.AccountIdentifierCompatibility
 import com.baraa.masroof.transaction.AccountLiquidityDefaults
 import com.baraa.masroof.transaction.AccountNature
@@ -41,30 +39,41 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountFromPatternsStep(
+fun AccountSetupStep(
     app: MasroofApplication,
     state: UiOnboardingState,
+    repository: OnboardingRepository,
     onContinue: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var sources by remember { mutableStateOf<List<SenderProfile>>(emptyList()) }
-    var sourceExpanded by remember { mutableStateOf(false) }
     var typeExpanded by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        val approvedIds = app.messagePatternRepository.senderProfileIdsWithApprovedPatterns()
-        sources = app.senderProfileRepository.getActive().filter { it.id in approvedIds }
-        if (state.patternSourceProfileId <= 0L && sources.isNotEmpty()) {
-            val first = sources.first()
-            state.patternSourceProfileId = first.id
-            state.patternSourceLabel = first.displayInstitutionName ?: first.displaySender
-            state.institution = state.patternSourceLabel
+    var saving by remember { mutableStateOf(false) }
+    val identifierType = remember(state.accountType) {
+        com.baraa.masroof.data.repository.AccountIdentifierRepository
+            .defaultIdentifierTypeFor(state.accountType)
+            ?: AccountIdentifierType.ACCOUNT_LAST4
+    }
+    LaunchedEffect(state.createdAccountId) {
+        if (state.createdAccountId > 0L) {
+            val existing = app.financialAccountRepository.getById(state.createdAccountId)
+            if (existing == null) {
+                state.createdAccountId = 0L
+            } else {
+                state.displayName = existing.displayName
+                state.accountType = existing.accountType
+                state.institution = existing.institutionName.orEmpty()
+                state.currency = existing.currency
+                state.openingBalance = existing.openingBalance.toPlainString()
+                state.includeNetWorth = existing.includeInNetWorth
+                state.includeLiquidity = existing.includeInLiquidity
+            }
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("إنشاء حساب", style = MaterialTheme.typography.titleLarge)
         Text(
-            "مصدر الأنماط يجب أن يكون مرسلاً له أنماط معتمدة — وليس اختيار مرسل خام من الصندوق.",
+            "أنشئ حسابك أولاً. يمكنك ربط مرسل الرسائل في الخطوة التالية دون الحاجة إلى نمط معتمد.",
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedTextField(
@@ -95,30 +104,22 @@ fun AccountFromPatternsStep(
                 }
             }
         }
-        ExposedDropdownMenuBox(expanded = sourceExpanded, onExpandedChange = { sourceExpanded = !sourceExpanded }) {
-            OutlinedTextField(
-                value = state.patternSourceLabel,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("البنك / مصدر الأنماط") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sourceExpanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
-            )
-            ExposedDropdownMenu(sourceExpanded, { sourceExpanded = false }) {
-                sources.forEach { profile ->
-                    val label = profile.displayInstitutionName ?: profile.displaySender
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = {
-                            state.patternSourceProfileId = profile.id
-                            state.patternSourceLabel = label
-                            state.institution = label
-                            sourceExpanded = false
-                        },
-                    )
-                }
+        Text("العملة", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(Currency.SAR, Currency.USD, Currency.EUR).forEach { currency ->
+                FilterChip(
+                    selected = state.currency == currency,
+                    onClick = { state.currency = currency },
+                    label = { Text(currency.name) },
+                )
             }
         }
+        OutlinedTextField(
+            value = state.institution,
+            onValueChange = { state.institution = it },
+            label = { Text("اسم البنك / المؤسسة (اختياري)") },
+            modifier = Modifier.fillMaxWidth(),
+        )
         Text("تاريخ بداية المتابعة والرصيد الافتتاحي", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
@@ -159,135 +160,95 @@ fun AccountFromPatternsStep(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
         )
+        OutlinedTextField(
+            value = state.lastFour,
+            onValueChange = {
+                if (it.length <= 4 && it.all(Char::isDigit)) state.lastFour = it
+            },
+            label = { Text("آخر 4 أرقام (اختياري)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         PrimaryButton(
-            if (state.createdAccountId > 0L) "متابعة إلى المعرفات" else "حفظ الحساب والمتابعة",
+            when {
+                saving -> "جارٍ الحفظ…"
+                state.createdAccountId > 0L -> "متابعة"
+                else -> "حفظ الحساب والمتابعة"
+            },
             enabled = state.displayName.isNotBlank() &&
-                state.patternSourceProfileId > 0L &&
-                runCatching { BigDecimal(state.openingBalance) }.isSuccess,
+                runCatching { BigDecimal(state.openingBalance) }.isSuccess &&
+                !saving,
             onClick = {
-                if (state.createdAccountId > 0L) {
-                    onContinue()
-                    return@PrimaryButton
-                }
                 scope.launch {
+                    saving = true
+                    error = null
                     val balance = runCatching { BigDecimal(state.openingBalance) }.getOrNull()
                     if (balance == null || balance.signum() < 0) {
                         error = "رصيد غير صالح"
+                        saving = false
                         return@launch
                     }
                     val openingDate = state.trackingDate
                         .atStartOfDay(java.time.ZoneId.systemDefault())
                         .toInstant()
                         .toEpochMilli()
-                    val id = app.financialAccountRepository.add(
-                        displayName = state.displayName.trim(),
-                        accountType = state.accountType,
-                        institutionName = state.institution.trim().takeIf { it.isNotBlank() },
-                        accountNature = AccountNature.defaultNatureFor(state.accountType),
-                        currency = state.currency,
-                        openingBalance = balance,
-                        openingBalanceDate = openingDate,
-                        includeInNetWorth = state.includeNetWorth,
-                        includeInLiquidity = state.includeLiquidity,
-                    )
-                    if (id <= 0L) {
-                        error = "تعذر حفظ الحساب"
-                        return@launch
-                    }
-                    app.senderProfileRepository.associateAccount(id, state.patternSourceProfileId)
-                    app.financialSetupRepository.save(setupFrom(state, completed = false))
-                    state.createdAccountId = id
-                    onContinue()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-fun IdentifiersStep(
-    app: MasroofApplication,
-    state: UiOnboardingState,
-    onContinue: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    var suggested by remember { mutableStateOf<List<String>>(emptyList()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val defaultType = remember(state.accountType) {
-        com.baraa.masroof.data.repository.AccountIdentifierRepository.defaultIdentifierTypeFor(state.accountType)
-            ?: AccountIdentifierType.ACCOUNT_LAST4
-    }
-    LaunchedEffect(state.selectedSenderProfileId) {
-        val patterns = app.messagePatternRepository.getForSender(state.selectedSenderProfileId)
-            .filter(com.baraa.masroof.sms.PatternRuntimeEligibility::isEligible)
-        val fromTemplates = patterns.flatMap { p ->
-            val t = p.definition.templateText.orEmpty()
-            listOfNotNull(
-                if ("CREDIT_CARD_LAST4" in t) "بطاقة ائتمان" else null,
-                if ("ACCOUNT_LAST4" in t) "حساب" else null,
-                if ("DEBIT_CARD_LAST4" in t) "مدى" else null,
-            )
-        }.distinct()
-        suggested = fromTemplates
-        // Suggest digits from a sample SMS if present — user must still confirm typing.
-        val sample = state.selectedSmsBody
-        if (sample != null) {
-            val digits = Regex("""(?<!\d)(\d{4})(?!\d)""").findAll(sample).map { it.groupValues[1] }.toList()
-            if (digits.isNotEmpty() && state.lastFour.isBlank()) {
-                // Do not auto-fill; only show as hint text below.
-                suggested = suggested + digits.map { "مقترح من رسالة: $it (أدخله يدوياً للتأكيد)" }
-            }
-        }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("معرفات الحساب", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "أدخل آخر 4 أرقام يدوياً. الأرقام المكتشفة في الرسائل تُعرض كاقتراح فقط ولا تُحفظ تلقائياً.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text("النوع المتوقع: ${typeLabel(defaultType)}", style = MaterialTheme.typography.bodySmall)
-        suggested.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-        OutlinedTextField(
-            value = state.lastFour,
-            onValueChange = {
-                if (it.length <= 4 && it.all(Char::isDigit)) {
-                    state.lastFour = it
-                    state.identifierConfirmed = false
-                }
-            },
-            label = { Text("آخر 4 أرقام") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        PrimaryButton(
-            "تأكيد المعرف والمتابعة",
-            enabled = state.lastFour.length == 4 && state.createdAccountId > 0L,
-            onClick = {
-                scope.launch {
-                    if (!AccountIdentifierCompatibility.isCompatibleTyped(state.accountType, defaultType)) {
+                    if (
+                        state.lastFour.length == 4 &&
+                        !AccountIdentifierCompatibility.isCompatibleTyped(state.accountType, identifierType)
+                    ) {
                         error = "نوع المعرف غير متوافق مع نوع الحساب"
+                        saving = false
                         return@launch
                     }
-                    val outcome = app.accountIdentifierRepository.addOrUpdate(
-                        state.createdAccountId,
-                        IdentifierForm(defaultType, "معرف الحساب", state.lastFour),
-                    )
-                    if (outcome.result == com.baraa.masroof.data.repository.IdentifierAddResult.Rejected) {
-                        error = outcome.message ?: "تعذر حفظ المعرف"
-                        return@launch
+                    runCatching {
+                        persistAccountOnce(
+                            state = state,
+                            repository = repository,
+                            accountExists = { id ->
+                                app.financialAccountRepository.getById(id) != null
+                            },
+                            createAccount = {
+                                app.financialAccountRepository.add(
+                                    displayName = state.displayName.trim(),
+                                    accountType = state.accountType,
+                                    institutionName = state.institution.trim().takeIf { it.isNotBlank() },
+                                    accountNature = AccountNature.defaultNatureFor(state.accountType),
+                                    currency = state.currency,
+                                    openingBalance = balance,
+                                    openingBalanceDate = openingDate,
+                                    includeInNetWorth = state.includeNetWorth,
+                                    includeInLiquidity = state.includeLiquidity,
+                                )
+                            },
+                            saveOptionalIdentifier = { id ->
+                                if (state.lastFour.length == 4) {
+                                    val outcome = app.accountIdentifierRepository.addOrUpdate(
+                                        id,
+                                        IdentifierForm(identifierType, "معرف الحساب", state.lastFour),
+                                    )
+                                    check(
+                                        outcome.result !=
+                                            com.baraa.masroof.data.repository.IdentifierAddResult.Rejected,
+                                    ) {
+                                        outcome.message ?: "identifier rejected"
+                                    }
+                                    state.identifierConfirmed = true
+                                }
+                            },
+                        )
+                    }.onSuccess {
+                        onContinue()
+                    }.onFailure {
+                        error = if (state.createdAccountId > 0L) {
+                            "تم حفظ الحساب، لكن تعذر حفظ المعرف الاختياري"
+                        } else {
+                            "تعذر حفظ الحساب"
+                        }
                     }
-                    state.identifierConfirmed = true
-                    onContinue()
+                    saving = false
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PrimaryButton(
-            "تخطّي الآن (ستحتاج مراجعة لاحقاً)",
-            onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -299,12 +260,4 @@ private fun accountTypeLabel(type: AccountType): String = when (type) {
     AccountType.DIGITAL_WALLET -> "محفظة رقمية"
     AccountType.CASH -> "نقد"
     else -> type.name
-}
-
-private fun typeLabel(type: AccountIdentifierType): String = when (type) {
-    AccountIdentifierType.CREDIT_CARD_LAST4 -> "CREDIT_CARD_LAST4"
-    AccountIdentifierType.DEBIT_CARD_LAST4 -> "DEBIT_CARD_LAST4"
-    AccountIdentifierType.IBAN_LAST4 -> "IBAN_LAST4"
-    AccountIdentifierType.WALLET_LAST4 -> "WALLET_LAST4"
-    AccountIdentifierType.ACCOUNT_LAST4 -> "ACCOUNT_LAST4"
 }

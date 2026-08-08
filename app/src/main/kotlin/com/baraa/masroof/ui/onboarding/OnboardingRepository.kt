@@ -65,66 +65,52 @@ sealed interface OnboardingState {
 }
 
 /** Stable version stamp for the current onboarding flow. */
-const val CURRENT_ONBOARDING_VERSION: Int = 2
+const val CURRENT_ONBOARDING_VERSION: Int = 3
 
 /**
- * Map a persisted step name (including v1 names) to the nearest v2 resume step.
- * Unsafe mid-v1 account steps restart at SELECT_SENDER so patterns are created first.
- *
- * [onboardingVersion] distinguishes v1 `ACCOUNT` (pre-pattern) from v2 `ACCOUNT`
- * (post-pattern), which share the same enum name.
+ * Maps legacy step names to the safe v3 account-first resume point.
+ * Migration uses stable names and persisted IDs; enum ordinals are never restored.
  */
-fun mapPersistedStepName(name: String?, onboardingVersion: Int = CURRENT_ONBOARDING_VERSION): OnboardingStep? {
+fun mapPersistedStepName(
+    name: String?,
+    onboardingVersion: Int = CURRENT_ONBOARDING_VERSION,
+    createdAccountId: Long = 0L,
+    selectedSenderProfileId: Long = 0L,
+): OnboardingStep? {
     if (name.isNullOrBlank()) return null
-    if (onboardingVersion < 2) {
-        return when (name) {
-            "START_DATE", "ACCOUNT", "OPENING_BALANCE", "PERMISSION", "WELCOME" ->
-                if (name == "PERMISSION" || name == "WELCOME") {
-                    runCatching { OnboardingStep.valueOf(name) }.getOrDefault(OnboardingStep.WELCOME)
-                } else {
-                    OnboardingStep.SELECT_SENDER
-                }
-            "COMPLETION" -> OnboardingStep.COMPLETION
-            else -> OnboardingStep.WELCOME
-        }
+    if (onboardingVersion >= CURRENT_ONBOARDING_VERSION) {
+        return runCatching { OnboardingStep.valueOf(name) }.getOrDefault(OnboardingStep.ACCOUNT)
     }
-    return runCatching { OnboardingStep.valueOf(name) }.getOrElse {
-        when (name) {
-            "START_DATE", "OPENING_BALANCE" -> OnboardingStep.SELECT_SENDER
-            else -> OnboardingStep.WELCOME
-        }
+    if (name == "WELCOME" && createdAccountId <= 0L) return OnboardingStep.WELCOME
+    if (createdAccountId <= 0L) return OnboardingStep.ACCOUNT
+    return when {
+        name == "COMPLETION" -> OnboardingStep.COMPLETION
+        selectedSenderProfileId > 0L && name in OLD_POST_ACCOUNT_STEPS -> OnboardingStep.COMPLETION
+        else -> OnboardingStep.SELECT_SENDER
     }
 }
 
 fun nextOnboardingStep(completed: OnboardingStep): OnboardingStep = when (completed) {
-    OnboardingStep.WELCOME -> OnboardingStep.PERMISSION
-    OnboardingStep.PERMISSION -> OnboardingStep.SELECT_SENDER
-    OnboardingStep.SELECT_SENDER -> OnboardingStep.CREATE_PATTERN
-    OnboardingStep.CREATE_PATTERN -> OnboardingStep.PATTERN_SUMMARY
-    OnboardingStep.PATTERN_SUMMARY -> OnboardingStep.SENDER_PATTERN_SUMMARY
-    OnboardingStep.SENDER_PATTERN_SUMMARY -> OnboardingStep.ACCOUNT
-    OnboardingStep.ACCOUNT -> OnboardingStep.IDENTIFIERS
-    OnboardingStep.IDENTIFIERS -> OnboardingStep.IMPORT_PREVIEW
-    OnboardingStep.IMPORT_PREVIEW -> OnboardingStep.LINK_PREVIEW
-    OnboardingStep.LINK_PREVIEW -> OnboardingStep.IMPORT
-    OnboardingStep.IMPORT -> OnboardingStep.COMPLETION
+    OnboardingStep.WELCOME -> OnboardingStep.ACCOUNT
+    OnboardingStep.ACCOUNT -> OnboardingStep.SELECT_SENDER
+    OnboardingStep.SELECT_SENDER -> OnboardingStep.COMPLETION
     OnboardingStep.COMPLETION -> OnboardingStep.COMPLETION
 }
 
 fun previousOnboardingStep(step: OnboardingStep): OnboardingStep = when (step) {
     OnboardingStep.WELCOME -> OnboardingStep.WELCOME
-    OnboardingStep.PERMISSION -> OnboardingStep.WELCOME
-    OnboardingStep.SELECT_SENDER -> OnboardingStep.PERMISSION
-    OnboardingStep.CREATE_PATTERN -> OnboardingStep.SELECT_SENDER
-    OnboardingStep.PATTERN_SUMMARY -> OnboardingStep.CREATE_PATTERN
-    OnboardingStep.SENDER_PATTERN_SUMMARY -> OnboardingStep.PATTERN_SUMMARY
-    OnboardingStep.ACCOUNT -> OnboardingStep.SENDER_PATTERN_SUMMARY
-    OnboardingStep.IDENTIFIERS -> OnboardingStep.ACCOUNT
-    OnboardingStep.IMPORT_PREVIEW -> OnboardingStep.IDENTIFIERS
-    OnboardingStep.LINK_PREVIEW -> OnboardingStep.IMPORT_PREVIEW
-    OnboardingStep.IMPORT -> OnboardingStep.LINK_PREVIEW
-    OnboardingStep.COMPLETION -> OnboardingStep.IMPORT
+    OnboardingStep.ACCOUNT -> OnboardingStep.WELCOME
+    OnboardingStep.SELECT_SENDER -> OnboardingStep.ACCOUNT
+    OnboardingStep.COMPLETION -> OnboardingStep.SELECT_SENDER
 }
+
+private val OLD_POST_ACCOUNT_STEPS = setOf(
+    "IDENTIFIERS",
+    "IMPORT_PREVIEW",
+    "LINK_PREVIEW",
+    "IMPORT",
+    "COMPLETION",
+)
 
 interface OnboardingRepository {
     /** Cold Flow of the persisted onboarding state. */
@@ -282,8 +268,20 @@ class SharedPreferencesOnboardingRepository(
 
     override fun loadDraft(): OnboardingDraft? {
         if (!prefs.contains(KEY_DRAFT_STEP)) return null
+        val createdAccountId = prefs.getLong(KEY_DRAFT_ACCOUNT_ID, 0L)
+        val selectedSenderProfileId = prefs.getLong(KEY_DRAFT_SENDER_PROFILE_ID, 0L)
+        val draftVersion = prefs.getInt(
+            KEY_DRAFT_VERSION,
+            prefs.getInt(KEY_VERSION, 2),
+        )
         return OnboardingDraft(
-            step = mapPersistedStepName(prefs.getString(KEY_DRAFT_STEP, null)) ?: OnboardingStep.WELCOME,
+            onboardingVersion = draftVersion,
+            step = mapPersistedStepName(
+                prefs.getString(KEY_DRAFT_STEP, null),
+                draftVersion,
+                createdAccountId,
+                selectedSenderProfileId,
+            ) ?: OnboardingStep.WELCOME,
             option = enumValueOrDefault(prefs.getString(KEY_DRAFT_OPTION, null), StartDateOption.TODAY),
             trackingDate = runCatching {
                 LocalDate.parse(prefs.getString(KEY_DRAFT_DATE, null).orEmpty())
@@ -294,8 +292,6 @@ class SharedPreferencesOnboardingRepository(
             ),
             displayName = prefs.getString(KEY_DRAFT_DISPLAY_NAME, "").orEmpty(),
             institution = prefs.getString(KEY_DRAFT_INSTITUTION, "").orEmpty(),
-            patternSourceProfileId = prefs.getLong(KEY_DRAFT_PATTERN_PROFILE_ID, 0L),
-            patternSourceLabel = prefs.getString(KEY_DRAFT_PATTERN_LABEL, "").orEmpty(),
             lastFour = prefs.getString(KEY_DRAFT_LAST_FOUR, "").orEmpty(),
             identifierConfirmed = prefs.getBoolean(KEY_DRAFT_IDENTIFIER_CONFIRMED, false),
             openingBalance = prefs.getString(KEY_DRAFT_OPENING_BALANCE, "0").orEmpty(),
@@ -305,23 +301,22 @@ class SharedPreferencesOnboardingRepository(
             ),
             includeLiquidity = prefs.getBoolean(KEY_DRAFT_LIQUIDITY, true),
             includeNetWorth = prefs.getBoolean(KEY_DRAFT_NET_WORTH, true),
-            selectedSenderProfileId = prefs.getLong(KEY_DRAFT_SENDER_PROFILE_ID, 0L),
+            selectedSenderProfileId = selectedSenderProfileId,
             selectedSenderKey = prefs.getString(KEY_DRAFT_SENDER_KEY, "").orEmpty(),
             selectedSenderDisplay = prefs.getString(KEY_DRAFT_SENDER_DISPLAY, "").orEmpty(),
-            createdAccountId = prefs.getLong(KEY_DRAFT_ACCOUNT_ID, 0L),
+            createdAccountId = createdAccountId,
         )
     }
 
     override fun saveDraft(draft: OnboardingDraft) {
         prefs.edit()
+            .putInt(KEY_DRAFT_VERSION, CURRENT_ONBOARDING_VERSION)
             .putString(KEY_DRAFT_STEP, draft.step.name)
             .putString(KEY_DRAFT_OPTION, draft.option.name)
             .putString(KEY_DRAFT_DATE, draft.trackingDate.toString())
             .putString(KEY_DRAFT_ACCOUNT_TYPE, draft.accountType.name)
             .putString(KEY_DRAFT_DISPLAY_NAME, draft.displayName)
             .putString(KEY_DRAFT_INSTITUTION, draft.institution)
-            .putLong(KEY_DRAFT_PATTERN_PROFILE_ID, draft.patternSourceProfileId)
-            .putString(KEY_DRAFT_PATTERN_LABEL, draft.patternSourceLabel)
             .putString(KEY_DRAFT_LAST_FOUR, draft.lastFour)
             .putBoolean(KEY_DRAFT_IDENTIFIER_CONFIRMED, draft.identifierConfirmed)
             .putString(KEY_DRAFT_OPENING_BALANCE, draft.openingBalance)
@@ -389,6 +384,7 @@ class SharedPreferencesOnboardingRepository(
         const val KEY_LAST_STEP: String = "onboarding_last_step"
         const val KEY_COMPLETED_AT: String = "onboarding_completed_at"
         private const val KEY_DRAFT_STEP = "draft_step"
+        private const val KEY_DRAFT_VERSION = "draft_version"
         private const val KEY_DRAFT_OPTION = "draft_option"
         private const val KEY_DRAFT_DATE = "draft_date"
         private const val KEY_DRAFT_ACCOUNT_TYPE = "draft_account_type"
@@ -408,6 +404,7 @@ class SharedPreferencesOnboardingRepository(
         private const val KEY_DRAFT_ACCOUNT_ID = "draft_account_id"
         private val DRAFT_KEYS = listOf(
             KEY_DRAFT_STEP,
+            KEY_DRAFT_VERSION,
             KEY_DRAFT_OPTION,
             KEY_DRAFT_DATE,
             KEY_DRAFT_ACCOUNT_TYPE,

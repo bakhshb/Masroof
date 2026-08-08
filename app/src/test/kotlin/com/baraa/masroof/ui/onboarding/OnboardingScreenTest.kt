@@ -1,108 +1,103 @@
 package com.baraa.masroof.ui.onboarding
 
+import androidx.compose.runtime.saveable.SaverScope
+import com.baraa.masroof.transaction.AccountType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import androidx.compose.runtime.saveable.SaverScope
-import com.baraa.masroof.transaction.AccountType
+import java.io.File
 
 class OnboardingScreenTest {
     @Test
-    fun onboardingStartsAtWelcome() {
-        assertEquals(OnboardingStep.WELCOME, OnboardingStep.values().first())
-        assertEquals(OnboardingStep.WELCOME, UiOnboardingState().step)
-    }
-
-    @Test
-    fun onboardingDefinesPatternFirstSteps() {
-        val steps = OnboardingStep.values().toSet()
-        assertTrue(OnboardingStep.WELCOME in steps)
-        assertTrue(OnboardingStep.PERMISSION in steps)
-        assertTrue(OnboardingStep.SELECT_SENDER in steps)
-        assertTrue(OnboardingStep.CREATE_PATTERN in steps)
-        assertTrue(OnboardingStep.PATTERN_SUMMARY in steps)
-        assertTrue(OnboardingStep.SENDER_PATTERN_SUMMARY in steps)
-        assertTrue(OnboardingStep.ACCOUNT in steps)
-        assertTrue(OnboardingStep.IDENTIFIERS in steps)
-        assertTrue(OnboardingStep.IMPORT_PREVIEW in steps)
-        assertTrue(OnboardingStep.LINK_PREVIEW in steps)
-        assertTrue(OnboardingStep.IMPORT in steps)
-        assertTrue(OnboardingStep.COMPLETION in steps)
-        assertFalse("START_DATE was removed in v2", steps.any { it.name == "START_DATE" })
-        assertFalse("OPENING_BALANCE was removed in v2", steps.any { it.name == "OPENING_BALANCE" })
-    }
-
-    @Test
-    fun nextStepAdvancesThroughPatternFirstFlow() {
-        assertEquals(OnboardingStep.PERMISSION, nextOnboardingStep(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.SELECT_SENDER, nextOnboardingStep(OnboardingStep.PERMISSION))
-        assertEquals(OnboardingStep.CREATE_PATTERN, nextOnboardingStep(OnboardingStep.SELECT_SENDER))
-        assertEquals(OnboardingStep.ACCOUNT, nextOnboardingStep(OnboardingStep.SENDER_PATTERN_SUMMARY))
-        assertEquals(OnboardingStep.IDENTIFIERS, nextOnboardingStep(OnboardingStep.ACCOUNT))
-        assertEquals(OnboardingStep.COMPLETION, nextOnboardingStep(OnboardingStep.IMPORT))
-    }
-
-    @Test
-    fun previousStepNavigatesBackThroughPatternFirstFlow() {
-        assertEquals(OnboardingStep.WELCOME, previousOnboardingStep(OnboardingStep.PERMISSION))
-        assertEquals(OnboardingStep.SELECT_SENDER, previousOnboardingStep(OnboardingStep.CREATE_PATTERN))
-        assertEquals(OnboardingStep.ACCOUNT, previousOnboardingStep(OnboardingStep.IDENTIFIERS))
-        assertEquals(OnboardingStep.LINK_PREVIEW, previousOnboardingStep(OnboardingStep.IMPORT))
-        assertEquals(OnboardingStep.WELCOME, previousOnboardingStep(OnboardingStep.WELCOME))
-    }
-
-    @Test
-    fun saverRestoresFieldsThatEnableResumedButtons() {
-        val original = UiOnboardingState().apply {
-            step = OnboardingStep.ACCOUNT
-            selectedSenderProfileId = 42L
-            selectedSenderKey = "bank-key"
-            selectedSenderDisplay = "البنك"
-            displayName = "حساب يومي"
-            patternSourceProfileId = 42L
-            accountType = AccountType.BANK_ACCOUNT
-            openingBalance = "125.50"
-            createdAccountId = 99L
-        }
-        val saved = with(OnboardingSaver) {
-            SaverScope { true }.save(original)
-        }
-        val restored = OnboardingSaver.restore(requireNotNull(saved))
-
-        requireNotNull(restored)
-        assertEquals(OnboardingStep.ACCOUNT, restored.step)
-        assertEquals(42L, restored.selectedSenderProfileId)
-        assertEquals("bank-key", restored.selectedSenderKey)
-        assertEquals("حساب يومي", restored.displayName)
-        assertEquals(42L, restored.patternSourceProfileId)
-        assertEquals("125.50", restored.openingBalance)
-        assertEquals(99L, restored.createdAccountId)
-    }
-
-    @Test
-    fun customStartDateOptionKeepsCustomDate() {
-        val state = UiOnboardingState().apply {
-            option = StartDateOption.CUSTOM
-            trackingDate = java.time.LocalDate.of(2025, 1, 1)
-        }
-        assertEquals(java.time.LocalDate.of(2025, 1, 1), state.trackingDate)
-    }
-
-    @Test
-    fun setupFromTrackingDateStoresStartOfDay() {
-        val state = UiOnboardingState().apply { trackingDate = java.time.LocalDate.of(2025, 5, 1) }
-        val setup = setupFrom(state)
+    fun onboardingContainsOnlyFourAccountFirstSteps() {
         assertEquals(
-            java.time.LocalDate.of(2025, 5, 1),
-            java.time.Instant.ofEpochMilli(setup.trackingStartDate)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toLocalDate(),
+            listOf(
+                OnboardingStep.WELCOME,
+                OnboardingStep.ACCOUNT,
+                OnboardingStep.SELECT_SENDER,
+                OnboardingStep.COMPLETION,
+            ),
+            OnboardingStep.entries,
         )
     }
 
     @Test
-    fun identifiersRequireExplicitConfirmFlagDefaultFalse() {
-        assertFalse(UiOnboardingState().identifierConfirmed)
+    fun saverRestoresAccountAndSenderWithoutCreatingAnotherAccount() {
+        val original = UiOnboardingState().apply {
+            step = OnboardingStep.SELECT_SENDER
+            displayName = "حساب يومي"
+            accountType = AccountType.BANK_ACCOUNT
+            openingBalance = "125.50"
+            createdAccountId = 99L
+            selectedSenderProfileId = 42L
+            selectedSenderDisplay = "البنك"
+        }
+        val saved = with(OnboardingSaver) { SaverScope { true }.save(original) }
+        val restored = requireNotNull(OnboardingSaver.restore(requireNotNull(saved)))
+
+        assertEquals(OnboardingStep.SELECT_SENDER, restored.step)
+        assertEquals(99L, restored.createdAccountId)
+        assertEquals(42L, restored.selectedSenderProfileId)
+        assertEquals("حساب يومي", restored.displayName)
+    }
+
+    @Test
+    fun onboardingNavigationNeverCallsPatternEngineOrImportPipeline() {
+        val source = File(
+            "src/main/kotlin/com/baraa/masroof/ui/onboarding/OnboardingScreen.kt",
+        ).readText()
+        val sender = File(
+            "src/main/kotlin/com/baraa/masroof/ui/onboarding/OnboardingSenderStep.kt",
+        ).readText()
+        assertFalse(source.contains("MessageTemplateEngine"))
+        assertFalse(source.contains("PatternDiscoveryService"))
+        assertFalse(source.contains("importOrchestrator"))
+        assertFalse(sender.contains("MessageTemplateEngine"))
+        assertFalse(sender.contains("PatternDiscoveryService"))
+        assertTrue(sender.contains("upsertFromSmsSender"))
+        assertTrue(sender.contains("associateAccount"))
+    }
+
+    @Test
+    fun permissionDenialHasDeferredSenderPath() {
+        val source = File(
+            "src/main/kotlin/com/baraa/masroof/ui/onboarding/OnboardingSenderStep.kt",
+        ).readText()
+        assertTrue(source.contains("ربط المرسل لاحقاً"))
+        assertTrue(source.contains("permissionGranted"))
+    }
+
+    @Test
+    fun completionRequiresPersistedAccountBeforeMarkingCompleted() {
+        val source = File(
+            "src/main/kotlin/com/baraa/masroof/ui/onboarding/MinimalOnboardingPersistence.kt",
+        ).readText()
+        val accountCheck = source.indexOf("accountExists(accountId)")
+        val setupSave = source.indexOf("saveFinancialSetup()")
+        val completed = source.indexOf("markCompleted()")
+        assertTrue(accountCheck >= 0)
+        assertTrue(setupSave > accountCheck)
+        assertTrue(completed > setupSave)
+    }
+
+    @Test
+    fun otpBodiesAreNeverOfferedAsFirstRunPatternCandidates() {
+        val onboardingDirectory = File("src/main/kotlin/com/baraa/masroof/ui/onboarding")
+        val sources = onboardingDirectory.listFiles()
+            .orEmpty()
+            .filter { it.extension == "kt" }
+            .joinToString("\n") { it.readText() }
+        assertFalse(sources.contains("buildFromSms("))
+        assertFalse(sources.contains("CreatePatternStep"))
+    }
+
+    @Test
+    fun importWithoutApprovedPatternsShowsBankMessagesCallToAction() {
+        val source = File(
+            "src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
+        ).readText()
+        assertTrue(source.contains("يجب مراجعة أنماط رسائل البنك قبل الاستيراد"))
+        assertTrue(source.contains("\"مراجعة رسائل البنك\""))
     }
 }

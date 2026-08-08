@@ -343,6 +343,9 @@ fun ImportMessagesScreen(
     val registeredSenderCount by produceState(initialValue = 0) {
         value = app.senderProfileRepository.activeOwnedSenderKeys().size
     }
+    val hasApprovedPatterns by produceState(initialValue = true) {
+        value = app.messagePatternRepository.senderProfileIdsWithApprovedPatterns().isNotEmpty()
+    }
 
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -508,6 +511,29 @@ fun ImportMessagesScreen(
                 if (!permissionGranted) {
                     Text("تعذر فحص الرسائل لأن إذن قراءة الرسائل غير ممنوح.", color = MaterialTheme.colorScheme.error, style = FinancialTypography.merchant)
                     return@content
+                }
+
+                if (!hasApprovedPatterns) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = FinancialShapes.medium,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Column(
+                            Modifier.padding(Spacing.x4),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.x2),
+                        ) {
+                            Text(
+                                "يجب مراجعة أنماط رسائل البنك قبل الاستيراد",
+                                style = FinancialTypography.merchant,
+                            )
+                            PrimaryButton(
+                                "مراجعة رسائل البنك",
+                                onClick = onBankMessages,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
 
                 OpeningBalanceDateCard(

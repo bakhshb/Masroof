@@ -42,7 +42,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.ui.theme.MasroofTopAppBar
 import com.baraa.masroof.ui.theme.PrimaryButton
-import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,18 +60,66 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
     val uiState = rememberSaveable(saver = OnboardingSaver) { UiOnboardingState() }
-    val scope = rememberCoroutineScope()
     var hydrated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (!uiState.restoredFromSaver) {
             val draft = repository.loadDraft()
             if (draft != null) {
-                uiState.restoreDraft(draft)
+                val persistedAccount = draft.createdAccountId
+                    .takeIf { it > 0L }
+                    ?.let { app.financialAccountRepository.getById(it) }
+                val recoveredAccount = if (
+                    draft.onboardingVersion < CURRENT_ONBOARDING_VERSION &&
+                    persistedAccount == null
+                ) {
+                    app.financialAccountRepository.getOwnedActive().firstOrNull()
+                } else {
+                    persistedAccount
+                }
+                val migrated = when {
+                    draft.createdAccountId > 0L && persistedAccount == null ->
+                        draft.copy(step = OnboardingStep.ACCOUNT, createdAccountId = 0L)
+                    recoveredAccount != null && draft.onboardingVersion < CURRENT_ONBOARDING_VERSION ->
+                        draft.copy(
+                            step = if (draft.selectedSenderProfileId > 0L) {
+                                OnboardingStep.COMPLETION
+                            } else {
+                                OnboardingStep.SELECT_SENDER
+                            },
+                            createdAccountId = recoveredAccount.id,
+                            displayName = recoveredAccount.displayName,
+                            institution = recoveredAccount.institutionName.orEmpty(),
+                            accountType = recoveredAccount.accountType,
+                            currency = recoveredAccount.currency,
+                            openingBalance = recoveredAccount.openingBalance.toPlainString(),
+                            includeNetWorth = recoveredAccount.includeInNetWorth,
+                            includeLiquidity = recoveredAccount.includeInLiquidity,
+                        )
+                    else -> draft
+                }
+                uiState.restoreDraft(migrated)
             } else {
                 val pending = repository.snapshot() as? OnboardingState.Pending
-                uiState.step = pending?.lastCompletedStep
-                    ?.let(::nextOnboardingStep)
-                    ?: OnboardingStep.WELCOME
+                if (pending != null && pending.onboardingVersion < CURRENT_ONBOARDING_VERSION) {
+                    val existing = app.financialAccountRepository.getOwnedActive().firstOrNull()
+                    if (existing == null) {
+                        uiState.step = OnboardingStep.ACCOUNT
+                    } else {
+                        uiState.createdAccountId = existing.id
+                        uiState.displayName = existing.displayName
+                        uiState.accountType = existing.accountType
+                        uiState.institution = existing.institutionName.orEmpty()
+                        uiState.currency = existing.currency
+                        uiState.openingBalance = existing.openingBalance.toPlainString()
+                        uiState.includeNetWorth = existing.includeInNetWorth
+                        uiState.includeLiquidity = existing.includeInLiquidity
+                        uiState.step = OnboardingStep.SELECT_SENDER
+                    }
+                } else {
+                    uiState.step = pending?.lastCompletedStep
+                        ?.let(::nextOnboardingStep)
+                        ?: OnboardingStep.WELCOME
+                }
             }
         }
         hydrated = true
@@ -110,10 +157,6 @@ fun OnboardingScreen(
         if (!granted && activity != null) {
             permanentlyDenied = !activity.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS)
         }
-        if (granted) {
-            scope.launch { onStepCompleted(OnboardingStep.PERMISSION) }
-            uiState.step = OnboardingStep.SELECT_SENDER
-        }
     }
 
     fun advance(from: OnboardingStep, to: OnboardingStep) {
@@ -150,20 +193,28 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "الخطوة ${uiState.step.ordinal + 1} من ${OnboardingStep.values().size}",
+                "الخطوة ${uiState.step.ordinal + 1} من ${OnboardingStep.entries.size}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             when (uiState.step) {
-                OnboardingStep.WELCOME -> WelcomePatternFirstStep(
-                    onContinue = { advance(OnboardingStep.WELCOME, OnboardingStep.PERMISSION) },
+                OnboardingStep.WELCOME -> WelcomeAccountFirstStep(
+                    onContinue = { advance(OnboardingStep.WELCOME, OnboardingStep.ACCOUNT) },
                 )
-                OnboardingStep.PERMISSION -> PermissionStep(
-                    granted = permissionGranted,
+                OnboardingStep.ACCOUNT -> AccountSetupStep(
+                    app = app,
+                    state = uiState,
+                    repository = repository,
+                    onContinue = { advance(OnboardingStep.ACCOUNT, OnboardingStep.SELECT_SENDER) },
+                )
+                OnboardingStep.SELECT_SENDER -> SelectSenderStep(
+                    app = app,
+                    state = uiState,
+                    permissionGranted = permissionGranted,
                     permanentlyDenied = permanentlyDenied,
-                    onRequest = { permissionLauncher.launch(Manifest.permission.READ_SMS) },
-                    onContinue = {
-                        advance(OnboardingStep.PERMISSION, OnboardingStep.SELECT_SENDER)
+                    resumeGeneration = resumeGeneration,
+                    onRequestPermission = {
+                        permissionLauncher.launch(Manifest.permission.READ_SMS)
                     },
                     onOpenSettings = {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -171,97 +222,34 @@ fun OnboardingScreen(
                         }
                         context.startActivity(intent)
                     },
-                )
-                OnboardingStep.SELECT_SENDER -> SelectSenderStep(
-                    app = app,
-                    state = uiState,
-                    resumeGeneration = resumeGeneration,
-                    onContinue = { advance(OnboardingStep.SELECT_SENDER, OnboardingStep.CREATE_PATTERN) },
-                )
-                OnboardingStep.CREATE_PATTERN -> CreatePatternStep(
-                    app = app,
-                    state = uiState,
-                    resumeGeneration = resumeGeneration,
-                    onSaved = { advance(OnboardingStep.CREATE_PATTERN, OnboardingStep.PATTERN_SUMMARY) },
-                )
-                OnboardingStep.PATTERN_SUMMARY -> PatternSummaryStep(
-                    state = uiState,
-                    onAddAnother = {
-                        uiState.selectedSmsBody = null
-                        uiState.draftTemplate = ""
-                        advance(OnboardingStep.PATTERN_SUMMARY, OnboardingStep.CREATE_PATTERN)
-                    },
                     onContinue = {
-                        advance(OnboardingStep.PATTERN_SUMMARY, OnboardingStep.SENDER_PATTERN_SUMMARY)
+                        advance(OnboardingStep.SELECT_SENDER, OnboardingStep.COMPLETION)
                     },
                 )
-                OnboardingStep.SENDER_PATTERN_SUMMARY -> SenderPatternSummaryStep(
-                    app = app,
-                    state = uiState,
-                    onContinue = { advance(OnboardingStep.SENDER_PATTERN_SUMMARY, OnboardingStep.ACCOUNT) },
-                    onAddPattern = {
-                        uiState.selectedSmsBody = null
-                        uiState.draftTemplate = ""
-                        uiState.step = OnboardingStep.CREATE_PATTERN
-                    },
-                )
-                OnboardingStep.ACCOUNT -> AccountFromPatternsStep(
-                    app = app,
-                    state = uiState,
-                    onContinue = { advance(OnboardingStep.ACCOUNT, OnboardingStep.IDENTIFIERS) },
-                )
-                OnboardingStep.IDENTIFIERS -> IdentifiersStep(
-                    app = app,
-                    state = uiState,
-                    onContinue = { advance(OnboardingStep.IDENTIFIERS, OnboardingStep.IMPORT_PREVIEW) },
-                )
-                OnboardingStep.IMPORT_PREVIEW -> ImportPreviewStep(
-                    app = app,
-                    state = uiState,
-                    resumeGeneration = resumeGeneration,
-                    onContinue = { advance(OnboardingStep.IMPORT_PREVIEW, OnboardingStep.LINK_PREVIEW) },
-                )
-                OnboardingStep.LINK_PREVIEW -> LinkPreviewStep(
-                    app = app,
-                    state = uiState,
-                    resumeGeneration = resumeGeneration,
-                    onContinue = { advance(OnboardingStep.LINK_PREVIEW, OnboardingStep.IMPORT) },
-                )
-                OnboardingStep.IMPORT -> ImportCommitStep(
+                OnboardingStep.COMPLETION -> CompletionStep(
                     app = app,
                     state = uiState,
                     repository = repository,
-                    resumeGeneration = resumeGeneration,
-                    onFinished = onFinished,
-                    onStepCompleted = onStepCompleted,
+                    onFinish = onFinished,
                 )
-                OnboardingStep.COMPLETION -> CompletionStep(onFinish = onFinished)
             }
         }
     }
 }
 
 private fun progressOf(step: OnboardingStep): Float = when (step) {
-    OnboardingStep.WELCOME -> 0.05f
-    OnboardingStep.PERMISSION -> 0.12f
-    OnboardingStep.SELECT_SENDER -> 0.22f
-    OnboardingStep.CREATE_PATTERN -> 0.32f
-    OnboardingStep.PATTERN_SUMMARY -> 0.40f
-    OnboardingStep.SENDER_PATTERN_SUMMARY -> 0.48f
-    OnboardingStep.ACCOUNT -> 0.58f
-    OnboardingStep.IDENTIFIERS -> 0.68f
-    OnboardingStep.IMPORT_PREVIEW -> 0.78f
-    OnboardingStep.LINK_PREVIEW -> 0.86f
-    OnboardingStep.IMPORT -> 0.94f
+    OnboardingStep.WELCOME -> 0.25f
+    OnboardingStep.ACCOUNT -> 0.5f
+    OnboardingStep.SELECT_SENDER -> 0.75f
     OnboardingStep.COMPLETION -> 1f
 }
 
 @Composable
-internal fun WelcomePatternFirstStep(onContinue: () -> Unit) {
+internal fun WelcomeAccountFirstStep(onContinue: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("مرحباً بك في مصروف", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "سنساعدك على تعريف رسائل البنك وإنشاء حسابك، ثم استيراد العمليات المطابقة فقط. تبقى الرسائل على جهازك.",
+            "أنشئ حسابك واربط مرسل رسائله. يمكنك مراجعة أنماط البنك لاحقاً من «رسائل البنوك».",
             style = MaterialTheme.typography.bodyLarge,
         )
         PrimaryButton("متابعة", onClick = onContinue, modifier = Modifier.fillMaxWidth())
@@ -269,45 +257,58 @@ internal fun WelcomePatternFirstStep(onContinue: () -> Unit) {
 }
 
 @Composable
-internal fun PermissionStep(
-    granted: Boolean,
-    permanentlyDenied: Boolean,
-    onRequest: () -> Unit,
-    onContinue: () -> Unit,
-    onOpenSettings: () -> Unit,
+internal fun CompletionStep(
+    app: MasroofApplication,
+    state: UiOnboardingState,
+    repository: OnboardingRepository,
+    onFinish: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("إذن قراءة الرسائل", style = MaterialTheme.typography.titleLarge)
+        Text("تم إعداد مصروف", style = MaterialTheme.typography.titleLarge)
+        Text("الحساب: ${state.displayName}", style = MaterialTheme.typography.bodyLarge)
         Text(
-            "نحتاج الإذن لاكتشاف مرسلي البنوك وإنشاء الأنماط. لن نستورد عمليات مالية في هذه الخطوة.",
+            "مرسل الرسائل: ${state.selectedSenderDisplay.ifBlank { "سيتم ربطه لاحقاً" }}",
             style = MaterialTheme.typography.bodyLarge,
         )
         Text(
-            if (granted) "تم منح الإذن"
-            else if (permanentlyDenied) "تم رفض الإذن — افتح الإعدادات لمنحه"
-            else "لم يُمنح الإذن بعد",
+            "راجع أنماط رسائل البنك قبل أول استيراد.",
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (!granted) {
-            PrimaryButton("السماح بقراءة الرسائل", onClick = onRequest, modifier = Modifier.fillMaxWidth())
-            if (permanentlyDenied) {
-                SecondaryButton("فتح إعدادات التطبيق", onClick = onOpenSettings, modifier = Modifier.fillMaxWidth())
-            }
-        } else {
-            PrimaryButton("متابعة", onClick = onContinue, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-internal fun CompletionStep(onFinish: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("جاهز للبدء", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "يمكنك لاحقاً إضافة أنماط جديدة من «رسائل البنوك» عند ظهور أنواع رسائل غير معروفة.",
-            style = MaterialTheme.typography.bodyLarge,
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        PrimaryButton(
+            if (saving) "جارٍ الإعداد…" else "بدء استخدام مصروف",
+            enabled = !saving && state.createdAccountId > 0L,
+            onClick = {
+                scope.launch {
+                    saving = true
+                    error = null
+                    runCatching {
+                        completeMinimalOnboarding(
+                            accountId = state.createdAccountId,
+                            accountExists = { id ->
+                                app.financialAccountRepository.getById(id) != null
+                            },
+                            saveFinancialSetup = {
+                                app.financialSetupRepository.save(
+                                    setupFrom(state, completed = true),
+                                )
+                            },
+                            markCompleted = repository::markCompleted,
+                        )
+                    }.onSuccess {
+                        onFinish()
+                    }.onFailure {
+                        error = "تعذر إكمال الإعداد. حاول مرة أخرى."
+                    }
+                    saving = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
         )
-        PrimaryButton("بدء استخدام التطبيق", onClick = onFinish, modifier = Modifier.fillMaxWidth())
     }
 }
 
