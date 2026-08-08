@@ -300,6 +300,6 @@ private val ELIGIBLE_TYPES = setOf(
     com.baraa.masroof.transaction.TransactionType.PURCHASE,
     com.baraa.masroof.transaction.TransactionType.ONLINE_PURCHASE,
     com.baraa.masroof.transaction.TransactionType.CASH_WITHDRAWAL,
-    com.baraa.masroof.transaction.TransactionType.BANK_FEE,
-    com.baraa.masroof.transaction.TransactionType.UNKNOWN,
+    com.baraa.masroof.transaction.TransactionType.FEE,
+    com.baraa.masroof.transaction.TransactionType.OTHER_FINANCIAL,
 )

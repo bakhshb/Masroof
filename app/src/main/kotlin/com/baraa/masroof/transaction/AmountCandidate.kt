@@ -2,14 +2,25 @@ package com.baraa.masroof.transaction
 
 import java.math.BigDecimal
 
-/** Evidence for a numeric amount candidate. Context is normalized and never logged with the SMS body. */
+/**
+ * One monetary value observed in an SMS, with its semantic role.
+ *
+ * Selection rule: [ParsedTransaction.amount] may only come from candidates
+ * whose [semanticRole] is [MonetaryRole.TRANSACTION_AMOUNT]. Magnitude,
+ * position, or currency proximity alone must never decide the amount.
+ */
 data class AmountCandidate(
-    val parsedValue: BigDecimal?,
-    val originalTextRange: IntRange,
+    val value: BigDecimal,
     val currency: Currency,
-    val precedingContext: String,
-    val followingContext: String,
+    val semanticRole: MonetaryRole,
+    val label: String,
+    val evidence: String,
     val confidence: Int,
     val exclusionReason: String? = null,
-    val sourcePattern: String,
+    /** Retained for older diagnostics that keyed off pattern id / source. */
+    val sourcePattern: String = evidence,
+    val originalTextRange: IntRange = 0..0,
+    val precedingContext: String = label,
+    val followingContext: String = "",
+    val parsedValue: BigDecimal? = value,
 )

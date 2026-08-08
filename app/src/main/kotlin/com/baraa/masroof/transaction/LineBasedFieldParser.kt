@@ -171,18 +171,11 @@ object LineBasedFieldParser {
     }
 
     fun amountLabelRegex(): Regex = AMOUNT_LABEL_REGEX
-    fun isAmountLabel(label: String): Boolean {
-    val normalized = java.text.Normalizer.normalize(label, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT).trim()
-    val labels = AMOUNT_LABELS.map { java.text.Normalizer.normalize(it, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT).trim() }
-    return labels.any { it == normalized }
-}
-fun containsAmountLabel(label: String): Boolean {
-    val trim = label.trim()
-    if (AMOUNT_LABELS.contains(trim)) return true
-    val normalized = java.text.Normalizer.normalize(trim, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT)
-    val labels = AMOUNT_LABELS.map { java.text.Normalizer.normalize(it, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT) }
-    return labels.any { it == normalized }
-}
+    fun isAmountLabel(label: String): Boolean =
+        MonetaryFieldClassifier.isTransactionAmount(label)
+
+    fun containsAmountLabel(label: String): Boolean =
+        MonetaryFieldClassifier.isTransactionAmount(label)
     fun balanceLabelRegex(): Regex = BALANCE_LABEL_REGEX
     fun cardLabelRegex(): Regex = CARD_LABEL_REGEX
     fun accountLabelRegex(): Regex = ACCOUNT_LABEL_REGEX

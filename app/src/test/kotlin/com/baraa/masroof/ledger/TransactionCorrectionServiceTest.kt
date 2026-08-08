@@ -13,7 +13,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -78,7 +77,9 @@ class TransactionCorrectionServiceTest {
             now = { 42L },
         )
 
-        val reopened = service.reopenForCorrection(withId)
+        val result = service.reopenForCorrection(withId)
+        assertTrue(result is CorrectionResult.Success)
+        val reopened = (result as CorrectionResult.Success).transaction
         assertEquals(100L, reversedId)
         assertNull(reopened.linkedJournalEntryId)
         assertEquals(TransactionPostingStatus.NEEDS_REVIEW, reopened.postingStatus)
@@ -113,23 +114,55 @@ class TransactionCorrectionServiceTest {
                 1L
             },
         )
-        val reopened = service.reopenForCorrection(withId)
+        val result = service.reopenForCorrection(withId)
+        assertTrue(result is CorrectionResult.Success)
         assertEquals(0, reverseCalls)
-        assertEquals(TransactionPostingStatus.NEEDS_REVIEW, reopened.postingStatus)
-        assertNull(reopened.linkedJournalEntryId)
+        assertEquals(
+            TransactionPostingStatus.NEEDS_REVIEW,
+            (result as CorrectionResult.Success).transaction.postingStatus,
+        )
+        assertNull(result.transaction.linkedJournalEntryId)
     }
 
     @Test
-    fun rejectsUnpostedTransaction() = runBlocking {
+    fun rejectsUnpostedTransactionWithoutThrowing() = runBlocking {
+        val repo = FakeTransactionRepository()
+        val id = repo.insert(baseTx("fp-unposted").copy(postingStatus = TransactionPostingStatus.NEEDS_REVIEW))
+        val tx = repo.getById(id)!!
+        val service = TransactionCorrectionService(repo, JournalReverser { it })
+        val result = service.reopenForCorrection(tx)
+        assertTrue(result is CorrectionResult.ValidationError)
+        assertEquals(
+            "correction_requires_posted_or_reversed",
+            (result as CorrectionResult.ValidationError).code,
+        )
+    }
+
+    @Test
+    fun reverseFailureReturnsFailureNotCrash() = runBlocking {
+        val repo = FakeTransactionRepository()
+        val assignedId = repo.insert(baseTx("fp-fail"))
+        val withId = repo.getById(assignedId)!!.copy(
+            postingStatus = TransactionPostingStatus.POSTED,
+            linkedJournalEntryId = 7L,
+        )
+        repo.update(withId)
+        val service = TransactionCorrectionService(
+            transactions = repo,
+            journalReverser = JournalReverser { error("journal_missing") },
+        )
+        val result = service.reopenForCorrection(withId)
+        assertTrue(result is CorrectionResult.Failure)
+        assertEquals(TransactionPostingStatus.POSTED, repo.getById(withId.id)!!.postingStatus)
+    }
+
+    @Test
+    fun deletedTransactionReturnsValidationError() = runBlocking {
         val repo = FakeTransactionRepository()
         val service = TransactionCorrectionService(repo, JournalReverser { it })
-        try {
-            service.reopenForCorrection(
-                baseTx().copy(postingStatus = TransactionPostingStatus.NEEDS_REVIEW),
-            )
-            fail("expected require failure")
-        } catch (_: IllegalArgumentException) {
-            // expected
-        }
+        val result = service.reopenForCorrection(
+            baseTx().copy(id = 404, postingStatus = TransactionPostingStatus.POSTED),
+        )
+        assertEquals("transaction_deleted", (result as CorrectionResult.ValidationError).code)
     }
 }

@@ -161,11 +161,72 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration23to24AddsTemplateTextColumn() {
+        assertEquals(23, MasroofDatabase.MIGRATION_23_24.startVersion)
+        assertEquals(24, MasroofDatabase.MIGRATION_23_24.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("ADD COLUMN templateText TEXT"))
+    }
+
+    @Test
+    fun migration24to25AddsCanonicalKeyAndMergesDuplicates() {
+        assertEquals(24, MasroofDatabase.MIGRATION_24_25.startVersion)
+        assertEquals(25, MasroofDatabase.MIGRATION_24_25.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("ADD COLUMN canonicalKey TEXT NOT NULL DEFAULT ''"))
+        assertTrue(source.contains("index_message_pattern_definitions_senderProfileId_canonicalKey"))
+        // Duplicate merge must preserve field definitions and survivor selection
+        // must be the shared, unit-tested rule.
+        assertTrue(source.contains("PatternDuplicateMerger.selectSurvivor"))
+        assertTrue(source.contains("PatternDuplicateMerger.mergedExampleCount"))
+        assertTrue(source.contains("UPDATE pattern_field_definitions SET patternId ="))
+        // Only duplicate losers are deleted — never the whole table.
+        assertFalse(source.contains("DROP TABLE IF EXISTS `message_pattern_definitions`"))
+        assertTrue(source.contains("DELETE FROM message_pattern_definitions WHERE id IN"))
+    }
+
+    @Test
+    fun migration25to26RecomputesSemanticFamilyKeys() {
+        assertEquals(25, MasroofDatabase.MIGRATION_25_26.startVersion)
+        assertEquals(26, MasroofDatabase.MIGRATION_25_26.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("MIGRATION_25_26"))
+        assertTrue(source.contains("semantic family"))
+        assertTrue(source.contains("stripWalletFromDisplayName"))
+        assertFalse(source.contains("DROP TABLE IF EXISTS `message_pattern_definitions`"))
+    }
+
+    @Test
+    fun migration26to27CanonicalizesTypesAndAddsTemplateRevisions() {
+        assertEquals(26, MasroofDatabase.MIGRATION_26_27.startVersion)
+        assertEquals(27, MasroofDatabase.MIGRATION_26_27.endVersion)
+        val source = File("src/main/kotlin/com/baraa/masroof/data/db/MasroofDatabase.kt").readText()
+        assertTrue(source.contains("MIGRATION_26_27"))
+        assertTrue(source.contains("WHEN 'BANK_FEE' THEN 'FEE'"))
+        assertTrue(source.contains("WHEN 'DEPOSIT' THEN 'OTHER_FINANCIAL'"))
+        assertTrue(source.contains("ADD COLUMN `lineageId`"))
+        assertTrue(source.contains("ADD COLUMN `isActive`"))
+        assertTrue(source.contains("ADD COLUMN `placeholderToken`"))
+        assertTrue(source.contains("active = 0"))
+        assertFalse(
+            source.substringAfter("val MIGRATION_26_27")
+                .substringBefore("/** All migrations")
+                .contains("DELETE FROM transactions"),
+        )
+        assertFalse(
+            source.substringAfter("val MIGRATION_26_27")
+                .substringBefore("/** All migrations")
+                .contains("journal_entries"),
+        )
+    }
+
+    @Test
     fun allMigrationsArrayContainsAllMigrations() {
         val versions = MasroofDatabase.ALL_MIGRATIONS.map { "${it.startVersion}->${it.endVersion}" }
         val expected = setOf(
             "1->2", "2->3", "3->4", "4->5", "5->6", "13->14", "14->15",
-            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21", "21->22", "22->23",
+            "15->16", "16->17", "17->18", "18->19", "19->20", "20->21", "21->22", "22->23", "23->24",
+            "24->25", "25->26", "26->27",
         )
         val missing = expected - versions.toSet()
         assertTrue(

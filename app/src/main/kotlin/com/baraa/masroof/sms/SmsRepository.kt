@@ -3,19 +3,19 @@ package com.baraa.masroof.sms
 import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
-import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Reads SMS rows from the system SMS provider, classifies them with
- * [BankSmsFilter], and parses any likely financial message into a
- * structured transaction via [BankParserRegistry].
+ * Reads SMS rows from the system SMS provider.
  *
  * The repository is read-only: it never writes, deletes, or modifies messages.
  * All I/O runs on [Dispatchers.IO] so callers may invoke it from the main thread.
+ *
+ * **Important:** the provider query is date-range only. Sender, OTP, template,
+ * and account filters belong in [com.baraa.masroof.data.repository.SmsImportOrchestrator].
  */
 class SmsRepository(private val context: Context) {
 
@@ -23,78 +23,92 @@ class SmsRepository(private val context: Context) {
 
     /**
      * Load inbox messages inside the given [range], capped at [limit].
-     * Each row is annotated with the bank-filter result AND a parsed
-     * transaction (when applicable). UI layers can decide whether to show
-     * or hide non-financial messages, and whether to render the structured
-     * card or the raw body.
      *
-     * Messages outside the selected range are never returned.
-     *
-     * @return list of messages, empty if the provider is unavailable or no rows match
+     * Prefer [loadInboxResult] when the UI must distinguish permission denial
+     * from a genuinely empty date window.
      */
     suspend fun loadInbox(
         range: SmsImportRange,
         limit: Int = DEFAULT_LIMIT,
-    ): List<SmsMessage> = withContext(Dispatchers.IO) {
-        val startMillis = range.startMillis()
-        // endExclusive for the SQL query is end-of-last-day; if [endExclusive]
-        // lands at start of next day, that already represents end-of-day.
-        val endMillis = range.endMillis()
+    ): List<SmsMessage> = loadInboxResult(range, limit).messagesOrEmpty
+
+    /**
+     * Query the SMS provider and return a typed result with query diagnostics.
+     */
+    suspend fun loadInboxResult(
+        range: SmsImportRange,
+        limit: Int = DEFAULT_LIMIT,
+    ): SmsInboxLoadResult = withContext(Dispatchers.IO) {
+        val query = SmsInboxQuery.forRange(range, limit = limit)
         val resolver: ContentResolver = context.contentResolver
-        val uri: Uri = Telephony.Sms.Inbox.CONTENT_URI
+        val uri = android.net.Uri.parse(query.uriString)
 
-        val projection = arrayOf(
-            Telephony.Sms._ID,
-            Telephony.Sms.ADDRESS,
-            Telephony.Sms.BODY,
-            Telephony.Sms.DATE,
-        )
-        // Cap must be high enough for full-month bank SMS; 100 silently dropped
-        // older messages and left balances incomplete.
-        val sortOrder = "${Telephony.Sms.DATE} DESC LIMIT $limit"
-        val selection = "${Telephony.Sms.DATE} >= ? AND ${Telephony.Sms.DATE} < ?"
-        val args = arrayOf(startMillis.toString(), endMillis.toString())
 
-        val result = ArrayList<SmsMessage>()
         var cursor: Cursor? = null
         try {
-            cursor = resolver.query(uri, projection, selection, args, sortOrder)
+            cursor = resolver.query(
+                uri,
+                query.projection,
+                query.selection,
+                query.selectionArgs,
+                query.sortOrder,
+            )
             if (cursor == null) {
-                Log.w(tag, "ContentResolver returned null cursor")
-                return@withContext emptyList()
+                Log.w(tag, "ContentResolver returned null cursor for ${query.uriString}")
+                return@withContext SmsInboxLoadResult.Failed(
+                    query = query,
+                    errorMessage = "مزود الرسائل أعاد نتيجة فارغة",
+                )
             }
-            val idIdx = cursor.getColumnIndex(Telephony.Sms._ID)
-            val addrIdx = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
-            val bodyIdx = cursor.getColumnIndex(Telephony.Sms.BODY)
-            val dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE)
+            val idIdx = cursor.getColumnIndex(SmsInboxQuery.COL_ID)
+            val addrIdx = cursor.getColumnIndex(SmsInboxQuery.COL_ADDRESS)
+            val bodyIdx = cursor.getColumnIndex(SmsInboxQuery.COL_BODY)
+            val dateIdx = cursor.getColumnIndex(SmsInboxQuery.COL_DATE)
 
+            val result = ArrayList<SmsMessage>(cursor.count.coerceAtLeast(0).coerceAtMost(limit))
+            var rawRows = 0
             while (cursor.moveToNext()) {
+                rawRows++
+                if (result.size >= limit) continue
                 val id = if (idIdx >= 0 && !cursor.isNull(idIdx)) cursor.getLong(idIdx) else 0L
                 val sender = if (addrIdx >= 0 && !cursor.isNull(addrIdx)) cursor.getString(addrIdx) else null
                 val body = if (bodyIdx >= 0 && !cursor.isNull(bodyIdx)) cursor.getString(bodyIdx) else null
                 val date = if (dateIdx >= 0 && !cursor.isNull(dateIdx)) cursor.getLong(dateIdx) else 0L
-                if (date < startMillis || date >= endMillis) continue
+                // Defense in depth: provider selection already applies the window.
+                if (date < query.startMillis || date >= query.endMillisExclusive) continue
                 val match = BankSmsFilter.classifyMessage(sender, body)
-                // Parsing is intentionally deferred to SmsImportOrchestrator,
-                // after the registered-sender authorization gate.
-                result.add(SmsMessage(id = id, sender = sender, body = body, timestamp = date, matchReason = match.reason))
+                result.add(
+                    SmsMessage(
+                        id = id,
+                        sender = sender,
+                        body = body,
+                        timestamp = date,
+                        matchReason = match.reason,
+                    ),
+                )
             }
             if (result.size >= limit) {
                 Log.w(tag, "SMS inbox hit limit=$limit in selected range — older messages may be missing")
             } else {
-                Log.d(tag, "Loaded ${result.size} SMS rows in selected range")
+                Log.d(tag, "Loaded ${result.size} SMS rows in selected range (rawCursor=$rawRows)")
             }
+            SmsInboxLoadResult.Success(
+                messages = result,
+                query = query,
+                rawRowCount = rawRows,
+            )
         } catch (security: SecurityException) {
-            // Permission revoked between check and query — return empty so UI can recover.
             Log.e(tag, "READ_SMS permission missing while reading inbox", security)
-            return@withContext emptyList()
+            SmsInboxLoadResult.PermissionDenied(query = query)
         } catch (t: Throwable) {
             Log.e(tag, "Failed to read SMS inbox", t)
-            return@withContext emptyList()
+            SmsInboxLoadResult.Failed(
+                query = query,
+                errorMessage = t.message ?: t.javaClass.simpleName,
+            )
         } finally {
             runCatching { cursor?.close() }
         }
-        result
     }
 
     /**

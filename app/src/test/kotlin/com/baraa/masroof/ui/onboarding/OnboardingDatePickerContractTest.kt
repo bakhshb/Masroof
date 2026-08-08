@@ -9,9 +9,9 @@ import java.io.File
 class OnboardingDatePickerContractTest {
     @Test
     fun startDateCustomUsesCalendarDateField() {
-        val source = File("src/main/kotlin/com/baraa/masroof/ui/onboarding/OnboardingScreen.kt").readText()
+        val source = File("src/main/kotlin/com/baraa/masroof/ui/onboarding/OnboardingAccountSteps.kt").readText()
         assertTrue(
-            "StartDateStep CUSTOM must use CalendarDateField",
+            "Account step CUSTOM tracking date must use CalendarDateField",
             source.contains("CalendarDateField"),
         )
         assertFalse(

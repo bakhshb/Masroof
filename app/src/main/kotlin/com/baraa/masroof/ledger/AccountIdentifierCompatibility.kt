@@ -41,7 +41,7 @@ object AccountIdentifierCompatibility {
             AccountIdentifierType.DEBIT_CARD_LAST4,
         )
         TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN, TransactionType.INTERNAL_TRANSFER,
-        TransactionType.LOAN_INSTALLMENT, TransactionType.BILL_PAYMENT,
+        TransactionType.BILL_PAYMENT,
         -> listOf(
             AccountIdentifierType.ACCOUNT_LAST4,
             AccountIdentifierType.IBAN_LAST4,
@@ -58,8 +58,7 @@ object AccountIdentifierCompatibility {
         identifierType: AccountIdentifierType,
         transactionType: TransactionType,
     ): Boolean =
-        identifierType in identifierTypesFor(transactionType) ||
-            transactionType == TransactionType.UNKNOWN
+        identifierType in identifierTypesFor(transactionType)
 
     fun defaultIdentifierTypeFor(accountType: AccountType): AccountIdentifierType? = when (accountType) {
         AccountType.BANK_ACCOUNT, AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT ->

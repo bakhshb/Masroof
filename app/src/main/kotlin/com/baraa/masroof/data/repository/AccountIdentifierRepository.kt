@@ -96,20 +96,6 @@ class AccountIdentifierRepository(
             .distinctBy { it.id }
     }
 
-    /**
-     * Legacy column backfill is performed by [com.baraa.masroof.data.db.MasroofDatabase.MIGRATION_14_15].
-     * Kept as a no-op so older call sites remain safe and idempotent.
-     */
-    suspend fun ensureLegacyIdentifierBackfill() {
-        // no-op after schema v15
-    }
-
-    @Deprecated("Legacy columns removed in schema v15; migration performs backfill")
-    suspend fun backfillFromLegacyLastFour(): Int = 0
-
-    @Deprecated("Legacy columns removed in schema v15; migration performs backfill")
-    suspend fun backfillFromLegacySenderAliases(): Int = 0
-
     suspend fun addOrUpdate(accountId: Long, form: IdentifierForm): IdentifierAddOutcome {
         val account = accountDao.getById(accountId)?.toDomainRef()
             ?: return IdentifierAddOutcome(IdentifierAddResult.Rejected, null, emptyList(), "حساب غير موجود")

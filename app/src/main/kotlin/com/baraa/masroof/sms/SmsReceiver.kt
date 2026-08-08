@@ -49,7 +49,12 @@ class SmsReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val combined = combineMultipart(intent)
-                val filtered = combined.filter { isFinancial(it) }
+                // The orchestrator owns sender/template classification. Pre-filter
+                // only authentication messages so a novel message from a registered
+                // sender can become an UNKNOWN candidate instead of being dropped.
+                val filtered = combined.filterNot {
+                    BankSmsFilter.isOtpOrAuthenticationMessage(it.body)
+                }
                 if (filtered.isEmpty()) {
                     recordDiagnostic(app, sender = null, result = "IGNORED_NON_FINANCIAL")
                     return@launch
@@ -97,16 +102,6 @@ class SmsReceiver : BroadcastReceiver() {
             }
         }
         return bySender.values.toList()
-    }
-
-    /**
-     * Filters out OTP-only and unknown senders. Keeps only messages
-     * that look like bank notifications.
-     */
-    private fun isFinancial(message: SmsMessage): Boolean {
-        val body = message.body ?: return false
-        // OTP / auth challenges are rejected inside BankSmsFilter.classifyMessage.
-        return BankSmsFilter.classifyMessage(message.sender, body).isMatch
     }
 
     private fun updateCounters(app: MasroofApplication, result: com.baraa.masroof.data.repository.SmsImportResult) {

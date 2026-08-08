@@ -17,8 +17,14 @@ class SystemAccountSeeder(
         }
     }
 
-    suspend fun accountId(key: SystemAccountKey): Long =
-        requireNotNull(accountDao.getSystemAccount(key.name)) { "System account missing: ${key.name}" }.id
+    suspend fun accountId(key: SystemAccountKey): Long {
+        accountDao.getSystemAccount(key.name)?.let { return it.id }
+        // Seed lazily if app startup seed raced or failed — still fail clearly if absent.
+        seed()
+        return requireNotNull(accountDao.getSystemAccount(key.name)) {
+            "System account missing: ${key.name}"
+        }.id
+    }
 
     private fun create(key: SystemAccountKey): FinancialAccountEntity {
         val time = now()

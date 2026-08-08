@@ -17,7 +17,8 @@ import com.baraa.masroof.rules.RuleEngine
 import com.baraa.masroof.rules.RuleEngineFactory
 import com.baraa.masroof.sms.SmsMessage
 import com.baraa.masroof.sms.SenderNormalizer
-import com.baraa.masroof.transaction.BankParserRegistry
+import com.baraa.masroof.sms.PatternDiscoveryService
+import com.baraa.masroof.sms.SmsStructureNormalizer
 import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.MerchantNormalizer
 import com.baraa.masroof.transaction.ParsedTransaction
@@ -32,9 +33,30 @@ import java.time.ZoneId
 
 enum class SmsImportMode { REGISTERED_ACCOUNTS_ONLY, DISCOVER_NEW_SENDERS }
 
+/**
+ * What [SmsImportOrchestrator.commit] should persist.
+ *
+ * - [READY_ONLY]: postable READY rows only (primary «استيراد»).
+ * - [REVIEW_CANDIDATES]: unmatched templates + account/review rows (primary «مراجعة»).
+ * - [ALL]: legacy / onboarding path that processes every preview disposition.
+ */
+enum class SmsImportCommitMode {
+    READY_ONLY,
+    /** Message-review rows only (account link / classification) — not template gates. */
+    MESSAGE_REVIEW_ONLY,
+    REVIEW_CANDIDATES,
+    ALL,
+}
+
 enum class ImportDisposition {
     READY, NEEDS_ACCOUNT, NEEDS_CONFIRMATION, NEEDS_INSTITUTION, UNPARSED,
     EXACT_DUPLICATE, POSSIBLE_DUPLICATE, BEFORE_TRACKING_START, UNREGISTERED_SENDER, IGNORED,
+    /** Registered sender SMS with no matching approved template — still counted in scan. */
+    UNMATCHED_TEMPLATE,
+    /** Multiple approved templates matched — needs user review, still counted in scan. */
+    AMBIGUOUS_TEMPLATE,
+    /** Template matched but amount/entity extraction failed — still counted in scan. */
+    TEMPLATE_EXTRACTION_FAILED,
 }
 
 /**
@@ -168,6 +190,107 @@ data class SmsImportResult(
  * Pure, side-effect-free preview used by the "scan" step. Carries every
  * computed candidate so the user can review before any data is persisted.
  */
+/**
+ * Per-stage counts after the inbox has already been date-filtered.
+ *
+ * Invariant for messages that enter template matching:
+ * [templateInput] == [templateMatched] + [unmatchedTemplate] + [ambiguousTemplate]
+ */
+data class ScanFilterFunnel(
+    val rawSms: Int = 0,
+    val afterOtpFilter: Int = 0,
+    val afterSenderFilter: Int = 0,
+    /** Registered, non-OTP, non-ignored messages that entered template matching. */
+    val templateInput: Int = 0,
+    val templateMatched: Int = 0,
+    val unmatchedTemplate: Int = 0,
+    val ambiguousTemplate: Int = 0,
+    /** Matched template but amount/entity extraction failed (subset of matched). */
+    val extractionFailed: Int = 0,
+    /** Explicit IGNORED-pattern hits (excluded from [templateInput]). */
+    val ignoredPattern: Int = 0,
+) {
+    val templateOutcomeSum: Int
+        get() = templateMatched + unmatchedTemplate + ambiguousTemplate
+
+    val templateInvariantHolds: Boolean
+        get() = templateInput == templateOutcomeSum
+
+    fun toLogMap(): Map<String, Any?> = mapOf(
+        "rawSms" to rawSms,
+        "afterOtpFilter" to afterOtpFilter,
+        "afterSenderFilter" to afterSenderFilter,
+        "templateInput" to templateInput,
+        "templateMatched" to templateMatched,
+        "unmatchedTemplate" to unmatchedTemplate,
+        "ambiguousTemplate" to ambiguousTemplate,
+        "extractionFailed" to extractionFailed,
+        "ignoredPattern" to ignoredPattern,
+        "templateInvariantHolds" to templateInvariantHolds,
+    )
+}
+
+/**
+ * One pending-candidate cluster explained for debug/report after scan.
+ * Never includes unregistered senders or clusters covered by APPROVED templates.
+ */
+data class CandidatePatternDiagnostic(
+    val senderRaw: String?,
+    val senderNormalized: String?,
+    val senderProfileId: Long?,
+    val senderRegistered: Boolean,
+    val candidatePatternId: Long?,
+    val canonicalKey: String,
+    val transactionType: String?,
+    val messageCount: Int,
+    val approvedEquivalentId: Long?,
+    val reason: String,
+)
+
+data class ApprovedTemplateCoverage(
+    val templateId: Long,
+    val displayName: String,
+    val transactionType: String?,
+    val canonicalSignature: String,
+    val active: Boolean,
+    val approved: Boolean,
+    val requiredPlaceholders: List<String>,
+    val optionalPlaceholders: List<String>,
+    val historicalMessageCount: Int,
+    val currentCandidateMessages: Int,
+    val successfulMatches: Int,
+    val failureCounts: Map<String, Int>,
+)
+
+data class SenderTemplateCoverage(
+    val normalizedSender: String,
+    val senderProfileId: Long,
+    val approvedTemplatesLoaded: Int,
+    val messagesEnteringMatcher: Int,
+    val matched: Int,
+    val unmatched: Int,
+    val ambiguous: Int,
+)
+
+data class TemplateAnchorDiagnostic(
+    val expected: String,
+    val actualStructuralLine: String?,
+)
+
+data class UnmatchedTemplateGroupDiagnostic(
+    val count: Int,
+    val normalizedSender: String,
+    val senderProfileId: Long,
+    val closestTemplateId: Long?,
+    val closestTemplateName: String?,
+    val closestTemplateTransactionType: String?,
+    val failureReason: String,
+    val normalizedStructuralRepresentation: String,
+    val redactedRepresentativeMessage: String,
+    val matchedAnchors: List<TemplateAnchorDiagnostic>,
+    val failedAnchors: List<TemplateAnchorDiagnostic>,
+)
+
 data class ScanPreview(
     val mode: SmsImportMode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
     val configuredSenderCount: Int = 0,
@@ -182,11 +305,40 @@ data class ScanPreview(
     val duplicateTransactions: Int = 0,
     val needsReviewTransactions: Int = 0,
     val beforeTrackingStartCount: Int = 0,
+    /** Registered-sender messages with no matching approved template. */
+    val unmatchedTemplateMessages: Int = 0,
+    val ambiguousTemplateMessages: Int = 0,
+    /** Template matched but extraction failed. */
+    val extractionFailedMessages: Int = 0,
+    /**
+     * Distinct candidate (UNKNOWN) patterns that cover [patternApprovalCount] messages.
+     * UI must show this for «مراجعة N نمطاً», never the raw message count as «أنماط».
+     * Only counts structures that do NOT already have an equivalent APPROVED template.
+     */
+    val candidatePatternCount: Int = 0,
+    /**
+     * Per-cluster diagnostics for pending candidates (registered senders only).
+     * Used to explain rediscovery / duplicates after approval.
+     */
+    val candidateDiagnostics: List<CandidatePatternDiagnostic> = emptyList(),
+    /** One primary deterministic rejection reason per unmatched registered SMS. */
+    val templateFailureCounts: Map<String, Int> = emptyMap(),
+    /** Coverage of each approved template against current sender SMS. */
+    val approvedTemplateCoverage: List<ApprovedTemplateCoverage> = emptyList(),
+    val senderTemplateCoverage: List<SenderTemplateCoverage> = emptyList(),
+    val unmatchedTemplateGroups: List<UnmatchedTemplateGroupDiagnostic> = emptyList(),
     val institutionGroups: List<InstitutionGroup> = emptyList(),
     val perTransaction: List<PreviewItem> = emptyList(),
     val discoveredSenders: List<DiscoveredSender> = emptyList(),
     /** Aggregated skips (no SMS bodies) for «رسائل لم تُستورد». */
     val skippedSenders: List<SkippedSenderGroup> = emptyList(),
+    /** Stage funnel for diagnostics (raw count is independent of templates). */
+    val filterFunnel: ScanFilterFunnel? = null,
+    /** True when READ_SMS was missing — never present this as an empty inbox. */
+    val permissionMissing: Boolean = false,
+    val permissionMessage: String? = null,
+    /** Non-permission scan failure; raw inbox count may still be set. */
+    val scanError: String? = null,
 ) {
     data class DiscoveredSender(val sender: String, val messageCount: Int, val latestTimestamp: Long, val likelyInstitution: String?)
 
@@ -196,6 +348,8 @@ data class ScanPreview(
         NON_FINANCIAL,
         OTP_OR_AUTH,
         UNKNOWN_PATTERN,
+        AMBIGUOUS_TEMPLATE,
+        TEMPLATE_EXTRACTION_FAILED,
     }
 
     data class SkippedSenderGroup(
@@ -213,6 +367,8 @@ data class ScanPreview(
                 SkipReason.NON_FINANCIAL -> "ليست رسالة مالية واضحة"
                 SkipReason.OTP_OR_AUTH -> "رمز تحقق / تأكيد هوية — ليست عملية مالية"
                 SkipReason.UNKNOWN_PATTERN -> "نمط جديد يحتاج مراجعة"
+                SkipReason.AMBIGUOUS_TEMPLATE -> "أكثر من قالب مطابق — يحتاج مراجعة"
+                SkipReason.TEMPLATE_EXTRACTION_FAILED -> "طابق القالب لكن تعذّر استخراج المبلغ"
             }
     }
 
@@ -233,13 +389,64 @@ data class ScanPreview(
                 .coerceAtLeast(0)
         }
 
-    /** Exclusive count of messages that need user review after import. */
-    val reviewDispositionCount: Int
+    /** Alias for UI counters — same as [readyCount]. */
+    val readyToImport: Int get() = readyCount
+
+    /**
+     * Message/import reviewables for the operations review queue
+     * (account link / classification / possible duplicate).
+     * Never includes template-approval gates.
+     */
+    val messageReviewCount: Int
+        get() = if (perTransaction.isNotEmpty()) {
+            perTransaction.count { isMessageReviewDisposition(it.disposition) }
+        } else {
+            needsReviewTransactions
+        }
+
+    /**
+     * Template gates resolved in «رسائل البنوك», not the operations review queue.
+     * This is a **message** count — see [candidatePatternCount] for pattern count.
+     */
+    val patternApprovalCount: Int
+        get() = if (perTransaction.isNotEmpty()) {
+            perTransaction.count { isPatternApprovalDisposition(it.disposition) }
+        } else {
+            unmatchedTemplateMessages + ambiguousTemplateMessages + extractionFailedMessages
+        }
+
+    /**
+     * Distinct candidate patterns needing approval for registered senders.
+     * Never invents a count when [candidatePatternCount] is zero.
+     */
+    val patternsNeedingApproval: Int get() = candidatePatternCount
+
+    /** Combined count — prefer [messageReviewCount] / [patternApprovalCount] in UI. */
+    val needsReview: Int
+        get() = if (perTransaction.isNotEmpty()) {
+            messageReviewCount + patternApprovalCount
+        } else {
+            needsReviewTransactions
+        }
+
+    val matchedTemplate: Int get() = filterFunnel?.templateMatched ?: 0
+    val unmatchedTemplate: Int get() = unmatchedTemplateMessages
+    val ambiguousTemplate: Int get() = ambiguousTemplateMessages
+    val extractionFailed: Int get() = extractionFailedMessages
+    val duplicate: Int get() = duplicateTransactions
+    val ignored: Int get() = nonFinancialMessages
+    val nonFinancial: Int get() = nonFinancialMessages
+    val totalSms: Int get() = scannedMessages
+    val needsAccountLink: Int
         get() = perTransaction.count {
             it.disposition == ImportDisposition.NEEDS_ACCOUNT ||
-                it.disposition == ImportDisposition.NEEDS_CONFIRMATION ||
                 it.disposition == ImportDisposition.NEEDS_INSTITUTION
         }
+    val needsClassification: Int
+        get() = perTransaction.count { it.disposition == ImportDisposition.NEEDS_CONFIRMATION }
+
+    val reviewDispositionCount: Int
+        get() = perTransaction.count { isReviewDisposition(it.disposition) }
 
     data class InstitutionGroup(
         val institutionName: String,
@@ -261,10 +468,32 @@ data class ScanPreview(
         val isBeforeTrackingStart: Boolean,
         val date: LocalDate?,
         val disposition: ImportDisposition,
+        /** Exact immutable template revision used by scan; null when unmatched. */
+        val patternRevisionId: Long? = null,
     )
 
     companion object {
         const val MAX_SKIPPED_GROUPS = 10
+
+        fun isMessageReviewDisposition(disposition: ImportDisposition): Boolean = when (disposition) {
+            ImportDisposition.NEEDS_ACCOUNT,
+            ImportDisposition.NEEDS_CONFIRMATION,
+            ImportDisposition.NEEDS_INSTITUTION,
+            ImportDisposition.POSSIBLE_DUPLICATE,
+            -> true
+            else -> false
+        }
+
+        fun isPatternApprovalDisposition(disposition: ImportDisposition): Boolean = when (disposition) {
+            ImportDisposition.UNMATCHED_TEMPLATE,
+            ImportDisposition.AMBIGUOUS_TEMPLATE,
+            ImportDisposition.TEMPLATE_EXTRACTION_FAILED,
+            -> true
+            else -> false
+        }
+
+        fun isReviewDisposition(disposition: ImportDisposition): Boolean =
+            isMessageReviewDisposition(disposition) || isPatternApprovalDisposition(disposition)
 
         fun aggregateSkipped(
             buckets: Map<Pair<String, SkipReason>, SkipAccum>,
@@ -324,27 +553,40 @@ class SmsImportOrchestrator(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
 ) {
-    /** Persist SMS body locally for on-device link assist. Never logs the body. */
-    private suspend fun rememberSmsBody(transactionId: Long, body: String?) {
-        if (transactionId <= 0L) return
-        runCatching { smsBodyRepository?.save(transactionId, body) }
-    }
+    /** Raw SMS is intentionally never persisted by the importer. */
+    private suspend fun rememberSmsBody(transactionId: Long, body: String?) = Unit
     /**
      * Step 1 — read-only scan. Returns a [ScanPreview] describing what
      * the eventual commit would do.
+     *
+     * [messages] must already be the date-window inbox slice. Template matching
+     * runs only after OTP / registered-sender / ignored-pattern gates and never
+     * reduces [ScanPreview.scannedMessages].
+     *
+     * Template invariant:
+     * templateInput == matched + unmatched + ambiguous
      */
     suspend fun scan(
         messages: List<SmsMessage>,
         trackingStartDate: LocalDate?,
         mode: SmsImportMode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
+        allowOncePatternIds: Set<Long> = emptySet(),
     ): ScanPreview = withContext(Dispatchers.IO) {
         val registeredSenders = registeredSenderKeys()
         val authorizedSenders = registeredSenders
+        val rawSms = messages.size
 
         if (mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY && authorizedSenders.isEmpty()) {
-            return@withContext ScanPreview(mode = mode, configuredSenderCount = 0, hasRegisteredSenders = false)
+            return@withContext ScanPreview(
+                mode = mode,
+                configuredSenderCount = 0,
+                hasRegisteredSenders = false,
+                scannedMessages = rawSms,
+                filterFunnel = ScanFilterFunnel(rawSms = rawSms),
+            )
         }
         if (mode == SmsImportMode.DISCOVER_NEW_SENDERS) {
+            val otpCount = messages.count { com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(it.body) }
             val discoveries = messages.asSequence()
                 .filter { sms -> !com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(sms.body) }
                 .filter { sms -> SenderNormalizer.normalize(sms.sender) !in authorizedSenders }
@@ -354,25 +596,93 @@ class SmsImportOrchestrator(
                 .map { (sender, rows) -> ScanPreview.DiscoveredSender(sender, rows.size, rows.maxOf { it.timestamp }, null) }
                 .sortedByDescending { it.latestTimestamp }
             return@withContext ScanPreview(
-                mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = messages.size,
+                mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = rawSms,
                 unregisteredSenderMessages = messages.count { SenderNormalizer.normalize(it.sender) !in authorizedSenders },
+                otpOrAuthMessages = otpCount,
                 discoveredSenders = discoveries,
+                filterFunnel = ScanFilterFunnel(
+                    rawSms = rawSms,
+                    afterOtpFilter = rawSms - otpCount,
+                ),
             )
         }
 
-        val categories = categoryRepository.getAll()
-        val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
-        val merchantMemory = merchantMemoryRepository.getAll()
-        val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
-        val accountsBySender = senderProfileRepository?.accountsBySenderKeyMap().orEmpty()
-        val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
-        val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots, accountsBySender)
-        var scanned = 0; var recognized = 0; var nonFinancial = 0; var unparsed = 0
+        // Engine setup is lazy: a failure here must NOT wipe template classification.
+        data class EngineBundle(
+            val engine: RuleEngine,
+            val context: RuleContext,
+            val ownedAccounts: List<com.baraa.masroof.data.db.FinancialAccount>,
+        )
+        var engineBundle: EngineBundle? = null
+        var engineSetupError: String? = null
+        suspend fun ensureEngine(): EngineBundle? {
+            engineBundle?.let { return it }
+            return try {
+                val categories = categoryRepository.getAll()
+                val ownedAccounts = RoomFinancialAccountRepository(database.financialAccountDao()).getOwnedActive()
+                val merchantMemory = merchantMemoryRepository.getAll()
+                val identifierSnapshots = accountIdentifierRepository.getActiveSnapshots()
+                val accountsBySender = senderProfileRepository?.accountsBySenderKeyMap().orEmpty()
+                val engine = RuleEngineFactory.build(categories, feeCategoryId = null)
+                val context = RuleContext(ownedAccounts, merchantMemory, categories, identifierSnapshots, accountsBySender)
+                EngineBundle(engine, context, ownedAccounts).also { engineBundle = it }
+            } catch (t: Throwable) {
+                engineSetupError = t.message ?: t.javaClass.simpleName
+                android.util.Log.e("SmsImport", "scan engine setup failed — template buckets still counted", t)
+                null
+            }
+        }
+
+        var recognized = 0; var nonFinancial = 0; var unparsed = 0
         var unregistered = 0; var otpOrAuth = 0; var duplicates = 0; var needsReview = 0; var beforeTracking = 0
+        var unmatchedTemplates = 0; var ambiguousTemplates = 0; var templateMatched = 0
+        var templateInput = 0; var extractionFailed = 0; var ignoredPattern = 0
+        data class CoverageAccum(
+            val templateId: Long,
+            val displayName: String,
+            val transactionType: String?,
+            val canonicalSignature: String,
+            val active: Boolean,
+            val approved: Boolean,
+            val requiredPlaceholders: List<String>,
+            val optionalPlaceholders: List<String>,
+            val historicalMessageCount: Int,
+            var currentCandidateMessages: Int = 0,
+            var successfulMatches: Int = 0,
+            val failures: MutableMap<String, Int> = linkedMapOf(),
+        )
+        data class SenderCoverageAccum(
+            val normalizedSender: String,
+            val senderProfileId: Long,
+            val approvedTemplatesLoaded: Int,
+            var messagesEnteringMatcher: Int = 0,
+            var matched: Int = 0,
+            var unmatched: Int = 0,
+            var ambiguous: Int = 0,
+        )
+        data class UnmatchedGroupAccum(
+            var count: Int,
+            val normalizedSender: String,
+            val senderProfileId: Long,
+            val closestTemplateId: Long?,
+            val closestTemplateName: String?,
+            val closestTemplateTransactionType: String?,
+            val failureReason: String,
+            val normalizedStructuralRepresentation: String,
+            val redactedRepresentativeMessage: String,
+            val matchedAnchors: List<TemplateAnchorDiagnostic>,
+            val failedAnchors: List<TemplateAnchorDiagnostic>,
+        )
+        val templateFailureCounts = linkedMapOf<String, Int>()
+        val templateCoverage = linkedMapOf<Long, CoverageAccum>()
+        val senderCoverage = linkedMapOf<Long, SenderCoverageAccum>()
+        val unmatchedGroups = linkedMapOf<String, UnmatchedGroupAccum>()
+        var loggedFirstMatcherFailure = false
         val groups = linkedMapOf<String, MutableList<ScanPreview.PreviewItem>>()
         val items = ArrayList<ScanPreview.PreviewItem>()
         val batchTimestampsByKey = mutableMapOf<String, MutableList<Long>>()
         val skipBuckets = linkedMapOf<Pair<String, ScanPreview.SkipReason>, ScanPreview.SkipAccum>()
+        val senderTemplateDiag = mutableMapOf<String, Pair<Long?, Int>>() // key → (profileId, approvedCount)
         fun bumpSkip(sender: String?, reason: ScanPreview.SkipReason, body: String?, timestamp: Long) {
             val key = (sender?.trim().orEmpty().ifBlank { "—" }) to reason
             val acc = skipBuckets.getOrPut(key) { ScanPreview.SkipAccum() }
@@ -386,145 +696,482 @@ class SmsImportOrchestrator(
                 if (redacted.isNotBlank()) acc.redactedSample = redacted
             }
         }
+        fun reviewItem(
+            sms: SmsMessage,
+            disposition: ImportDisposition,
+        ): ScanPreview.PreviewItem = ScanPreview.PreviewItem(
+            smsId = sms.id,
+            sender = sms.sender,
+            amount = null,
+            transactionType = TransactionType.OTHER_FINANCIAL,
+            proposedAccountId = null,
+            proposedAccountName = null,
+            isDuplicate = false,
+            needsReview = true,
+            isBeforeTrackingStart = false,
+            date = null,
+            disposition = disposition,
+        )
+        fun exportFailureReason(match: com.baraa.masroof.sms.TemplateMatcher.MatchResult?): String {
+            val failedLine = match?.failedTemplateLine.orEmpty()
+            return when (match?.failureReason) {
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.EMPTY_INPUT ->
+                    "NO_TEMPLATE_LOADED"
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.REQUIRED_LINE_MISSING ->
+                    "REQUIRED_FIELD_MISSING"
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.STATIC_TEXT_MISMATCH,
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.LABEL_MISMATCH,
+                -> "STATIC_ANCHOR_MISMATCH"
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.LINE_SHAPE_MISMATCH ->
+                    "EXTRA_STATIC_TEXT"
+                com.baraa.masroof.sms.TemplateMatcher.FailureReason.PLACEHOLDER_VALIDATION_MISMATCH -> when {
+                    "{DATE}" in failedLine || "{TIME}" in failedLine || "{DATETIME}" in failedLine ->
+                        "DATE_FORMAT_MISMATCH"
+                    "{CURRENCY}" in failedLine -> "CURRENCY_FORMAT_MISMATCH"
+                    else -> "PLACEHOLDER_VALIDATION_FAILED"
+                }
+                null -> "UNKNOWN"
+            }
+        }
 
         for (sms in messages) {
-            scanned++
-            val senderKey = SenderNormalizer.normalize(sms.sender).orEmpty()
-            if (com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(sms.body)) {
-                otpOrAuth++
-                bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
-                continue
-            }
-            if (senderKey !in authorizedSenders) {
-                unregistered++
-                bumpSkip(sms.sender, ScanPreview.SkipReason.UNREGISTERED_SENDER, sms.body, sms.timestamp)
-                continue
-            }
-            val profile = senderProfileRepository?.findByRawSender(sms.sender)
-            val definitionPatterns = if (profile != null && messagePatternRepository != null) {
-                messagePatternRepository.getForSender(profile.id)
-            } else {
-                emptyList()
-            }
-            val hasDefinitionPatterns = definitionPatterns.any {
-                it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED ||
-                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.DEPRECATED ||
-                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.IGNORED
-            }
-
-            if (hasDefinitionPatterns) {
-                if (com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)) {
+            var countedInTemplateStage = false
+            try {
+                val senderKey = SenderNormalizer.normalize(sms.sender).orEmpty()
+                if (com.baraa.masroof.sms.BankSmsFilter.isOtpOrAuthenticationMessage(sms.body)) {
                     otpOrAuth++
                     bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
                     continue
                 }
-                val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
-                if (defMatch == null) {
-                    if (profile != null && messagePatternRepository != null) {
-                        val signature = com.baraa.masroof.sms.SmsStructureNormalizer.signatureFromBody(sms.body)
-                        messagePatternRepository.ensureUnknown(
-                            senderProfileId = profile.id,
-                            signature = signature,
-                            friendlyName = com.baraa.masroof.sms.SmsStructureNormalizer.friendlyNameHint(sms.body),
-                        )
-                    }
-                    bumpSkip(sms.sender, ScanPreview.SkipReason.UNKNOWN_PATTERN, sms.body, sms.timestamp)
+                if (senderKey !in authorizedSenders) {
+                    unregistered++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.UNREGISTERED_SENDER, sms.body, sms.timestamp)
                     continue
                 }
-                if (defMatch.pattern.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.IGNORED) {
-                    otpOrAuth++
-                    bumpSkip(sms.sender, ScanPreview.SkipReason.OTP_OR_AUTH, sms.body, sms.timestamp)
-                    continue
-                }
-            }
 
-            var parsed = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
-            if (hasDefinitionPatterns) {
-                val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
-                if (defMatch != null &&
-                    defMatch.pattern.definition.status != com.baraa.masroof.data.db.MessagePatternStatus.IGNORED
-                ) {
-                    val extracted = com.baraa.masroof.sms.PatternFieldExtractor.extract(sms.body, defMatch.pattern)
-                    parsed = com.baraa.masroof.sms.PatternFieldExtractor.toParsedTransaction(extracted, parsed)
+                val profile = runCatching { senderProfileRepository?.findByRawSender(sms.sender) }
+                    .getOrNull()
+                // Authorized via institution mapping alone is not enough for template
+                // discovery — require a SenderProfile so approved templates can load.
+                if (profile == null) {
+                    unregistered++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.UNREGISTERED_SENDER, sms.body, sms.timestamp)
+                    continue
                 }
-            }
-            if (parsed.amount == null) {
-                if (isLikelyFinancialSender(sms.sender) || hasDefinitionPatterns) {
-                    unparsed++
-                    bumpSkip(sms.sender, ScanPreview.SkipReason.NO_AMOUNT, sms.body, sms.timestamp)
+                val definitionPatterns = if (messagePatternRepository != null) {
+                    runCatching { messagePatternRepository.getForSender(profile.id) }
+                        .getOrElse { emptyList() }
                 } else {
+                    emptyList()
+                }
+                if (senderKey.isNotBlank() && senderKey !in senderTemplateDiag) {
+                    val approved = definitionPatterns.count {
+                        it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
+                            it.definition.isActive
+                    }
+                    senderTemplateDiag[senderKey] = profile?.id to approved
+                }
+
+                // IGNORED patterns are an explicit pre-template exclusion (not OTP).
+                if (profile != null &&
+                    com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)
+                ) {
+                    ignoredPattern++
                     nonFinancial++
                     bumpSkip(sms.sender, ScanPreview.SkipReason.NON_FINANCIAL, sms.body, sms.timestamp)
+                    continue
                 }
-                continue
+
+                // Every remaining registered message MUST produce Matched / Unmatched / Ambiguous.
+                templateInput++
+                countedInTemplateStage = true
+                val matchDiagnostics = com.baraa.masroof.sms.TemplateResolutionService.diagnose(
+                    body = sms.body,
+                    patterns = definitionPatterns,
+                    allowOncePatternIds = allowOncePatternIds,
+                )
+                val senderStats = senderCoverage.getOrPut(profile.id) {
+                    SenderCoverageAccum(
+                        normalizedSender = senderKey,
+                        senderProfileId = profile.id,
+                        approvedTemplatesLoaded = matchDiagnostics.attempts.count {
+                            it.eligible && it.approved
+                        },
+                    )
+                }
+                senderStats.messagesEnteringMatcher++
+                matchDiagnostics.attempts
+                    .filter { it.eligible && it.approved }
+                    .forEach { attempt ->
+                        val coverage = templateCoverage.getOrPut(attempt.templateId) {
+                            CoverageAccum(
+                                templateId = attempt.templateId,
+                                displayName = attempt.displayName,
+                                transactionType = attempt.transactionType,
+                                canonicalSignature = attempt.canonicalSignature,
+                                active = attempt.active,
+                                approved = attempt.approved,
+                                requiredPlaceholders = attempt.requiredPlaceholders,
+                                optionalPlaceholders = attempt.optionalPlaceholders,
+                                historicalMessageCount = attempt.historicalMessageCount,
+                            )
+                        }
+                        coverage.currentCandidateMessages++
+                        if (attempt.match?.matched == true) {
+                            coverage.successfulMatches++
+                        } else {
+                            val reason = attempt.match?.failureReason?.name ?: "NO_APPROVED_MATCH"
+                            coverage.failures[reason] = (coverage.failures[reason] ?: 0) + 1
+                        }
+                    }
+                val outcome = runCatching {
+                    com.baraa.masroof.sms.TemplateResolutionService.resolve(
+                        sender = sms.sender,
+                        body = sms.body,
+                        smsTimestampMillis = sms.timestamp.takeIf { it > 0L },
+                        patterns = definitionPatterns,
+                        allowOncePatternIds = allowOncePatternIds,
+                    )
+                }.getOrElse {
+                    android.util.Log.w("SmsImport", "template resolve failed for smsId=${sms.id}", it)
+                    com.baraa.masroof.sms.TemplateResolutionResult.Unmatched(
+                        com.baraa.masroof.sms.TemplateResolutionResult.Unmatched.Reason.LOOKUP_FAILED,
+                    )
+                }
+
+                when (outcome) {
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Unmatched -> {
+                        // A known sender's unseen structure is durable training
+                        // material. Upsert is exact-signature idempotent and does
+                        // not alter transactions, accounts, or journals.
+                        unmatchedTemplates++
+                        needsReview++
+                        senderStats.unmatched++
+                        val best = matchDiagnostics.attempts
+                            .filter { it.eligible && it.approved }
+                            .maxByOrNull { it.match?.score ?: -1 }
+                        val failure = when (outcome.reason) {
+                            com.baraa.masroof.sms.TemplateResolutionResult.Unmatched.Reason.NO_APPROVED_MATCH ->
+                                if (best == null) "NO_TEMPLATE_LOADED" else exportFailureReason(best.match)
+                            else -> outcome.reason.name
+                        }
+                        templateFailureCounts[failure] =
+                            (templateFailureCounts[failure] ?: 0) + 1
+                        val safeRepresentative =
+                            com.baraa.masroof.diagnostics.ApprovedTemplateDiagnosticSanitizer
+                                .sanitizeMessage(sms.body)
+                        val match = best?.match
+                        val matchedAnchors = match?.trace.orEmpty()
+                            .filter { it.matched }
+                            .map {
+                                TemplateAnchorDiagnostic(
+                                    expected = com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(it.templateLine),
+                                    actualStructuralLine = com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(it.bodyLine),
+                                )
+                            }
+                        val failedAnchors = match?.trace.orEmpty()
+                            .filterNot { it.matched }
+                            .takeLast(1)
+                            .map {
+                                TemplateAnchorDiagnostic(
+                                    expected = com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(it.templateLine),
+                                    actualStructuralLine = com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(it.bodyLine),
+                                )
+                            }
+                        val groupKey = listOf(
+                            profile.id,
+                            matchDiagnostics.smsStructuralSignature,
+                            best?.templateId ?: -1L,
+                            failure,
+                        ).joinToString("|")
+                        val group = unmatchedGroups[groupKey]
+                        if (group == null) {
+                            unmatchedGroups[groupKey] = UnmatchedGroupAccum(
+                                count = 1,
+                                normalizedSender = senderKey,
+                                senderProfileId = profile.id,
+                                closestTemplateId = best?.templateId,
+                                closestTemplateName = best?.displayName,
+                                closestTemplateTransactionType = best?.transactionType,
+                                failureReason = failure,
+                                normalizedStructuralRepresentation =
+                                    safeRepresentative.replace("\n", " | "),
+                                redactedRepresentativeMessage = safeRepresentative,
+                                matchedAnchors = matchedAnchors,
+                                failedAnchors = failedAnchors,
+                            )
+                        } else {
+                            group.count++
+                        }
+                        if (!loggedFirstMatcherFailure && com.baraa.masroof.BuildConfig.DEBUG) {
+                            loggedFirstMatcherFailure = true
+                            android.util.Log.i(
+                                "ApprovedTemplateMatcher",
+                                "first_failure smsId=${sms.id} normalizedSender=${com.baraa.masroof.diagnostics
+                                    .ApprovedTemplateDiagnosticSanitizer.sanitizeSender(senderKey)} " +
+                                    "profileId=${profile.id} " +
+                                    "templateId=${best?.templateId ?: -1L} " +
+                                    "canonicalKey=${com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeCanonicalStructure(best?.canonicalKey)} " +
+                                    "smsStructure=${safeRepresentative.replace("\n", " | ")} " +
+                                    "reason=$failure " +
+                                    "templateLine=${com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(best?.match?.failedTemplateLine)} " +
+                                    "smsLine=${com.baraa.masroof.diagnostics
+                                        .ApprovedTemplateDiagnosticSanitizer
+                                        .sanitizeTemplateLine(best?.match?.failedBodyLine)}",
+                            )
+                        }
+                        messagePatternRepository?.ensureUnknown(
+                            senderProfileId = profile.id,
+                            signature = matchDiagnostics.smsStructuralSignature,
+                            friendlyName = SmsStructureNormalizer.friendlyNameHint(sms.body),
+                            templateText = com.baraa.masroof.sms.MessageTemplateEngine
+                                .buildFromSms(sms.body).templateText,
+                            body = sms.body,
+                        )
+                        bumpSkip(sms.sender, ScanPreview.SkipReason.UNKNOWN_PATTERN, sms.body, sms.timestamp)
+                        items += reviewItem(sms, ImportDisposition.UNMATCHED_TEMPLATE)
+                    }
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Ambiguous -> {
+                        ambiguousTemplates++
+                        needsReview++
+                        senderStats.ambiguous++
+                        bumpSkip(sms.sender, ScanPreview.SkipReason.AMBIGUOUS_TEMPLATE, sms.body, sms.timestamp)
+                        items += reviewItem(sms, ImportDisposition.AMBIGUOUS_TEMPLATE)
+                    }
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Matched -> {
+                        templateMatched++
+                        if (
+                            outcome.pattern.definition.status ==
+                            com.baraa.masroof.data.db.MessagePatternStatus.APPROVED
+                        ) {
+                            senderStats.matched++
+                        } else {
+                            senderStats.unmatched++
+                        }
+                        val parsed = outcome.parsed
+                        val bundle = ensureEngine()
+                        if (parsed.amount == null || bundle == null) {
+                            extractionFailed++
+                            unparsed++
+                            needsReview++
+                            bumpSkip(
+                                sms.sender,
+                                ScanPreview.SkipReason.TEMPLATE_EXTRACTION_FAILED,
+                                sms.body,
+                                sms.timestamp,
+                            )
+                            items += reviewItem(sms, ImportDisposition.TEMPLATE_EXTRACTION_FAILED)
+                            continue
+                        }
+                        val entity = runCatching {
+                            buildEntity(sms, parsed, bundle.engine, bundle.context)
+                        }.getOrNull()
+                        if (entity == null) {
+                            extractionFailed++
+                            unparsed++
+                            needsReview++
+                            bumpSkip(
+                                sms.sender,
+                                ScanPreview.SkipReason.TEMPLATE_EXTRACTION_FAILED,
+                                sms.body,
+                                sms.timestamp,
+                            )
+                            items += reviewItem(sms, ImportDisposition.TEMPLATE_EXTRACTION_FAILED)
+                            continue
+                        }
+                        recognized++
+                        val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
+                        val similarExisting = entity.transactionSimilarityKey
+                            ?.let { transactionRepository.findBySimilarityKey(it) }
+                            .orEmpty()
+                        val isPossibleDup = !isDup && NearDuplicateDetector.isPossibleDuplicate(
+                            candidateTimestamp = entity.smsTimestamp,
+                            candidateSimilarityKey = entity.transactionSimilarityKey,
+                            existingByKey = similarExisting,
+                            batchTimestampsByKey = batchTimestampsByKey,
+                        )
+                        val match = accountMatcher.match(
+                            entity,
+                            bundle.ownedAccounts,
+                            accountIdentifierRepository,
+                            parsed.identifierEvidence,
+                        )
+                        val before = trackingStartDate != null &&
+                            entity.transactionDate != null &&
+                            entity.transactionDate.isBefore(trackingStartDate)
+                        val incompleteTwoSided = entity.financialTreatment.requiresTwoAccounts &&
+                            match.account != null &&
+                            !match.needsReview &&
+                            match.destinationAccountCandidate == null
+                        val confirmedMatch = match.account != null && !match.needsReview
+                        val lowConfidence = parsed.confidence < 30
+                        val disposition = ImportDispositionClassifier.classify(
+                            isExactDuplicate = isDup,
+                            isPossibleDuplicate = isPossibleDup,
+                            isBeforeTrackingStart = before && !isDup && !isPossibleDup,
+                            accountMatched = confirmedMatch && !lowConfidence,
+                            needsConfirmation = incompleteTwoSided || lowConfidence,
+                        )
+                        val isReviewNow = disposition == ImportDisposition.NEEDS_ACCOUNT ||
+                            disposition == ImportDisposition.NEEDS_CONFIRMATION ||
+                            disposition == ImportDisposition.NEEDS_INSTITUTION ||
+                            disposition == ImportDisposition.POSSIBLE_DUPLICATE
+                        when (disposition) {
+                            ImportDisposition.EXACT_DUPLICATE -> duplicates++
+                            ImportDisposition.POSSIBLE_DUPLICATE -> duplicates++
+                            ImportDisposition.BEFORE_TRACKING_START -> beforeTracking++
+                            ImportDisposition.NEEDS_ACCOUNT,
+                            ImportDisposition.NEEDS_CONFIRMATION,
+                            ImportDisposition.NEEDS_INSTITUTION -> needsReview++
+                            else -> Unit
+                        }
+                        entity.transactionSimilarityKey?.let { key ->
+                            batchTimestampsByKey.getOrPut(key) { mutableListOf() }.add(entity.smsTimestamp)
+                        }
+                        val institutionKey = institutionResolver.resolve(
+                            sender = sms.sender,
+                            parsedInstitution = parserInstitution(parsed),
+                            parserIdentity = parsed.parserName,
+                            knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
+                        ).institutionDisplayName
+                        val previewAccount = match.account?.takeIf { !match.needsReview }
+                        val item = ScanPreview.PreviewItem(
+                            sms.id, sms.sender, entity.amount, entity.transactionType, previewAccount?.id,
+                            previewAccount?.displayName, isDup || isPossibleDup, isReviewNow, before,
+                            entity.transactionDate, disposition, outcome.pattern.definition.id,
+                        )
+                        groups.getOrPut(institutionKey) { mutableListOf() }.add(item)
+                        items += item
+                    }
+                }
+            } catch (t: Throwable) {
+                android.util.Log.w("SmsImport", "scan row failed smsId=${sms.id}", t)
+                if (!countedInTemplateStage) {
+                    templateInput++
+                }
+                // If we already counted matched/unmatched/ambiguous, don't double-count outcomes.
+                val alreadyOutcome =
+                    countedInTemplateStage &&
+                        (templateMatched + unmatchedTemplates + ambiguousTemplates) >= templateInput
+                if (!alreadyOutcome) {
+                    unmatchedTemplates++
+                    needsReview++
+                    bumpSkip(sms.sender, ScanPreview.SkipReason.UNKNOWN_PATTERN, sms.body, sms.timestamp)
+                    items += reviewItem(sms, ImportDisposition.UNMATCHED_TEMPLATE)
+                }
             }
-            val entity = buildEntity(sms, parsed, engine, context)
-            if (entity == null) {
-                unparsed++
-                bumpSkip(sms.sender, ScanPreview.SkipReason.NO_AMOUNT, sms.body, sms.timestamp)
-                continue
-            }
-            recognized++
-            val isDup = transactionRepository.existsByFingerprint(entity.uniqueFingerprint)
-            val similarExisting = entity.transactionSimilarityKey
-                ?.let { transactionRepository.findBySimilarityKey(it) }
-                .orEmpty()
-            val isPossibleDup = !isDup && NearDuplicateDetector.isPossibleDuplicate(
-                candidateTimestamp = entity.smsTimestamp,
-                candidateSimilarityKey = entity.transactionSimilarityKey,
-                existingByKey = similarExisting,
-                batchTimestampsByKey = batchTimestampsByKey,
-            )
-            val match = accountMatcher.match(entity, ownedAccounts, accountIdentifierRepository, parsed.identifierEvidence)
-            val before = trackingStartDate != null && entity.transactionDate != null && entity.transactionDate.isBefore(trackingStartDate)
-            val incompleteTwoSided = entity.financialTreatment.requiresTwoAccounts &&
-                match.account != null &&
-                !match.needsReview &&
-                match.destinationAccountCandidate == null
-            // Confirmed last-four only: sender-only proposals are not "matched" for READY.
-            val confirmedMatch = match.account != null && !match.needsReview
-            val lowConfidence = parsed.confidence < 30
-            val disposition = ImportDispositionClassifier.classify(
-                isExactDuplicate = isDup,
-                isPossibleDuplicate = isPossibleDup,
-                isBeforeTrackingStart = before && !isDup && !isPossibleDup,
-                accountMatched = confirmedMatch && !lowConfidence,
-                needsConfirmation = incompleteTwoSided || lowConfidence,
-            )
-            val isReviewNow = disposition == ImportDisposition.NEEDS_ACCOUNT ||
-                disposition == ImportDisposition.NEEDS_CONFIRMATION ||
-                disposition == ImportDisposition.NEEDS_INSTITUTION ||
-                disposition == ImportDisposition.POSSIBLE_DUPLICATE
-            when (disposition) {
-                ImportDisposition.EXACT_DUPLICATE -> duplicates++
-                ImportDisposition.POSSIBLE_DUPLICATE -> duplicates++ // surface in duplicate bucket for UI counts
-                ImportDisposition.BEFORE_TRACKING_START -> beforeTracking++
-                ImportDisposition.NEEDS_ACCOUNT,
-                ImportDisposition.NEEDS_CONFIRMATION,
-                ImportDisposition.NEEDS_INSTITUTION -> needsReview++
-                else -> Unit
-            }
-            entity.transactionSimilarityKey?.let { key ->
-                batchTimestampsByKey.getOrPut(key) { mutableListOf() }.add(entity.smsTimestamp)
-            }
-            val institutionKey = institutionResolver.resolve(
-                sender = sms.sender, parsedInstitution = parserInstitution(parsed), parserIdentity = parsed.parserName,
-                knownInstitutionNames = com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS.toSet(),
-            ).institutionDisplayName
-            val previewAccount = match.account?.takeIf { !match.needsReview }
-            val item = ScanPreview.PreviewItem(
-                sms.id, sms.sender, entity.amount, entity.transactionType, previewAccount?.id,
-                previewAccount?.displayName, isDup || isPossibleDup, isReviewNow, before, entity.transactionDate, disposition,
-            )
-            groups.getOrPut(institutionKey) { mutableListOf() }.add(item)
-            items += item
         }
-        ScanPreview(
-            mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = scanned,
+
+        val funnel = ScanFilterFunnel(
+            rawSms = rawSms,
+            afterOtpFilter = rawSms - otpOrAuth,
+            afterSenderFilter = rawSms - otpOrAuth - unregistered,
+            templateInput = templateInput,
+            templateMatched = templateMatched,
+            unmatchedTemplate = unmatchedTemplates,
+            ambiguousTemplate = ambiguousTemplates,
+            extractionFailed = extractionFailed,
+            ignoredPattern = ignoredPattern,
+        ).let { f ->
+            // Heal any residual gap so messages never disappear from the template stage.
+            val gap = f.templateInput - f.templateOutcomeSum
+            if (gap > 0) {
+                android.util.Log.e("SmsImport", "healing template gap=$gap (invariant would fail)")
+                unmatchedTemplates += gap
+                needsReview += gap
+                f.copy(unmatchedTemplate = unmatchedTemplates)
+            } else {
+                f
+            }
+        }
+        if (!funnel.templateInvariantHolds) {
+            android.util.Log.e(
+                "SmsImport",
+                "Template invariant still broken after heal: ${funnel.toLogMap()}",
+            )
+        }
+        if (com.baraa.masroof.BuildConfig.DEBUG) {
+            android.util.Log.i(
+                "ApprovedTemplateMatcher",
+                "failure_summary=$templateFailureCounts coverage=${templateCoverage.values.map {
+                    "${it.templateId}:${it.transactionType}:${it.successfulMatches}/${it.currentCandidateMessages}"
+                }}",
+            )
+        }
+
+        val patternGateMessageCount = unmatchedTemplates + ambiguousTemplates + extractionFailed
+        val candidateEval = if (patternGateMessageCount > 0) {
+            evaluateCandidatePatternsForScan(messages, authorizedSenders, items)
+        } else {
+            CandidatePatternEvaluation(0, emptyList())
+        }
+
+        val preview = ScanPreview(
+            mode = mode, configuredSenderCount = authorizedSenders.size, scannedMessages = rawSms,
             recognizedTransactions = recognized, nonFinancialMessages = nonFinancial, unparsedMessages = unparsed,
             unregisteredSenderMessages = unregistered, otpOrAuthMessages = otpOrAuth,
             duplicateTransactions = duplicates, needsReviewTransactions = needsReview,
             beforeTrackingStartCount = beforeTracking,
+            unmatchedTemplateMessages = unmatchedTemplates,
+            ambiguousTemplateMessages = ambiguousTemplates,
+            extractionFailedMessages = extractionFailed,
+            candidatePatternCount = candidateEval.count,
+            candidateDiagnostics = candidateEval.diagnostics,
+            templateFailureCounts = templateFailureCounts.toMap(),
+            approvedTemplateCoverage = templateCoverage.values.map {
+                ApprovedTemplateCoverage(
+                    templateId = it.templateId,
+                    displayName = it.displayName,
+                    transactionType = it.transactionType,
+                    canonicalSignature = it.canonicalSignature,
+                    active = it.active,
+                    approved = it.approved,
+                    requiredPlaceholders = it.requiredPlaceholders,
+                    optionalPlaceholders = it.optionalPlaceholders,
+                    historicalMessageCount = it.historicalMessageCount,
+                    currentCandidateMessages = it.currentCandidateMessages,
+                    successfulMatches = it.successfulMatches,
+                    failureCounts = it.failures.toMap(),
+                )
+            }.sortedBy { it.templateId },
+            senderTemplateCoverage = senderCoverage.values.map {
+                SenderTemplateCoverage(
+                    normalizedSender = it.normalizedSender,
+                    senderProfileId = it.senderProfileId,
+                    approvedTemplatesLoaded = it.approvedTemplatesLoaded,
+                    messagesEnteringMatcher = it.messagesEnteringMatcher,
+                    matched = it.matched,
+                    unmatched = it.unmatched,
+                    ambiguous = it.ambiguous,
+                )
+            }.sortedBy { it.senderProfileId },
+            unmatchedTemplateGroups = unmatchedGroups.values.map {
+                UnmatchedTemplateGroupDiagnostic(
+                    count = it.count,
+                    normalizedSender = it.normalizedSender,
+                    senderProfileId = it.senderProfileId,
+                    closestTemplateId = it.closestTemplateId,
+                    closestTemplateName = it.closestTemplateName,
+                    closestTemplateTransactionType = it.closestTemplateTransactionType,
+                    failureReason = it.failureReason,
+                    normalizedStructuralRepresentation = it.normalizedStructuralRepresentation,
+                    redactedRepresentativeMessage = it.redactedRepresentativeMessage,
+                    matchedAnchors = it.matchedAnchors,
+                    failedAnchors = it.failedAnchors,
+                )
+            }.sortedByDescending { it.count },
             institutionGroups = groups.map { (institution, its) ->
                 ScanPreview.InstitutionGroup(
                     institution, its.size,
@@ -532,14 +1179,134 @@ class SmsImportOrchestrator(
                     its.count {
                         it.disposition == ImportDisposition.NEEDS_ACCOUNT ||
                             it.disposition == ImportDisposition.NEEDS_CONFIRMATION ||
-                            it.disposition == ImportDisposition.NEEDS_INSTITUTION
+                            it.disposition == ImportDisposition.NEEDS_INSTITUTION ||
+                            it.disposition == ImportDisposition.UNMATCHED_TEMPLATE ||
+                            it.disposition == ImportDisposition.AMBIGUOUS_TEMPLATE ||
+                            it.disposition == ImportDisposition.TEMPLATE_EXTRACTION_FAILED
                     },
                     0,
                 )
             },
             perTransaction = items,
             skippedSenders = ScanPreview.aggregateSkipped(skipBuckets),
+            filterFunnel = funnel,
+            scanError = engineSetupError?.let { "تعذر تجهيز محرك الاستخراج: $it — الرسائل بلا قالب ما زالت ظاهرة للمراجعة" },
         )
+        preview
+    }
+
+    private data class CandidatePatternEvaluation(
+        val count: Int,
+        val diagnostics: List<CandidatePatternDiagnostic>,
+    )
+
+    /**
+     * Distinct candidate patterns covering pattern-gate SMS in this scan.
+     *
+     * CRITICAL: pass existing saved patterns (including APPROVED) into discovery.
+     * Clusters that match an APPROVED template must NOT be counted as pending.
+     * Unregistered senders never appear in gate messages.
+     */
+    private suspend fun evaluateCandidatePatternsForScan(
+        messages: List<SmsMessage>,
+        authorizedSenders: Set<String>,
+        items: List<ScanPreview.PreviewItem>,
+    ): CandidatePatternEvaluation {
+        val gateSmsIds = items.filter {
+            ScanPreview.isPatternApprovalDisposition(it.disposition)
+        }.map { it.smsId }.toSet()
+        if (gateSmsIds.isEmpty()) return CandidatePatternEvaluation(0, emptyList())
+
+        val gateMessages = messages.filter { it.id in gateSmsIds }
+        val repo = messagePatternRepository
+        val diagnostics = mutableListOf<CandidatePatternDiagnostic>()
+        val pendingKeys = linkedSetOf<String>()
+
+        gateMessages
+            .groupBy { SenderNormalizer.normalize(it.sender).orEmpty() }
+            .filterKeys { it.isNotBlank() && it in authorizedSenders }
+            .forEach { (senderKey, smsForSender) ->
+                val profile = senderProfileRepository?.findByRawSender(smsForSender.first().sender)
+                    ?: return@forEach
+                val existing = repo?.getForSender(profile.id)?.map { it.definition }.orEmpty()
+                val approvedByKey = existing
+                    .filter {
+                        it.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
+                            it.deprecatedAt == null &&
+                            it.isActive
+                    }
+                    .associateBy { it.canonicalKey }
+
+                val discovered = PatternDiscoveryService.discover(smsForSender, existing)
+                    .filter { !it.looksLikeOtpOrMarketing && !it.looksLikeNonFinancial }
+
+                for (cluster in discovered) {
+                    val key = cluster.canonicalKey.ifBlank { cluster.signature }
+                    val sampleBody = smsForSender.firstOrNull()?.body
+                    val approvedHit = when {
+                        key.isNotBlank() -> approvedByKey[key]
+                        else -> null
+                    } ?: existing.firstOrNull { approved ->
+                        approved.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED &&
+                            approved.deprecatedAt == null &&
+                            approved.isActive &&
+                            !approved.templateText.isNullOrBlank() &&
+                            (
+                                (!cluster.templateText.isNullOrBlank() &&
+                                    com.baraa.masroof.sms.TemplateMatcher.matches(
+                                        approved.templateText,
+                                        cluster.templateText,
+                                    )) ||
+                                    (!sampleBody.isNullOrBlank() &&
+                                        com.baraa.masroof.sms.TemplateMatcher.matches(
+                                            approved.templateText,
+                                            sampleBody,
+                                        ))
+                                )
+                    }
+                    if (approvedHit != null ||
+                        cluster.matchedPatternStatus ==
+                        com.baraa.masroof.data.db.MessagePatternStatus.APPROVED
+                    ) {
+                        android.util.Log.i(
+                            "SmsImport",
+                            "candidate_suppressed_by_approved key=$key approvedId=${approvedHit?.id ?: cluster.matchedPatternId}",
+                        )
+                        continue
+                    }
+                    if (cluster.matchedPatternStatus ==
+                        com.baraa.masroof.data.db.MessagePatternStatus.IGNORED
+                    ) {
+                        continue
+                    }
+                    val identity = "${profile.id}|$key"
+                    if (!pendingKeys.add(identity)) continue
+                    diagnostics += CandidatePatternDiagnostic(
+                        senderRaw = smsForSender.firstOrNull()?.sender,
+                        senderNormalized = senderKey,
+                        senderProfileId = profile.id,
+                        senderRegistered = true,
+                        candidatePatternId = cluster.matchedPatternId?.takeIf {
+                            cluster.matchedPatternStatus ==
+                                com.baraa.masroof.data.db.MessagePatternStatus.UNKNOWN
+                        },
+                        canonicalKey = key,
+                        transactionType = cluster.transactionTypeName,
+                        messageCount = cluster.messageCount,
+                        approvedEquivalentId = null,
+                        reason = when {
+                            cluster.matchedPatternId != null &&
+                                cluster.matchedPatternStatus ==
+                                com.baraa.masroof.data.db.MessagePatternStatus.UNKNOWN ->
+                                "existing_unknown_candidate"
+                            else -> "no_approved_template_for_structure"
+                        },
+                    )
+                }
+            }
+
+
+        return CandidatePatternEvaluation(diagnostics.size, diagnostics)
     }
 
     private suspend fun registeredSenderKeys(): Set<String> {
@@ -563,6 +1330,8 @@ class SmsImportOrchestrator(
         scanPreview: ScanPreview,
         trackingStartDate: LocalDate?,
         importedSms: List<SmsMessage>,
+        mode: SmsImportCommitMode = SmsImportCommitMode.ALL,
+        allowOncePatternIds: Set<Long> = emptySet(),
     ): SmsImportResult = withContext(Dispatchers.IO) {
         if (scanPreview.scannedMessages == 0) return@withContext SmsImportResult.Empty
 
@@ -587,6 +1356,16 @@ class SmsImportOrchestrator(
         val registeredSenders = registeredSenderKeys()
         val authorizedSenders = registeredSenders
 
+        fun acceptDisposition(disposition: ImportDisposition): Boolean = when (mode) {
+            SmsImportCommitMode.ALL -> true
+            SmsImportCommitMode.READY_ONLY -> disposition == ImportDisposition.READY
+            SmsImportCommitMode.REVIEW_CANDIDATES ->
+                ScanPreview.isReviewDisposition(disposition) ||
+                    disposition == ImportDisposition.BEFORE_TRACKING_START
+            SmsImportCommitMode.MESSAGE_REVIEW_ONLY ->
+                ScanPreview.isMessageReviewDisposition(disposition)
+        }
+
         database.withTransaction {
             for (sms in importedSms) {
                 if (scanPreview.mode == SmsImportMode.REGISTERED_ACCOUNTS_ONLY &&
@@ -596,12 +1375,32 @@ class SmsImportOrchestrator(
                 }
                 val previewItem = previewBySms[sms.id]
                 if (previewItem == null) continue
+                if (!acceptDisposition(previewItem.disposition)) continue
+                if (previewItem.disposition == ImportDisposition.UNMATCHED_TEMPLATE) {
+                    val profile = senderProfileRepository?.findByRawSender(sms.sender)
+                    if (profile != null && messagePatternRepository != null) {
+                        val built = com.baraa.masroof.sms.MessageTemplateEngine.buildFromSms(sms.body)
+                        messagePatternRepository.ensureUnknown(
+                            senderProfileId = profile.id,
+                            signature = built.signature,
+                            friendlyName = built.displayName,
+                            templateText = built.templateText,
+                            body = sms.body,
+                        )
+                    }
+                    continue
+                }
                 when (previewItem.disposition) {
                     ImportDisposition.EXACT_DUPLICATE -> {
                         duplicates++
                         continue
                     }
-                    ImportDisposition.UNREGISTERED_SENDER, ImportDisposition.IGNORED, ImportDisposition.UNPARSED -> continue
+                    ImportDisposition.UNREGISTERED_SENDER,
+                    ImportDisposition.IGNORED,
+                    ImportDisposition.UNPARSED,
+                    ImportDisposition.AMBIGUOUS_TEMPLATE,
+                    ImportDisposition.TEMPLATE_EXTRACTION_FAILED,
+                    -> continue
                     else -> Unit
                 }
                 val profile = senderProfileRepository?.findByRawSender(sms.sender)
@@ -610,21 +1409,29 @@ class SmsImportOrchestrator(
                 } else {
                     emptyList()
                 }
-                val hasDefinitionPatterns = definitionPatterns.any {
-                    it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.APPROVED ||
-                        it.definition.status == com.baraa.masroof.data.db.MessagePatternStatus.DEPRECATED
-                }
-                if (hasDefinitionPatterns) {
-                    val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
-                    if (defMatch == null) continue
-                }
-                var parsed: ParsedTransaction = BankParserRegistry.parse(sms.sender, sms.body, sms.timestamp.takeIf { it > 0L })
-                if (hasDefinitionPatterns) {
-                    val defMatch = com.baraa.masroof.sms.MessagePatternMatcher.match(sms.body, definitionPatterns)
-                    if (defMatch != null) {
-                        val extracted = com.baraa.masroof.sms.PatternFieldExtractor.extract(sms.body, defMatch.pattern)
-                        parsed = com.baraa.masroof.sms.PatternFieldExtractor.toParsedTransaction(extracted, parsed)
+                if (profile == null) continue
+                if (com.baraa.masroof.sms.MessagePatternMatcher.isIgnored(sms.body, definitionPatterns)) continue
+                val outcome = com.baraa.masroof.sms.TemplateResolutionService.resolve(
+                    sender = sms.sender,
+                    body = sms.body,
+                    smsTimestampMillis = sms.timestamp.takeIf { it > 0L },
+                    patterns = definitionPatterns,
+                    allowOncePatternIds = allowOncePatternIds,
+                )
+                val parsed = when (outcome) {
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Matched -> {
+                        // A template edited between preview and commit must not
+                        // silently change the imported transaction.
+                        if (outcome.pattern.definition.id != previewItem.patternRevisionId) {
+                            reviewCount++
+                            continue
+                        }
+                        outcome.parsed
                     }
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Unmatched -> {
+                        continue
+                    }
+                    is com.baraa.masroof.sms.TemplateResolutionResult.Ambiguous -> continue
                 }
                 if (parsed.amount == null) continue
                 val entity = buildEntity(sms, parsed, engine, context) ?: continue
@@ -683,7 +1490,7 @@ class SmsImportOrchestrator(
                 }
                 // Credit-limit notices / declined IGNORED rows: store as VOIDED, never journal.
                 if (entity.financialTreatment == FinancialTreatment.IGNORED ||
-                    entity.transactionType == TransactionType.CREDIT_LIMIT_CHANGE
+                    entity.transactionType == TransactionType.NON_FINANCIAL
                 ) {
                     val voided = entity.copy(
                         financialTreatment = FinancialTreatment.IGNORED,
@@ -709,9 +1516,9 @@ class SmsImportOrchestrator(
                         }
                         val limit = entity.amount
                         if (card != null && limit != null &&
-                            (entity.transactionType == TransactionType.CREDIT_LIMIT_CHANGE ||
+                            (entity.transactionType == TransactionType.NON_FINANCIAL ||
                                 entity.exclusionReason?.contains("حد") == true ||
-                                parsed.transactionType == TransactionType.CREDIT_LIMIT_CHANGE)
+                                parsed.transactionType == TransactionType.NON_FINANCIAL)
                         ) {
                             runCatching {
                                 com.baraa.masroof.ledger.CreditLimitUpdater.applyToAccount(

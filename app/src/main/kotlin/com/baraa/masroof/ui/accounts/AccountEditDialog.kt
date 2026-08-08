@@ -66,6 +66,16 @@ fun AccountEditDialog(
 ) {
     var displayName by remember(existing) { mutableStateOf(existing?.displayName.orEmpty()) }
     var institutionName by remember(existing) { mutableStateOf(existing?.institutionName.orEmpty()) }
+    val knownBanks = remember {
+        com.baraa.masroof.ledger.FinancialInstitutionResolver.WELL_KNOWN_INSTITUTIONS
+    }
+    var institutionCustom by remember(existing) {
+        mutableStateOf(
+            !existing?.institutionName.isNullOrBlank() &&
+                existing?.institutionName !in knownBanks,
+        )
+    }
+    var institutionExpanded by remember { mutableStateOf(false) }
     var accountType by remember(existing) { mutableStateOf(existing?.accountType ?: AccountType.BANK_ACCOUNT) }
     var accountNature by remember(existing) {
         mutableStateOf(existing?.accountNature ?: AccountNature.defaultNatureFor(accountType))
@@ -118,13 +128,61 @@ fun AccountEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = institutionName,
-                    onValueChange = { institutionName = it },
-                    label = { Text("المؤسسة المالية (اختياري)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                ExposedDropdownMenuBox(
+                    expanded = institutionExpanded,
+                    onExpandedChange = { institutionExpanded = !institutionExpanded },
+                ) {
+                    OutlinedTextField(
+                        value = when {
+                            institutionCustom -> "أخرى"
+                            institutionName.isBlank() -> ""
+                            else -> institutionName
+                        },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("البنك / المؤسسة") },
+                        placeholder = { Text("اختر البنك") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(institutionExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    ExposedDropdownMenu(institutionExpanded, { institutionExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("— بدون تحديد —") },
+                            onClick = {
+                                institutionName = ""
+                                institutionCustom = false
+                                institutionExpanded = false
+                            },
+                        )
+                        knownBanks.forEach { bank ->
+                            DropdownMenuItem(
+                                text = { Text(bank) },
+                                onClick = {
+                                    institutionName = bank
+                                    institutionCustom = false
+                                    institutionExpanded = false
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("أخرى…") },
+                            onClick = {
+                                if (!institutionCustom) institutionName = ""
+                                institutionCustom = true
+                                institutionExpanded = false
+                            },
+                        )
+                    }
+                }
+                if (institutionCustom) {
+                    OutlinedTextField(
+                        value = institutionName,
+                        onValueChange = { institutionName = it },
+                        label = { Text("اسم المؤسسة (أخرى)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 ExposedDropdownMenuBox(
                     expanded = typeExpanded,
                     onExpandedChange = { typeExpanded = !typeExpanded },
@@ -248,7 +306,7 @@ fun AccountEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (onDelete != null) {
-                    TextButton(onClick = { showDeleteConfirm = true }) { Text("حذف الحساب") }
+                    TextButton(onClick = { showDeleteConfirm = true }) { Text("إيقاف الحساب") }
                 }
             }
         },
@@ -280,9 +338,9 @@ fun AccountEditDialog(
     if (showDeleteConfirm && onDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("حذف الحساب؟") },
-            text = { Text("لن يمكن استعادة الحساب بعد حذفه.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; onDelete() }) { Text("حذف") } },
+            title = { Text("إيقاف الحساب؟") },
+            text = { Text("سيُحفظ الحساب وتاريخه وقيوده، لكنه لن يُستخدم في المطابقة أو الاستيراد الجديد.") },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; onDelete() }) { Text("إيقاف") } },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("إلغاء") } },
         )
     }

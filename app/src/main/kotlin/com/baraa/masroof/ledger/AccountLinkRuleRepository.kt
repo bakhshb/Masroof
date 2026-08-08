@@ -35,10 +35,7 @@ class AccountLinkRuleRepository(
         transaction: TransactionEntity,
         direction: String = DIRECTION_SOURCE,
     ): AccountLinkRuleEntity? {
-        val primary = dao.bySignature(signature(transaction, direction))?.takeIf { it.active }
-        if (primary != null) return primary
-        // Legacy signatures (pre last-4 / direction) still apply when unique.
-        return dao.bySignature(legacySignature(transaction))?.takeIf { it.active }
+        return dao.bySignature(signature(transaction, direction))?.takeIf { it.active }
     }
 
     suspend fun remember(transaction: TransactionEntity, account: FinancialAccount, direction: String) {
@@ -104,14 +101,6 @@ class AccountLinkRuleRepository(
                 lastFourKey(t.accountOrCardLastFourDigits),
                 t.financialTreatment.name,
                 direction,
-            ).joinToString("|")
-
-        /** Pre–last-4 signatures used by older installs. */
-        fun legacySignature(t: TransactionEntity): String =
-            listOf(
-                senderKey(t.originalSender),
-                t.transactionType.name,
-                t.financialTreatment.name,
             ).joinToString("|")
 
         private fun senderKey(sender: String?): String =

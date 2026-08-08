@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.baraa.masroof.data.db.MasroofDatabase
 import com.baraa.masroof.rules.RuleEngineFactory
-import com.baraa.masroof.transaction.BankParserRegistry
 import kotlinx.coroutines.flow.first
 
 /**
@@ -73,7 +72,7 @@ class DiagnosticCollector(
             aiProviderName = if (aiCfg.enabled) aiCfg.providerLabel else null,
             aiModelName = if (aiCfg.enabled) aiCfg.modelName else null,
             lastAiOutcome = lastOutcome,
-            parserNames = BankParserRegistry.parsers.map { it.javaClass.simpleName },
+            parserNames = listOf("TemplateResolutionService"),
             ruleNames = RuleEngineFactory.documentedPriorities.map { it.name },
             recentErrors = errorLog.snapshot(),
             buildTimestamp = buildTimestamp,

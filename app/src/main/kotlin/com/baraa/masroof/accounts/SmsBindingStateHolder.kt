@@ -5,6 +5,7 @@ import com.baraa.masroof.data.repository.AccountIdentifierRepository
 import com.baraa.masroof.data.repository.IdentifierAddOutcome
 import com.baraa.masroof.data.repository.IdentifierAddResult
 import com.baraa.masroof.data.repository.IdentifierForm
+import com.baraa.masroof.data.repository.MessagePatternRepository
 import com.baraa.masroof.data.repository.SenderProfileRepository
 import com.baraa.masroof.sms.BankSmsFilter
 import com.baraa.masroof.sms.ExpectedSalaryDateService
@@ -25,6 +26,7 @@ class SmsBindingStateHolder(
     private val smsRepository: SmsRepository,
     private val identifierRepository: AccountIdentifierRepository,
     private val senderProfileRepository: SenderProfileRepository,
+    private val messagePatternRepository: MessagePatternRepository? = null,
     private val afterBindRelink: (suspend () -> Unit)? = null,
     private val todayProvider: () -> LocalDate = { LocalDate.now() },
 ) {
@@ -71,11 +73,26 @@ class SmsBindingStateHolder(
             )
         }
         val range = resolveRange(mode, from, today)
-        val loaded = runCatching {
-            smsRepository.loadInbox(range, BINDING_INBOX_LIMIT)
-        }.getOrDefault(emptyList())
-            .sortedByDescending { BankSmsFilter.classifyMessage(it.sender, it.body).isMatch }
-        _state.update { it.copy(loading = false, messages = loaded) }
+        when (val result = smsRepository.loadInboxResult(range, BINDING_INBOX_LIMIT)) {
+            is com.baraa.masroof.sms.SmsInboxLoadResult.Success -> {
+                val loaded = result.messages.sortedByDescending {
+                    BankSmsFilter.classifyMessage(it.sender, it.body).isMatch
+                }
+                _state.update { it.copy(loading = false, messages = loaded, error = null) }
+            }
+            is com.baraa.masroof.sms.SmsInboxLoadResult.PermissionDenied ->
+                _state.update {
+                    it.copy(loading = false, messages = emptyList(), error = result.messageAr)
+                }
+            is com.baraa.masroof.sms.SmsInboxLoadResult.Failed ->
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        messages = emptyList(),
+                        error = "تعذر قراءة الرسائل: ${result.errorMessage}",
+                    )
+                }
+        }
     }
 
     fun setCustomFrom(date: LocalDate) {
@@ -92,8 +109,20 @@ class SmsBindingStateHolder(
 
     fun setSenderQuery(value: String) = _state.update { it.copy(senderQuery = value) }
     fun setShowAll(value: Boolean) = _state.update { it.copy(showAllMessages = value) }
-    fun choose(message: SmsMessage, accountType: AccountType) {
-        _state.update { it.copy(selected = message, analysis = AccountSmsAnalyzer.analyze(message, accountType), error = null) }
+    suspend fun choose(message: SmsMessage, accountType: AccountType) {
+        val profile = senderProfileRepository.findByRawSender(message.sender)
+        val patterns = if (profile != null && messagePatternRepository != null) {
+            messagePatternRepository.getForSender(profile.id)
+        } else {
+            emptyList()
+        }
+        _state.update {
+            it.copy(
+                selected = message,
+                analysis = AccountSmsAnalyzer.analyze(message, accountType, patterns),
+                error = null,
+            )
+        }
     }
     fun chooseAnother() = _state.update { it.copy(selected = null, analysis = null, error = null) }
 

@@ -80,6 +80,7 @@ fun HomeScreen(
     onImportMessages: () -> Unit = {},
     onShowAllTransactions: () -> Unit = {},
     onOpenReview: () -> Unit = {},
+    onBankMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MasroofApplication
@@ -88,6 +89,24 @@ fun HomeScreen(
     val identifiers by app.accountIdentifierRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
     val transactions by app.transactionRepository.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
     val setup by app.financialSetupRepository.observe().collectAsStateWithLifecycle(initialValue = null)
+    val unknownPatterns by app.messagePatternRepository.observeUnknown().collectAsStateWithLifecycle(initialValue = emptyList())
+
+    val patternCtaPrefs = remember {
+        context.getSharedPreferences("masroof_home_cta_prefs", android.content.Context.MODE_PRIVATE)
+    }
+    var patternsCtaDismissed by remember {
+        mutableStateOf(patternCtaPrefs.getBoolean("patterns_setup_cta_dismissed", false))
+    }
+    var hasApprovedPatterns by remember { mutableStateOf(true) }
+    LaunchedEffect(accounts) {
+        hasApprovedPatterns = withContext(Dispatchers.IO) {
+            app.messagePatternRepository.senderProfileIdsWithApprovedPatterns().isNotEmpty()
+        }
+    }
+    val ownedAccounts = remember(accounts) {
+        accounts.filter { it.isOwnedByUser && it.isActive && it.systemAccountKey == null }
+    }
+    val showPatternsSetupCta = ownedAccounts.isNotEmpty() && !hasApprovedPatterns && !patternsCtaDismissed
 
     var month by remember { mutableStateOf(YearMonth.now()) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
@@ -173,6 +192,35 @@ fun HomeScreen(
     }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+        if (showPatternsSetupCta) {
+            item {
+                AttentionBanner(
+                    title = "أنشئ نمطاً قبل الاستيراد",
+                    description = "لا يمكن استيراد رسائل البنوك قبل حفظ نمط معتمد من «رسائل البنوك».",
+                    actionLabel = "رسائل البنوك",
+                    onAction = onBankMessages,
+                )
+            }
+            item {
+                SecondaryButton(
+                    label = "إخفاء",
+                    onClick = {
+                        patternsCtaDismissed = true
+                        patternCtaPrefs.edit().putBoolean("patterns_setup_cta_dismissed", true).apply()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        } else if (unknownPatterns.isNotEmpty()) {
+            item {
+                AttentionBanner(
+                    title = "تم العثور على نوع رسالة جديد",
+                    description = "راجع الأنماط غير المعروفة في «رسائل البنوك» قبل الاستيراد التالي.",
+                    actionLabel = "مراجعة",
+                    onAction = onBankMessages,
+                )
+            }
+        }
         item {
             MonthSelector(
                 current = month,
@@ -461,9 +509,9 @@ private fun ImportGuidanceCard(
                 style = FinancialTypography.metadata,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
-            Text("1. اربط الحساب برسالة من البنك (مرسل + آخر 4 أرقام).", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text("2. استورد الرسائل من تاريخ الرصيد الافتتاحي حتى اليوم.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text("3. أكمل قائمة المراجعة إن ظهرت عمليات غير مربوطة.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("1. أنشئ أنماطاً معتمدة من «رسائل البنوك».", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("2. أضف معرف الحساب (آخر 4 أرقام) يدوياً.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text("3. استورد الرسائل المطابقة للأنماط فقط.", style = FinancialTypography.metadata, color = MaterialTheme.colorScheme.onSecondaryContainer)
             PrimaryButton(label = "استيراد الرسائل", onClick = onImport, modifier = Modifier.fillMaxWidth())
             if (hasReviewItems) {
                 SecondaryButton(label = "فتح قائمة المراجعة", onClick = onReview, modifier = Modifier.fillMaxWidth())

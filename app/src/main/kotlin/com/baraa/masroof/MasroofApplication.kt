@@ -276,6 +276,10 @@ class MasroofApplication : Application() {
         com.baraa.masroof.data.repository.MessagePatternRepository(
             definitionDao = database.messagePatternDefinitionDao(),
             fieldDao = database.patternFieldDefinitionDao(),
+            database = database,
+            senderProfileDao = database.senderProfileDao(),
+            familyDao = database.messagePatternFamilyDao(),
+            anchorDao = database.patternVariantAnchorDao(),
         )
     }
 
@@ -324,10 +328,6 @@ class MasroofApplication : Application() {
         )
     }
 
-    val importResetService: com.baraa.masroof.ledger.ImportResetService by lazy {
-        com.baraa.masroof.ledger.ImportResetService(database)
-    }
-
     /**
      * Atomic, single-Room-transaction SMS importer. Replaces the previous
      * two-stage `importService.preview/commit` flow that left transactions
@@ -338,6 +338,14 @@ class MasroofApplication : Application() {
      */
     val transactionSmsBodyRepository: com.baraa.masroof.data.repository.TransactionSmsBodyRepository by lazy {
         com.baraa.masroof.data.repository.TransactionSmsBodyRepository(database.transactionSmsBodyDao())
+    }
+
+    /**
+     * Survives Scan → Review → Import navigation. Screen-local remember
+     * state previously caused Review to see zero while Scan still held candidates.
+     */
+    val importSessionStore: com.baraa.masroof.data.repository.ImportSessionStore by lazy {
+        com.baraa.masroof.data.repository.ImportSessionStore()
     }
 
     val importOrchestrator: com.baraa.masroof.data.repository.SmsImportOrchestrator by lazy {
@@ -365,7 +373,6 @@ class MasroofApplication : Application() {
         appScope.launch {
             runCatching { categoryRepository.seedIfEmpty() }
             runCatching { systemAccountSeeder.seed() }
-            runCatching { accountIdentifierRepository.ensureLegacyIdentifierBackfill() }
             // Pre-load the AI config so the first batch call doesn't
             // need to block on a DB read.
             runCatching { rebuildAiIfNeeded() }

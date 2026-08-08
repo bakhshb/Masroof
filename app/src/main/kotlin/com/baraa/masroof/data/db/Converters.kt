@@ -64,7 +64,16 @@ class Converters {
     fun fromTransactionType(value: TransactionType): String = value.name
 
     @TypeConverter
-    fun toTransactionType(value: String): TransactionType = TransactionType.valueOf(value)
+    fun toTransactionType(value: String): TransactionType =
+        runCatching { TransactionType.valueOf(value) }.getOrElse {
+            // Defensive fallback for a future value from a newer app version.
+            when (value) {
+                "FEE" -> TransactionType.FEE
+                "OTHER_FINANCIAL" -> TransactionType.OTHER_FINANCIAL
+                "NON_FINANCIAL" -> TransactionType.NON_FINANCIAL
+                else -> TransactionType.OTHER_FINANCIAL
+            }
+        }
 
     @TypeConverter
     fun fromTransactionStatus(value: TransactionStatus): String = value.name

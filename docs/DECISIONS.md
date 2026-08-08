@@ -26,9 +26,10 @@ Statuses: APPROVED, IGNORED, UNKNOWN, DEPRECATED. Import posts only from APPROVE
 Production import/training uses `MessagePatternDefinition` via «رسائل البنوك».
 Room **v22** migrates remaining IGNORE/amount-label data from
 `sender_message_patterns`, then drops that table. Historical migrations
-17→21 still create it for upgrades. `SmsImportMode.TEACH_FROM_EXAMPLES` and
-the flat learner/matcher code are removed. Thin bank parser classes stay as
-sender-routing shells over `GenericBankSmsParser` — not as competing allowlists.
+17→21 still create it for upgrades. `SmsImportMode.TEACH_FROM_EXAMPLES`, the
+flat learner/matcher code, and bank-specific parser shells are removed.
+Production import resolves only active canonical templates through
+`TemplateResolutionService`.
 
 ## AD-002 — Nested NavHosts
 

@@ -178,6 +178,19 @@ class AutomaticAccountLinkingEngineTest {
     }
 
     @Test
+    fun senderWithExactlyOneCompatibleAccountIsSafeFallback() = runBlocking {
+        val bank = account(1, AccountType.BANK_ACCOUNT)
+        val repo = repoWith(
+            Triple(bank, AccountIdentifierType.ACCOUNT_LAST4, "1111"),
+            senderLinks = listOf(1L to "bank"),
+        )
+        val m = AccountMatcher.match(tx(null, FinancialTreatment.EXPENSE), listOf(bank), repo)
+        assertEquals(bank.id, m.account?.id)
+        assertEquals("single_compatible_sender_account", m.diagnosticCode)
+        assertEquals(AccountLinkConfidence.CONFIRMED, m.level)
+    }
+
+    @Test
     fun senderAloneWithMultipleAccountsRequiresReview() = runBlocking {
         val bank = account(1, AccountType.BANK_ACCOUNT)
         val card = account(2, AccountType.CREDIT_CARD)
@@ -283,10 +296,9 @@ class AutomaticAccountLinkingEngineTest {
             repo,
             evidence,
         )
-        assertEquals(a2.id, m.account?.id)
-        assertEquals(false, m.needsReview)
-        assertEquals("last_four_cross_type_match", m.diagnosticCode)
-        assertEquals(AccountLinkConfidence.CONFIRMED, m.level)
+        assertNull(m.account)
+        assertTrue(m.needsReview)
+        assertEquals("typed_identifier_not_found", m.diagnosticCode)
     }
 
     @Test

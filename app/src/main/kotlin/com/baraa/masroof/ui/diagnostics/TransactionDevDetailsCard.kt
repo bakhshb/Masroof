@@ -115,6 +115,6 @@ private val ELIGIBLE_TYPES = setOf(
     TransactionType.PURCHASE,
     TransactionType.ONLINE_PURCHASE,
     TransactionType.CASH_WITHDRAWAL,
-    TransactionType.BANK_FEE,
-    TransactionType.UNKNOWN,
+    TransactionType.FEE,
+    TransactionType.OTHER_FINANCIAL,
 )

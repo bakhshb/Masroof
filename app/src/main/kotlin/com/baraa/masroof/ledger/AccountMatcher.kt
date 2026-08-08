@@ -12,13 +12,10 @@ import com.baraa.masroof.transaction.ParsedIdentifierEvidence
  *
  * Priority:
  *  1. Exact typed identifier evidence (SOURCE-role preferred when roles are present)
- *  2. Same last-four across last4 identifier types (label type mismatch soft-match)
- *  3. Untyped TX last-four across last4 identifier types
- *  4. Unambiguous SenderProfile↔account link (needs review; never auto-confirmed)
+ *  2. Untyped historical last-four only when no typed evidence exists
  *
- * Institution name alone never selects an account. Matching uses typed
- * [AccountIdentifierEntity] rows and SenderProfile cross-refs. Same-sender
- * multi-account setups require a unique last-four — sender never breaks ties.
+ * SenderProfile links narrow exact evidence but never override a type conflict.
+ * Institution name alone never selects an account.
  */
 object AccountMatcher {
     data class Match(
@@ -81,30 +78,9 @@ object AccountMatcher {
                 primaryExact.size > 1 -> return unmatched("ambiguous_typed_identifier")
             }
 
-            val primaryCross = resolveByLastFours(
-                primaryEvidence.map { it.lastFour }.distinct(),
-                eligibleIds,
-                identifierRepository,
-                transaction,
-            )
-            when {
-                primaryCross.size == 1 -> return matched(
-                    account = primaryCross.single(),
-                    source = AccountLinkSource.LAST_FOUR_MATCH,
-                    confidence = 100,
-                    review = false,
-                    level = AccountLinkConfidence.CONFIRMED,
-                    code = "last_four_cross_type_match",
-                    destination = resolveDestination(
-                        destinationEvidence,
-                        primaryCross.single().id,
-                        eligibleIds,
-                        identifierRepository,
-                        transaction,
-                    ),
-                )
-                primaryCross.size > 1 -> return unmatched("ambiguous_typed_identifier")
-            }
+            // Typed evidence that does not resolve exactly is a review case.
+            // Never reinterpret CREDIT_CARD_LAST4 as ACCOUNT_LAST4 (or vice versa).
+            return unmatched("typed_identifier_not_found")
         }
 
         val fallbackLastFour = transaction.accountOrCardLastFourDigits
@@ -141,17 +117,17 @@ object AccountMatcher {
                     )
             }
             .distinctBy { it.id }
+        if (senderMatches.size > 1) return unmatched("ambiguous_sender")
         if (senderMatches.size == 1) {
             return matched(
-                senderMatches.single(),
-                AccountLinkSource.OWNED_ACCOUNT_RULE,
-                75,
-                true,
-                AccountLinkConfidence.MEDIUM,
-                "sender_only_compatible",
+                account = senderMatches.single(),
+                source = AccountLinkSource.SENDER_PROFILE,
+                confidence = 80,
+                review = false,
+                level = AccountLinkConfidence.CONFIRMED,
+                code = "single_compatible_sender_account",
             )
         }
-        if (senderMatches.size > 1) return unmatched("ambiguous_sender")
 
         return unmatched("missing_account_identifier")
     }
@@ -168,12 +144,7 @@ object AccountMatcher {
             .singleOrNull()
             ?.takeIf { it.id != primaryAccountId }
         if (exact != null) return exact
-        return resolveByLastFours(
-            destinationEvidence.map { it.lastFour }.distinct(),
-            eligibleIds,
-            identifierRepository,
-            transaction,
-        ).singleOrNull()?.takeIf { it.id != primaryAccountId }
+        return null
     }
 
     private suspend fun resolveTyped(

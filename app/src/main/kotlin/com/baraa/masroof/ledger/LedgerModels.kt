@@ -35,7 +35,7 @@ enum class JournalType {
 enum class JournalPostingStatus { DRAFT, NEEDS_REVIEW, POSTED, REVERSED, VOIDED }
 enum class PostingSide { DEBIT, CREDIT }
 enum class JournalGeneratedBy { IMPORT_RULE, USER, MIGRATION, SYSTEM }
-enum class AccountLinkSource { LAST_FOUR_MATCH, INSTITUTION_MATCH, OWNED_ACCOUNT_RULE, USER, UNLINKED }
+enum class AccountLinkSource { LAST_FOUR_MATCH, SENDER_PROFILE, INSTITUTION_MATCH, OWNED_ACCOUNT_RULE, USER, UNLINKED }
 enum class AccountLinkConfidence { CONFIRMED, HIGH, MEDIUM, LOW, UNMATCHED }
 enum class TransactionPostingStatus { UNPOSTED, NEEDS_REVIEW, POSTED, REVERSED, VOIDED }
 

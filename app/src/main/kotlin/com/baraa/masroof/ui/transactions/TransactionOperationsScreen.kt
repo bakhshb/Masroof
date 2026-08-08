@@ -20,8 +20,10 @@ import com.baraa.masroof.ledger.TransactionPostingStatus
 import com.baraa.masroof.ui.sms.SmsPermissionRequiredBanner
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /**
@@ -91,12 +93,20 @@ fun TransactionOperationsScreen(
                         onCorrect = {
                             scope.launch {
                                 correctionError = null
-                                runCatching {
+                                val result = withContext(Dispatchers.IO) {
                                     app.transactionCorrectionService.reopenForCorrection(tx)
-                                }.onSuccess { reopened ->
-                                    correcting = reopened
-                                }.onFailure {
-                                    correctionError = "تعذّر فتح التصحيح — العملية ليست مُرحّلة"
+                                }
+                                when (result) {
+                                    is com.baraa.masroof.ledger.CorrectionResult.Success -> {
+                                        correcting = result.transaction
+                                    }
+                                    is com.baraa.masroof.ledger.CorrectionResult.ValidationError -> {
+                                        correctionError = result.messageAr
+                                    }
+                                    is com.baraa.masroof.ledger.CorrectionResult.Failure -> {
+                                        android.util.Log.e("TxOps", "correction reopen failed", result.cause)
+                                        correctionError = result.messageAr
+                                    }
                                 }
                             }
                         },
@@ -107,25 +117,52 @@ fun TransactionOperationsScreen(
     }
     if (showFilters) FilterSheet(state = state, accounts = accounts, categories = categories, onDismiss = { showFilters = false }, onApply = { showFilters = false })
     correcting?.let { tx ->
+        var linkSaveState by remember(tx.id) { mutableStateOf<ReviewLinkSaveState>(ReviewLinkSaveState.Idle) }
         AccountChooserDialog(
             tx = tx,
             accounts = accounts,
-            onDismiss = { correcting = null },
-        ) { sourceId, destinationId, rememberLink, saveIdentifier, preferredAccount, treatment ->
+            saveState = linkSaveState,
+            onDismiss = {
+                if (linkSaveState !is ReviewLinkSaveState.Saving) {
+                    correcting = null
+                    correctionError = null
+                }
+            },
+        ) { sourceId, destinationId, rememberLink, saveIdentifier, preferredAccount, treatment, selectedType ->
+            if (linkSaveState is ReviewLinkSaveState.Saving) return@AccountChooserDialog
+            linkSaveState = ReviewLinkSaveState.Saving
             scope.launch {
                 val candidate = preferredAccount?.let {
                     if (saveIdentifier) com.baraa.masroof.ledger.DiscoveredIdentifierProposer.propose(tx, it) else null
                 }
-                app.transactionLinkingService.applyUserLink(
-                    transaction = tx,
-                    sourceAccountId = sourceId,
-                    destinationAccountId = destinationId,
-                    accounts = accounts,
-                    rememberForFuture = rememberLink,
-                    identifierToAdd = candidate,
-                    financialTreatment = treatment,
-                )
-                correcting = null
+                val result = withContext(Dispatchers.IO) {
+                    app.transactionLinkingService.applyUserLink(
+                        transaction = tx,
+                        sourceAccountId = sourceId,
+                        destinationAccountId = destinationId,
+                        accounts = accounts,
+                        rememberForFuture = rememberLink,
+                        identifierToAdd = candidate,
+                        financialTreatment = treatment,
+                        transactionType = selectedType,
+                    )
+                }
+                when (result) {
+                    is com.baraa.masroof.ledger.LinkApplyResult.Success -> {
+                        correcting = null
+                        correctionError = result.identifierOutcome?.message
+                        linkSaveState = ReviewLinkSaveState.Idle
+                    }
+                    is com.baraa.masroof.ledger.LinkApplyResult.ValidationError -> {
+                        linkSaveState = ReviewLinkSaveState.ValidationError(result.messageAr)
+                        correctionError = result.messageAr
+                    }
+                    is com.baraa.masroof.ledger.LinkApplyResult.Failure -> {
+                        android.util.Log.e("TxOps", "link save failed", result.cause)
+                        linkSaveState = ReviewLinkSaveState.Failure(result.messageAr)
+                        correctionError = result.messageAr
+                    }
+                }
             }
         }
     }

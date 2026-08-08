@@ -15,10 +15,21 @@ object DiscoveredIdentifierProposer {
         selectedAccount: FinancialAccount,
         evidence: List<ParsedIdentifierEvidence> = emptyList(),
     ): IdentifierCandidate? {
-        val typed = evidence.firstOrNull {
-            it.lastFour.length == 4 &&
-                AccountIdentifierCompatibility.isCompatibleTyped(selectedAccount.accountType, it.type)
-        }
+        // Prefer SOURCE-role evidence so destination IBAN last4 is never offered
+        // as the account's primary identifier when linking the debiting account.
+        val typed = evidence
+            .filter {
+                it.lastFour.length == 4 &&
+                    AccountIdentifierCompatibility.isCompatibleTyped(selectedAccount.accountType, it.type)
+            }
+            .sortedBy { ev ->
+                when (ev.role) {
+                    com.baraa.masroof.transaction.IdentifierRole.SOURCE -> 0
+                    com.baraa.masroof.transaction.IdentifierRole.UNSPECIFIED -> 1
+                    com.baraa.masroof.transaction.IdentifierRole.DESTINATION -> 2
+                }
+            }
+            .firstOrNull()
         if (typed != null) {
             return IdentifierCandidate(
                 identifierType = typed.type,

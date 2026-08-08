@@ -10,6 +10,7 @@ import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionStatus
 import com.baraa.masroof.transaction.TransactionType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -71,25 +72,35 @@ class ReviewClassificationTest {
     @Test
     fun suggestedChoiceHighlightsOutgoingExternalTransfer() {
         val choice = ReviewClassification.suggestedChoice(tx(TransactionType.TRANSFER_OUT))
-        assertEquals("transfer_out_external", choice.id)
+        assertEquals(TransactionType.TRANSFER_OUT, choice.type)
         assertEquals(FinancialTreatment.EXPENSE, choice.treatment)
-        assertTrue(choice.label.contains("صادرة"))
+        assertTrue(choice.label.contains("صادر"))
     }
 
     @Test
     fun suggestedChoiceHighlightsIncomingExternalTransfer() {
         val choice = ReviewClassification.suggestedChoice(tx(TransactionType.TRANSFER_IN))
-        assertEquals("transfer_in_external", choice.id)
+        assertEquals(TransactionType.TRANSFER_IN, choice.type)
         assertEquals(FinancialTreatment.INCOME, choice.treatment)
-        assertTrue(choice.label.contains("واردة"))
+        assertTrue(choice.label.contains("وارد"))
     }
 
     @Test
     fun choosableChoicesIncludeOutgoingAndInternalTransfers() {
-        val labels = ReviewClassification.choosableChoices.map { it.label }
-        assertTrue(labels.any { it.contains("حوالة صادرة خارجية") })
-        assertTrue(labels.any { it.contains("حوالة واردة خارجية") })
-        assertTrue(labels.any { it.contains("داخلي") })
+        val types = ReviewClassification.choosableChoices.map { it.type }.toSet()
+        assertTrue(TransactionType.TRANSFER_OUT in types)
+        assertTrue(TransactionType.TRANSFER_IN in types)
+        assertTrue(TransactionType.INTERNAL_TRANSFER in types)
+        assertTrue(TransactionType.PURCHASE in types)
+        assertTrue(TransactionType.SALARY in types)
+    }
+
+    @Test
+    fun templateAndReviewShareSameTaxonomy() {
+        assertEquals(
+            com.baraa.masroof.transaction.TransactionTypeTaxonomy.reviewChoices.map { it.type },
+            ReviewClassification.choosableChoices.map { it.type },
+        )
     }
 
     @Test
@@ -112,9 +123,11 @@ class ReviewClassificationTest {
 
     @Test
     fun arabicLabelsArePresent() {
-        assertTrue(ReviewClassification.friendlyType(tx(TransactionType.TRANSFER_IN)).contains("واردة"))
+        assertTrue(ReviewClassification.friendlyType(tx(TransactionType.TRANSFER_IN)).contains("وارد"))
         assertTrue(ReviewClassification.treatmentLabel(FinancialTreatment.INTERNAL_TRANSFER).contains("داخلي"))
-        assertTrue(ReviewClassification.treatmentLabel(FinancialTreatment.EXPENSE).contains("صادرة"))
+        // EXPENSE label must not conflate purchases with outgoing transfers.
+        assertEquals("مصروف", ReviewClassification.treatmentLabel(FinancialTreatment.EXPENSE))
+        assertFalse(ReviewClassification.treatmentLabel(FinancialTreatment.EXPENSE).contains("حوالة"))
     }
 
     @Test

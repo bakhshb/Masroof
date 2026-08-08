@@ -39,8 +39,17 @@ object SettingsDestinations {
     val linkTransactions = SettingsDestination("settings/link_transactions", "ربط العمليات بالحسابات", SettingsGroup.AccountsAndLinking)
     val financialHistory = SettingsDestination("settings/financial_history", "السجل المالي", SettingsGroup.AccountsAndLinking)
     val accountLinkRules = SettingsDestination("settings/account_link_rules", "قواعد الربط المحفوظة", SettingsGroup.AccountsAndLinking)
-    val senderMappings = SettingsDestination("settings/sender_mappings", "مرسلو الرسائل والمؤسسات", SettingsGroup.AccountsAndLinking)
+    // Kept for deep-link / diagnostics; removed from More menu and Settings landing.
+    val senderMappings = SettingsDestination("settings/sender_mappings", "مرسلو الرسائل والمؤسسات", SettingsGroup.Diagnostics)
     val bankMessages = SettingsDestination("settings/bank_messages", "رسائل البنوك", SettingsGroup.AccountsAndLinking)
+    const val bankMessagesSenderRoute = "settings/bank_messages/sender/{senderProfileId}"
+    const val bankMessagesTemplateRoute = "settings/bank_messages/template/{patternId}"
+
+    fun bankMessagesSender(senderProfileId: Long): String =
+        "settings/bank_messages/sender/$senderProfileId"
+
+    fun bankMessagesTemplate(patternId: Long): String =
+        "settings/bank_messages/template/$patternId"
 
     // Diagnostics group
     val diagnostics = SettingsDestination("settings/diagnostics", "تشخيص التطبيق", SettingsGroup.Diagnostics)
@@ -69,9 +78,9 @@ object SettingsDestinations {
             // Categories
             categoryManagement, merchantMemory, aiCategorization, aiSuggestions, aiBatch,
             // Accounts and linking
-            accounts, linkTransactions, financialHistory, accountLinkRules, senderMappings, bankMessages,
-            // Diagnostics
-            diagnostics, testData, releaseNotes,
+            accounts, linkTransactions, financialHistory, accountLinkRules, bankMessages,
+            // Diagnostics (senderMappings kept for advanced deep-link only)
+            diagnostics, testData, releaseNotes, senderMappings,
             // Messages
             autoSmsImport, transactionNotifications,
         )

@@ -48,17 +48,17 @@ fun IdentifiersSection(
         repo.observeByAccount(accountId).collectLatest { items = it }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("معرفات الحساب", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = { showAdd = true }) { Text("إدخال المعرفات يدويًا") }
-        }
+        Text("معرفات الحساب", style = MaterialTheme.typography.titleSmall)
         Text(
             "أدخل آخر 4 أرقام للحساب / البطاقة / الآيبان يدوياً. مرسل الرسائل يُختار من القسم أعلاه.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("استخراج آخر 4 أرقام من رسالة")
+        Button(
+            onClick = { showAdd = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("إدخال آخر 4 أرقام يدوياً")
         }
         if (items.isEmpty()) Text("لا توجد معرفات بعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
         items.forEach { identifier ->
@@ -68,6 +68,23 @@ fun IdentifiersSection(
                 onEdit = { editing = identifier },
                 onDelete = { scope.launch { repo.delete(identifier) } },
             )
+        }
+        var showSmsExtract by remember { mutableStateOf(false) }
+        TextButton(
+            onClick = { showSmsExtract = !showSmsExtract },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (showSmsExtract) "إخفاء الاستخراج من رسالة" else "خيار متقدم: استخراج من رسالة")
+        }
+        if (showSmsExtract) {
+            Text(
+                "اختياري — يمكنك اختيار رسالة بنك لاستخراج آخر 4 أرقام تلقائياً.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { showSmsBinding = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("استخراج آخر 4 أرقام من رسالة")
+            }
         }
         if (showSmsBinding) {
             AccountSmsBindingDialog(

@@ -326,12 +326,12 @@ object OnDeviceLinkAssist {
     }
 
     private fun treatmentFromParsedType(type: String?): FinancialTreatment = when (type?.uppercase()) {
-        "SALARY", "DEPOSIT", "TRANSFER_IN" -> FinancialTreatment.INCOME
+        "SALARY", "TRANSFER_IN" -> FinancialTreatment.INCOME
         "REFUND" -> FinancialTreatment.REFUND
         "INTERNAL_TRANSFER" -> FinancialTreatment.INTERNAL_TRANSFER
         "CARD_PAYMENT" -> FinancialTreatment.CREDIT_CARD_PAYMENT
         "CASH_WITHDRAWAL" -> FinancialTreatment.CASH_WITHDRAWAL
-        "BANK_FEE" -> FinancialTreatment.BANK_FEE
+        "FEE" -> FinancialTreatment.BANK_FEE
         else -> FinancialTreatment.EXPENSE
     }
 

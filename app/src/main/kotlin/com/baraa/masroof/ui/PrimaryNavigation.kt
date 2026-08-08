@@ -18,10 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.baraa.masroof.ui.accounts.AccountLinkRulesScreen
 import com.baraa.masroof.ui.ai.AiSettingsScreen
 import com.baraa.masroof.ui.ai.AiSuggestionsScreen
@@ -33,6 +35,8 @@ import com.baraa.masroof.ui.history.FinancialHistoryScreen
 import com.baraa.masroof.ui.merchants.MerchantMemoryScreen
 import com.baraa.masroof.ui.senders.SenderMappingsScreen
 import com.baraa.masroof.ui.senders.ImportMessagesScreen
+import com.baraa.masroof.ui.senders.SenderDetailsScreen
+import com.baraa.masroof.ui.senders.TemplateEditorScreen
 import com.baraa.masroof.ui.settings.AutoSmsImportSettingsScreen
 import com.baraa.masroof.ui.settings.NotificationsSettingsScreen
 import com.baraa.masroof.ui.transactions.TransactionOperationsScreen
@@ -111,6 +115,9 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onImportMessages = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
                     onShowAllTransactions = { navController.navigate("primary/TRANSACTIONS") },
                     onOpenReview = { navController.navigate(ReviewQueueRoute) { launchSingleTop = true } },
+                    onBankMessages = {
+                        navController.navigate(SettingsDestinations.bankMessages.route) { launchSingleTop = true }
+                    },
                 )
             }
             composable("primary/TRANSACTIONS") {
@@ -142,6 +149,10 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                         }
                     },
                     onHome = { navigateToPrimaryTab(navController, PrimaryTab.HOME) },
+                    onImport = { navController.navigate(ImportMessagesRoute) { launchSingleTop = true } },
+                    onBankMessages = {
+                        navController.navigate(SettingsDestinations.bankMessages.route) { launchSingleTop = true }
+                    },
                 )
             }
             composable("primary/ACCOUNTS") {
@@ -167,7 +178,6 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                     onCategories = { navController.navigate(SettingsDestinations.categoryManagement.route) },
                     onAccounts = { navController.navigate(SettingsDestinations.accounts.route) },
                     onBankMessages = { navController.navigate(SettingsDestinations.bankMessages.route) },
-                    onSenderMappings = { navController.navigate(SettingsDestinations.senderMappings.route) },
                     onLinkRules = { navController.navigate(SettingsDestinations.accountLinkRules.route) },
                     onFinancialHistory = { navController.navigate(SettingsDestinations.financialHistory.route) },
                     onPrivacyAndAi = { navController.navigate(SettingsDestinations.aiCategorization.route) },
@@ -212,7 +222,48 @@ fun PrimaryNavigation(initialTab: PrimaryTab = PrimaryTab.HOME) {
                 SenderMappingsScreen(onClose = { navController.popBackStack() })
             }
             composable(SettingsDestinations.bankMessages.route) {
-                com.baraa.masroof.ui.senders.BankMessagesScreen(onBack = { navController.popBackStack() })
+                com.baraa.masroof.ui.senders.BankMessagesScreen(
+                    onBack = { navController.popBackStack() },
+                    onSenderClick = {
+                        navController.navigate(SettingsDestinations.bankMessagesSender(it))
+                    },
+                    onReturnToImport = {
+                        if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {
+                            navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
+                        }
+                    },
+                )
+            }
+            composable(
+                SettingsDestinations.bankMessagesSenderRoute,
+                arguments = listOf(navArgument("senderProfileId") { type = NavType.LongType }),
+            ) { entry ->
+                SenderDetailsScreen(
+                    senderProfileId = entry.arguments?.getLong("senderProfileId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                    onTemplateClick = {
+                        navController.navigate(SettingsDestinations.bankMessagesTemplate(it))
+                    },
+                    onReturnToImport = {
+                        if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {
+                            navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
+                        }
+                    },
+                )
+            }
+            composable(
+                SettingsDestinations.bankMessagesTemplateRoute,
+                arguments = listOf(navArgument("patternId") { type = NavType.LongType }),
+            ) { entry ->
+                TemplateEditorScreen(
+                    patternId = entry.arguments?.getLong("patternId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                    onReturnToImport = {
+                        if (!navController.popBackStack(ImportMessagesRoute, inclusive = false)) {
+                            navController.navigate(ImportMessagesRoute) { launchSingleTop = true }
+                        }
+                    },
+                )
             }
             composable(SettingsDestinations.diagnostics.route) {
                 DiagnosticsScreen(onClose = { navController.popBackStack() })

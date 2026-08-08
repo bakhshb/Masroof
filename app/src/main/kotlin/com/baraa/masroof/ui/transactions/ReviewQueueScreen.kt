@@ -21,6 +21,7 @@ import com.baraa.masroof.ledger.LinkPatternSuggestion
 import com.baraa.masroof.ledger.TransactionPostingStatus
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.FinancialTreatment
+import com.baraa.masroof.ui.TransactionTypeVisuals
 import com.baraa.masroof.ui.theme.PrimaryButton
 import com.baraa.masroof.ui.theme.SecondaryButton
 import kotlinx.coroutines.Dispatchers
@@ -29,15 +30,24 @@ import kotlinx.coroutines.withContext
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Active, Room-backed review queue. Unresolved items stay persisted here until confirmed. */
+/** Active review queue: Room-backed rows + optional in-memory import session. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
+fun ReviewQueueScreen(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onImport: () -> Unit = onBack,
+    onBankMessages: () -> Unit = onBack,
+) {
     val app = LocalContext.current.applicationContext as MasroofApplication
     val scope = rememberCoroutineScope()
     val transactions by app.transactionRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val accounts by app.financialAccountRepository.observeAll().collectAsStateWithLifecycle(emptyList())
+    val importSession by app.importSessionStore.session.collectAsStateWithLifecycle(null)
     var chosen by remember { mutableStateOf<TransactionEntity?>(null) }
+    var linkSaveState by remember { mutableStateOf<ReviewLinkSaveState>(ReviewLinkSaveState.Idle) }
+    var materializing by remember { mutableStateOf(false) }
+    var materializeError by remember { mutableStateOf<String?>(null) }
     val actionable = remember(transactions) {
         transactions.filter {
             it.postingStatus != TransactionPostingStatus.VOIDED &&
@@ -45,6 +55,17 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
                 (it.postingStatus == TransactionPostingStatus.NEEDS_REVIEW || it.accountLinkNeedsReview || it.needsReview)
         }
     }
+    val sessionMessageReview = remember(importSession) {
+        importSession?.preview?.perTransaction.orEmpty().filter {
+            com.baraa.masroof.data.repository.ScanPreview.isMessageReviewDisposition(it.disposition)
+        }
+    }
+    val sessionPatternGates = remember(importSession) {
+        importSession?.preview?.perTransaction.orEmpty().filter {
+            com.baraa.masroof.data.repository.ScanPreview.isPatternApprovalDisposition(it.disposition)
+        }
+    }
+    val sessionReady = importSession?.readyToImport ?: 0
     var patternSuggestions by remember { mutableStateOf<Map<Long, LinkPatternSuggestion>>(emptyMap()) }
     var smsBodies by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
 
@@ -66,6 +87,40 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
         }
     }
 
+    fun materializeSessionMessageReview() {
+        val session = importSession ?: return
+        if (sessionMessageReview.isEmpty() || materializing) return
+        materializing = true
+        materializeError = null
+        scope.launch {
+            val outcome = runCatching {
+                withContext(Dispatchers.IO) {
+                    app.importOrchestrator.commit(
+                        scanPreview = session.preview,
+                        trackingStartDate = session.trackingStartDate,
+                        importedSms = session.messages,
+                        mode = com.baraa.masroof.data.repository.SmsImportCommitMode.MESSAGE_REVIEW_ONLY,
+                    )
+                }
+            }
+            materializing = false
+            outcome.onFailure {
+                materializeError = it.message ?: "تعذر تجهيز قائمة المراجعة"
+                android.util.Log.e("ReviewQueue", "materialize failed", it)
+            }
+            outcome.onSuccess { result ->
+                // Refresh session counters from a re-scan without clearing navigation state.
+                val refreshed = withContext(Dispatchers.IO) {
+                    app.importOrchestrator.scan(session.messages, session.trackingStartDate, session.mode)
+                }
+                app.importSessionStore.replace(session.withPreview(refreshed))
+                if (result.importedTransactions == 0 && result.needsReviewTransactions == 0) {
+                    materializeError = "لم تُحفظ أي رسالة للمراجعة — تحقق من الربط والأنماط."
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -79,14 +134,70 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
                 Modifier.fillMaxSize().padding(padding).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("اكتملت مراجعة العمليات", style = MaterialTheme.typography.titleLarge)
-                Text("لا توجد عمليات قابلة للمراجعة حالياً.")
-                Text(
-                    "بعد اعتماد النوع والحساب تُرحَّل القيود ويتغيّر صافي الثروة.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                PrimaryButton(label = "العودة إلى العمليات", onClick = onBack)
-                SecondaryButton(label = "الرئيسية", onClick = onHome)
+                when {
+                    sessionMessageReview.isNotEmpty() -> {
+                        Text("رسائل بانتظار المراجعة", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "${sessionMessageReview.size} رسالة من الفحص الحالي تحتاج ربط حساب أو تصنيفاً.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        sessionMessageReview.take(8).forEach { item ->
+                            Text(
+                                "• ${com.baraa.masroof.data.repository.ImportMessageLabels.dispositionAr(item.disposition)}" +
+                                    (item.amount?.let { " — $it" } ?: ""),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        if (sessionMessageReview.size > 8) {
+                            Text("… و${sessionMessageReview.size - 8} أخرى")
+                        }
+                        materializeError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error)
+                        }
+                        PrimaryButton(
+                            label = if (materializing) "جارٍ التجهيز…" else "حفظ في قائمة المراجعة",
+                            enabled = !materializing,
+                            onClick = { materializeSessionMessageReview() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "الفتح وحده لا يغيّر الحالة — الحفظ ينقل الرسائل إلى قائمة المراجعة.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    sessionPatternGates.isNotEmpty() -> {
+                        Text("أنماط تحتاج اعتماد", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "${sessionPatternGates.size} رسالة غير جاهزة للمراجعة كعمليات — اعتمد الأنماط أولاً من «رسائل البنوك».",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        PrimaryButton(
+                            label = "فتح رسائل البنوك",
+                            onClick = onBankMessages,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    sessionReady > 0 -> {
+                        Text("اكتملت المراجعة", style = MaterialTheme.typography.titleLarge)
+                        Text("$sessionReady عملية جاهزة للاستيراد")
+                        PrimaryButton(
+                            label = "استيراد $sessionReady عملية",
+                            onClick = onImport,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    else -> {
+                        Text("اكتملت مراجعة العمليات", style = MaterialTheme.typography.titleLarge)
+                        Text("لا توجد عمليات قابلة للمراجعة حالياً.")
+                        Text(
+                            "بعد اعتماد النوع والحساب تُرحَّل القيود ويتغيّر صافي الثروة.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                SecondaryButton(label = "العودة", onClick = onBack, modifier = Modifier.fillMaxWidth())
+                SecondaryButton(label = "الرئيسية", onClick = onHome, modifier = Modifier.fillMaxWidth())
             }
         } else {
             LazyColumn(
@@ -156,7 +267,10 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
                             ReviewSmsBodyBlock(body = smsBodies[tx.id])
                             PrimaryButton(
                                 label = "تصنيف وربط الحساب",
-                                onClick = { chosen = tx },
+                                onClick = {
+                                    linkSaveState = ReviewLinkSaveState.Idle
+                                    chosen = tx
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -173,7 +287,19 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
                                     label = "تجاهل",
                                     onClick = {
                                         scope.launch {
-                                            app.transactionLinkingService.ignoreTransaction(tx)
+                                            when (
+                                                val result = withContext(Dispatchers.IO) {
+                                                    app.transactionLinkingService.ignoreTransaction(tx)
+                                                }
+                                            ) {
+                                                is com.baraa.masroof.ledger.LinkApplyResult.Success -> Unit
+                                                is com.baraa.masroof.ledger.LinkApplyResult.ValidationError -> {
+                                                    linkSaveState = ReviewLinkSaveState.ValidationError(result.messageAr)
+                                                }
+                                                is com.baraa.masroof.ledger.LinkApplyResult.Failure -> {
+                                                    linkSaveState = ReviewLinkSaveState.Failure(result.messageAr)
+                                                }
+                                            }
                                         }
                                     },
                                     modifier = Modifier.weight(1f),
@@ -191,25 +317,60 @@ fun ReviewQueueScreen(onBack: () -> Unit, onHome: () -> Unit) {
             accounts = accounts,
             smsBody = smsBodies[tx.id],
             patternSuggestion = patternSuggestions[tx.id],
-            onDismiss = { chosen = null },
-        ) { sourceId, destinationId, rememberLink, saveIdentifier, preferredAccount, treatment ->
+            saveState = linkSaveState,
+            onDismiss = {
+                if (linkSaveState !is ReviewLinkSaveState.Saving) {
+                    chosen = null
+                    linkSaveState = ReviewLinkSaveState.Idle
+                }
+            },
+        ) { sourceId, destinationId, rememberLink, saveIdentifier, preferredAccount, treatment, selectedType ->
+            if (linkSaveState is ReviewLinkSaveState.Saving) return@AccountChooserDialog
+            linkSaveState = ReviewLinkSaveState.Saving
             scope.launch {
                 val candidate = preferredAccount?.let {
                     if (saveIdentifier) DiscoveredIdentifierProposer.propose(tx, it) else null
                 }
-                app.transactionLinkingService.applyUserLink(
-                    transaction = tx,
-                    sourceAccountId = sourceId,
-                    destinationAccountId = destinationId,
-                    accounts = accounts,
-                    rememberForFuture = rememberLink,
-                    identifierToAdd = candidate,
-                    financialTreatment = treatment,
-                )
-                chosen = null
+                val result = withContext(Dispatchers.IO) {
+                    app.transactionLinkingService.applyUserLink(
+                        transaction = tx,
+                        sourceAccountId = sourceId,
+                        destinationAccountId = destinationId,
+                        accounts = accounts,
+                        rememberForFuture = rememberLink,
+                        identifierToAdd = candidate,
+                        financialTreatment = treatment,
+                        transactionType = selectedType,
+                    )
+                }
+                when (result) {
+                    is com.baraa.masroof.ledger.LinkApplyResult.Success -> {
+                        linkSaveState = ReviewLinkSaveState.Success(
+                            conflictWarning = result.identifierOutcome?.message,
+                        )
+                        chosen = null
+                        linkSaveState = ReviewLinkSaveState.Idle
+                    }
+                    is com.baraa.masroof.ledger.LinkApplyResult.ValidationError -> {
+                        linkSaveState = ReviewLinkSaveState.ValidationError(result.messageAr)
+                    }
+                    is com.baraa.masroof.ledger.LinkApplyResult.Failure -> {
+                        android.util.Log.e("ReviewQueue", "link save failed", result.cause)
+                        linkSaveState = ReviewLinkSaveState.Failure(result.messageAr)
+                    }
+                }
             }
         }
     }
+}
+
+/** Explicit persistence state for the review classify/link dialog. */
+sealed class ReviewLinkSaveState {
+    data object Idle : ReviewLinkSaveState()
+    data object Saving : ReviewLinkSaveState()
+    data class Success(val conflictWarning: String? = null) : ReviewLinkSaveState()
+    data class ValidationError(val messageAr: String) : ReviewLinkSaveState()
+    data class Failure(val messageAr: String) : ReviewLinkSaveState()
 }
 
 @Composable
@@ -219,7 +380,8 @@ internal fun AccountChooserDialog(
     onDismiss: () -> Unit,
     patternSuggestion: LinkPatternSuggestion? = null,
     smsBody: String? = null,
-    onConfirm: (Long?, Long?, Boolean, Boolean, FinancialAccount?, FinancialTreatment) -> Unit,
+    saveState: ReviewLinkSaveState = ReviewLinkSaveState.Idle,
+    onConfirm: (Long?, Long?, Boolean, Boolean, FinancialAccount?, FinancialTreatment, com.baraa.masroof.transaction.TransactionType) -> Unit,
 ) {
     val owned = remember(accounts) {
         accounts.filter { it.isActive && it.isOwnedByUser && it.systemAccountKey == null }
@@ -279,14 +441,17 @@ internal fun AccountChooserDialog(
 
     val preferredForIdentifier: FinancialAccount? = if (twoSided) source ?: destination else single
     val proposed: IdentifierCandidate? = preferredForIdentifier?.let { DiscoveredIdentifierProposer.propose(tx, it) }
-    val canConfirm = treatment != FinancialTreatment.PENDING_REVIEW && if (twoSided) {
-        source != null && destination != null && source?.id != destination?.id
-    } else {
-        single != null
-    }
+    val saving = saveState is ReviewLinkSaveState.Saving
+    val canConfirm = !saving &&
+        treatment != FinancialTreatment.PENDING_REVIEW &&
+        if (twoSided) {
+            source != null && destination != null && source?.id != destination?.id
+        } else {
+            single != null
+        }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!saving) onDismiss() },
         title = { Text("تصنيف وربط العملية") },
         text = {
             Column(
@@ -312,10 +477,29 @@ internal fun AccountChooserDialog(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                when (saveState) {
+                    is ReviewLinkSaveState.ValidationError -> Text(
+                        saveState.messageAr,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    is ReviewLinkSaveState.Failure -> Text(
+                        saveState.messageAr,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    is ReviewLinkSaveState.Saving -> Text(
+                        "جارٍ الحفظ…",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    else -> Unit
+                }
                 Text("1) ما نوع هذه العملية؟", style = MaterialTheme.typography.titleSmall)
                 ReviewClassification.choosableChoices.forEach { option ->
                     FilterChip(
                         selected = selectedChoice.id == option.id,
+                        enabled = !saving,
                         onClick = {
                             selectedChoice = option
                             saveIdentifier = false
@@ -326,10 +510,21 @@ internal fun AccountChooserDialog(
                                 destination = null
                             }
                         },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = TransactionTypeVisuals.icon(option.type),
+                                contentDescription = null,
+                            )
+                        },
                         label = { Text(option.label) },
                     )
                 }
                 if (treatment != FinancialTreatment.PENDING_REVIEW) {
+                    Text(
+                        ReviewClassification.directionLabel(selectedChoice.direction),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Text(
                         selectedChoice.hint,
                         style = MaterialTheme.typography.bodySmall,
@@ -341,6 +536,7 @@ internal fun AccountChooserDialog(
                     sourceOptions.forEach { account ->
                         FilterChip(
                             selected = source?.id == account.id,
+                            enabled = !saving,
                             onClick = {
                                 source = account
                                 saveIdentifier = false
@@ -352,6 +548,7 @@ internal fun AccountChooserDialog(
                     destinationOptions.forEach { account ->
                         FilterChip(
                             selected = destination?.id == account.id,
+                            enabled = !saving,
                             onClick = {
                                 destination = account
                                 saveIdentifier = false
@@ -370,6 +567,7 @@ internal fun AccountChooserDialog(
                     owned.forEach { account ->
                         FilterChip(
                             selected = single?.id == account.id,
+                            enabled = !saving,
                             onClick = {
                                 single = account
                                 saveIdentifier = false
@@ -379,13 +577,21 @@ internal fun AccountChooserDialog(
                     }
                 }
                 Row {
-                    Checkbox(checked = rememberLink, onCheckedChange = { rememberLink = it })
+                    Checkbox(
+                        checked = rememberLink,
+                        enabled = !saving,
+                        onCheckedChange = { rememberLink = it },
+                    )
                     Text("تذكر هذا الربط للمرات القادمة")
                 }
                 if (proposed != null) {
                     Row {
-                        Checkbox(checked = saveIdentifier, onCheckedChange = { saveIdentifier = it })
-                        Text("حفظ المعرف المكتشف ••••${proposed.normalizedLastFour}")
+                        Checkbox(
+                            checked = saveIdentifier,
+                            enabled = !saving,
+                            onCheckedChange = { saveIdentifier = it },
+                        )
+                        Text("حفظ المعرف المكتشف ••••${proposed.normalizedLastFour} (${proposed.identifierType.name})")
                     }
                 }
             }
@@ -394,8 +600,9 @@ internal fun AccountChooserDialog(
             TextButton(
                 enabled = canConfirm,
                 onClick = {
+                    if (saving) return@TextButton
                     if (twoSided) {
-                        onConfirm(source?.id, destination?.id, rememberLink, saveIdentifier, preferredForIdentifier, treatment)
+                        onConfirm(source?.id, destination?.id, rememberLink, saveIdentifier, preferredForIdentifier, treatment, selectedChoice.type)
                     } else {
                         val account = single ?: return@TextButton
                         val isSource = ReviewClassification.isSourceSide(treatment)
@@ -406,12 +613,15 @@ internal fun AccountChooserDialog(
                             saveIdentifier,
                             account,
                             treatment,
+                            selectedChoice.type,
                         )
                     }
                 },
-            ) { Text("اعتماد وترحيل") }
+            ) { Text(if (saving) "جارٍ الحفظ…" else "اعتماد وترحيل") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        dismissButton = {
+            TextButton(enabled = !saving, onClick = onDismiss) { Text("إلغاء") }
+        },
     )
 }
 

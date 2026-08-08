@@ -44,7 +44,6 @@ class HistoricalAccountRelinkService(
     )
 
     suspend fun relinkUnposted(dryRun: Boolean = false): Result {
-        identifierRepository.ensureLegacyIdentifierBackfill()
         val accounts = financialAccountRepository.getOwnedActive()
         val accountsById = accounts.associateBy { it.id }
         val all = transactionRepository.getAllNewestFirst()
@@ -133,6 +132,7 @@ class HistoricalAccountRelinkService(
             AccountLinkSource.UNLINKED,
             AccountLinkSource.OWNED_ACCOUNT_RULE,
             AccountLinkSource.LAST_FOUR_MATCH,
+            AccountLinkSource.SENDER_PROFILE,
             AccountLinkSource.INSTITUTION_MATCH,
             -> true
             AccountLinkSource.USER -> false

@@ -180,7 +180,7 @@ class RuleEngineTest {
     fun declinedTransactionIgnored() {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
-            makeInput(type = TransactionType.DECLINED, status = TransactionStatus.DECLINED),
+            makeInput(type = TransactionType.OTHER_FINANCIAL, status = TransactionStatus.DECLINED),
             emptyContext()
         )
         assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
@@ -192,7 +192,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
-                type = TransactionType.CREDIT_LIMIT_CHANGE,
+                type = TransactionType.NON_FINANCIAL,
                 amount = BigDecimal("25000"),
                 merchant = null,
                 body = "تغيير حد الرصيد\nالحد الائتماني الجديد: 25000 ريال",
@@ -208,7 +208,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
-                type = TransactionType.UNKNOWN,
+                type = TransactionType.OTHER_FINANCIAL,
                 amount = BigDecimal("30000"),
                 body = "تم تغيير الحد الائتماني لبطاقتك",
             ),
@@ -233,7 +233,7 @@ class RuleEngineTest {
         val fee = makeCategory(101, "رسوم بنكية")
         val engine = RuleEngineFactory.build(categories = listOf(fee), feeCategoryId = 101L)
         val verdict = engine.classify(
-            makeInput(type = TransactionType.BANK_FEE, amount = BigDecimal("25.00")),
+            makeInput(type = TransactionType.FEE, amount = BigDecimal("25.00")),
             emptyContext(categories = listOf(fee))
         )
         assertEquals(FinancialTreatment.BANK_FEE, verdict.financialTreatment)
@@ -279,15 +279,14 @@ class RuleEngineTest {
     }
 
     @Test
-    fun depositWithoutMerchantUsesParsedTypeFallbackIncome() {
+    fun untypedDepositRequiresReview() {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
-            makeInput(type = TransactionType.DEPOSIT, merchant = null, body = "تم إيداع مبلغ"),
+            makeInput(type = TransactionType.OTHER_FINANCIAL, merchant = null, body = "تم إيداع مبلغ"),
             emptyContext(),
         )
-        assertEquals(FinancialTreatment.INCOME, verdict.financialTreatment)
+        assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
         assertTrue(verdict.excludeFromSpending)
-        assertTrue(verdict.reason.contains("ParsedTypeFallbackRule"))
     }
 
     @Test
@@ -376,7 +375,7 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = listOf(fee), feeCategoryId = 101L)
         val verdict = engine.classify(
             makeInput(
-                type = TransactionType.BANK_FEE,
+                type = TransactionType.FEE,
                 amount = BigDecimal("2.50"),
                 body = "رسوم تحويل محفظة 2.50 ريال"
             ),
@@ -387,7 +386,7 @@ class RuleEngineTest {
     }
 
     @Test
-    fun investmentTransferSeparatedFromSpending() {
+    fun investmentCueWithoutDedicatedTypeRequiresReview() {
         val inv = makeAccount(
             1,
             "Abyan",
@@ -398,15 +397,15 @@ class RuleEngineTest {
         val engine = RuleEngineFactory.build(categories = emptyList(), feeCategoryId = null)
         val verdict = engine.classify(
             makeInput(
-                type = TransactionType.INVESTMENT_TRANSFER,
+                type = TransactionType.INTERNAL_TRANSFER,
                 sender = "alrajhi",
                 body = "تحويل صادر إلى حسابك الاستثماري في Abyan",
                 merchant = "Abyan"
             ),
             emptyContext(accounts = listOf(inv))
         )
-        assertEquals(FinancialTreatment.INVESTMENT, verdict.financialTreatment)
-        assertTrue("investment must be excluded from consumer spending", verdict.excludeFromSpending)
+        assertEquals(FinancialTreatment.PENDING_REVIEW, verdict.financialTreatment)
+        assertTrue(verdict.excludeFromSpending)
     }
 
     // -- Merchant memory --------------------------------------------------
@@ -449,7 +448,11 @@ class RuleEngineTest {
         )
         val engine = RuleEngineFactory.build(categories = listOf(cat), feeCategoryId = null)
         val verdict = engine.classify(
-            makeInput(type = TransactionType.DECLINED, merchant = "Starbucks"),
+            makeInput(
+                type = TransactionType.OTHER_FINANCIAL,
+                status = TransactionStatus.DECLINED,
+                merchant = "Starbucks",
+            ),
             emptyContext(categories = listOf(cat)).copy(merchantMemories = listOf(memory))
         )
         assertEquals(FinancialTreatment.IGNORED, verdict.financialTreatment)
@@ -523,11 +526,11 @@ class RuleEngineTest {
         // We test by invoking the engine with inputs designed to fire each
         // rule and observing the rule-name embedded in the reason.
         val probeInputs: List<Pair<RulePriority, RuleInput>> = listOf(
-            RulePriority.SAFETY to makeInput(type = TransactionType.DECLINED, status = TransactionStatus.DECLINED),
+            RulePriority.SAFETY to makeInput(type = TransactionType.OTHER_FINANCIAL, status = TransactionStatus.DECLINED),
             RulePriority.SAFETY to makeInput(status = TransactionStatus.PENDING),
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.CARD_PAYMENT),
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.REFUND),
-            RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.BANK_FEE),
+            RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.FEE),
             RulePriority.SAFETY_CRITICAL to makeInput(type = TransactionType.SALARY),
             RulePriority.MERCHANT_RULE to makeInput(merchant = "Starbucks")
         )

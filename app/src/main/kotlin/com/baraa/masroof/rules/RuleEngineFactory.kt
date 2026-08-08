@@ -8,7 +8,6 @@ import com.baraa.masroof.rules.rules.CreditLimitChangeRule
 import com.baraa.masroof.rules.rules.DeclinedRule
 import com.baraa.masroof.rules.rules.HighConfidenceMerchantRule
 import com.baraa.masroof.rules.rules.InternalTransferRule
-import com.baraa.masroof.rules.rules.InvestmentTransferRule
 import com.baraa.masroof.rules.rules.MerchantMemoryRule
 import com.baraa.masroof.rules.rules.ParsedTypeFallbackRule
 import com.baraa.masroof.rules.rules.PendingStatusRule
@@ -33,7 +32,7 @@ object RuleEngineFactory {
     val REGISTERED_PRIORITIES: List<RulePriority> = listOf(
         RulePriority.SAFETY,             // DeclinedRule + CreditLimitChangeRule + PendingStatusRule
         RulePriority.SAFETY_CRITICAL,    // CardPaymentRule + RefundRule + BankFeeRule + SalaryRule
-        RulePriority.INTERNAL_TRANSFER,  // InternalTransferRule + InvestmentTransferRule + WalletTopUpRule
+        RulePriority.INTERNAL_TRANSFER,  // InternalTransferRule + WalletTopUpRule
         RulePriority.MERCHANT_MEMORY,    // MerchantMemoryRule
         RulePriority.MERCHANT_RULE,      // HighConfidenceMerchantRule
         RulePriority.CATEGORY_RULE,      // ArabicMerchantCategoryRule
@@ -55,12 +54,11 @@ object RuleEngineFactory {
             RefundRule(),
             BankFeeRule(feeCategoryIdResolver = { feeCategoryId }),
             SalaryRule(),
-            // InternalTransferRule + InvestmentTransferRule + WalletTopUpRule
+            // InternalTransferRule + WalletTopUpRule
             // all run at INTERNAL_TRANSFER priority. They all return null
             // when only one side is known (or none) so the engine falls
             // through to PENDING_REVIEW.
             InternalTransferRule(),
-            InvestmentTransferRule(),
             WalletTopUpRule(),
             // MerchantMemoryRule runs BEFORE the generic category rules so
             // a user-confirmed mapping always wins over a generic pattern.
@@ -107,7 +105,7 @@ object RuleEngineFactory {
             when (p) {
                 RulePriority.SAFETY -> listOf("DeclinedRule", "CreditLimitChangeRule", "PendingStatusRule")
                 RulePriority.SAFETY_CRITICAL -> listOf("CardPaymentRule", "RefundRule", "BankFeeRule", "SalaryRule")
-                RulePriority.INTERNAL_TRANSFER -> listOf("InternalTransferRule", "InvestmentTransferRule", "WalletTopUpRule")
+                RulePriority.INTERNAL_TRANSFER -> listOf("InternalTransferRule", "WalletTopUpRule")
                 RulePriority.MERCHANT_MEMORY -> listOf("MerchantMemoryRule")
                 RulePriority.MERCHANT_RULE -> listOf("HighConfidenceMerchantRule")
                 RulePriority.CATEGORY_RULE -> listOf("ArabicMerchantCategoryRule")

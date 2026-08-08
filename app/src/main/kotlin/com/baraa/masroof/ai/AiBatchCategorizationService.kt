@@ -217,9 +217,7 @@ class AiBatchCategorizationService(
         private val NON_ELIGIBLE_TYPES = setOf(
             com.baraa.masroof.transaction.TransactionType.REFUND,
             com.baraa.masroof.transaction.TransactionType.SALARY,
-            com.baraa.masroof.transaction.TransactionType.DEPOSIT,
             com.baraa.masroof.transaction.TransactionType.INTERNAL_TRANSFER,
-            com.baraa.masroof.transaction.TransactionType.INVESTMENT_TRANSFER,
             com.baraa.masroof.transaction.TransactionType.TRANSFER_IN,
             com.baraa.masroof.transaction.TransactionType.TRANSFER_OUT,
             com.baraa.masroof.transaction.TransactionType.CARD_PAYMENT,

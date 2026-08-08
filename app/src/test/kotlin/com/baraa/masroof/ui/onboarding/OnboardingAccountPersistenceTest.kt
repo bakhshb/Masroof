@@ -86,7 +86,7 @@ class OnboardingAccountPersistenceTest {
     @Test fun accountIsInsertedIntoRoom() = kotlinx.coroutines.runBlocking {
         val accountRepo = FakeAccountRepository()
         val setupRepo = FakeSetupRepository()
-        val onboardingRepo = TestOnboardingRepository(initial = OnboardingState.Pending(onboardingVersion = 1, lastCompletedStep = null, smsPermissionGranted = false))
+        val onboardingRepo = TestOnboardingRepository(initial = OnboardingState.Pending(onboardingVersion = CURRENT_ONBOARDING_VERSION, lastCompletedStep = null, smsPermissionGranted = false))
 
         val id = accountRepo.add(
             displayName = "حساب الراتب",
@@ -109,7 +109,7 @@ class OnboardingAccountPersistenceTest {
     @Test fun onboardingCompletionIsNotSavedIfAccountInsertionFails() = kotlinx.coroutines.runBlocking {
         val accountRepo = FakeAccountRepository().also { it.failNextInsert = true }
         val setupRepo = FakeSetupRepository()
-        val onboardingRepo = TestOnboardingRepository(initial = OnboardingState.Pending(onboardingVersion = 1, lastCompletedStep = null, smsPermissionGranted = false))
+        val onboardingRepo = TestOnboardingRepository(initial = OnboardingState.Pending(onboardingVersion = CURRENT_ONBOARDING_VERSION, lastCompletedStep = null, smsPermissionGranted = false))
 
         val id = accountRepo.add(
             displayName = "x",

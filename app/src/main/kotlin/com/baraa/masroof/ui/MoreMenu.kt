@@ -43,7 +43,6 @@ fun MoreMenu(
     onCategories: () -> Unit = onSettings,
     onAccounts: () -> Unit = onSettings,
     onBankMessages: () -> Unit = onSettings,
-    onSenderMappings: () -> Unit = onSettings,
     onLinkRules: () -> Unit = onSettings,
     onFinancialHistory: () -> Unit = onSettings,
     onPrivacyAndAi: () -> Unit = onSettings,
@@ -63,7 +62,6 @@ fun MoreMenu(
         MenuCard(Icons.Filled.Style, "التصنيفات", "إدارة تصنيفات المصروفات والدخل", onCategories)
         MenuCard(Icons.Filled.AccountBox, "الحسابات", "أرصدة الحسابات والمعرفات", onAccounts)
         MenuCard(Icons.Filled.Sms, "رسائل البنوك", "تعليم المرسلين وأنماط الرسائل", onBankMessages)
-        MenuCard(Icons.Filled.Sms, "المرسلون والمؤسسات", "ربط رسائل البنك بالمؤسسات", onSenderMappings)
         MenuCard(Icons.Filled.Link, "قواعد الربط", "القواعد المحفوظة لربط العمليات", onLinkRules)
         MenuCard(Icons.Filled.History, "التاريخ المالي", "أرصدة يومية وصافي الثروة", onFinancialHistory)
         MenuCard(Icons.Filled.PrivacyTip, "الخصوصية والذكاء الاصطناعي", "إعدادات محلية واختيارية", onPrivacyAndAi)

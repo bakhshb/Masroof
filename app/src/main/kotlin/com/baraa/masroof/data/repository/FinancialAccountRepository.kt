@@ -108,30 +108,10 @@ class RoomFinancialAccountRepository(
         )
     }
 
+    /** Legacy API name retained for callers; financial accounts are never hard-deleted. */
     override suspend fun delete(account: FinancialAccount) {
-        require(account.systemAccountKey == null) { "System accounts cannot be deleted" }
-        dao.delete(
-            FinancialAccountEntity(
-                id = account.id,
-                displayName = account.displayName,
-                institutionName = account.institutionName,
-                accountType = account.accountType,
-                accountNature = account.accountNature,
-                currency = account.currency,
-                openingBalance = account.openingBalance,
-                openingBalanceDate = account.openingBalanceDate,
-                includeInNetWorth = account.includeInNetWorth,
-                includeInLiquidity = account.includeInLiquidity,
-                isOwnedByUser = account.isOwnedByUser,
-                systemAccountKey = account.systemAccountKey,
-                isActive = account.isActive,
-                notes = account.notes,
-                createdAt = account.createdAt,
-                updatedAt = now(),
-                creditLimit = account.creditLimit,
-                openingBalanceKind = account.openingBalanceKind,
-            ),
-        )
+        require(account.systemAccountKey == null) { "System accounts cannot be deactivated" }
+        update(account.copy(isActive = false))
     }
 }
 

@@ -90,21 +90,6 @@ class AccountIdentifierRepositoryTest {
         assertEquals(IdentifierAddResult.Rejected, outcome.result)
     }
 
-    @Test fun legacyColumnBackfillIsNoOpAfterSchemaRetirement() = runBlocking {
-        val repo = newRepo(bank(1), bank(2, type = AccountType.CREDIT_CARD))
-        assertEquals(0, repo.backfillFromLegacyLastFour())
-        assertEquals(0, repo.backfillFromLegacySenderAliases())
-        assertTrue(repo.getForAccount(1).isEmpty())
-        assertTrue(repo.getForAccount(2).isEmpty())
-    }
-
-    @Test fun ensureLegacyIdentifierBackfillIsIdempotentNoOp() = runBlocking {
-        val repo = newRepo(bank(1, type = AccountType.CREDIT_CARD))
-        repo.ensureLegacyIdentifierBackfill()
-        repo.ensureLegacyIdentifierBackfill()
-        assertTrue(repo.getForAccount(1).isEmpty())
-    }
-
     @Test fun updateValueChangesNormalizedDigits() = runBlocking {
         val repo = newRepo(bank(1))
         val added = repo.addOrUpdate(1, IdentifierForm(AccountIdentifierType.ACCOUNT_LAST4, "Old", "1234"))

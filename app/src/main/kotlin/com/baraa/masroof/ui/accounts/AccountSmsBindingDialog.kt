@@ -34,6 +34,7 @@ fun AccountSmsBindingDialog(
             smsRepository = app.smsRepository,
             identifierRepository = app.accountIdentifierRepository,
             senderProfileRepository = app.senderProfileRepository,
+            messagePatternRepository = app.messagePatternRepository,
             afterBindRelink = { app.historicalAccountRelinkService.relinkUnposted(dryRun = false) },
         )
     }
@@ -69,7 +70,7 @@ fun AccountSmsBindingDialog(
             },
             onQuery = holder::setSenderQuery,
             onShowAll = holder::setShowAll,
-            onSelect = { holder.choose(it, accountType) },
+            onSelect = { message -> scope.launch { holder.choose(message, accountType) } },
             onCancel = onDismiss,
         )
         else -> ConfirmDialog(

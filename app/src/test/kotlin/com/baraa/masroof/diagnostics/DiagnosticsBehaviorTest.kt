@@ -1,6 +1,5 @@
 package com.baraa.masroof.diagnostics
 
-import com.baraa.masroof.transaction.BankParserRegistry
 import com.baraa.masroof.transaction.Currency
 import com.baraa.masroof.transaction.TransactionStatus
 import com.baraa.masroof.transaction.TransactionType
@@ -26,23 +25,17 @@ class DiagnosticsBehaviorTest {
         // to MasroofDatabase. The contract is enforced by construction:
         // the type does not even reference the database.
         FakeTransactionStore.clear()
-        val result = BankParserRegistry.parse(
-            sender = "TestBank",
-            body = "Purchase at TestMerchant for 100 SAR",
-            smsTimestampMillis = null
-        )
-        assertNotNull(result)
         FakeTransactionStore.addFromParse(
             sampleId = "x",
             sender = "TestBank",
             rawBody = "Purchase at TestMerchant for 100 SAR",
-            merchant = result.merchant,
-            amount = result.amount,
-            currency = result.currency,
-            type = result.transactionType,
-            status = result.status,
-            date = result.transactionDate,
-            time = result.transactionTime
+            merchant = "TestMerchant",
+            amount = java.math.BigDecimal("100"),
+            currency = Currency.SAR,
+            type = TransactionType.PURCHASE,
+            status = TransactionStatus.COMPLETED,
+            date = null,
+            time = null
         )
         assertEquals(1, FakeTransactionStore.count())
         // Critical guarantee: FakeTransactionStore.snapshot() returns

@@ -5,6 +5,7 @@ import com.baraa.masroof.ledger.InstitutionResolution
 import com.baraa.masroof.transaction.AccountType
 import com.baraa.masroof.transaction.FinancialTreatment
 import com.baraa.masroof.transaction.TransactionType
+import com.baraa.masroof.transaction.TransactionTypeTaxonomy
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalTime
@@ -104,33 +105,15 @@ object TransactionPresentationFactory {
         )
     }
 
-    fun friendlyTransactionType(type: TransactionType): String = when (type) {
-        TransactionType.PURCHASE -> "شراء"
-        TransactionType.ONLINE_PURCHASE -> "شراء عبر الإنترنت"
-        TransactionType.CASH_WITHDRAWAL -> "سحب نقدي"
-        TransactionType.TRANSFER_OUT -> "حوالة صادرة"
-        TransactionType.TRANSFER_IN -> "حوالة واردة"
-        TransactionType.CARD_PAYMENT -> "سداد بطاقة"
-        TransactionType.REFUND -> "استرداد"
-        TransactionType.SALARY -> "راتب"
-        TransactionType.DEPOSIT -> "إيداع"
-        TransactionType.BANK_FEE -> "رسوم بنكية"
-        TransactionType.INTERNAL_TRANSFER -> "تحويل داخلي"
-        TransactionType.INVESTMENT_TRANSFER -> "تحويل استثماري"
-        TransactionType.LOAN_INSTALLMENT -> "قسط تمويل"
-        TransactionType.BILL_PAYMENT -> "سداد فاتورة"
-        TransactionType.DECLINED -> "عملية مرفوضة"
-        TransactionType.CREDIT_LIMIT_CHANGE -> "تغيير حد الرصيد"
-        TransactionType.UNKNOWN -> "عملية غير مصنفة"
-    }
+    fun friendlyTransactionType(type: TransactionType): String =
+        TransactionTypeTaxonomy.labelAr(type)
 
     private fun accountOrInstrumentLabel(accountType: AccountType?, lastFour: String?): String {
         val safeLastFour = lastFour?.takeLast(4)?.takeIf { it.isNotBlank() } ?: return "غير مرتبط بحساب"
         return when (accountType) {
             AccountType.BANK_ACCOUNT -> "حساب ••••$safeLastFour"
             AccountType.CREDIT_CARD -> "بطاقة ائتمانية ••••$safeLastFour"
-            AccountType.DIGITAL_WALLET, AccountType.WALLET -> "بطاقة مدى ••••$safeLastFour"
-            AccountType.DIGITAL_WALLET -> "محفظة رقمية ••••$safeLastFour"
+            AccountType.DIGITAL_WALLET, AccountType.WALLET -> "محفظة رقمية ••••$safeLastFour"
             AccountType.CASH -> "نقد"
             AccountType.INVESTMENT_ACCOUNT, AccountType.SUKUK_ACCOUNT -> "استثمار"
             AccountType.LOAN, AccountType.OTHER_LIABILITY -> "التزام ••••$safeLastFour"

@@ -245,7 +245,7 @@ class DiagnosticsSanitizationTest {
             aiProviderName = null,
             aiModelName = null,
             lastAiOutcome = DiagnosticSnapshot.EMPTY_OUTCOME,
-            parserNames = listOf("AlRajhiParser", "GenericBankSmsParser"),
+            parserNames = listOf("TemplateResolver:AlRajhi", "TemplateResolver"),
             ruleNames = listOf("SAFETY", "CATEGORY_RULE"),
             recentErrors = emptyList(),
             buildTimestamp = "2024-01-01T00:00:00Z",

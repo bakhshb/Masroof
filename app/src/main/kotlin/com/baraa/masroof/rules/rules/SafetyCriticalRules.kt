@@ -60,7 +60,7 @@ class BankFeeRule(
     override val name: String = "BankFeeRule"
     override val priority: RulePriority = RulePriority.SAFETY_CRITICAL
     override fun evaluate(input: RuleInput, context: RuleContext): RuleResult? {
-        if (input.type != TransactionType.BANK_FEE) return null
+        if (input.type != TransactionType.FEE) return null
         return RuleResult(
             financialTreatment = FinancialTreatment.BANK_FEE,
             categoryId = feeCategoryIdResolver(),

@@ -6,10 +6,10 @@ import com.baraa.masroof.data.db.AccountIdentifierType
 import java.time.LocalTime
 
 /**
- * Structured representation of a single bank SMS, produced by a [BankSmsParser].
+ * Structured representation of a bank SMS produced by canonical template resolution.
  *
- * Fields are nullable / [TransactionType.UNKNOWN] when the parser could not
- * extract them. [confidence] is a 0..100 score the UI can use to decide whether
+ * Optional fields are null when the approved template did not extract them.
+ * [confidence] is a 0..100 score the UI can use to decide whether
  * to render this as a structured transaction card or fall back to the raw
  * message.
  *
@@ -52,8 +52,7 @@ data class ParsedTransaction(
     val confidence: Int,
     val parsingNotes: List<String>,
     /**
-     * Name of the [BankSmsParser] that produced this result (e.g. "AlRajhi",
-     * "Generic"). Always present.
+     * Name of the canonical resolver/template that produced this result.
      */
     val parserName: String = "Unknown",
     /**

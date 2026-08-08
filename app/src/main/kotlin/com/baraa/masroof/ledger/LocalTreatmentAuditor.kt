@@ -90,6 +90,18 @@ object LocalTreatmentAuditor {
         "reversed",
     )
 
+    private val PURCHASE_BODY_CUES = listOf(
+        "pos purchase",
+        "online purchase",
+        "apple pay purchase",
+        "purchase",
+        "شراء عبر نقاط البيع",
+        "شراء عبر الإنترنت",
+        "شراء عبر الانترنت",
+        "عملية شراء",
+        "شراء",
+    )
+
     private val CREDIT_LIMIT_BODY_CUES = listOf(
         "تغيير حد الرصيد",
         "تم تغيير الحد الائتماني",
@@ -97,9 +109,16 @@ object LocalTreatmentAuditor {
         "الحد الائتماني الجديد",
         "حد ائتماني جديد",
         "تحديث الحد الائتماني",
+        "تم تغيير الحد اليومي",
+        "تغيير الحد اليومي",
+        "الحد اليومي للشراء",
+        "الحد اليومي",
+        "تغيير الحد",
         "credit limit change",
         "new credit limit",
         "credit limit has been changed",
+        "daily limit",
+        "daily purchase limit",
     )
 
     /**
@@ -136,12 +155,12 @@ object LocalTreatmentAuditor {
 
         val normalized = body.orEmpty().lowercase(Locale.ROOT)
         if (CREDIT_LIMIT_BODY_CUES.any { it.lowercase(Locale.ROOT) in normalized } ||
-            type == TransactionType.CREDIT_LIMIT_CHANGE
+            type == TransactionType.NON_FINANCIAL
         ) {
             return Result(
                 treatment = FinancialTreatment.IGNORED,
                 confidence = 98,
-                reasonAr = "تغيير حد ائتماني — لا يُحسب مصروفًا ولا يغيّر الرصيد",
+                reasonAr = "رسالة إعدادات/حد — لا تُحسب مصروفًا ولا تغيّر الرصيد",
                 autoApply = true,
             )
         }
@@ -177,7 +196,7 @@ object LocalTreatmentAuditor {
         }
 
         if (FEE_BODY_CUES.any { it.lowercase(Locale.ROOT) in normalized } ||
-            type == TransactionType.BANK_FEE
+            type == TransactionType.FEE
         ) {
             return Result(
                 treatment = FinancialTreatment.BANK_FEE,
@@ -231,17 +250,24 @@ object LocalTreatmentAuditor {
             )
         }
 
+        // Explicit purchase language always wins over a transfer-typed parse.
+        if (PURCHASE_BODY_CUES.any { it.lowercase(Locale.ROOT) in normalized } ||
+            type == TransactionType.PURCHASE ||
+            type == TransactionType.ONLINE_PURCHASE
+        ) {
+            return Result(
+                treatment = FinancialTreatment.EXPENSE,
+                confidence = 90,
+                reasonAr = "عبارة شراء في الرسالة",
+                autoApply = true,
+            )
+        }
+
         return when (type) {
             TransactionType.PURCHASE, TransactionType.ONLINE_PURCHASE -> Result(
                 treatment = FinancialTreatment.EXPENSE,
                 confidence = 85,
                 reasonAr = "عبارة شراء في الرسالة",
-                autoApply = true,
-            )
-            TransactionType.LOAN_INSTALLMENT -> Result(
-                treatment = FinancialTreatment.EXPENSE,
-                confidence = 90,
-                reasonAr = "خصم قسط تمويل من الحساب",
                 autoApply = true,
             )
             TransactionType.BILL_PAYMENT -> Result(
@@ -262,7 +288,7 @@ object LocalTreatmentAuditor {
                 reasonAr = "حوالة واردة خارجية — تُحسب كدخل ما لم يثبت أنها داخلية",
                 autoApply = true,
             )
-            TransactionType.DEPOSIT, TransactionType.SALARY -> Result(
+            TransactionType.SALARY -> Result(
                 treatment = FinancialTreatment.INCOME,
                 confidence = 85,
                 reasonAr = "إيداع أو راتب",
@@ -280,7 +306,7 @@ object LocalTreatmentAuditor {
                 reasonAr = "سداد بطاقة في الرسالة",
                 autoApply = false, // needs bank + card accounts
             )
-            TransactionType.BANK_FEE -> Result(
+            TransactionType.FEE -> Result(
                 treatment = FinancialTreatment.BANK_FEE,
                 confidence = 85,
                 reasonAr = "رسوم بنكية",
@@ -292,31 +318,19 @@ object LocalTreatmentAuditor {
                 reasonAr = "استرداد",
                 autoApply = true,
             )
-            TransactionType.INVESTMENT_TRANSFER -> Result(
-                treatment = FinancialTreatment.INVESTMENT,
-                confidence = 80,
-                reasonAr = "تحويل استثماري",
-                autoApply = false,
-            )
             TransactionType.INTERNAL_TRANSFER -> Result(
                 treatment = FinancialTreatment.INTERNAL_TRANSFER,
                 confidence = 75,
                 reasonAr = "تحويل داخلي — يلزم حسابان",
                 autoApply = hasConfirmedTwoOwnedSides,
             )
-            TransactionType.DECLINED -> Result(
+            TransactionType.NON_FINANCIAL -> Result(
                 treatment = FinancialTreatment.IGNORED,
                 confidence = 95,
-                reasonAr = "عملية مرفوضة",
+                reasonAr = "رسالة غير مالية — لا تُحسب كعملية",
                 autoApply = true,
             )
-            TransactionType.CREDIT_LIMIT_CHANGE -> Result(
-                treatment = FinancialTreatment.IGNORED,
-                confidence = 98,
-                reasonAr = "تغيير حد ائتماني — لا يُحسب مصروفًا ولا يغيّر الرصيد",
-                autoApply = true,
-            )
-            TransactionType.UNKNOWN -> Result(
+            TransactionType.OTHER_FINANCIAL -> Result(
                 treatment = FinancialTreatment.PENDING_REVIEW,
                 confidence = 20,
                 reasonAr = "نوع العملية غير واضح من الرسالة",

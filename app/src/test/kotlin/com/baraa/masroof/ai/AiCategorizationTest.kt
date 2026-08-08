@@ -120,7 +120,7 @@ class AiCategorizationTest {
         val provider = MockAiCategorizationProvider()
         val (svc, _, _) = makeService(provider)
         assertTrue(svc.isEligible(TransactionType.PURCHASE, TransactionStatus.COMPLETED, FinancialTreatment.EXPENSE, "merchant", null))
-        assertTrue(svc.isEligible(TransactionType.BANK_FEE, TransactionStatus.COMPLETED, FinancialTreatment.BANK_FEE, "merchant", null))
+        assertTrue(svc.isEligible(TransactionType.FEE, TransactionStatus.COMPLETED, FinancialTreatment.BANK_FEE, "merchant", null))
     }
 
     @Test

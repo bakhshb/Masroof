@@ -100,7 +100,17 @@ class RoomSchemaSafetyTest {
         assertTrue("v21 schema must exist", File(root, "21.json").exists())
         // v22 is exported by KSP on compile after dropping sender_message_patterns.
         assertTrue("v22 schema must exist after compile", File(root, "22.json").exists())
-        assertTrue("v23 schema must exist after compile", File(root, "23.json").exists())
+        assertTrue("v24 schema must exist after compile", File(root, "24.json").exists())
+        val v25 = File(root, "25.json")
+        assertTrue("v25 schema must exist after compile", v25.exists())
+        val v25Json = v25.readText()
+        assertTrue("v25 schema must contain canonicalKey", v25Json.contains("canonicalKey"))
+        assertTrue(
+            "v25 schema must declare the unique canonical index",
+            v25Json.contains("index_message_pattern_definitions_senderProfileId_canonicalKey"),
+        )
+        // v26 keeps the same columns; key semantics change in migration only.
+        assertTrue("v26 schema must exist after compile", File(root, "26.json").exists())
         // v3 must contain the new transaction columns and the new tables.
         val v3Json = v3.readText()
         assertTrue(

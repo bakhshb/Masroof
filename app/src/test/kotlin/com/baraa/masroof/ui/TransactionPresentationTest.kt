@@ -37,7 +37,7 @@ class TransactionPresentationTest {
                 senderKey = "alrajhi"
             ),
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 90
         )
         assertTrue(presentation.accountOrInstrumentLabel.contains("بطاقة ائتمانية"))
@@ -72,7 +72,7 @@ class TransactionPresentationTest {
                 senderKey = "alrajhi"
             ),
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 80
         )
         assertEquals("نقاط البيع", presentation.channelLabel)
@@ -105,11 +105,11 @@ class TransactionPresentationTest {
                 senderKey = "jazira"
             ),
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 90
         )
         assertTrue(presentation.isExpense == false)
-        assertEquals("حوالة واردة", presentation.friendlyType)
+        assertEquals("تحويل وارد", presentation.friendlyType)
         assertEquals("بنك الجزيرة", presentation.institutionDisplayName)
         assertTrue(presentation.accountOrInstrumentLabel.contains("3003"))
     }
@@ -132,7 +132,7 @@ class TransactionPresentationTest {
             needsAttention = false,
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 50
         )
         // Card payment must not present itself as a spending row.
@@ -158,7 +158,7 @@ class TransactionPresentationTest {
             needsAttention = false,
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 50
         )
         assertNull(presentation.technicalDetails)
@@ -182,11 +182,11 @@ class TransactionPresentationTest {
             needsAttention = false,
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = true,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 50
         )
         assertNotNull(presentation.technicalDetails)
-        assertEquals("GenericBankSmsParser", presentation.technicalDetails!!.parserName)
+        assertEquals("TemplateResolver", presentation.technicalDetails!!.parserName)
     }
 
     @Test fun unknownInstitutionReturnsArabicLabel() {
@@ -207,7 +207,7 @@ class TransactionPresentationTest {
             needsAttention = false,
             institution = com.baraa.masroof.ledger.InstitutionResolution.Unknown,
             showTechnical = false,
-            parserName = "GenericBankSmsParser",
+            parserName = "TemplateResolver",
             confidence = 50
         )
         assertEquals("مرسل مالي غير معروف", presentation.institutionDisplayName)

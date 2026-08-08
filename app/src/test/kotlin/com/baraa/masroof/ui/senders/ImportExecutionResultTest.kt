@@ -1,251 +1,358 @@
 package com.baraa.masroof.ui.senders
 
+import com.baraa.masroof.data.repository.ImportDisposition
+import com.baraa.masroof.data.repository.ImportSession
+import com.baraa.masroof.data.repository.ImportSessionStore
 import com.baraa.masroof.data.repository.ScanPreview
+import com.baraa.masroof.data.repository.SmsImportCommitMode
+import com.baraa.masroof.data.repository.SmsImportMode
 import com.baraa.masroof.data.repository.SmsImportResult
-import org.junit.Assert.*
+import com.baraa.masroof.transaction.TransactionType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.math.BigDecimal
 
 /**
- * Pure tests for the SMS import screen contracts required by sections
- * B, C, D, E, F, L of the spec.
- *
- * The Compose UI cannot be exercised without Android runtime, so we
- * mirror the screen logic in pure functions and assert the contract
- * that the UI honors.
+ * Pure tests for SMS import CTA contracts: ready vs message-review vs pattern approval.
  */
 class ImportExecutionResultTest {
 
-    /**
-     * Spec L.1 — Scan result with readyCount = 12 displays
-     * exactly "استيراد 12 عملية".
-     */
-    @Test fun scanResultLabelIsExactlyCorrect() {
-        val preview = ScanPreview(
-            scannedMessages = 100,
-            recognizedTransactions = 42,
-            needsReviewTransactions = 30,
-            duplicateTransactions = 0,
-            beforeTrackingStartCount = 0
+    private fun item(
+        id: Long,
+        disposition: ImportDisposition,
+        amount: BigDecimal? = BigDecimal("10.00"),
+    ) = ScanPreview.PreviewItem(
+        smsId = id,
+        sender = "BANK",
+        amount = amount,
+        transactionType = TransactionType.PURCHASE,
+        proposedAccountId = if (disposition == ImportDisposition.READY) 1L else null,
+        proposedAccountName = if (disposition == ImportDisposition.READY) "حساب" else null,
+        isDuplicate = disposition == ImportDisposition.EXACT_DUPLICATE,
+        needsReview = ScanPreview.isReviewDisposition(disposition),
+        isBeforeTrackingStart = disposition == ImportDisposition.BEFORE_TRACKING_START,
+        date = null,
+        disposition = disposition,
+    )
+
+    private fun previewWith(vararg dispositions: ImportDisposition): ScanPreview {
+        val items = dispositions.mapIndexed { index, d -> item(index + 1L, d) }
+        return ScanPreview(
+            scannedMessages = items.size,
+            recognizedTransactions = items.count {
+                it.disposition == ImportDisposition.READY ||
+                    ScanPreview.isMessageReviewDisposition(it.disposition)
+            },
+            needsReviewTransactions = items.count { ScanPreview.isReviewDisposition(it.disposition) },
+            duplicateTransactions = items.count {
+                it.disposition == ImportDisposition.EXACT_DUPLICATE ||
+                    it.disposition == ImportDisposition.POSSIBLE_DUPLICATE
+            },
+            beforeTrackingStartCount = items.count { it.disposition == ImportDisposition.BEFORE_TRACKING_START },
+            unmatchedTemplateMessages = items.count { it.disposition == ImportDisposition.UNMATCHED_TEMPLATE },
+            ambiguousTemplateMessages = items.count { it.disposition == ImportDisposition.AMBIGUOUS_TEMPLATE },
+            extractionFailedMessages = items.count { it.disposition == ImportDisposition.TEMPLATE_EXTRACTION_FAILED },
+            perTransaction = items,
         )
-        val readyCount = preview.readyCount
-        assertEquals(12, readyCount)
-        val label = "استيراد $readyCount عملية"
-        assertEquals("استيراد 12 عملية", label)
     }
 
-    /** Spec L.2 — The import button label is built from readyCount. */
-    @Test fun importButtonLabelReflectsReadyCount() {
-        val preview = ScanPreview(recognizedTransactions = 5, needsReviewTransactions = 0)
-        val label = "استيراد ${preview.readyCount} عملية"
-        assertEquals("استيراد 5 عملية", label)
+    @Test
+    fun zeroReadyWithMessageReviewShowsReviewPrimaryNotImport() {
+        val preview = previewWith(
+            ImportDisposition.NEEDS_ACCOUNT,
+            ImportDisposition.NEEDS_CONFIRMATION,
+        )
+        assertEquals(0, preview.readyToImport)
+        assertEquals(2, preview.messageReviewCount)
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("مراجعة 2 رسالة", actions.primaryLabel)
+        assertTrue(actions.primaryNavigateReview)
+        assertNull(actions.primaryMode)
+        assertFalse(actions.primaryLabel.contains("استيراد"))
+        assertFalse(actions.primaryLabel.contains("اعتماد"))
     }
 
-    /** Spec L.3 — The review button label is built from reviewCount. */
-    @Test fun reviewButtonLabelReflectsReviewCount() {
-        val preview = ScanPreview(recognizedTransactions = 50, needsReviewTransactions = 30)
-        val label = "مراجعة ${preview.needsReviewTransactions} عملية"
-        assertEquals("مراجعة 30 عملية", label)
+    @Test
+    fun unmatchedTemplatesRouteToPatternReviewNotAmbiguousApprove() {
+        val preview = previewWith(
+            ImportDisposition.UNMATCHED_TEMPLATE,
+            ImportDisposition.UNMATCHED_TEMPLATE,
+        ).let {
+            it.copy(candidatePatternCount = 2)
+        }
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals(0, preview.messageReviewCount)
+        assertEquals(2, preview.patternApprovalCount)
+        assertEquals("مراجعة 2 نمطاً", actions.primaryLabel)
+        assertTrue(actions.primaryNavigateBankMessages)
+        assertFalse(actions.primaryNavigateReview)
+        assertNull(actions.primaryMode)
+        assertFalse(actions.primaryLabel.startsWith("اعتماد "))
+        assertNotNull(actions.headline)
+        assertTrue(actions.supportingText.orEmpty().contains("2 نمطاً"))
     }
 
-    /**
-     * Spec L.4 — Scan does NOT claim imported/linked/posted.
-     * The ScanPreview data class must not expose those fields.
-     */
-    @Test fun scanPreviewDoesNotExposeImportedCount() {
-        val preview = ScanPreview()
-        val fields = preview.javaClass.declaredFields.map { it.name }
-        assertFalse("ScanPreview must not expose importedTransactions", fields.contains("importedTransactions"))
-        assertFalse("ScanPreview must not expose linkedTransactions", fields.contains("linkedTransactions"))
-        assertFalse("ScanPreview must not expose postedTransactions", fields.contains("postedTransactions"))
+    @Test
+    fun readyRemainsPrimaryEvenWhenPatternsNeedApproval() {
+        val preview = ScanPreview(
+            scannedMessages = 5,
+            unmatchedTemplateMessages = 3,
+            candidatePatternCount = 3,
+            perTransaction = listOf(
+                item(1, ImportDisposition.READY),
+                item(2, ImportDisposition.READY),
+                item(3, ImportDisposition.UNMATCHED_TEMPLATE),
+                item(4, ImportDisposition.UNMATCHED_TEMPLATE),
+                item(5, ImportDisposition.UNMATCHED_TEMPLATE),
+            ),
+        )
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("استيراد 2 عملية", actions.primaryLabel)
+        assertEquals(SmsImportCommitMode.READY_ONLY, actions.primaryMode)
+        assertEquals("مراجعة 3 نمطاً", actions.secondaryLabel)
+        assertTrue(actions.secondaryNavigateBankMessages)
+        assertFalse(actions.primaryLabel.contains("اعتماد"))
     }
 
-    /**
-     * Spec L.5 — When readyCount > 0, the import button is enabled.
-     * Test the boolean decision that drives `enabled =`.
-     */
-    @Test fun importButtonEnabledWhenReadyCountPositive() {
-        val preview = ScanPreview(recognizedTransactions = 42, needsReviewTransactions = 30)
-        val importable = preview.readyCount + preview.needsReviewTransactions + preview.beforeTrackingStartCount
-        val enabled = importable > 0
-        assertTrue(enabled)
+    @Test
+    fun readyOnlyShowsImportPrimary() {
+        val preview = previewWith(ImportDisposition.READY, ImportDisposition.READY)
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals(2, actions.readyToImport)
+        assertEquals(0, actions.needsMessageReview)
+        assertEquals("استيراد 2 عملية", actions.primaryLabel)
+        assertEquals(SmsImportCommitMode.READY_ONLY, actions.primaryMode)
+        assertTrue(actions.primaryEnabled)
     }
 
-    /**
-     * Spec L.6 — When nothing is importable, the import button is disabled.
-     */
-    @Test fun importButtonDisabledWhenReadyCountZero() {
-        val preview = ScanPreview(recognizedTransactions = 0, needsReviewTransactions = 0)
-        val importable = preview.readyCount + preview.needsReviewTransactions + preview.beforeTrackingStartCount
-        val enabled = importable > 0
-        assertFalse(enabled)
+    @Test
+    fun mixedReadyAndMessageReviewShowsBothActions() {
+        val preview = previewWith(
+            ImportDisposition.READY,
+            ImportDisposition.READY,
+            ImportDisposition.NEEDS_ACCOUNT,
+        )
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("استيراد 2 عملية", actions.primaryLabel)
+        assertEquals("مراجعة 1 رسالة", actions.secondaryLabel)
+        assertEquals(SmsImportCommitMode.READY_ONLY, actions.primaryMode)
+        assertTrue(actions.secondaryNavigateReview)
+        assertNull(actions.secondaryMode)
+        assertNull(actions.tertiaryLabel)
     }
 
-    /**
-     * Spec L.7 — ImportExecutionResult.Idle is the initial state.
-     */
-    @Test fun initialResultStateIsIdle() {
-        val state: ImportExecutionResult = ImportExecutionResult.Idle
-        assertTrue(state is ImportExecutionResult.Idle)
+    @Test
+    fun mixedReadyMessageReviewAndPatternsShowsThreeActions() {
+        val preview = ScanPreview(
+            scannedMessages = 5,
+            unmatchedTemplateMessages = 2,
+            candidatePatternCount = 2,
+            perTransaction = listOf(
+                item(1, ImportDisposition.READY),
+                item(2, ImportDisposition.READY),
+                item(3, ImportDisposition.NEEDS_ACCOUNT),
+                item(4, ImportDisposition.UNMATCHED_TEMPLATE),
+                item(5, ImportDisposition.UNMATCHED_TEMPLATE),
+            ),
+        )
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("استيراد 2 عملية", actions.primaryLabel)
+        assertEquals("مراجعة 1 رسالة", actions.secondaryLabel)
+        assertEquals("مراجعة 2 نمطاً", actions.tertiaryLabel)
+        assertTrue(actions.secondaryNavigateReview)
+        assertTrue(actions.tertiaryNavigateBankMessages)
+        assertEquals(SmsImportCommitMode.READY_ONLY, actions.primaryMode)
     }
 
-    /**
-     * Spec L.8 — ImportExecutionResult.Loading is reported during
-     * commit.
-     */
-    @Test fun loadingStateDuringCommit() {
-        val state: ImportExecutionResult = ImportExecutionResult.Loading
-        assertTrue(state is ImportExecutionResult.Loading)
+    @Test
+    fun journeyTwentyMessagesTenReadySixPatternFourAccount() {
+        val dispositions = buildList {
+            repeat(10) { add(ImportDisposition.READY) }
+            repeat(6) { add(ImportDisposition.UNMATCHED_TEMPLATE) }
+            repeat(4) { add(ImportDisposition.NEEDS_ACCOUNT) }
+        }
+        val items = dispositions.mapIndexed { index, d -> item(index + 1L, d) }
+        val preview = ScanPreview(
+            scannedMessages = 20,
+            unmatchedTemplateMessages = 6,
+            candidatePatternCount = 6,
+            perTransaction = items,
+        )
+        assertEquals(10, preview.readyToImport)
+        assertEquals(4, preview.messageReviewCount)
+        assertEquals(6, preview.patternApprovalCount)
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("استيراد 10 عملية", actions.primaryLabel)
+        assertEquals("مراجعة 4 رسالة", actions.secondaryLabel)
+        assertEquals("مراجعة 6 نمطاً", actions.tertiaryLabel)
+        assertEquals(SmsImportCommitMode.READY_ONLY, actions.primaryMode)
     }
 
-    /**
-     * Spec L.9 — Success requires importedCount > 0; all-duplicates map to AlreadyImported.
-     */
-    @Test fun successRequiresImportedCountPositive() {
+    @Test
+    fun afterPatternApprovalSessionResumesAndCountsRefresh() {
+        val store = ImportSessionStore()
+        val initial = previewWith(
+            *Array(10) { ImportDisposition.READY },
+            *Array(6) { ImportDisposition.UNMATCHED_TEMPLATE },
+            *Array(4) { ImportDisposition.NEEDS_ACCOUNT },
+        )
+        val session = ImportSession(
+            id = "journey-1",
+            preview = initial,
+            messages = emptyList(),
+            trackingStartDate = null,
+            mode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
+        )
+        store.replace(session)
+        store.beginTemplateApprovalFromImport()
+        assertTrue(store.isReturnToImportActive())
+
+        // Simulate approving templates: 5 of 6 unmatched become READY, 1 needs account.
+        val afterApproval = previewWith(
+            *Array(15) { ImportDisposition.READY },
+            *Array(5) { ImportDisposition.NEEDS_ACCOUNT },
+        )
+        store.markTemplatesChanged()
+        assertTrue(store.consumeTemplatesDirty())
+        store.replace(session.copy(preview = afterApproval))
+        store.clearReturnToImport()
+
+        assertEquals("journey-1", store.current()?.id)
+        assertEquals(15, store.current()?.readyToImport)
+        assertEquals(5, store.current()?.needsMessageReview)
+        assertEquals(0, store.current()?.needsPatternApproval)
+        assertFalse(store.isReturnToImportActive())
+
+        val actions = importActionState(afterApproval, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertEquals("استيراد 15 عملية", actions.primaryLabel)
+        assertEquals("مراجعة 5 رسالة", actions.secondaryLabel)
+    }
+
+    @Test
+    fun normalTemplateManagementDoesNotForceReturnToImport() {
+        val store = ImportSessionStore()
+        // Session exists but user opened Bank Messages from settings — no beginTemplateApprovalFromImport.
+        store.replace(
+            ImportSession(
+                preview = previewWith(ImportDisposition.READY),
+                messages = emptyList(),
+                trackingStartDate = null,
+                mode = SmsImportMode.REGISTERED_ACCOUNTS_ONLY,
+            ),
+        )
+        assertFalse(store.isReturnToImportActive())
+        store.markTemplatesChanged()
+        assertTrue(store.consumeTemplatesDirty())
+        // Return flag stays off — UI must not auto-pop to Import.
+        assertFalse(store.isReturnToImportActive())
+    }
+
+    @Test
+    fun importButtonLabelHelperMatchesActionState() {
+        val preview = previewWith(ImportDisposition.READY)
+        assertEquals("استيراد 1 عملية", importCommitButtonLabel(preview))
+        val reviewOnly = previewWith(ImportDisposition.NEEDS_ACCOUNT)
+        assertEquals("مراجعة 1 رسالة", importCommitButtonLabel(reviewOnly))
+    }
+
+    @Test
+    fun successRequiresImportedCountPositiveForReadyMode() {
         val result = SmsImportResult(importedTransactions = 12, linkedTransactions = 12, postedTransactions = 12)
-        assertTrue("importedCount must be > 0 for success", result.importedTransactions > 0)
-        assertTrue(mapImportCommitResult(result) is ImportExecutionResult.Success)
+        assertTrue(mapImportCommitResult(result, SmsImportCommitMode.READY_ONLY) is ImportExecutionResult.Success)
     }
 
-    @Test fun allDuplicatesMapToAlreadyImportedNotFailure() {
+    @Test
+    fun databaseFailureMapsToFailureNotSilent() {
+        val failure = ImportExecutionResult.Failure(
+            userMessage = "تعذر استيراد العمليات. حاول مجدداً.",
+            technicalMessage = "SQLiteConstraintException",
+        )
+        assertTrue(failure.userMessage.isNotBlank())
+        assertNotNull(failure.technicalMessage)
+    }
+
+    @Test
+    fun zeroImportReadyModeIsFailure() {
+        val mapped = mapImportCommitResult(
+            SmsImportResult(importedTransactions = 0, duplicateTransactions = 0),
+            SmsImportCommitMode.READY_ONLY,
+        )
+        assertTrue(mapped is ImportExecutionResult.Failure)
+    }
+
+    @Test
+    fun allDuplicatesMapToAlreadyImportedNotFailure() {
         val result = SmsImportResult(
             scannedMessages = 10,
             duplicateTransactions = 10,
             importedTransactions = 0,
         )
-        val mapped = mapImportCommitResult(result)
+        val mapped = mapImportCommitResult(result, SmsImportCommitMode.READY_ONLY)
         assertTrue(mapped is ImportExecutionResult.AlreadyImported)
         assertEquals(10, (mapped as ImportExecutionResult.AlreadyImported).duplicateCount)
     }
 
-    @Test fun duplicateOnlyScanUsesAlreadyImportedButtonLabel() {
-        val preview = ScanPreview(
-            scannedMessages = 8,
-            recognizedTransactions = 8,
-            needsReviewTransactions = 0,
-            duplicateTransactions = 8,
-            beforeTrackingStartCount = 0,
-        )
-        assertEquals(0, preview.readyCount)
-        assertEquals("مستوردة سابقًا · 8 مكررة", importCommitButtonLabel(preview))
+    @Test
+    fun busyStateDisablesPrimaryToPreventRepeatedTap() {
+        val preview = previewWith(ImportDisposition.READY)
+        val loading = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Loading)
+        assertFalse(loading.primaryEnabled)
+        val committing = importActionState(preview, ImportPhase.Committing, ImportExecutionResult.Idle)
+        assertFalse(committing.primaryEnabled)
     }
 
-    @Test fun importButtonLabelReflectsReadyCountViaHelper() {
-        val preview = ScanPreview(recognizedTransactions = 5, needsReviewTransactions = 0)
-        assertEquals("استيراد 5 عملية", importCommitButtonLabel(preview))
+    @Test
+    fun recompositionDuringImportKeepsLoadingGuard() {
+        val preview = previewWith(ImportDisposition.READY)
+        repeat(3) {
+            val actions = importActionState(preview, ImportPhase.Committing, ImportExecutionResult.Loading)
+            assertFalse(actions.primaryEnabled)
+        }
     }
 
-    /**
-     * Spec L.10 — Failure.typed surface carries user + technical message.
-     */
-    @Test fun failureCarriesUserAndTechnicalMessage() {
-        val failure = ImportExecutionResult.Failure(
-            userMessage = "تعذر استيراد العمليات. حاول مجدداً.",
-            technicalMessage = "commit produced 0 imported transactions"
-        )
-        assertTrue("userMessage must be set", failure.userMessage.isNotBlank())
-        assertNotNull("technicalMessage must be set", failure.technicalMessage)
+    @Test
+    fun duplicateOnlyScanDisablesImport() {
+        val preview = previewWith(ImportDisposition.EXACT_DUPLICATE, ImportDisposition.EXACT_DUPLICATE)
+        assertEquals(0, preview.readyToImport)
+        val actions = importActionState(preview, ImportPhase.Idle, ImportExecutionResult.Idle)
+        assertFalse(actions.primaryEnabled)
+        assertTrue(actions.primaryLabel.contains("مكررة"))
     }
 
-    /**
-     * Spec L.11 — The Home navigation callback is invoked when the
-     * "العودة إلى الرئيسية" button is pressed.
-     */
-    @Test fun homeCallbackIsInvoked() {
-        var homeCalled = false
-        val onHome: () -> Unit = { homeCalled = true }
-        onHome()
-        assertTrue("onHome must be invoked", homeCalled)
-    }
-
-    /**
-     * Spec L.12 — The ImportMessagesScreen uses the parent NavController
-     * (no second NavController declared inside).
-     */
-    @Test fun importScreenDoesNotCreateSecondNavController() {
+    @Test
+    fun importButtonDoesNotCommitOnReviewNavigation() {
         val source = readSourceFile()
-        assertFalse("ImportMessagesScreen must not call rememberNavController()", source.contains("rememberNavController()"))
+        assertTrue(source.contains("primaryNavigateReview"))
+        assertTrue(source.contains("SMS_IMPORT_OPEN_REVIEW"))
+        assertTrue(source.contains("openPatternApprovalFromImport"))
+        assertTrue(source.contains("beginTemplateApprovalFromImport"))
+        val openIdx = source.indexOf("SMS_IMPORT_OPEN_PATTERNS")
+        assertTrue(openIdx >= 0)
+        val snippet = source.substring(openIdx, (openIdx + 280).coerceAtMost(source.length))
+        assertTrue(snippet.contains("openPatternApprovalFromImport()"))
+        assertFalse(snippet.contains(".commit("))
     }
 
-    /**
-     * Spec L.13 — The screen is scrollable so the import button is
-     * reachable above the bottom nav.
-     */
-    @Test fun screenIsScrollable() {
+    @Test
+    fun messagesFailuresAreNotSwallowed() {
         val source = readSourceFile()
-        assertTrue("ImportMessagesScreen must use verticalScroll", source.contains("verticalScroll"))
-    }
-
-    /** Spec L.14 — WindowInsets.navigationBars is queried for inset. */
-    @Test fun navigationBarInsetIsApplied() {
-        val source = readSourceFile()
-        assertTrue("ImportMessagesScreen must query navigationBars inset", source.contains("navigationBars"))
-    }
-
-    /**
-     * Spec L.15 — The import button calls the canonical
-     * importOrchestrator.commit, not a fake / preview path.
-     */
-    @Test fun importButtonCallsCanonicalCommit() {
-        val source = readSourceFile()
-        assertTrue("ImportMessagesScreen must call importOrchestrator.commit", source.contains(".commit("))
-    }
-
-    /**
-     * Spec L.16 — The import button never invokes scan again.
-     */
-    @Test fun importButtonDoesNotRescan() {
-        val source = readSourceFile()
-        // The import button onClick body must call .commit() and must
-        // not call .scan() inside the same body.
-        val lines = source.lines()
-        // Find the import button onClick lambda.
-        val importOnClickStart = lines.indexOfFirst { it.contains("SMS_IMPORT_BUTTON_CLICKED") }
-        assertTrue("import button click log must be present", importOnClickStart >= 0)
-        val body = lines.subList((importOnClickStart - 15).coerceAtLeast(0), (importOnClickStart + 25).coerceAtMost(lines.size)).joinToString("\n")
-        assertTrue("Import button must call .commit(", body.contains(".commit("))
-        assertFalse("Import button must not call .scan(", body.contains(".scan("))
-    }
-
-    /**
-     * Spec L.17 — The import button must guard against double-clicks
-     * via the Loading state.
-     */
-    @Test fun importButtonGuardsAgainstDoubleClickViaLoading() {
-        val source = readSourceFile()
-        assertTrue("Must mark Loading before commit", source.contains("ImportExecutionResult.Loading"))
-    }
-
-    /**
-     * Spec L.18 — failures are reported, not silently swallowed.
-     */
-    @Test fun messagesFailuresAreNotSwallowed() {
-        val source = readSourceFile()
-        // The catch block must surface the result as Failure.
-        assertTrue("Must convert exceptions to ImportExecutionResult.Failure", source.contains("ImportExecutionResult.Failure"))
-    }
-
-    /** Spec L.19 — Diagnostics: SMS_IMPORT_BUTTON_CLICKED is logged. */
-    @Test fun diagnosticsLogsImportButtonClick() {
-        val source = readSourceFile()
-        assertTrue("Must log SMS_IMPORT_BUTTON_CLICKED", source.contains("SMS_IMPORT_BUTTON_CLICKED"))
-    }
-
-    /** Spec L.20 — Diagnostics: HOME_NAVIGATION_CLICKED is logged. */
-    @Test fun diagnosticsLogsHomeNavigationClick() {
-        val navSource = java.io.File("/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/PrimaryNavigation.kt").readText()
-        assertTrue("PrimaryNavigation must log HOME_NAVIGATION_CLICKED", navSource.contains("HOME_NAVIGATION_CLICKED"))
+        assertTrue(source.contains("ImportExecutionResult.Failure"))
+        assertTrue(source.contains("SMS_IMPORT_COMMIT_FAILED"))
     }
 
     private fun readSourceFile(): String {
         val candidates = listOf(
             "app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
-            "src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
-            "/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt"
+            "/home/debian/projects/Masroof/app/src/main/kotlin/com/baraa/masroof/ui/senders/ImportMessagesScreen.kt",
         )
         for (path in candidates) {
             val f = java.io.File(path)
             if (f.exists()) return f.readText()
         }
-        throw java.io.FileNotFoundException("ImportMessagesScreen.kt not found in any candidate path")
+        throw java.io.FileNotFoundException("ImportMessagesScreen.kt not found")
     }
 }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import java.time.LocalDate
 
 /**
  * Single source of truth for onboarding state.
@@ -64,7 +65,66 @@ sealed interface OnboardingState {
 }
 
 /** Stable version stamp for the current onboarding flow. */
-const val CURRENT_ONBOARDING_VERSION: Int = 1
+const val CURRENT_ONBOARDING_VERSION: Int = 2
+
+/**
+ * Map a persisted step name (including v1 names) to the nearest v2 resume step.
+ * Unsafe mid-v1 account steps restart at SELECT_SENDER so patterns are created first.
+ *
+ * [onboardingVersion] distinguishes v1 `ACCOUNT` (pre-pattern) from v2 `ACCOUNT`
+ * (post-pattern), which share the same enum name.
+ */
+fun mapPersistedStepName(name: String?, onboardingVersion: Int = CURRENT_ONBOARDING_VERSION): OnboardingStep? {
+    if (name.isNullOrBlank()) return null
+    if (onboardingVersion < 2) {
+        return when (name) {
+            "START_DATE", "ACCOUNT", "OPENING_BALANCE", "PERMISSION", "WELCOME" ->
+                if (name == "PERMISSION" || name == "WELCOME") {
+                    runCatching { OnboardingStep.valueOf(name) }.getOrDefault(OnboardingStep.WELCOME)
+                } else {
+                    OnboardingStep.SELECT_SENDER
+                }
+            "COMPLETION" -> OnboardingStep.COMPLETION
+            else -> OnboardingStep.WELCOME
+        }
+    }
+    return runCatching { OnboardingStep.valueOf(name) }.getOrElse {
+        when (name) {
+            "START_DATE", "OPENING_BALANCE" -> OnboardingStep.SELECT_SENDER
+            else -> OnboardingStep.WELCOME
+        }
+    }
+}
+
+fun nextOnboardingStep(completed: OnboardingStep): OnboardingStep = when (completed) {
+    OnboardingStep.WELCOME -> OnboardingStep.PERMISSION
+    OnboardingStep.PERMISSION -> OnboardingStep.SELECT_SENDER
+    OnboardingStep.SELECT_SENDER -> OnboardingStep.CREATE_PATTERN
+    OnboardingStep.CREATE_PATTERN -> OnboardingStep.PATTERN_SUMMARY
+    OnboardingStep.PATTERN_SUMMARY -> OnboardingStep.SENDER_PATTERN_SUMMARY
+    OnboardingStep.SENDER_PATTERN_SUMMARY -> OnboardingStep.ACCOUNT
+    OnboardingStep.ACCOUNT -> OnboardingStep.IDENTIFIERS
+    OnboardingStep.IDENTIFIERS -> OnboardingStep.IMPORT_PREVIEW
+    OnboardingStep.IMPORT_PREVIEW -> OnboardingStep.LINK_PREVIEW
+    OnboardingStep.LINK_PREVIEW -> OnboardingStep.IMPORT
+    OnboardingStep.IMPORT -> OnboardingStep.COMPLETION
+    OnboardingStep.COMPLETION -> OnboardingStep.COMPLETION
+}
+
+fun previousOnboardingStep(step: OnboardingStep): OnboardingStep = when (step) {
+    OnboardingStep.WELCOME -> OnboardingStep.WELCOME
+    OnboardingStep.PERMISSION -> OnboardingStep.WELCOME
+    OnboardingStep.SELECT_SENDER -> OnboardingStep.PERMISSION
+    OnboardingStep.CREATE_PATTERN -> OnboardingStep.SELECT_SENDER
+    OnboardingStep.PATTERN_SUMMARY -> OnboardingStep.CREATE_PATTERN
+    OnboardingStep.SENDER_PATTERN_SUMMARY -> OnboardingStep.PATTERN_SUMMARY
+    OnboardingStep.ACCOUNT -> OnboardingStep.SENDER_PATTERN_SUMMARY
+    OnboardingStep.IDENTIFIERS -> OnboardingStep.ACCOUNT
+    OnboardingStep.IMPORT_PREVIEW -> OnboardingStep.IDENTIFIERS
+    OnboardingStep.LINK_PREVIEW -> OnboardingStep.IMPORT_PREVIEW
+    OnboardingStep.IMPORT -> OnboardingStep.LINK_PREVIEW
+    OnboardingStep.COMPLETION -> OnboardingStep.IMPORT
+}
 
 interface OnboardingRepository {
     /** Cold Flow of the persisted onboarding state. */
@@ -90,6 +150,13 @@ interface OnboardingRepository {
      */
     suspend fun resetOnboarding()
 
+    /** Process-death-safe draft. SMS bodies and inbox contents are deliberately excluded. */
+    fun loadDraft(): OnboardingDraft?
+
+    fun saveDraft(draft: OnboardingDraft)
+
+    fun clearDraft()
+
     /**
      * Audit log for the [OnboardingRepository] production-readiness
      * checks: the implementation guarantees the flow never emits
@@ -104,12 +171,16 @@ class TestOnboardingRepository(
         lastCompletedStep = null,
         smsPermissionGranted = false,
     ),
+    initialDraft: OnboardingDraft? = null,
 ) : OnboardingRepository {
     private val mutable = MutableStateFlow(initial)
+    private var draft: OnboardingDraft? = initialDraft
     override fun observe(): Flow<OnboardingState> = mutable
     override fun snapshot(): OnboardingState = mutable.value
     override suspend fun markStepCompleted(step: OnboardingStep) {
         if (mutable.value is OnboardingState.Completed) return
+        val previous = (mutable.value as? OnboardingState.Pending)?.lastCompletedStep
+        if (previous != null && previous.ordinal >= step.ordinal) return
         mutable.value = OnboardingState.Pending(
             onboardingVersion = CURRENT_ONBOARDING_VERSION,
             lastCompletedStep = step,
@@ -122,6 +193,7 @@ class TestOnboardingRepository(
             completedAt = System.currentTimeMillis(),
             smsPermissionGranted = (mutable.value as? OnboardingState.Pending)?.smsPermissionGranted ?: false,
         )
+        draft = null
     }
     override suspend fun resetOnboarding() {
         mutable.value = OnboardingState.Pending(
@@ -129,6 +201,14 @@ class TestOnboardingRepository(
             lastCompletedStep = null,
             smsPermissionGranted = (mutable.value as? OnboardingState.Completed)?.smsPermissionGranted ?: false,
         )
+        draft = null
+    }
+    override fun loadDraft(): OnboardingDraft? = draft
+    override fun saveDraft(draft: OnboardingDraft) {
+        this.draft = draft
+    }
+    override fun clearDraft() {
+        draft = null
     }
     override fun isCompleted(): Boolean = mutable.value is OnboardingState.Completed
 }
@@ -165,9 +245,11 @@ class SharedPreferencesOnboardingRepository(
     override suspend fun markStepCompleted(step: OnboardingStep) {
         val current = mutable.value
         if (current is OnboardingState.Completed) return
-        val nextVersion = (current as? OnboardingState.Pending)?.onboardingVersion ?: CURRENT_ONBOARDING_VERSION
+        val previous = (current as? OnboardingState.Pending)?.lastCompletedStep
+        if (previous != null && previous.ordinal >= step.ordinal) return
+        // Pending v1 mid-flow continues under the v2 step machine.
         val updated = OnboardingState.Pending(
-            onboardingVersion = nextVersion,
+            onboardingVersion = CURRENT_ONBOARDING_VERSION,
             lastCompletedStep = step,
             smsPermissionGranted = (current as? OnboardingState.Pending)?.smsPermissionGranted ?: false,
         )
@@ -177,10 +259,13 @@ class SharedPreferencesOnboardingRepository(
 
     override suspend fun markCompleted() {
         val now = System.currentTimeMillis()
-        val current = mutable.value
-        val version = (current as? OnboardingState.Pending)?.onboardingVersion ?: CURRENT_ONBOARDING_VERSION
-        val updated = OnboardingState.Completed(onboardingVersion = version, completedAt = now, smsPermissionGranted = false)
+        val updated = OnboardingState.Completed(
+            onboardingVersion = CURRENT_ONBOARDING_VERSION,
+            completedAt = now,
+            smsPermissionGranted = false,
+        )
         persist(updated)
+        clearDraft()
         mutable.value = updated
     }
 
@@ -191,7 +276,70 @@ class SharedPreferencesOnboardingRepository(
             smsPermissionGranted = (snapshotFromPrefs() as? OnboardingState.Completed)?.smsPermissionGranted ?: false,
         )
         persist(updated)
+        clearDraft()
         mutable.value = updated
+    }
+
+    override fun loadDraft(): OnboardingDraft? {
+        if (!prefs.contains(KEY_DRAFT_STEP)) return null
+        return OnboardingDraft(
+            step = mapPersistedStepName(prefs.getString(KEY_DRAFT_STEP, null)) ?: OnboardingStep.WELCOME,
+            option = enumValueOrDefault(prefs.getString(KEY_DRAFT_OPTION, null), StartDateOption.TODAY),
+            trackingDate = runCatching {
+                LocalDate.parse(prefs.getString(KEY_DRAFT_DATE, null).orEmpty())
+            }.getOrDefault(LocalDate.now()),
+            accountType = enumValueOrDefault(
+                prefs.getString(KEY_DRAFT_ACCOUNT_TYPE, null),
+                com.baraa.masroof.transaction.AccountType.BANK_ACCOUNT,
+            ),
+            displayName = prefs.getString(KEY_DRAFT_DISPLAY_NAME, "").orEmpty(),
+            institution = prefs.getString(KEY_DRAFT_INSTITUTION, "").orEmpty(),
+            patternSourceProfileId = prefs.getLong(KEY_DRAFT_PATTERN_PROFILE_ID, 0L),
+            patternSourceLabel = prefs.getString(KEY_DRAFT_PATTERN_LABEL, "").orEmpty(),
+            lastFour = prefs.getString(KEY_DRAFT_LAST_FOUR, "").orEmpty(),
+            identifierConfirmed = prefs.getBoolean(KEY_DRAFT_IDENTIFIER_CONFIRMED, false),
+            openingBalance = prefs.getString(KEY_DRAFT_OPENING_BALANCE, "0").orEmpty(),
+            currency = enumValueOrDefault(
+                prefs.getString(KEY_DRAFT_CURRENCY, null),
+                com.baraa.masroof.transaction.Currency.SAR,
+            ),
+            includeLiquidity = prefs.getBoolean(KEY_DRAFT_LIQUIDITY, true),
+            includeNetWorth = prefs.getBoolean(KEY_DRAFT_NET_WORTH, true),
+            selectedSenderProfileId = prefs.getLong(KEY_DRAFT_SENDER_PROFILE_ID, 0L),
+            selectedSenderKey = prefs.getString(KEY_DRAFT_SENDER_KEY, "").orEmpty(),
+            selectedSenderDisplay = prefs.getString(KEY_DRAFT_SENDER_DISPLAY, "").orEmpty(),
+            createdAccountId = prefs.getLong(KEY_DRAFT_ACCOUNT_ID, 0L),
+        )
+    }
+
+    override fun saveDraft(draft: OnboardingDraft) {
+        prefs.edit()
+            .putString(KEY_DRAFT_STEP, draft.step.name)
+            .putString(KEY_DRAFT_OPTION, draft.option.name)
+            .putString(KEY_DRAFT_DATE, draft.trackingDate.toString())
+            .putString(KEY_DRAFT_ACCOUNT_TYPE, draft.accountType.name)
+            .putString(KEY_DRAFT_DISPLAY_NAME, draft.displayName)
+            .putString(KEY_DRAFT_INSTITUTION, draft.institution)
+            .putLong(KEY_DRAFT_PATTERN_PROFILE_ID, draft.patternSourceProfileId)
+            .putString(KEY_DRAFT_PATTERN_LABEL, draft.patternSourceLabel)
+            .putString(KEY_DRAFT_LAST_FOUR, draft.lastFour)
+            .putBoolean(KEY_DRAFT_IDENTIFIER_CONFIRMED, draft.identifierConfirmed)
+            .putString(KEY_DRAFT_OPENING_BALANCE, draft.openingBalance)
+            .putString(KEY_DRAFT_CURRENCY, draft.currency.name)
+            .putBoolean(KEY_DRAFT_LIQUIDITY, draft.includeLiquidity)
+            .putBoolean(KEY_DRAFT_NET_WORTH, draft.includeNetWorth)
+            .putLong(KEY_DRAFT_SENDER_PROFILE_ID, draft.selectedSenderProfileId)
+            .putString(KEY_DRAFT_SENDER_KEY, draft.selectedSenderKey)
+            .putString(KEY_DRAFT_SENDER_DISPLAY, draft.selectedSenderDisplay)
+            .putLong(KEY_DRAFT_ACCOUNT_ID, draft.createdAccountId)
+            .apply()
+    }
+
+    override fun clearDraft() {
+        prefs.edit().apply {
+            DRAFT_KEYS.forEach(::remove)
+            apply()
+        }
     }
 
     private fun persist(state: OnboardingState) {
@@ -225,9 +373,10 @@ class SharedPreferencesOnboardingRepository(
             )
         }
         val lastStepName = prefs.getString(KEY_LAST_STEP, null)
-        val lastStep = lastStepName?.let { runCatching { OnboardingStep.valueOf(it) }.getOrNull() }
+        val version = prefs.getInt(KEY_VERSION, CURRENT_ONBOARDING_VERSION)
+        val lastStep = mapPersistedStepName(lastStepName, version)
         return OnboardingState.Pending(
-            onboardingVersion = prefs.getInt(KEY_VERSION, CURRENT_ONBOARDING_VERSION),
+            onboardingVersion = version,
             lastCompletedStep = lastStep,
             smsPermissionGranted = false,
         )
@@ -239,8 +388,49 @@ class SharedPreferencesOnboardingRepository(
         const val KEY_VERSION: String = "onboarding_version"
         const val KEY_LAST_STEP: String = "onboarding_last_step"
         const val KEY_COMPLETED_AT: String = "onboarding_completed_at"
+        private const val KEY_DRAFT_STEP = "draft_step"
+        private const val KEY_DRAFT_OPTION = "draft_option"
+        private const val KEY_DRAFT_DATE = "draft_date"
+        private const val KEY_DRAFT_ACCOUNT_TYPE = "draft_account_type"
+        private const val KEY_DRAFT_DISPLAY_NAME = "draft_display_name"
+        private const val KEY_DRAFT_INSTITUTION = "draft_institution"
+        private const val KEY_DRAFT_PATTERN_PROFILE_ID = "draft_pattern_profile_id"
+        private const val KEY_DRAFT_PATTERN_LABEL = "draft_pattern_label"
+        private const val KEY_DRAFT_LAST_FOUR = "draft_last_four"
+        private const val KEY_DRAFT_IDENTIFIER_CONFIRMED = "draft_identifier_confirmed"
+        private const val KEY_DRAFT_OPENING_BALANCE = "draft_opening_balance"
+        private const val KEY_DRAFT_CURRENCY = "draft_currency"
+        private const val KEY_DRAFT_LIQUIDITY = "draft_liquidity"
+        private const val KEY_DRAFT_NET_WORTH = "draft_net_worth"
+        private const val KEY_DRAFT_SENDER_PROFILE_ID = "draft_sender_profile_id"
+        private const val KEY_DRAFT_SENDER_KEY = "draft_sender_key"
+        private const val KEY_DRAFT_SENDER_DISPLAY = "draft_sender_display"
+        private const val KEY_DRAFT_ACCOUNT_ID = "draft_account_id"
+        private val DRAFT_KEYS = listOf(
+            KEY_DRAFT_STEP,
+            KEY_DRAFT_OPTION,
+            KEY_DRAFT_DATE,
+            KEY_DRAFT_ACCOUNT_TYPE,
+            KEY_DRAFT_DISPLAY_NAME,
+            KEY_DRAFT_INSTITUTION,
+            KEY_DRAFT_PATTERN_PROFILE_ID,
+            KEY_DRAFT_PATTERN_LABEL,
+            KEY_DRAFT_LAST_FOUR,
+            KEY_DRAFT_IDENTIFIER_CONFIRMED,
+            KEY_DRAFT_OPENING_BALANCE,
+            KEY_DRAFT_CURRENCY,
+            KEY_DRAFT_LIQUIDITY,
+            KEY_DRAFT_NET_WORTH,
+            KEY_DRAFT_SENDER_PROFILE_ID,
+            KEY_DRAFT_SENDER_KEY,
+            KEY_DRAFT_SENDER_DISPLAY,
+            KEY_DRAFT_ACCOUNT_ID,
+        )
     }
 }
+
+private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String?, default: T): T =
+    value?.let { runCatching { enumValueOf<T>(it) }.getOrNull() } ?: default
 
 /**
  * Cold Flow that re-emits the permission state on every subscription

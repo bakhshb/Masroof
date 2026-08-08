@@ -107,6 +107,19 @@ class LedgerRepository(
         create(replacement)
     }
 
+    /**
+     * Deletes non-posted journals for a transaction after a failed link attempt.
+     * Never touches POSTED / REVERSED / VOIDED entries.
+     */
+    suspend fun discardUnpostedDrafts(transactionId: Long) = database.withTransaction {
+        journalDao.getForTransaction(transactionId)
+            .filter {
+                it.postingStatus == JournalPostingStatus.NEEDS_REVIEW ||
+                    it.postingStatus == JournalPostingStatus.DRAFT
+            }
+            .forEach { journalDao.deleteJournal(it.id) }
+    }
+
     /** Reverse a posted journal then create a reviewable corrected replacement. */
     suspend fun correctPosted(journalId: Long, replacement: JournalDraft): Long = database.withTransaction {
         val original = requireNotNull(journalDao.getWithPostings(journalId)) { "journal_missing" }

@@ -18,7 +18,7 @@ class DeclinedRule : TransactionRule {
     override val name: String = "DeclinedRule"
     override val priority: RulePriority = RulePriority.SAFETY
     override fun evaluate(input: RuleInput, context: RuleContext): RuleResult? {
-        if (input.type != TransactionType.DECLINED && input.status != TransactionStatus.DECLINED) return null
+        if (input.status != TransactionStatus.DECLINED) return null
         return RuleResult(
             financialTreatment = FinancialTreatment.IGNORED,
             categoryId = null,
@@ -39,9 +39,8 @@ class CreditLimitChangeRule : TransactionRule {
     override val priority: RulePriority = RulePriority.SAFETY
     override fun evaluate(input: RuleInput, context: RuleContext): RuleResult? {
         val body = input.body.orEmpty().lowercase(java.util.Locale.ROOT)
-        val fromType = input.type == TransactionType.CREDIT_LIMIT_CHANGE
         val fromBody = LIMIT_CUES.any { it in body }
-        if (!fromType && !fromBody) return null
+        if (!fromBody) return null
         return RuleResult(
             financialTreatment = FinancialTreatment.IGNORED,
             categoryId = null,

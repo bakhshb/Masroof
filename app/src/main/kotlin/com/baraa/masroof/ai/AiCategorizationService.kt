@@ -146,9 +146,7 @@ class AiCategorizationService(
         private val NEVER_AI_TYPES = setOf(
             TransactionType.REFUND,
             TransactionType.SALARY,
-            TransactionType.DEPOSIT,
             TransactionType.INTERNAL_TRANSFER,
-            TransactionType.INVESTMENT_TRANSFER,
             TransactionType.TRANSFER_IN,
             TransactionType.TRANSFER_OUT,
             TransactionType.CARD_PAYMENT,

@@ -40,7 +40,8 @@ import com.baraa.masroof.R
 import com.baraa.masroof.diagnostics.FakeSmsSamples
 import com.baraa.masroof.diagnostics.FakeTransactionStore
 import com.baraa.masroof.diagnostics.TextSanitizer
-import com.baraa.masroof.transaction.BankParserRegistry
+import com.baraa.masroof.sms.TemplateResolutionResult
+import com.baraa.masroof.sms.TemplateResolutionService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -129,11 +130,18 @@ fun TestDataModeScreen(onClose: () -> Unit) {
                                 Button(onClick = {
                                     scope.launch {
                                         val result = withContext(Dispatchers.Default) {
-                                            val parsed = BankParserRegistry.parse(
+                                            val profile = app.senderProfileRepository.findByRawSender(sample.sender)
+                                            val patterns = profile?.let {
+                                                app.messagePatternRepository.getForSender(it.id)
+                                            }.orEmpty()
+                                            val outcome = TemplateResolutionService.resolve(
                                                 sender = sample.sender,
                                                 body = sample.body,
                                                 smsTimestampMillis = null,
+                                                patterns = patterns,
                                             )
+                                            val parsed = (outcome as? TemplateResolutionResult.Matched)?.parsed
+                                                ?: return@withContext false
                                             FakeTransactionStore.addFromParse(
                                                 sampleId = sample.id,
                                                 sender = sample.sender,
@@ -146,9 +154,14 @@ fun TestDataModeScreen(onClose: () -> Unit) {
                                                 date = parsed.transactionDate,
                                                 time = parsed.transactionTime,
                                             )
+                                            true
                                         }
                                         count = FakeTransactionStore.count()
-                                        toast = context.getString(R.string.test_data_loaded, 1)
+                                        toast = if (result) {
+                                            context.getString(R.string.test_data_loaded, 1)
+                                        } else {
+                                            "لا يوجد قالب معتمد وفعال مطابق للعينة"
+                                        }
                                     }
                                 }) { Text(stringResource(R.string.test_data_load)) }
                             }
