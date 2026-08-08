@@ -709,6 +709,24 @@ class MessagePatternRepository(
         val existing = withContext(Dispatchers.IO) {
             definitionDao.getForSender(senderProfileId)
         }
+        // Semantic family identity (not exact variant identity) of every
+        // family previously represented by an APPROVED / IGNORED pattern for
+        // this sender. A genuinely new semantic family discovered during
+        // rebuild must NOT become APPROVED without user approval; it becomes
+        // an UNKNOWN candidate under "تحتاج اعتماد". A previously IGNORED
+        // family must remain ignored; a previously UNKNOWN family must remain
+        // UNKNOWN. Only a previously APPROVED (even if stale) family may be
+        // rebuilt as APPROVED.
+        val previousFamilyStatus = HashMap<String, MessagePatternStatus>()
+        for (row in existing) {
+            val key = semanticFamilyKeyOf(row) ?: continue
+            val prev = previousFamilyStatus[key]
+            if (prev == null ||
+                familyStatusPrecedence(row.status) < familyStatusPrecedence(prev)
+            ) {
+                previousFamilyStatus[key] = row.status
+            }
+        }
         val discovery = withContext(Dispatchers.Default) {
             PatternDiscoveryService.discoverSafely(messages, existing)
         }
@@ -719,6 +737,8 @@ class MessagePatternRepository(
         }
         if (clusters.isEmpty()) {
             return RebuildSummary(
+                rebuiltApprovedFamilies = 0,
+                newCandidateFamilies = 0,
                 rebuiltVariants = 0,
                 staleDeprecated = 0,
                 discovery = discovery,
@@ -727,28 +747,46 @@ class MessagePatternRepository(
         return withContext(Dispatchers.IO) {
             inTransaction {
                 val ts = now()
+                val rebuiltApprovedFamilyKeys = mutableSetOf<String>()
+                var rebuiltApprovedFamilies = 0
+                var newCandidateFamilies = 0
                 for (cluster in clusters) {
+                    val previousStatus = previousFamilyStatus[cluster.familyKey]
+                    val (status, userConfirmed) = when (previousStatus) {
+                        MessagePatternStatus.APPROVED ->
+                            MessagePatternStatus.APPROVED to true
+                        MessagePatternStatus.IGNORED ->
+                            MessagePatternStatus.IGNORED to true
+                        // New semantic family, or previously UNKNOWN / DEPRECATED:
+                        // never auto-approve; surface as a candidate instead.
+                        else -> MessagePatternStatus.UNKNOWN to false
+                    }
                     saveDiscoveredInternal(
-                        senderProfileId,
-                        cluster,
-                        MessagePatternStatus.APPROVED,
+                        senderProfileId = senderProfileId,
+                        discovered = cluster,
+                        status = status,
+                        userConfirmed = userConfirmed,
                         replaceExampleCount = true,
                     )
+                    when (status) {
+                        MessagePatternStatus.APPROVED -> {
+                            rebuiltApprovedFamilyKeys += cluster.familyKey
+                            rebuiltApprovedFamilies++
+                        }
+                        // Only a genuinely new family (no prior row of any
+                        // status) counts as a fresh candidate awaiting approval;
+                        // a previously UNKNOWN family re-saved stays UNKNOWN but
+                        // is not a *new* candidate.
+                        MessagePatternStatus.UNKNOWN -> if (previousStatus == null) newCandidateFamilies++
+                        else -> Unit
+                    }
                 }
-                val rebuiltFamilyKeys = clusters.map { it.familyKey }.toSet()
                 var staleDeprecated = 0
                 for (original in existing) {
-                    val originalFamilyKey = runCatching {
-                        (
-                            com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
-                                original.templateText,
-                                original.transactionType,
-                            ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
-                            )?.key
-                    }.getOrNull()
+                    val originalFamilyKey = semanticFamilyKeyOf(original) ?: continue
                     val current = definitionDao.getById(original.id) ?: continue
                     if (
-                        originalFamilyKey in rebuiltFamilyKeys &&
+                        originalFamilyKey in rebuiltApprovedFamilyKeys &&
                         com.baraa.masroof.sms.PatternRuntimeEligibility.evaluate(current) ==
                         com.baraa.masroof.sms.PatternRuntimeEligibilityResult.STALE_NORMALIZATION
                     ) {
@@ -764,6 +802,8 @@ class MessagePatternRepository(
                     }
                 }
                 RebuildSummary(
+                    rebuiltApprovedFamilies = rebuiltApprovedFamilies,
+                    newCandidateFamilies = newCandidateFamilies,
                     rebuiltVariants = clusters.sumOf {
                         it.exactVariants.ifEmpty { listOf(it) }.size
                     },
@@ -775,6 +815,8 @@ class MessagePatternRepository(
     }
 
     data class RebuildSummary(
+        val rebuiltApprovedFamilies: Int = 0,
+        val newCandidateFamilies: Int = 0,
         val rebuiltVariants: Int,
         val staleDeprecated: Int,
         val discovery: com.baraa.masroof.sms.PatternDiscoveryResult? = null,
@@ -1182,4 +1224,29 @@ class MessagePatternRepository(
 
     private fun revisionSignature(base: String, lineageId: Long, version: Int): String =
         "${base.substringBefore("#revision:")}#revision:$lineageId:$version"
+
+    /**
+     * Runtime/semantic family identity of a saved pattern, derived through the
+     * same [com.baraa.masroof.sms.SemanticPatternSchemaNormalizer] used during
+     * discovery. Returns null for rows whose structure cannot be safely
+     * projected (legacy signature-only, ambiguous, or non-financial).
+     */
+    private fun semanticFamilyKeyOf(
+        definition: MessagePatternDefinitionEntity,
+    ): String? = runCatching {
+        (
+            com.baraa.masroof.sms.SemanticPatternSchemaNormalizer.fromTemplate(
+                definition.templateText,
+                definition.transactionType,
+            ) as? com.baraa.masroof.sms.SemanticSchemaResult.Safe
+        )?.key
+    }.getOrNull()
+
+    /** Lower number = stronger prior user decision. */
+    private fun familyStatusPrecedence(status: MessagePatternStatus): Int = when (status) {
+        MessagePatternStatus.APPROVED -> 0
+        MessagePatternStatus.IGNORED -> 1
+        MessagePatternStatus.UNKNOWN -> 2
+        MessagePatternStatus.DEPRECATED -> 3
+    }
 }

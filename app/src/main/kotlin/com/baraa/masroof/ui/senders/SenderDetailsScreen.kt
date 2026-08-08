@@ -380,13 +380,16 @@ fun SenderDetailsScreen(
                                     }
                                     app.importSessionStore.markTemplatesChanged()
                                     val failed = summary.discovery?.failedMessages ?: 0
-                                    "أعيد بناء ${summary.rebuiltVariants} صيغة — " +
-                                        "${summary.staleDeprecated} قديم تم تعطيله" +
-                                        if (failed > 0) {
-                                            " — تم تجاوز $failed لتعذر تحليلها"
-                                        } else {
-                                            ""
+                                    buildString {
+                                        append("تم تحديث ${summary.rebuiltApprovedFamilies} أنماط معتمدة")
+                                        append(" — ${summary.newCandidateFamilies} أنماط جديدة تحتاج اعتماد")
+                                        if (summary.staleDeprecated > 0) {
+                                            append(" — ${summary.staleDeprecated} قديم تم تعطيله")
                                         }
+                                        if (failed > 0) {
+                                            append(" — تم تجاوز $failed لتعذر تحليلها")
+                                        }
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f),
