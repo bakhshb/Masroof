@@ -683,7 +683,10 @@ fun SenderDetailsScreen(
                         is com.baraa.masroof.sms.PatternDraftResult.NonFinancial ->
                             draftFailure = "هذه الرسالة غير مالية (${result.reason}) — اختر رسالة أخرى"
                         is com.baraa.masroof.sms.PatternDraftResult.Failed ->
-                            draftFailure = "تعذر تحليل هذه الرسالة (${result.stage}) — اختر رسالة أخرى"
+                            draftFailure = buildString {
+                                append("تعذر تحليل هذه الرسالة (${result.stage}) — اختر رسالة أخرى")
+                                if (result.detail.isNotBlank()) append("\n${result.detail}")
+                            }
                     }
                 }
             },
@@ -972,6 +975,24 @@ private fun ZeroDiscoveryDialog(
                             "${b.stage.name} — ${b.count} ${b.exceptionClass}$tag",
                             style = FinancialTypography.metadata,
                         )
+                        if (b.exceptionMessage.isNotBlank()) {
+                            Text(
+                                "missing/رسالة: ${b.exceptionMessage}",
+                                style = FinancialTypography.metadata,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        if (b.causeClass.isNotBlank()) {
+                            Text(
+                                "cause: ${b.causeClass}${if (b.causeMessage.isNotBlank()) ": " + b.causeMessage else ""}",
+                                style = FinancialTypography.metadata,
+                            )
+                        }
+                        if (b.topStackFrames.isNotEmpty()) {
+                            b.topStackFrames.take(3).forEach { frame ->
+                                Text("at $frame", style = FinancialTypography.metadata)
+                            }
+                        }
                     }
                 }
                 if (!result.isReconciled()) {

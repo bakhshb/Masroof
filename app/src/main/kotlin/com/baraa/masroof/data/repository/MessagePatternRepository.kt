@@ -165,8 +165,8 @@ class MessagePatternRepository(
                         "تعذر إنشاء قالب بنيوي من الرسالة",
                     )
                 }
-                val labels = LineBasedFieldParser.splitLines(inboxBody).map { it.label }
-                val fields = PatternDiscoveryService.suggestFields(labels)
+                val lines = LineBasedFieldParser.splitLines(inboxBody)
+                val fields = PatternDiscoveryService.suggestFields(lines)
                 val nextVersion = (definitionDao.getByLineage(lineageId).maxOfOrNull { it.version }
                     ?: legacy.version) + 1
                 val ts = now()
@@ -1192,7 +1192,7 @@ class MessagePatternRepository(
         persistFields(
             id,
             PatternDiscoveryService.suggestFields(
-                com.baraa.masroof.transaction.LineBasedFieldParser.splitLines(body.orEmpty()).map { it.label },
+                com.baraa.masroof.transaction.LineBasedFieldParser.splitLines(body.orEmpty()),
             ),
             built.placeholders,
         )

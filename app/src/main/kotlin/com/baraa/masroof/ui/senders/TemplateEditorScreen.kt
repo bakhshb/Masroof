@@ -65,6 +65,14 @@ import com.baraa.masroof.ui.theme.SecondaryButton
 import com.baraa.masroof.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
+/** Editor save error: a generic message, or a specific suspicious-digit-run
+ *  finding that the user can auto-replace in one tap. */
+sealed class EditorError {
+    data class Generic(val messageAr: String) : EditorError()
+    data class DigitRun(val finding: com.baraa.masroof.sms.DigitRunFinding) : EditorError()
+}
+
+
 @Composable
 fun TemplateEditorScreen(
     patternId: Long,
@@ -220,11 +228,15 @@ private fun TemplateEditorContent(
     var selectedType by remember(editorKey) { mutableStateOf(initialDraft.transactionType) }
     var direction by remember(editorKey) { mutableStateOf(initialDraft.direction) }
     var templateText by remember(editorKey) { mutableStateOf(initialDraft.templateText) }
+    var templateEdited by remember(editorKey) { mutableStateOf(false) }
     var status by remember(editorKey) { mutableStateOf(initialDraft.status) }
     var active by remember(editorKey) { mutableStateOf(initialDraft.active) }
     var saving by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var showFullTemplate by remember { mutableStateOf(false) }
+    var errorState by remember { mutableStateOf<EditorError?>(null) }
+    // New (auto-generated) drafts surface the full template text so the
+    // user can review and edit the capture without an extra tap. Existing
+    // patterns (which already have a saved template) keep the preview-first
+    // default to avoid a large text area on first open.
     var showAdvanced by remember { mutableStateOf(false) }
     var showTypePicker by remember { mutableStateOf(false) }
     var editingFieldIndex by remember { mutableStateOf<Int?>(null) }
@@ -263,17 +275,70 @@ private fun TemplateEditorContent(
             }
         } catch (t: Throwable) {
             android.util.Log.e("TemplateEditor", "navigation after save failed id=$savedPatternId", t)
-            error = "تم الحفظ لكن تعذر الرجوع: ${t.message ?: t.javaClass.simpleName}"
+            errorState = EditorError.Generic("تم الحفظ لكن تعذر الرجوع: ${t.message ?: t.javaClass.simpleName}")
         }
     }
 
+    /**
+     * Ensure [fields] contains a definition for every {{TOKEN}} in [templateText].
+     * Auto-infers canonicalField from the token name, default placeholder token
+     * from the field type, and a sensible sourceLabel/role so the user only
+     * has to touch the template text itself to fix a capture mistake.
+     * Preserves any existing field definitions the user already configured.
+     */
+    fun autoSyncFieldsWithTemplate() {
+        val tokenRegex = Regex("""\{([A-Z][A-Z0-9_]*)\}""")
+        val templateTokens = tokenRegex.findAll(templateText).map { it.groupValues[1] }.toSet()
+        val definedTokens = fields.map { it.placeholderToken.trim().uppercase() }.toSet()
+        val missing = templateTokens - definedTokens
+        if (missing.isEmpty()) return
+        val additions = missing.map { token ->
+            val canonical = com.baraa.masroof.sms.TemplateResolutionService.fieldForPlaceholderToken(token)
+            val placeholder = if (token == com.baraa.masroof.sms.TemplateResolutionService
+                    .defaultPlaceholder(canonical)) token
+            else token
+            TemplateFieldDraft(
+                placeholderToken = placeholder,
+                canonicalField = canonical,
+                sourceLabel = placeholder,
+                role = when (canonical) {
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4,
+                -> com.baraa.masroof.data.db.PatternFieldRole.SOURCE
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4,
+                com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4,
+                -> com.baraa.masroof.data.db.PatternFieldRole.DESTINATION
+                else -> com.baraa.masroof.data.db.PatternFieldRole.PRIMARY
+            },
+                valueType = com.baraa.masroof.sms.TemplateEditValidator.expectedValueTypeForUi(canonical),
+                required = canonical == com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT,
+            )
+        }
+        fields = fields + additions
+    }
+
     fun save(approve: Boolean) {
+        // Auto-sync field definitions with the (possibly user-edited) template
+        // so editing the template text alone is enough to fix a capture — the
+        // strict "missing field" error cannot fire on a template the user
+        // authored.
+        autoSyncFieldsWithTemplate()
         val value = draft()
+        // Unedited auto-generated drafts (e.g. from PatternDraftFactory) are
+        // engine-clean: every digit is already a placeholder. Only enforce the
+        // suspicious-digit-run check once the user actually edits the template.
+        if (templateEdited) {
+            val digitRun = TemplateEditValidator.findSuspiciousDigitRun(value.templateText)
+            if (digitRun != null) {
+                errorState = EditorError.DigitRun(digitRun)
+                return
+            }
+        }
         when (val validation = TemplateEditValidator.validate(value)) {
-            is TemplateEditValidation.Error -> error = validation.messageAr
+            is TemplateEditValidation.Error -> errorState = EditorError.Generic(validation.messageAr)
             TemplateEditValidation.Ok -> scope.launch {
                 saving = true
-                error = null
+                errorState = null
                 try {
                     val result = onSave(value, approve)
                     when (result) {
@@ -284,21 +349,21 @@ private fun TemplateEditorContent(
                             return@launch
                         }
                         is MessagePatternRepository.TemplateUpdateResult.ValidationError ->
-                            error = result.messageAr
+                            errorState = EditorError.Generic(result.messageAr)
                         MessagePatternRepository.TemplateUpdateResult.NotFound ->
-                            error = "النمط غير موجود"
+                            errorState = EditorError.Generic("النمط غير موجود")
                         MessagePatternRepository.TemplateUpdateResult.SenderNotFound ->
-                            error = "المرسل غير موجود"
+                            errorState = EditorError.Generic("المرسل غير موجود")
                         MessagePatternRepository.TemplateUpdateResult.SenderInactive ->
-                            error = "المرسل غير نشط"
+                            errorState = EditorError.Generic("المرسل غير نشط")
                         is MessagePatternRepository.TemplateUpdateResult.CanonicalCollision ->
-                            error = "يوجد نمط آخر بنفس البنية"
+                            errorState = EditorError.Generic("يوجد نمط آخر بنفس البنية")
                         is MessagePatternRepository.TemplateUpdateResult.Failure ->
-                            error = result.messageAr
+                            errorState = EditorError.Generic(result.messageAr)
                     }
                 } catch (t: Throwable) {
                     android.util.Log.e("TemplateEditor", "save crashed", t)
-                    error = "تعذر حفظ النمط: ${t.message ?: t.javaClass.simpleName}"
+                    errorState = EditorError.Generic("تعذر حفظ النمط: ${t.message ?: t.javaClass.simpleName}")
                 }
                 saving = false
             }
@@ -381,20 +446,17 @@ private fun TemplateEditorContent(
             }
 
             EditorSection("بنية الرسالة") {
-                val preview = templateText.lineSequence().take(4).joinToString("\n").ifBlank { "—" }
-                Text(preview, style = FinancialTypography.metadata, maxLines = 4)
-                TextButton(onClick = { showFullTemplate = !showFullTemplate }) {
-                    Text(if (showFullTemplate) "إخفاء النص الكامل" else "عرض النص الكامل")
-                }
-                if (showFullTemplate) {
-                    OutlinedTextField(
-                        templateText,
-                        onValueChange = { templateText = it },
-                        label = { Text("نص بنية النمط") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                    )
-                }
+                // The template text is always directly editable as free text so
+                // any capture mistake (garbled merchant, missing field, extra
+                // line) is fixable from the app. Field definitions auto-sync
+                // with the template tokens on save (see save()).
+                OutlinedTextField(
+                    value = templateText,
+                    onValueChange = { templateText = it; templateEdited = true },
+                    label = { Text("نص بنية النمط (حر — عدّل مباشرة)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 6,
+                )
             }
 
             sanitizedExample?.takeIf { it.isNotBlank() }?.let { sample ->
@@ -446,7 +508,20 @@ private fun TemplateEditorContent(
                     }
                 }
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            errorState?.let { err ->
+                when (err) {
+                    is EditorError.Generic -> Text(err.messageAr, color = MaterialTheme.colorScheme.error)
+                    is EditorError.DigitRun -> DigitRunErrorBlock(
+                        finding = err.finding,
+                        onAutoReplace = { suggested ->
+                            templateText = templateText.replaceFirst(err.finding.rawMatch, suggested)
+                            templateEdited = true
+                            errorState = null
+                        },
+                        onDismiss = { errorState = null },
+                    )
+                }
+            }
             if (isUnknownCandidate) {
                 PrimaryButton(
                     label = if (saving) "جارٍ الحفظ…" else "حفظ واعتماد",
@@ -649,4 +724,29 @@ private fun expectedValueType(field: PatternCanonicalField): PatternValueType = 
     PatternCanonicalField.TRANSACTION_DATE -> PatternValueType.DATE
     PatternCanonicalField.TRANSACTION_TIME -> PatternValueType.TIME
     else -> PatternValueType.TEXT
+}
+
+@Composable
+private fun DigitRunErrorBlock(
+    finding: com.baraa.masroof.sms.DigitRunFinding,
+    onAutoReplace: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.x1),
+    ) {
+        Text(
+            "تتابع رقمي في السطر ${finding.lineNumber}: '${finding.rawMatch}' — استبدله تلقائيًا بـ ${finding.suggestedPlaceholder}؟",
+            color = MaterialTheme.colorScheme.error,
+            style = FinancialTypography.metadata,
+        )
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.x2),
+        ) {
+            androidx.compose.material3.TextButton(onClick = { onAutoReplace(finding.suggestedPlaceholder) }) {
+                Text("استبدال بـ ${finding.suggestedPlaceholder}")
+            }
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("إلغاء") }
+        }
+    }
 }

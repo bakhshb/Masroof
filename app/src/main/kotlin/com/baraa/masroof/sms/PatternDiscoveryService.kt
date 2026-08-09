@@ -26,6 +26,16 @@ data class PatternDiscoveryFailure(
     val bodyHash: String,
     val stage: PatternDiscoveryStage,
     val exceptionClass: String,
+    /** DEBUG-only: throwable.message (for NoClassDefFoundError this is the
+     *  missing class FQN). Never contains SMS content. Empty in release. */
+    val exceptionMessage: String = "",
+    /** DEBUG-only: cause class simple name, or "". */
+    val causeClass: String = "",
+    /** DEBUG-only: cause.message, or "". */
+    val causeMessage: String = "",
+    /** DEBUG-only: first few stack frames as "ClassName.methodName(fileName:line)".
+     *  Internal class/method names only — never SMS. Empty in release. */
+    val topStackFrames: List<String> = emptyList(),
 )
 
 data class PatternDiscoveryResult(
@@ -76,6 +86,10 @@ data class PatternDiscoveryResult(
                     count = list.size,
                     optional = key.third,
                     sampleBodyHashes = list.map { it.second.bodyHash }.distinct().take(3),
+                    exceptionMessage = list.firstOrNull()?.second?.exceptionMessage.orEmpty(),
+                    causeClass = list.firstOrNull()?.second?.causeClass.orEmpty(),
+                    causeMessage = list.firstOrNull()?.second?.causeMessage.orEmpty(),
+                    topStackFrames = list.firstOrNull()?.second?.topStackFrames.orEmpty(),
                 )
             }
             .sortedWith(
@@ -95,6 +109,11 @@ data class StageFailureBreakdown(
     val optional: Boolean,
     /** First 3 short body hashes for this group (never raw SMS). */
     val sampleBodyHashes: List<String>,
+    /** DEBUG-only representative throwable detail (first failure in group). */
+    val exceptionMessage: String = "",
+    val causeClass: String = "",
+    val causeMessage: String = "",
+    val topStackFrames: List<String> = emptyList(),
 )
 
 data class DiscoveredMessagePattern(
@@ -163,7 +182,7 @@ data class OptionalDiscoveryStages(
     val fingerprint: (String) -> SemanticPatternCanonicalizer.Fingerprint =
         SemanticPatternCanonicalizer::fromBody,
     val suggestFields: (List<com.baraa.masroof.transaction.ParsedLine>) -> List<SuggestedPatternField> =
-        { lines -> PatternDiscoveryService.suggestFields(lines.map { it.label }) },
+        { lines -> PatternDiscoveryService.suggestFields(lines) },
 ) {
     companion object { val DEFAULT = OptionalDiscoveryStages() }
 }
@@ -480,7 +499,46 @@ object PatternDiscoveryService {
         bodyHash = safeHash(body),
         stage = stage,
         exceptionClass = cause.javaClass.simpleName.ifBlank { cause.javaClass.name },
+        exceptionMessage = safeDebugMessage(cause),
+        causeClass = cause.cause?.javaClass?.simpleName?.ifBlank { cause.cause?.javaClass?.name }.orEmpty(),
+        causeMessage = safeDebugMessage(cause.cause),
+        topStackFrames = safeDebugStackFrames(cause),
     )
+
+    /**
+     * DEBUG-only, SMS-free throwable detail. [NoClassDefFoundError.message]
+     * is normally the missing class FQN — exactly what is needed to diagnose
+     * Android class-loading/packaging failures. Returns "" in release builds
+     * so no internal detail is surfaced to end users.
+     */
+    private fun safeDebugMessage(throwable: Throwable?): String {
+        if (!com.baraa.masroof.BuildConfig.DEBUG) return ""
+        val message = throwable?.message?.trim().orEmpty()
+        // No SMS can appear here (this is an exception message), but guard
+        // against an unreasonably long message just in case.
+        return message.take(200)
+    }
+
+    private fun safeDebugStackFrames(throwable: Throwable): List<String> {
+        if (!com.baraa.masroof.BuildConfig.DEBUG) return emptyList()
+        return throwable.stackTrace.take(5).map { frame ->
+            buildString {
+                append(frame.className.substringAfterLast('.'))
+                append('.')
+                append(frame.methodName)
+                val where = frame.fileName
+                if (where != null) {
+                    append('(')
+                    append(where)
+                    if (frame.lineNumber > 0) {
+                        append(':')
+                        append(frame.lineNumber)
+                    }
+                    append(')')
+                }
+            }
+        }
+    }
 
     private fun safeHash(value: String): String = runCatching {
         MessageDigest.getInstance("SHA-256")
@@ -557,6 +615,38 @@ object PatternDiscoveryService {
         return null
     }
 
+    /**
+     * Value-aware field suggester. Each candidate field is only emitted when
+     * the line value actually fits the canonical shape (a 4-digit for any *_LAST4
+     * field, a money literal for AMOUNT / AVAILABLE_BALANCE / CARD_AMOUNT_DUE,
+     * a date or time for DATE / TIME, …). This keeps the suggested fields in
+     * lock-step with the placeholders MessageTemplateEngine actually inserts
+     * (the engine only writes a `{*_LAST4}` token when the value contains a
+     * 4-digit, an `{AMOUNT}` when the value parses as money, etc.), so the
+     * template ↔ fields contract holds automatically — patterns that need two
+     * last4s (card payment: card last4 + source-account last4) work, and
+     * lines whose label happens to match a field type but whose value is the
+     * type-indicator word (e.g. `بطاقة إئتمانية: تسديد` where the value
+     * `تسديد` is not a 4-digit) no longer produce a spurious unused field.
+     */
+    fun suggestFields(lines: List<com.baraa.masroof.transaction.ParsedLine>): List<SuggestedPatternField> {
+        val out = linkedMapOf<Pair<PatternCanonicalField, String>, SuggestedPatternField>()
+        for (line in lines) {
+            val label = line.label
+            val value = line.value
+            val normalized = CanonicalMessageNormalizer.normalizeLabel(label)
+            for (canonical in CanonicalPatternFieldClassifier.classify(label)) {
+                if (!isValueSuitableFor(canonical, value)) continue
+                val mapped = fieldFor(canonical, label.trim())
+                out.putIfAbsent(canonical to normalized, mapped)
+            }
+        }
+        return out.values.toList()
+    }
+
+    /** Back-compat overload: label-only suggester (no value gate). Prefer the
+     *  value-aware [suggestFields] overload; this is kept so legacy callers
+     *  still compile and behaves like the previous implementation. */
     fun suggestFields(labels: Collection<String>): List<SuggestedPatternField> {
         val out = linkedMapOf<Pair<PatternCanonicalField, String>, SuggestedPatternField>()
         for (label in labels) {
@@ -567,6 +657,45 @@ object PatternDiscoveryService {
             }
         }
         return out.values.toList()
+    }
+
+    private fun isValueSuitableFor(
+        canonical: PatternCanonicalField,
+        value: String,
+    ): Boolean {
+        val v = value.trim()
+        if (v.isEmpty()) return false
+        return when (canonical) {
+            PatternCanonicalField.CREDIT_CARD_LAST4,
+            PatternCanonicalField.DEBIT_CARD_LAST4,
+            PatternCanonicalField.ACCOUNT_LAST4,
+            PatternCanonicalField.SOURCE_ACCOUNT_LAST4,
+            PatternCanonicalField.DESTINATION_ACCOUNT_LAST4,
+            PatternCanonicalField.IBAN_LAST4,
+            PatternCanonicalField.SOURCE_IBAN_LAST4,
+            PatternCanonicalField.DESTINATION_IBAN_LAST4,
+            PatternCanonicalField.WALLET_LAST4,
+            -> com.baraa.masroof.transaction.LineBasedFieldParser
+                .lastFourFromValue(v) != null
+            PatternCanonicalField.TRANSACTION_AMOUNT,
+            PatternCanonicalField.AVAILABLE_BALANCE,
+            PatternCanonicalField.CARD_AMOUNT_DUE,
+            -> // Use the leading-money parser (same helper MessageTemplateEngine
+                // uses via replaceMoneyKeepingCurrency) so compact-English
+                // amount lines with trailing context (e.g. "of: 41.30 SAR At
+                // Merchant") still count as AMOUNT. The anchored parseMoneyValue
+                // rejected those because of the trailing merchant text.
+                com.baraa.masroof.transaction.LineBasedFieldParser
+                    .parseLeadingMoney(v) != null
+            PatternCanonicalField.TRANSACTION_DATE,
+            PatternCanonicalField.TRANSACTION_TIME,
+            -> com.baraa.masroof.transaction.LineBasedFieldParser
+                .parseDateTimeField(listOf(com.baraa.masroof.transaction.ParsedLine("", v)))
+                .let { (d, t) -> d != null || t != null }
+            PatternCanonicalField.CURRENCY -> v.contains("SAR") || v.contains("USD") ||
+                v.contains("EUR") || v.contains("SR") || v.contains("ريال") || v.contains("ر.س")
+            else -> true  // text fields (MERCHANT, BENEFICIARY, REFERENCE, BANK, CHANNEL)
+        }
     }
 
     private fun fieldFor(canonical: PatternCanonicalField, label: String): SuggestedPatternField {

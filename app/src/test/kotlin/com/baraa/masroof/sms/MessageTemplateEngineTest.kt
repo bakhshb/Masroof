@@ -93,11 +93,11 @@ class MessageTemplateEngineTest {
             المعرف البديل الايبان: 6810
         """.trimIndent()
         val built = MessageTemplateEngine.buildFromSms(sms)
-        assertTrue(built.templateText.contains("{ACCOUNT_LAST4}"))
+        assertTrue(built.templateText.contains("{SOURCE_ACCOUNT_LAST4}"))
         assertFalse(built.templateText.contains("{DEBIT_CARD_LAST4}"))
         assertTrue(
-            built.templateText.contains("{IBAN_LAST4}") ||
-                built.placeholders.contains("IBAN_LAST4"),
+            built.templateText.contains("{DESTINATION_IBAN_LAST4}") ||
+                built.placeholders.contains("DESTINATION_IBAN_LAST4"),
         )
     }
 }

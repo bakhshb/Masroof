@@ -32,13 +32,95 @@ data class TemplateFieldDraft(
 
 sealed class TemplateEditValidation {
     data object Ok : TemplateEditValidation()
-    data class Error(val messageAr: String) : TemplateEditValidation()
+    data class Error(
+        val messageAr: String,
+        val digitRun: DigitRunFinding? = null,
+    ) : TemplateEditValidation()
 }
+
+/** Debug-safe location of a suspicious digit run in the template text. */
+data class DigitRunFinding(
+    /** 1-based line number within the template text. */
+    val lineNumber: Int,
+    /** The offending digit run as it appears in the template (digits + spaces/hyphens). */
+    val rawMatch: String,
+    /** The label text of the line (after the first colon, or the whole line if label-only). */
+    val lineLabel: String,
+    /** Suggested placeholder token inferred from the label, e.g. {DATE} / {AMOUNT} / {ACCOUNT_LAST4}. */
+    val suggestedPlaceholder: String,
+)
 
 object TemplateEditValidator {
     private val tokenPattern = Regex("""[A-Z][A-Z0-9_]*""")
-    private val placeholderPattern = Regex("""\{([^{}]+)}""")
+    // Escaped closing brace for Android ICU regex portability (see PatternStructure.PLACEHOLDER).
+    private val placeholderPattern = Regex("""\{([^{}]+)\}""")
     private val suspiciousDigitRun = Regex("""(?:[0-9٠-٩][\s-]?){6,}""")
+
+    /**
+     * Locate the first 6+ digit run in the static text of [templateText]
+     * (placeholders stripped). Returns line number, the raw run, the line label
+     * and a suggested placeholder inferred from the label, or null if clean.
+     */
+    fun findSuspiciousDigitRun(templateText: String): DigitRunFinding? {
+        if (templateText.isBlank()) return null
+        val staticText = placeholderPattern.replace(templateText, " ")
+        val match = suspiciousDigitRun.find(staticText) ?: return null
+        val lineStart = staticText.lastIndexOf('\n', match.range.first - 1) + 1
+        val lineEnd = staticText.indexOf('\n', match.range.last + 1)
+            .takeIf { it >= 0 } ?: staticText.length
+        val staticLine = staticText.substring(lineStart, lineEnd).trim()
+        val lineNumber = staticText.substring(0, lineStart).count { it == '\n' } + 1
+        val rawMatch = staticText.substring(match.range.first, match.range.last + 1)
+        val label = staticLine.substringBefore(':').trim().ifBlank { staticLine }
+        return DigitRunFinding(
+            lineNumber = lineNumber,
+            rawMatch = rawMatch,
+            lineLabel = label,
+            suggestedPlaceholder = suggestPlaceholderFor(label),
+        )
+    }
+
+    /**
+     * Infer a sensible placeholder token from a label. Conservative mapping
+     * covering the labels the corpus / manual drafts actually produce.
+     */
+    fun suggestPlaceholderFor(label: String): String {
+        val shape = labelShape(label)
+        return when {
+            shape.hasAccount -> "{ACCOUNT_LAST4}"
+            shape.hasDateTime -> "{DATE}"
+            shape.hasAmount -> "{AMOUNT}"
+            shape.hasReference -> "{TRANSACTION_ID}"
+            shape.hasMerchant -> "{MERCHANT}"
+            else -> "{VALUE}"
+        }
+    }
+
+    private data class LabelShape(
+        val hasAccount: Boolean,
+        val hasDateTime: Boolean,
+        val hasAmount: Boolean,
+        val hasReference: Boolean,
+        val hasMerchant: Boolean,
+    )
+
+    private fun labelShape(label: String): LabelShape {
+        val folded = MessageTypeCueCatalog.foldArabic(label)
+        val hasAmount = com.baraa.masroof.transaction.MonetaryFieldClassifier
+            .isTransactionAmount(label)
+        val hasDateTime = folded == "في" || folded == "on" ||
+            folded.contains("تاريخ") || folded.contains("date")
+        val hasAccount = folded == "من" || folded == "حساب" || folded == "الحساب" ||
+            folded == "رقم الحساب" || folded.contains("حساب") || folded.contains("account") ||
+            folded == "الي" || folded == "إلى" || folded == "الى" ||
+            folded.contains("بطاقه") || folded.contains("بطاقة") || folded.contains("card")
+        val hasReference = folded == "ref" || folded.contains("مرجع") ||
+            folded.contains("reference") || folded.contains("رقم العمليه") ||
+            folded.contains("رقم المعامله")
+        val hasMerchant = folded == "لدى" || folded == "at" ||
+            folded == "التاجر" || folded.contains("تاجر") || folded.contains("merchant")
+        return LabelShape(hasAccount, hasDateTime, hasAmount, hasReference, hasMerchant)
+    }
 
     fun validate(draft: TemplateEditDraft): TemplateEditValidation {
         if (draft.senderProfileId <= 0L) {
@@ -50,11 +132,14 @@ object TemplateEditValidator {
         if (draft.templateText.isBlank()) {
             return error("نص القالب مطلوب ولا يمكن أن يكون فارغًا")
         }
-        val staticText = placeholderPattern.replace(draft.templateText, " ")
-        if (suspiciousDigitRun.containsMatchIn(staticText)) {
-            return error("يبدو أن نص القالب يحتوي رقم حساب/بطاقة/هاتف شخصيًا؛ استبدله بحقل نائب")
+        val digitRun = findSuspiciousDigitRun(draft.templateText)
+        if (digitRun != null) {
+            return error(
+                "يبدو أن نص القالب يحتوي رقم حساب/بطاقة/هاتف شخصيًا في السطر " +
+                    "${digitRun.lineNumber} (${digitRun.rawMatch})؛ استبدله بحقل نائب",
+                digitRun = digitRun,
+            )
         }
-
         val rawTokens = placeholderPattern.findAll(draft.templateText)
             .map { it.groupValues[1].trim() }
             .toList()
@@ -67,7 +152,6 @@ object TemplateEditValidator {
         if (invalidTemplateToken != null) {
             return error("الحقل {$invalidTemplateToken} غير صالح؛ استخدم أحرفًا إنجليزية كبيرة وأرقامًا وشرطة سفلية")
         }
-
         val definitionTokens = draft.fields.map { it.placeholderToken.trim() }
         val invalidDefinitionToken = definitionTokens.firstOrNull { !tokenPattern.matches(it) }
         if (invalidDefinitionToken != null) {
@@ -87,12 +171,11 @@ object TemplateEditValidator {
         if (unused.isNotEmpty()) {
             return error("احذف تعريفات الحقول غير الموجودة في القالب: ${unused.joinToString()}")
         }
-
         draft.fields.forEach { field ->
             if (field.sourceLabel.isBlank()) {
                 return error("أدخل تسمية مصدر للحقل ${field.placeholderToken}")
             }
-            val expected = expectedValueType(field.canonicalField)
+            val expected = expectedValueTypeForUi(field.canonicalField)
             if (field.valueType != expected) {
                 return error(
                     "الحقل ${field.placeholderToken} من النوع ${field.canonicalField.name} " +
@@ -101,7 +184,6 @@ object TemplateEditValidator {
             }
             identifierRoleError(field)?.let { return error(it) }
         }
-
         val derivedDirection = derivedDirection(draft.transactionType)
         if (draft.transactionType != TransactionType.OTHER_FINANCIAL &&
             draft.direction != derivedDirection
@@ -134,7 +216,7 @@ object TemplateEditValidator {
     fun derivedDirection(type: TransactionType): MoneyFlowDirection =
         TransactionTypeTaxonomy.directionOf(type)
 
-    private fun expectedValueType(field: PatternCanonicalField): PatternValueType = when (field) {
+    fun expectedValueTypeForUi(field: PatternCanonicalField): PatternValueType = when (field) {
         PatternCanonicalField.TRANSACTION_AMOUNT,
         PatternCanonicalField.AVAILABLE_BALANCE,
         PatternCanonicalField.CARD_AMOUNT_DUE,
@@ -169,7 +251,7 @@ object TemplateEditValidator {
             PatternCanonicalField.DEBIT_CARD_LAST4,
             PatternCanonicalField.IBAN_LAST4,
             PatternCanonicalField.WALLET_LAST4,
-            -> null // Generic identifiers may be SOURCE, DESTINATION, or context.
+            -> null
             else -> null
         }
         return if (expected != null && field.role != expected) {
@@ -179,5 +261,5 @@ object TemplateEditValidator {
         }
     }
 
-    private fun error(message: String) = TemplateEditValidation.Error(message)
+    private fun error(message: String, digitRun: DigitRunFinding? = null) = TemplateEditValidation.Error(message, digitRun)
 }

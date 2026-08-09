@@ -47,21 +47,47 @@ object MessageTemplateEngine {
             )
         }
         val cue = MessageTypeCueCatalog.detect(raw)
-        val originalLines = raw.lineSequence().map { it.trimEnd() }.filter { it.isNotBlank() }.toList()
+        // Expand compact inline fields (multiple label:value pairs on a single
+        // line, e.g. English credit-card SMS) so each label is templatized on
+        // its own. Each chunk produced by expandCompactInlineFields is either
+        // a single "label: value" pair or a label-only fragment, matching the
+        // pre-existing per-line assumption so original labels, separators and
+        // ordering are preserved.
+        val chunks = com.baraa.masroof.transaction.LineBasedFieldParser
+            .expandCompactInlineFields(raw)
 
         val outLines = mutableListOf<String>()
         val placeholders = linkedSetOf<String>()
 
-        for (orig in originalLines) {
+        // For multi-line bodies expandCompactInlineFields returns the whole body
+        // as a single chunk; for compact-inline it returns per-label chunks.
+        // In both cases each logical line (between newlines) carries at most
+        // one label:value pair, so split per line before templatizing.
+        val lines = chunks.flatMap { it.split('\n') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        for (orig in lines) {
+            if (orig.isBlank()) continue
             val split = splitPreserve(orig)
             if (split == null) {
                 val (cleaned, _) = MessageTypeCueCatalog.stripWalletSuffix(orig.trim())
+                // Bank lines like "[البنك الرياض]" stay literal: the bank is
+                // part of the pattern's identity (which counterparty bank)
+                // and emitting {BANK_NAME} would break strict template
+                // matching because the template label no longer matches the
+                // body label. Users who want a generic bank pattern can edit
+                // the bank line in the editor.
                 outLines += cleaned.trim()
                 continue
             }
             val (labelPart, sep, valuePart) = split
-            val placeholderValue = templatizeValue(labelPart.trim(), valuePart, placeholders)
-            outLines += "$labelPart$sep$placeholderValue"
+            // Trim the label so a trailing space before the colon
+            // (e.g. "خصمت من حساب : 3002") doesn't leak into the template
+            // as "خصمت من حساب : {ACCOUNT_LAST4}".
+            val cleanedLabel = labelPart.trim()
+            val placeholderValue = templatizeValue(cleanedLabel, valuePart, placeholders)
+            outLines += "$cleanedLabel$sep$placeholderValue"
         }
 
         val templateText = outLines.joinToString("\n")
@@ -132,7 +158,7 @@ object MessageTemplateEngine {
         "CREDIT_CARD_LAST4", "DEBIT_CARD_LAST4", "ACCOUNT_LAST4",
         "IBAN_LAST4", "WALLET_LAST4",
         -> """\d{4}"""
-        "TRANSACTION_ID" -> """[A-Za-z0-9\-]{4,}"""
+        "TRANSACTION_ID" -> """[A-Za-z0-9\-_/]{4,}"""
         "MERCHANT", "BENEFICIARY", "BANK_NAME" -> """.{1,120}?"""
         else -> """.{0,120}?"""
     }.let { "(?:$it)" }
@@ -167,6 +193,11 @@ object MessageTemplateEngine {
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_AMOUNT in canonicalFields -> {
                 remaining = replaceMoneyKeepingCurrency(remaining) { put("AMOUNT") }
+                // Compact English amount line: "of: 41.30 SAR At Amazon SA".
+                // After money replace the tail still carries the merchant as
+                // literal text; promote it so it is captured per-SMS, not baked
+                // into the template.
+                remaining = extractCompactMerchantTail(remaining) { put("MERCHANT") }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.CREDIT_CARD_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("CREDIT_CARD_LAST4") }
@@ -179,7 +210,25 @@ object MessageTemplateEngine {
                     it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4 ||
                     it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4
             } -> {
-                remaining = LAST4.replace(remaining) { put("IBAN_LAST4") }
+                // Distinct IBAN tokens (source vs destination) so a transfer can
+                // carry both counterparty IBANs without overwriting.
+                val ibanToken = when {
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .SOURCE_IBAN_LAST4 in canonicalFields -> "SOURCE_IBAN_LAST4"
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .DESTINATION_IBAN_LAST4 in canonicalFields -> "DESTINATION_IBAN_LAST4"
+                    else -> "IBAN_LAST4"
+                }
+                val last4 = com.baraa.masroof.transaction.LineBasedFieldParser
+                    .lastFourFromValue(remaining)
+                if (last4 != null) {
+                    remaining = LAST4.replace(remaining) { put(ibanToken) }
+                } else if (remaining.isNotBlank()) {
+                    // Non-digit value: promote to BENEFICIARY so a textual
+                    // counterparty identifier is captured.
+                    put("BENEFICIARY")
+                    remaining = "{BENEFICIARY}"
+                }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("WALLET_LAST4") }
@@ -189,7 +238,27 @@ object MessageTemplateEngine {
                     it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4 ||
                     it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4
             } -> {
-                remaining = LAST4.replace(remaining) { put("ACCOUNT_LAST4") }
+                // Distinct tokens for source vs destination so a transfer can
+                // carry both account last4s in one template without overwriting.
+                val accountToken = when {
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .SOURCE_ACCOUNT_LAST4 in canonicalFields -> "SOURCE_ACCOUNT_LAST4"
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .DESTINATION_ACCOUNT_LAST4 in canonicalFields -> "DESTINATION_ACCOUNT_LAST4"
+                    else -> "ACCOUNT_LAST4"
+                }
+                val last4 = com.baraa.masroof.transaction.LineBasedFieldParser
+                    .lastFourFromValue(remaining)
+                if (last4 != null) {
+                    remaining = LAST4.replace(remaining) { put(accountToken) }
+                } else if (remaining.isNotBlank()) {
+                    // Value-aware: bare من/إلى/حساب with a non-digit value is
+                    // a person/beneficiary name, not an account. Promote to
+                    // BENEFICIARY so the sender/recipient name is captured
+                    // per-SMS at match time instead of being baked literal.
+                    put("BENEFICIARY")
+                    remaining = "{BENEFICIARY}"
+                }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.MERCHANT in canonicalFields -> {
                 placeholders += "MERCHANT"
@@ -204,11 +273,12 @@ object MessageTemplateEngine {
                 remaining = "{BANK_NAME}"
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_REFERENCE in canonicalFields -> {
-                remaining = if (LONG_REF.containsMatchIn(remaining)) {
-                    LONG_REF.replace(remaining) { put("TRANSACTION_ID") }
-                } else {
-                    placeholders += "TRANSACTION_ID"
-                    "{TRANSACTION_ID}"
+                if (LONG_REF.containsMatchIn(remaining) || remaining.isNotBlank()) {
+                    // Capture the entire reference value (including any
+                    // alphanumeric prefix like "2BTMS"), not just the digit
+                    // run, so the reference is fully captured per-SMS.
+                    put("TRANSACTION_ID")
+                    remaining = "{TRANSACTION_ID}"
                 }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE in canonicalFields ||
@@ -226,6 +296,30 @@ object MessageTemplateEngine {
             }
         }
         return remaining.trim()
+    }
+
+    /**
+     * Compact-English merchant tail extractor. On a TRANSACTION_AMOUNT line
+     * like `of: 41.30 SAR At Amazon SA`, after money replacement the value
+     * ends with ` At <merchant>`. Promote that trailing merchant to the
+     * provided token so it is captured per-SMS at match time instead of
+     * being baked into the template as literal text. Returns the value
+     * unchanged when no merchant cue is present.
+     */
+    private fun extractCompactMerchantTail(value: String, put: () -> String): String {
+        // Search the ORIGINAL value (case-insensitive) for the " at " cue so
+        // indices align with the unmodified string. foldArabic would collapse
+        // whitespace and break index correspondence.
+        val atIdx = value.indexOf(" at ", ignoreCase = true)
+        if (atIdx < 0) return value
+        val merchant = value.substring(atIdx + 4).trim()
+        if (merchant.isEmpty()) return value
+        // Single put() call: put() returns the braced token ({MERCHANT}) and
+        // also registers it in the placeholders set as a side effect. Adding
+        // extra braces around the return value produced {{MERCHANT}}} which
+        // broke the validator's brace-balance check.
+        val token = put()
+        return value.substring(0, atIdx) + " " + token
     }
 
     private fun replaceMoneyKeepingCurrency(value: String, amountToken: () -> String): String {
