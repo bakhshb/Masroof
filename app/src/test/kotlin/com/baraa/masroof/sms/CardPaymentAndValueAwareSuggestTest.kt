@@ -41,7 +41,7 @@ class CardPaymentAndValueAwareSuggestTest {
         )
         assertTrue(
             "template must carry the source-account last4, got: " + t.templateText,
-            t.templateText.contains("{ACCOUNT_LAST4}"),
+            t.templateText.contains("{SOURCE_ACCOUNT_LAST4}"),
         )
         assertTrue(t.templateText.contains("{AMOUNT}"))
     }

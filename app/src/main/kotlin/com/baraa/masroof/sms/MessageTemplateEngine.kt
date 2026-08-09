@@ -72,12 +72,22 @@ object MessageTemplateEngine {
             val split = splitPreserve(orig)
             if (split == null) {
                 val (cleaned, _) = MessageTypeCueCatalog.stripWalletSuffix(orig.trim())
+                // Bank lines like "[البنك الرياض]" stay literal: the bank is
+                // part of the pattern's identity (which counterparty bank)
+                // and emitting {BANK_NAME} would break strict template
+                // matching because the template label no longer matches the
+                // body label. Users who want a generic bank pattern can edit
+                // the bank line in the editor.
                 outLines += cleaned.trim()
                 continue
             }
             val (labelPart, sep, valuePart) = split
-            val placeholderValue = templatizeValue(labelPart.trim(), valuePart, placeholders)
-            outLines += "$labelPart$sep$placeholderValue"
+            // Trim the label so a trailing space before the colon
+            // (e.g. "خصمت من حساب : 3002") doesn't leak into the template
+            // as "خصمت من حساب : {ACCOUNT_LAST4}".
+            val cleanedLabel = labelPart.trim()
+            val placeholderValue = templatizeValue(cleanedLabel, valuePart, placeholders)
+            outLines += "$cleanedLabel$sep$placeholderValue"
         }
 
         val templateText = outLines.joinToString("\n")
@@ -200,7 +210,25 @@ object MessageTemplateEngine {
                     it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_IBAN_LAST4 ||
                     it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_IBAN_LAST4
             } -> {
-                remaining = LAST4.replace(remaining) { put("IBAN_LAST4") }
+                // Distinct IBAN tokens (source vs destination) so a transfer can
+                // carry both counterparty IBANs without overwriting.
+                val ibanToken = when {
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .SOURCE_IBAN_LAST4 in canonicalFields -> "SOURCE_IBAN_LAST4"
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .DESTINATION_IBAN_LAST4 in canonicalFields -> "DESTINATION_IBAN_LAST4"
+                    else -> "IBAN_LAST4"
+                }
+                val last4 = com.baraa.masroof.transaction.LineBasedFieldParser
+                    .lastFourFromValue(remaining)
+                if (last4 != null) {
+                    remaining = LAST4.replace(remaining) { put(ibanToken) }
+                } else if (remaining.isNotBlank()) {
+                    // Non-digit value: promote to BENEFICIARY so a textual
+                    // counterparty identifier is captured.
+                    put("BENEFICIARY")
+                    remaining = "{BENEFICIARY}"
+                }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.WALLET_LAST4 in canonicalFields -> {
                 remaining = LAST4.replace(remaining) { put("WALLET_LAST4") }
@@ -210,7 +238,27 @@ object MessageTemplateEngine {
                     it == com.baraa.masroof.data.db.PatternCanonicalField.SOURCE_ACCOUNT_LAST4 ||
                     it == com.baraa.masroof.data.db.PatternCanonicalField.DESTINATION_ACCOUNT_LAST4
             } -> {
-                remaining = LAST4.replace(remaining) { put("ACCOUNT_LAST4") }
+                // Distinct tokens for source vs destination so a transfer can
+                // carry both account last4s in one template without overwriting.
+                val accountToken = when {
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .SOURCE_ACCOUNT_LAST4 in canonicalFields -> "SOURCE_ACCOUNT_LAST4"
+                    com.baraa.masroof.data.db.PatternCanonicalField
+                        .DESTINATION_ACCOUNT_LAST4 in canonicalFields -> "DESTINATION_ACCOUNT_LAST4"
+                    else -> "ACCOUNT_LAST4"
+                }
+                val last4 = com.baraa.masroof.transaction.LineBasedFieldParser
+                    .lastFourFromValue(remaining)
+                if (last4 != null) {
+                    remaining = LAST4.replace(remaining) { put(accountToken) }
+                } else if (remaining.isNotBlank()) {
+                    // Value-aware: bare من/إلى/حساب with a non-digit value is
+                    // a person/beneficiary name, not an account. Promote to
+                    // BENEFICIARY so the sender/recipient name is captured
+                    // per-SMS at match time instead of being baked literal.
+                    put("BENEFICIARY")
+                    remaining = "{BENEFICIARY}"
+                }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.MERCHANT in canonicalFields -> {
                 placeholders += "MERCHANT"
@@ -225,11 +273,12 @@ object MessageTemplateEngine {
                 remaining = "{BANK_NAME}"
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_REFERENCE in canonicalFields -> {
-                remaining = if (LONG_REF.containsMatchIn(remaining)) {
-                    LONG_REF.replace(remaining) { put("TRANSACTION_ID") }
-                } else {
-                    placeholders += "TRANSACTION_ID"
-                    "{TRANSACTION_ID}"
+                if (LONG_REF.containsMatchIn(remaining) || remaining.isNotBlank()) {
+                    // Capture the entire reference value (including any
+                    // alphanumeric prefix like "2BTMS"), not just the digit
+                    // run, so the reference is fully captured per-SMS.
+                    put("TRANSACTION_ID")
+                    remaining = "{TRANSACTION_ID}"
                 }
             }
             com.baraa.masroof.data.db.PatternCanonicalField.TRANSACTION_DATE in canonicalFields ||
