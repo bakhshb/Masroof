@@ -1,0 +1,55 @@
+{
+  "note": "Reference Bank AlJazira SMS bodies preserved from the legacy corpus for future fixture authoring. Legacy expected parser outputs were intentionally discarded and are not authoritative for the rewrite.",
+  "messages": [
+    {
+      "id": "case1_internal_outgoing_transfer",
+      "description": "Internal outgoing transfer (Arabic, multi-line, labeled). Source account -> destination account.",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 4,445.67\nإلى: 3003\nفي: 2026-08-03 10:38"
+    },
+    {
+      "id": "case2_internal_incoming_transfer",
+      "description": "Internal incoming transfer. Beneficiary account + sender name + sender account + sender bank.",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 4,445.67\nإلى: 3003\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-08-03 10:38"
+    },
+    {
+      "id": "case3_local_incoming_transfer",
+      "description": "Local incoming transfer via a counterparty bank.",
+      "body": "حوالة واردة: محلية\nعبر: بنك الرياض\nمبلغ: SAR 4,445.67\nإلى: 3001\nاسم المرسل: TEST_COMPANY\nالبنك المرسل: بنك الرياض\nفي: 2026-08-03 09:12"
+    },
+    {
+      "id": "case4_english_inline_online_credit_card_purchase",
+      "description": "English single-line compact online credit-card purchase. Available balance and due amount must NOT become the transaction amount.",
+      "body": "Internet Purchase Credit card: 3478 of: 41.30 SAR At TEST_SHOP_A on: 2026-08-02 12:04\nAvailable Balance: 17373.27 SAR Due Amount: 1826.12 SAR"
+    },
+    {
+      "id": "case5_english_inline_apple_pay_online_purchase",
+      "description": "English single-line compact Apple Pay online purchase. Irregular spacing preserved (at : / of : / on :). Balance/due are not transaction amounts.",
+      "body": "Online Purchase Apple Pay Credit Card: 8332 at :TEST_SHOP_B of : 34.25 SAR on : 2026-08-02 12:31 Available Balance is: 17339.02 SAR Due Amount: 1826.12 SAR"
+    },
+    {
+      "id": "case6_outgoing_external_transfer",
+      "description": "Outgoing external transfer with destination IBAN and counterparty bank in brackets.",
+      "body": "عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3002\nالى: TEST_BENEFICIARY\nمبلغ العملية: 13,258.00 SAR\nالمعرف البديل \\الايبان : 0593\n[البنك العربي الوطني]\nفي: 2026-08-01 12:26\nرقم المعاملة: TEST_REFERENCE_1"
+    },
+    {
+      "id": "case7_pos_samsung_pay_credit_card_purchase",
+      "description": "POS credit-card purchase with Samsung Pay wallet suffix. Available balance and total due are contextual, not the transaction amount.",
+      "body": "شراء عبر نقاط البيع (Samsung Pay)\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 178.02 SAR\nفي: 09:08 30-07-2026\nالرصيد المتاح: 18346.84 SAR\nإجمالي المبلغ المستحق:802.62 SAR"
+    },
+    {
+      "id": "case8_outgoing_external_transfer_variant",
+      "description": "Second external outgoing transfer — only values change vs case6 (beneficiary, amount, bank, IBAN last4, account last4, date, reference). Must stay in the SAME semantic family as case6.",
+      "body": "عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3001\nالى: TEST_BENEFICIARY_2\nمبلغ العملية: 500.00 SAR\nالمعرف البديل \\الايبان : 0107\n[البنك الأهلي السعودي]\nفي: 2026-07-27 07:42\nرقم المعاملة: TEST_REFERENCE_2"
+    },
+    {
+      "id": "case9_salary",
+      "description": "Salary inflow. SALARY must win over generic TRANSFER_IN.",
+      "body": "حوالة واردة راتب\nمبلغ: SAR 3,191.68\nإلى: 3001\nاسم المرسل: وزارة الحج والعمرة\nالبنك المرسل: بنك الجزيرة\nفي: 2026-07-27 01:12"
+    },
+    {
+      "id": "case10_financing_installment",
+      "description": "Financing installment deduction. Installment is the transaction amount; remaining financing balance is contextual and must NOT be the transaction amount.",
+      "body": "خصم: قسط تمويل\nمن: 3001\nالقسط: SAR 336.11\nالمبلغ المتبقي: SAR 3,633.36\nلـ: تمويل شخصي\nفي: 2026-07-27 01:12"
+    }
+  ]
+}
