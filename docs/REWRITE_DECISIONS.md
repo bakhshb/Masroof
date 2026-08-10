@@ -57,3 +57,15 @@ DOMAIN `ParsedEvent.occurredAt` is `Instant?`.
 **Decision:** store local values in `ParsedEventDetails.occurredAtLocal`
 (`LocalDateTime`). Leave `ParsedEvent.occurredAt` null at parse time rather than
 pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
+
+## 7. P5 — Persistence schema (clean rewrite)
+
+- Room schema **version = 1** (no legacy migrations).
+- `ParsedEventDetails` stored as **nullable columns on `ParsedEventEntity`**
+  (single-table atomic write); domain/parsing types remain separate via mappers.
+- Money as decimal string + currency name (never Double/Float).
+- Instant as epoch millis; LocalDateTime as ISO local text (no zone conversion).
+- RawSms dedupe: unique `dedupeKey = sender|receivedAtEpochMillis|bodyHash`,
+  plus unique nullable `deviceMessageId` (SQLite allows multiple NULLs).
+- FK `parsed_event.rawSmsId → raw_sms.id` with **RESTRICT**: deleting parsed
+  rows must not cascade-delete raw evidence.
