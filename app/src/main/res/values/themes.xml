@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        Compose owns the runtime theme; this XML theme only ensures the activity
-        starts without an ActionBar and uses a transparent system bar background
-        so enableEdgeToEdge() can paint behind the status / nav bars.
+        Compose owns the runtime theme; this XML theme keeps the activity
+        ActionBar-free with transparent system bars for the Compose shell.
     -->
     <style name="Theme.Masroof" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>

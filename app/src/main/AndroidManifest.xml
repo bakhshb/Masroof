@@ -1,39 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Read and receive SMS so the inbox reader can display device messages.
-         RECEIVE_SMS is required for the SMS_RECEIVED receiver that triggers
-         automatic import of new bank notifications. -->
+    <!-- SMS access is required for historical scan and live ingestion in later phases. -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
-    <!-- POST_NOTIFICATIONS is requested only at runtime on Android 13+
-         when the user enables notifications in Settings. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!--
-        INTERNET is used ONLY when the user explicitly enables a remote AI
-        provider in the AI settings screen. The rest of the application is
-        fully offline. The provider short-circuits when disabled, and we
-        never open a network connection without an enabled provider config.
-    -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Telephony hardware is required for the SMS permissions above. Declared
-         as required="false" so the app is installable on devices without
-         telephony (e.g. Chrome OS tablets), even though the SMS features will
-         not be available there. -->
+    <!-- Telephony is optional so the app remains installable on devices without SMS hardware. -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <!--
-        Local-only. The app MUST NOT request SEND_SMS. RECEIVE_SMS is
-        used only to display messages (no interception / replacement).
-        The app MUST NOT modify or delete SMS. android:allowBackup is
-        explicitly false so the financial database is never backed up
-        to Google's servers or device-to-device transfer.
+        Local-first financial data. allowBackup is false so structured financial
+        state is not uploaded to cloud backup or transferred without an explicit
+        future product decision.
     -->
-
     <application
         android:name=".MasroofApplication"
         android:allowBackup="false"
@@ -45,11 +24,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Masroof">
 
-        <!-- Optional GPU / OpenCL for on-device MediaPipe LLM (high-end devices). -->
-        <uses-native-library android:name="libOpenCL.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL-car.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -60,32 +34,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/diagnostic_file_paths" />
-        </provider>
-
-        <!--
-            Receives android.provider.Telephony.SMS_RECEIVED broadcasts and
-            routes every financial message through the canonical
-            SmsImportOrchestrator.processIncoming() path. BROADCAST_SMS is
-            a system-only signature permission; declaring it here restricts
-            who can send the broadcast.
-        -->
-        <receiver
-            android:name=".sms.SmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
     </application>
-
 </manifest>
