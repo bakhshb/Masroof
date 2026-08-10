@@ -223,4 +223,36 @@ class AccountCardRegistryTest {
         assertEquals(1, accounts.listAll().size)
         assertEquals(OwnershipStatus.EXTERNAL, accounts.resolve(alj3001))
     }
+
+    @Test
+    fun confirmationBeforeObservation_keepsOwnedAndPopulatesSeenMetadata() = runBlocking {
+        confirmation.confirmAccountOwned(alj3001)
+        val before = accounts.get(alj3001)!!
+        assertEquals(OwnershipStatus.OWNED, before.ownership)
+        assertNull(before.firstSeenRawSmsId)
+        assertNull(before.lastSeenRawSmsId)
+
+        accounts.observe(alj3001, "sms-later")
+        val after = accounts.get(alj3001)!!
+        assertEquals(OwnershipStatus.OWNED, after.ownership)
+        assertEquals("sms-later", after.firstSeenRawSmsId)
+        assertEquals("sms-later", after.lastSeenRawSmsId)
+        assertEquals(1, accounts.listAll().size)
+    }
+
+    @Test
+    fun cardConfirmationBeforeObservation_keepsOwnedAndPopulatesSeenMetadata() = runBlocking {
+        confirmation.confirmCardOwned(card7271)
+        val before = cards.get(card7271)!!
+        assertEquals(OwnershipStatus.OWNED, before.ownership)
+        assertNull(before.firstSeenRawSmsId)
+        assertNull(before.lastSeenRawSmsId)
+
+        cards.observe(card7271, "sms-card-later")
+        val after = cards.get(card7271)!!
+        assertEquals(OwnershipStatus.OWNED, after.ownership)
+        assertEquals("sms-card-later", after.firstSeenRawSmsId)
+        assertEquals("sms-card-later", after.lastSeenRawSmsId)
+        assertEquals(1, cards.listAll().size)
+    }
 }

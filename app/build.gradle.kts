@@ -57,24 +57,15 @@ android {
     }
 
     // Room schema export for migrations (new rewrite schema only).
+    // androidTest assets point at the canonical schemas/ directory for future
+    // MigrationTestHelper use — no duplicate committed copies.
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
-        getByName("test").assets.srcDir("$projectDir/schemas")
     }
 }
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
-}
-
-// Keep MigrationTestHelper assets identical to committed Room schema exports.
-tasks.register<Copy>("syncRoomSchemasToTestAssets") {
-    from(layout.projectDirectory.dir("schemas"))
-    into(layout.projectDirectory.dir("src/test/assets"))
-}
-
-tasks.matching { it.name.contains("UnitTest") }.configureEach {
-    dependsOn("syncRoomSchemasToTestAssets")
 }
 
 dependencies {

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 
 @Dao
@@ -40,23 +41,34 @@ interface AccountRegistryDao {
     ): Int
 
     /**
-     * Atomically ensure the row exists and set ownership.
-     * On conflict, only [ownershipStatus] is updated — observation metadata is kept.
+     * API-26-safe ownership write: IGNORE-insert then explicit UPDATE in one transaction.
+     * Never uses SQLite UPSERT (`ON CONFLICT ... DO UPDATE`).
      */
-    @Query(
-        """
-        INSERT INTO account_registry
-          (bankId, maskedNumber, ownershipStatus, firstSeenRawSmsId, lastSeenRawSmsId)
-        VALUES (:bankId, :maskedNumber, :ownershipStatus, NULL, NULL)
-        ON CONFLICT(bankId, maskedNumber) DO UPDATE SET
-          ownershipStatus = :ownershipStatus
-        """,
-    )
-    suspend fun upsertOwnership(
-        bankId: String,
-        maskedNumber: String,
+    @Transaction
+    suspend fun setOwnershipAtomic(
+        entity: AccountRegistryEntity,
         ownershipStatus: String,
-    )
+    ) {
+        insertIfAbsent(entity)
+        updateOwnership(
+            bankId = entity.bankId,
+            maskedNumber = entity.maskedNumber,
+            ownershipStatus = ownershipStatus,
+        )
+    }
+
+    /**
+     * Observation create-if-absent + metadata touch in one transaction.
+     * Does not modify ownershipStatus when the row already exists.
+     */
+    @Transaction
+    suspend fun observeAtomic(
+        entity: AccountRegistryEntity,
+        rawSmsId: String,
+    ) {
+        insertIfAbsent(entity)
+        touchObservation(entity.bankId, entity.maskedNumber, rawSmsId)
+    }
 
     @Query(
         """

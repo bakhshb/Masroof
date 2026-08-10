@@ -17,19 +17,17 @@ class RoomAccountRegistryRepository(
         val masked = reference.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return
 
-        val bankId = reference.bank.id
-        // Atomic create-if-absent as UNKNOWN. Never overwrites ownership on conflict.
-        dao.insertIfAbsent(
-            AccountRegistryEntity(
-                bankId = bankId,
+        // IGNORE-insert as UNKNOWN; never overwrites ownership on conflict.
+        dao.observeAtomic(
+            entity = AccountRegistryEntity(
+                bankId = reference.bank.id,
                 maskedNumber = masked,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
                 firstSeenRawSmsId = rawSmsId,
                 lastSeenRawSmsId = rawSmsId,
             ),
+            rawSmsId = rawSmsId,
         )
-        // Observation metadata only — ownershipStatus is untouched.
-        dao.touchObservation(bankId, masked, rawSmsId)
     }
 
     override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
@@ -37,9 +35,17 @@ class RoomAccountRegistryRepository(
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required to set ownership" }
 
-        // Single atomic UPSERT: discovery cannot leave UNKNOWN after this wins,
-        // and observation metadata is preserved on conflict.
-        dao.upsertOwnership(reference.bank.id, masked, status.name)
+        // Confirmation-before-observation may create a row with null seen metadata.
+        dao.setOwnershipAtomic(
+            entity = AccountRegistryEntity(
+                bankId = reference.bank.id,
+                maskedNumber = masked,
+                ownershipStatus = status.name,
+                firstSeenRawSmsId = null,
+                lastSeenRawSmsId = null,
+            ),
+            ownershipStatus = status.name,
+        )
     }
 
     override suspend fun resolve(reference: AccountReference): OwnershipStatus {

@@ -17,17 +17,16 @@ class RoomCardRegistryRepository(
         val last4 = reference.last4?.trim().orEmpty()
         if (last4.isEmpty()) return
 
-        val bankId = reference.bank.id
-        dao.insertIfAbsent(
-            CardRegistryEntity(
-                bankId = bankId,
+        dao.observeAtomic(
+            entity = CardRegistryEntity(
+                bankId = reference.bank.id,
                 last4 = last4,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
                 firstSeenRawSmsId = rawSmsId,
                 lastSeenRawSmsId = rawSmsId,
             ),
+            rawSmsId = rawSmsId,
         )
-        dao.touchObservation(bankId, last4, rawSmsId)
     }
 
     override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
@@ -35,7 +34,16 @@ class RoomCardRegistryRepository(
         val last4 = reference.last4?.trim().orEmpty()
         require(last4.isNotEmpty()) { "last4 required to set ownership" }
 
-        dao.upsertOwnership(reference.bank.id, last4, status.name)
+        dao.setOwnershipAtomic(
+            entity = CardRegistryEntity(
+                bankId = reference.bank.id,
+                last4 = last4,
+                ownershipStatus = status.name,
+                firstSeenRawSmsId = null,
+                lastSeenRawSmsId = null,
+            ),
+            ownershipStatus = status.name,
+        )
     }
 
     override suspend fun resolve(reference: CardReference): OwnershipStatus {

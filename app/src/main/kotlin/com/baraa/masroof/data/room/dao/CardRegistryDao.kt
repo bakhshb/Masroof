@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 
 @Dao
@@ -40,23 +41,34 @@ interface CardRegistryDao {
     ): Int
 
     /**
-     * Atomically ensure the row exists and set ownership.
-     * On conflict, only [ownershipStatus] is updated — observation metadata is kept.
+     * API-26-safe ownership write: IGNORE-insert then explicit UPDATE in one transaction.
+     * Never uses SQLite UPSERT (`ON CONFLICT ... DO UPDATE`).
      */
-    @Query(
-        """
-        INSERT INTO card_registry
-          (bankId, last4, ownershipStatus, firstSeenRawSmsId, lastSeenRawSmsId)
-        VALUES (:bankId, :last4, :ownershipStatus, NULL, NULL)
-        ON CONFLICT(bankId, last4) DO UPDATE SET
-          ownershipStatus = :ownershipStatus
-        """,
-    )
-    suspend fun upsertOwnership(
-        bankId: String,
-        last4: String,
+    @Transaction
+    suspend fun setOwnershipAtomic(
+        entity: CardRegistryEntity,
         ownershipStatus: String,
-    )
+    ) {
+        insertIfAbsent(entity)
+        updateOwnership(
+            bankId = entity.bankId,
+            last4 = entity.last4,
+            ownershipStatus = ownershipStatus,
+        )
+    }
+
+    /**
+     * Observation create-if-absent + metadata touch in one transaction.
+     * Does not modify ownershipStatus when the row already exists.
+     */
+    @Transaction
+    suspend fun observeAtomic(
+        entity: CardRegistryEntity,
+        rawSmsId: String,
+    ) {
+        insertIfAbsent(entity)
+        touchObservation(entity.bankId, entity.last4, rawSmsId)
+    }
 
     @Query(
         """
