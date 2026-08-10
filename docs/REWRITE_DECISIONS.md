@@ -73,3 +73,13 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   (no check-then-insert race).
 - `ParsedEventRepository` lives under `parsing.repository` (not domain), because
   it carries `ParsedEventDetails`.
+
+## 8. P6 — SMS ingestion identity
+
+- Provider inbox row → RawSms.id `android-sms:<providerId>` (stable re-scan).
+- Live BroadcastReceiver (no provider id yet) →
+  `android-sms-live:<sender>|<epochMillis>|<bodyHash>`.
+- Cross-path dedupe relies on P5 `dedupeKey = sender|epochMillis|bodyHash`.
+- Bank AlJazira scope is checked with the existing P4 detector **before**
+  RawSms persistence so unrelated personal SMS are not stored.
+- Historical scan processes inbox DATE ASC (oldest → newest).

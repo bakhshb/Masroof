@@ -1,12 +1,24 @@
 package com.baraa.masroof
 
 import android.app.Application
+import com.baraa.masroof.application.AppContainer
 
 /**
- * Minimal application entry for the clean Masroof baseline.
- *
- * Composition-root wiring for domain, SMS, parsing, and persistence will be
- * introduced in later rewrite phases. P0 intentionally has no service locator,
- * Room database, or feature services.
+ * Application entry and composition root holder for Masroof.
  */
-class MasroofApplication : Application()
+class MasroofApplication : Application() {
+    lateinit var container: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        container = AppContainer(this)
+    }
+
+    override fun onTerminate() {
+        if (::container.isInitialized) {
+            container.close()
+        }
+        super.onTerminate()
+    }
+}
