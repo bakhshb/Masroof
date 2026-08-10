@@ -83,3 +83,8 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Bank AlJazira scope is checked with the existing P4 detector **before**
   RawSms persistence so unrelated personal SMS are not stored.
 - Historical scan processes inbox DATE ASC (oldest → newest).
+- Live `RawSms.receivedAt` uses injectable device receipt [InstantClock], not SMSC
+  part timestamps.
+- Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) may
+  reconcile within a 5s receivedAt tolerance on exact sender+bodyHash; same-source
+  rows are never merged by that rule alone.

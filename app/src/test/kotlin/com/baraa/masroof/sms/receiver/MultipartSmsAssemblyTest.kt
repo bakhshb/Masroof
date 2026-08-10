@@ -1,23 +1,58 @@
 package com.baraa.masroof.sms.receiver
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Pure JVM coverage for multipart body assembly used by [IncomingSmsReceiver].
+ * Tests the production [ReceivedSmsAssembler] used by [IncomingSmsReceiver].
  */
 class MultipartSmsAssemblyTest {
     @Test
     fun joinsPartsInOrderWithoutExtraSeparators() {
-        val parts = listOf(
-            "شراء عبر الانترنت\n",
-            "بطاقة: 7271\n",
-            "بمبلغ: 51.99 SAR",
-        )
-        val combined = parts.joinToString(separator = "")
+        val assembled = ReceivedSmsAssembler.assemble(
+            listOf(
+                ReceivedSmsAssembler.Part("AlJazira", "شراء عبر الانترنت\n"),
+                ReceivedSmsAssembler.Part("AlJazira", "بطاقة: 7271\n"),
+                ReceivedSmsAssembler.Part("AlJazira", "بمبلغ: 51.99 SAR"),
+            ),
+        )!!
+        assertEquals("AlJazira", assembled.sender)
         assertEquals(
             "شراء عبر الانترنت\nبطاقة: 7271\nبمبلغ: 51.99 SAR",
-            combined,
+            assembled.body,
+        )
+    }
+
+    @Test
+    fun usesFirstPartSenderConsistently() {
+        val assembled = ReceivedSmsAssembler.assemble(
+            listOf(
+                ReceivedSmsAssembler.Part("AlJazira", "a"),
+                ReceivedSmsAssembler.Part(null, "b"),
+            ),
+        )!!
+        assertEquals("AlJazira", assembled.sender)
+        assertEquals("ab", assembled.body)
+    }
+
+    @Test
+    fun emptyOrInvalidPartSet_rejected() {
+        assertNull(ReceivedSmsAssembler.assemble(emptyList()))
+        assertNull(
+            ReceivedSmsAssembler.assemble(
+                listOf(ReceivedSmsAssembler.Part(null, "body")),
+            ),
+        )
+        assertNull(
+            ReceivedSmsAssembler.assemble(
+                listOf(ReceivedSmsAssembler.Part("AlJazira", null)),
+            ),
+        )
+        assertNull(
+            ReceivedSmsAssembler.assemble(
+                listOf(ReceivedSmsAssembler.Part("AlJazira", "")),
+            ),
         )
     }
 }

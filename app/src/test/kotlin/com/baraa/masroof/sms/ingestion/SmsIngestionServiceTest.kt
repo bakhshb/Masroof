@@ -12,13 +12,17 @@ import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.SmsParseInput
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
+import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -164,23 +168,57 @@ class SmsIngestionServiceTest {
     }
 
     @Test
-    fun liveThenHistorical_sameEvidence_dedupes() = runBlocking {
-        val receivedAt = Instant.parse("2026-08-01T12:26:00Z")
-        val body = """
-            عملية حوالة مالية صادرة مقبولة
-            خصمت من حساب: 3002
-            الى: TEST_BENEFICIARY
-            مبلغ العملية: 13,258.00 SAR
-            المعرف البديل \الايبان : 0593
-            [البنك العربي الوطني]
-            في: 2026-08-01 12:26
-            رقم المعاملة: TEST_REFERENCE_1
-        """.trimIndent()
+    fun parserCancellation_propagates() = runBlocking {
+        val cancelling = SmsParseGateway { throw CancellationException("cancel") }
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = cancelling,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:cancel", deviceId = "cancel")
+        try {
+            svc.ingest(raw)
+            org.junit.Assert.fail("expected CancellationException")
+        } catch (_: CancellationException) {
+            // expected
+        }
+        assertEquals(raw, rawRepo.getById(raw.id))
+    }
+
+    @Test
+    fun parsedEventSaveFailure_returnsFailed_keepsRawSms() = runBlocking {
+        val failingParsedRepo = object : ParsedEventRepository {
+            override suspend fun save(event: ParsedEvent, details: ParsedEventDetails) {
+                throw IllegalStateException("save failed")
+            }
+
+            override suspend fun getById(id: String): ParsedEventRecord? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
+            override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
+        }
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = failingParsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+        )
+        val raw = aljaziraPurchase(id = "android-sms:save-fail", deviceId = "save-fail")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.Failed)
+        assertEquals(raw, rawRepo.getById(raw.id))
+    }
+
+    @Test
+    fun liveThenHistorical_withSlightlyDifferentMillis_dedupes() = runBlocking {
+        val body = transferBody()
+        val liveAt = Instant.parse("2026-08-10T12:00:00.000Z")
+        val historicalAt = Instant.parse("2026-08-10T12:00:02.000Z")
         val live = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, "AlJazira", body, receivedAt),
+            ProviderSmsRecord(null, "AlJazira", body, liveAt),
         )
         val historical = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord("999", "AlJazira", body, receivedAt),
+            ProviderSmsRecord("999", "AlJazira", body, historicalAt),
         )
         assertTrue(live.id != historical.id)
         assertEquals(live.bodyHash, historical.bodyHash)
@@ -188,6 +226,52 @@ class SmsIngestionServiceTest {
         assertEquals(SmsIngestionResult.Duplicate, service.ingest(historical))
         assertEquals(1, db.rawSmsDao().count())
         assertEquals(1, parseCalls.get())
+    }
+
+    @Test
+    fun twoHistoricalNearby_sameBody_areNotCollapsedByTolerance() = runBlocking {
+        val body = transferBody()
+        val a = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("10", "AlJazira", body, Instant.parse("2026-08-10T12:00:00Z")),
+        )
+        val b = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("11", "AlJazira", body, Instant.parse("2026-08-10T12:00:02Z")),
+        )
+        assertTrue(service.ingest(a) is SmsIngestionResult.Parsed)
+        assertTrue(service.ingest(b) is SmsIngestionResult.Parsed)
+        assertEquals(2, db.rawSmsDao().count())
+        assertEquals(2, parseCalls.get())
+    }
+
+    @Test
+    fun twoLiveNearby_sameBody_areNotCollapsedByCrossSourceTolerance() = runBlocking {
+        val body = transferBody()
+        val a = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(null, "AlJazira", body, Instant.parse("2026-08-10T12:00:00Z")),
+        )
+        val b = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(null, "AlJazira", body, Instant.parse("2026-08-10T12:00:02Z")),
+        )
+        assertTrue(service.ingest(a) is SmsIngestionResult.Parsed)
+        assertTrue(service.ingest(b) is SmsIngestionResult.Parsed)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun liveReceivedAt_usesReceiptClockNotSmsc() {
+        val fixed = Instant.parse("2026-08-10T15:30:00Z")
+        val clock = InstantClock { fixed }
+        assertEquals(fixed, clock.now())
+        // IncomingSmsReceiver uses AppContainer.clock; assembler does not touch SMSC time.
+        val assembled = com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.assemble(
+            listOf(
+                com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.Part("AlJazira", "body"),
+            ),
+        )!!
+        val raw = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(null, assembled.sender, assembled.body, clock.now()),
+        )
+        assertEquals(fixed, raw.receivedAt)
     }
 
     @Test
@@ -228,4 +312,15 @@ class SmsIngestionServiceTest {
             bodyHash = SmsBodyHasher.sha256Hex(body),
         )
     }
+
+    private fun transferBody() = """
+        عملية حوالة مالية صادرة مقبولة
+        خصمت من حساب: 3002
+        الى: TEST_BENEFICIARY
+        مبلغ العملية: 13,258.00 SAR
+        المعرف البديل \الايبان : 0593
+        [البنك العربي الوطني]
+        في: 2026-08-01 12:26
+        رقم المعاملة: TEST_REFERENCE_1
+    """.trimIndent()
 }

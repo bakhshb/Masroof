@@ -9,16 +9,19 @@ import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 /**
  * Receives [Telephony.Sms.Intents.SMS_RECEIVED_ACTION] and hands off to the
  * shared [SmsIngestionService].
  *
- * Multipart PDUs are combined into one RawSms body (correct part order).
- * Work runs off the main broadcast path via [goAsync] + application scope.
+ * Multipart PDUs are combined into one RawSms body via [ReceivedSmsAssembler].
+ * [com.baraa.masroof.domain.model.RawSms.receivedAt] uses the application
+ * [com.baraa.masroof.sms.time.InstantClock] (device receipt), not SMSC timestamps.
  *
+ * Work runs off the main broadcast path via [goAsync] + application scope.
  * Does not log SMS bodies, OTPs, or financial fields.
+ *
+ * No-arg constructor required for manifest instantiation.
  */
 class IncomingSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -28,7 +31,6 @@ class IncomingSmsReceiver : BroadcastReceiver() {
 
         val app = context.applicationContext as? MasroofApplication
         if (app == null) {
-            // Unexpected process wiring — do not invent a separate database graph.
             return
         }
 
@@ -37,25 +39,23 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val sender = messages.firstOrNull()?.displayOriginatingAddress?.takeIf { it.isNotBlank() }
-            ?: return
-        val body = messages.joinToString(separator = "") { it.displayMessageBody.orEmpty() }
-        if (body.isEmpty()) {
-            return
-        }
-        // Prefer the earliest originating timestamp among parts when available.
-        val receivedAtMillis = messages
-            .mapNotNull { msg -> msg.timestampMillis.takeIf { it > 0L } }
-            .minOrNull()
-            ?: System.currentTimeMillis()
+        val assembled = ReceivedSmsAssembler.assemble(
+            messages.map { msg ->
+                ReceivedSmsAssembler.Part(
+                    sender = msg.displayOriginatingAddress,
+                    body = msg.displayMessageBody,
+                )
+            },
+        ) ?: return
 
+        val receivedAt = app.container.clock.now()
         val rawSms = try {
             AndroidSmsMapper.toRawSms(
                 ProviderSmsRecord(
                     providerMessageId = null,
-                    sender = sender,
-                    body = body,
-                    receivedAt = Instant.ofEpochMilli(receivedAtMillis),
+                    sender = assembled.sender,
+                    body = assembled.body,
+                    receivedAt = receivedAt,
                 ),
             )
         } catch (_: IllegalArgumentException) {

@@ -27,6 +27,34 @@ interface RawSmsDao {
     @Query("SELECT * FROM raw_sms WHERE dedupeKey = :dedupeKey LIMIT 1")
     suspend fun findByDedupeKey(dedupeKey: String): RawSmsEntity?
 
+    /**
+     * Cross-source live↔historical near-duplicate lookup.
+     *
+     * When [requireDeviceMessageIdNull] is true, finds historical rows
+     * (deviceMessageId NOT NULL). When false, finds live rows (deviceMessageId IS NULL).
+     */
+    @Query(
+        """
+        SELECT * FROM raw_sms
+        WHERE sender = :sender
+          AND bodyHash = :bodyHash
+          AND receivedAtEpochMillis BETWEEN :fromMillis AND :toMillis
+          AND (
+            (:requireDeviceMessageIdNull = 1 AND deviceMessageId IS NULL)
+            OR
+            (:requireDeviceMessageIdNull = 0 AND deviceMessageId IS NOT NULL)
+          )
+        LIMIT 1
+        """,
+    )
+    suspend fun findCrossSourceNearDuplicate(
+        sender: String,
+        bodyHash: String,
+        fromMillis: Long,
+        toMillis: Long,
+        requireDeviceMessageIdNull: Boolean,
+    ): RawSmsEntity?
+
     @Query("SELECT COUNT(*) FROM raw_sms")
     suspend fun count(): Int
 }

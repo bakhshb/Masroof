@@ -8,6 +8,7 @@ import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
@@ -60,16 +61,15 @@ class HistoricalSmsScannerTest {
         val after = Instant.parse("2026-07-01T00:00:00Z")
         val order = mutableListOf<String>()
         val source = FakeSmsDataSource(
-            records = listOf(
-                ProviderSmsRecord("1", "AlJazira", purchase, t1),
-                ProviderSmsRecord("2", "OtherBank", purchase, t1),
-                ProviderSmsRecord("3", "AlJazira", otp, t2),
-                ProviderSmsRecord("1", "AlJazira", purchase, t1), // duplicate provider row
+            rows = listOf(
+                InboxRow.Valid(ProviderSmsRecord("1", "AlJazira", purchase, t1)),
+                InboxRow.Valid(ProviderSmsRecord("2", "OtherBank", purchase, t1)),
+                InboxRow.Valid(ProviderSmsRecord("3", "AlJazira", otp, t2)),
+                InboxRow.Valid(ProviderSmsRecord("1", "AlJazira", purchase, t1)),
             ),
             onQuery = { receivedAfter -> order += "after=${receivedAfter?.toEpochMilli()}" },
         )
-        val scanner = HistoricalSmsScanner(source, ingestion)
-        val result = scanner.scan(receivedAfter = after)
+        val result = HistoricalSmsScanner(source, ingestion).scan(receivedAfter = after)
         assertEquals(listOf("after=${after.toEpochMilli()}"), order)
         assertEquals(4, result.scanned)
         assertEquals(1, result.parsed)
@@ -102,13 +102,49 @@ class HistoricalSmsScannerTest {
     }
 
     @Test
-    fun malformedRow_skippedWithoutAbortingScan() = runBlocking {
-        val good = ProviderSmsRecord("1", "AlJazira", purchaseBody(), Instant.parse("2026-08-01T00:00:00Z"))
-        val bad = ProviderSmsRecord("2", "AlJazira", "", Instant.parse("2026-08-02T00:00:00Z"))
-        val source = FakeSmsDataSource(listOf(good, bad))
+    fun lazyPermissionException_duringIteration_isCaught() = runBlocking {
+        val source = object : SmsDataSource {
+            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+                throw SmsPermissionException("lazy")
+            }
+        }
         val result = HistoricalSmsScanner(source, ingestion).scan()
-        assertEquals(2, result.scanned)
-        assertEquals(1, result.skippedMalformed)
+        assertEquals(SmsScanFailure.PermissionDenied, result.failure)
+        assertEquals(0, result.scanned)
+    }
+
+    @Test
+    fun lazyProviderException_preservesPartialSummary() = runBlocking {
+        val good = InboxRow.Valid(
+            ProviderSmsRecord(
+                "1",
+                "AlJazira",
+                purchaseBody(),
+                Instant.parse("2026-08-01T00:00:00Z"),
+            ),
+        )
+        val source = object : SmsDataSource {
+            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+                yield(good)
+                throw SmsProviderException("cursor died")
+            }
+        }
+        val result = HistoricalSmsScanner(source, ingestion).scan()
+        assertTrue(result.failure is SmsScanFailure.ProviderError)
+        assertEquals(1, result.scanned)
+        assertEquals(1, result.parsed)
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun malformedProviderRows_areCounted() = runBlocking {
+        val good = InboxRow.Valid(
+            ProviderSmsRecord("1", "AlJazira", purchaseBody(), Instant.parse("2026-08-01T00:00:00Z")),
+        )
+        val source = FakeSmsDataSource(listOf(good, InboxRow.Malformed, InboxRow.Malformed))
+        val result = HistoricalSmsScanner(source, ingestion).scan()
+        assertEquals(3, result.scanned)
+        assertEquals(2, result.skippedMalformed)
         assertEquals(1, result.parsed)
         assertEquals(1, db.rawSmsDao().count())
     }
@@ -122,15 +158,12 @@ class HistoricalSmsScannerTest {
     """.trimIndent()
 
     private class FakeSmsDataSource(
-        private val records: List<ProviderSmsRecord>,
+        private val rows: List<InboxRow>,
         private val onQuery: (Instant?) -> Unit = {},
     ) : SmsDataSource {
-        override fun queryInbox(receivedAfter: Instant?): Sequence<ProviderSmsRecord> {
+        override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> {
             onQuery(receivedAfter)
-            return records
-                .filter { receivedAfter == null || !it.receivedAt.isBefore(receivedAfter) }
-                .sortedBy { it.receivedAt }
-                .asSequence()
+            return rows.asSequence()
         }
     }
 }

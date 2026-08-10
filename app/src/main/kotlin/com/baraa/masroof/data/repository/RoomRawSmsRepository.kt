@@ -5,6 +5,7 @@ import com.baraa.masroof.data.room.mapper.RawSmsMapper
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import java.time.Instant
 
 class RoomRawSmsRepository(
     private val dao: RawSmsDao,
@@ -29,4 +30,19 @@ class RoomRawSmsRepository(
 
     override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? =
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
+
+    override suspend fun findCrossSourceNearDuplicate(
+        sender: String,
+        bodyHash: String,
+        fromInclusive: Instant,
+        toInclusive: Instant,
+        lookingForLiveRow: Boolean,
+    ): RawSms? =
+        dao.findCrossSourceNearDuplicate(
+            sender = sender,
+            bodyHash = bodyHash,
+            fromMillis = fromInclusive.toEpochMilli(),
+            toMillis = toInclusive.toEpochMilli(),
+            requireDeviceMessageIdNull = lookingForLiveRow,
+        )?.let(RawSmsMapper::toDomain)
 }

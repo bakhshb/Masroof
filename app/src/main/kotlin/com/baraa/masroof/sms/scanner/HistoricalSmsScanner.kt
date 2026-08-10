@@ -1,5 +1,6 @@
 package com.baraa.masroof.sms.scanner
 
+import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
@@ -36,24 +37,15 @@ sealed interface SmsScanFailure {
 /**
  * Historical inbox scan → shared [SmsIngestionService].
  *
- * Processes rows incrementally (oldest → newest). Does not parse or touch Room
- * entities directly.
+ * Processes rows incrementally (oldest → newest). Catches permission/provider
+ * failures from both sequence creation and lazy iteration, preserving partial
+ * counters when failure occurs mid-scan.
  */
 class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
     private val ingestionService: SmsIngestionService,
 ) {
     suspend fun scan(receivedAfter: Instant? = null): SmsScanResult {
-        val rows = try {
-            dataSource.queryInbox(receivedAfter)
-        } catch (_: SmsPermissionException) {
-            return SmsScanResult(failure = SmsScanFailure.PermissionDenied)
-        } catch (e: SmsProviderException) {
-            return SmsScanResult(
-                failure = SmsScanFailure.ProviderError(e.message ?: "provider_error"),
-            )
-        }
-
         var scanned = 0
         var inserted = 0
         var duplicates = 0
@@ -65,47 +57,7 @@ class HistoricalSmsScanner(
         var skippedMalformed = 0
         var failed = 0
 
-        for (record in rows) {
-            scanned++
-            val rawSms = try {
-                AndroidSmsMapper.toRawSms(record)
-            } catch (_: IllegalArgumentException) {
-                skippedMalformed++
-                continue
-            }
-
-            when (ingestionService.ingest(rawSms)) {
-                is SmsIngestionResult.Duplicate -> duplicates++
-                is SmsIngestionResult.NotRelevant -> notRelevant++
-                is SmsIngestionResult.Parsed -> {
-                    inserted++
-                    parsed++
-                }
-                is SmsIngestionResult.ReviewRequired -> {
-                    inserted++
-                    reviewRequired++
-                }
-                is SmsIngestionResult.NonFinancial -> {
-                    inserted++
-                    nonFinancial++
-                }
-                is SmsIngestionResult.Unsupported -> {
-                    inserted++
-                    unsupported++
-                }
-                is SmsIngestionResult.Invalid -> {
-                    inserted++
-                    failed++
-                }
-                is SmsIngestionResult.Failed -> {
-                    // RawSms may already exist; count as failure after insert path.
-                    inserted++
-                    failed++
-                }
-            }
-        }
-
-        return SmsScanResult(
+        fun snapshot(failure: SmsScanFailure?) = SmsScanResult(
             scanned = scanned,
             inserted = inserted,
             duplicates = duplicates,
@@ -116,7 +68,62 @@ class HistoricalSmsScanner(
             notRelevant = notRelevant,
             skippedMalformed = skippedMalformed,
             failed = failed,
-            failure = null,
+            failure = failure,
         )
+
+        try {
+            val rows = dataSource.queryInbox(receivedAfter)
+            for (row in rows) {
+                scanned++
+                when (row) {
+                    is InboxRow.Malformed -> {
+                        skippedMalformed++
+                    }
+                    is InboxRow.Valid -> {
+                        val rawSms = try {
+                            AndroidSmsMapper.toRawSms(row.record)
+                        } catch (_: IllegalArgumentException) {
+                            skippedMalformed++
+                            continue
+                        }
+
+                        when (ingestionService.ingest(rawSms)) {
+                            is SmsIngestionResult.Duplicate -> duplicates++
+                            is SmsIngestionResult.NotRelevant -> notRelevant++
+                            is SmsIngestionResult.Parsed -> {
+                                inserted++
+                                parsed++
+                            }
+                            is SmsIngestionResult.ReviewRequired -> {
+                                inserted++
+                                reviewRequired++
+                            }
+                            is SmsIngestionResult.NonFinancial -> {
+                                inserted++
+                                nonFinancial++
+                            }
+                            is SmsIngestionResult.Unsupported -> {
+                                inserted++
+                                unsupported++
+                            }
+                            is SmsIngestionResult.Invalid -> {
+                                inserted++
+                                failed++
+                            }
+                            is SmsIngestionResult.Failed -> {
+                                inserted++
+                                failed++
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: SmsPermissionException) {
+            return snapshot(SmsScanFailure.PermissionDenied)
+        } catch (e: SmsProviderException) {
+            return snapshot(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
+        }
+
+        return snapshot(failure = null)
     }
 }

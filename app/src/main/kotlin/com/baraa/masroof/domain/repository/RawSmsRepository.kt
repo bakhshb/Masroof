@@ -1,6 +1,7 @@
 package com.baraa.masroof.domain.repository
 
 import com.baraa.masroof.domain.model.RawSms
+import java.time.Instant
 
 /**
  * Domain-facing RawSms persistence. Implementations live in the data layer.
@@ -16,6 +17,22 @@ interface RawSmsRepository {
     suspend fun existsById(id: String): Boolean
 
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
+
+    /**
+     * Live↔historical near-duplicate: same sender + bodyHash within
+     * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness.
+     *
+     * @param lookingForLiveRow when true, match rows with null deviceMessageId
+     * (incoming is historical). When false, match rows with non-null
+     * deviceMessageId (incoming is live).
+     */
+    suspend fun findCrossSourceNearDuplicate(
+        sender: String,
+        bodyHash: String,
+        fromInclusive: Instant,
+        toInclusive: Instant,
+        lookingForLiveRow: Boolean,
+    ): RawSms?
 }
 
 /**

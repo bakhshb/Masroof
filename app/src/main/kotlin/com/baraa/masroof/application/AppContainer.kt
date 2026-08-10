@@ -13,6 +13,7 @@ import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.scanner.HistoricalSmsScanner
+import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +29,8 @@ class AppContainer(
     context: Context,
 ) {
     private val appContext = context.applicationContext
+
+    val clock: InstantClock = InstantClock.System
 
     val applicationScope: CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
