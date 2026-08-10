@@ -196,6 +196,7 @@ class SmsIngestionServiceTest {
             override suspend fun getById(id: String): ParsedEventRecord? = null
             override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
             override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
+            override suspend fun listAll(): List<ParsedEventRecord> = emptyList()
         }
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,

@@ -23,6 +23,9 @@ interface ParsedEventRepository {
      * Never deletes the related [com.baraa.masroof.domain.model.RawSms] evidence.
      */
     suspend fun deleteByRawSmsId(rawSmsId: String)
+
+    /** All persisted parse results (for ownership discovery backlog). */
+    suspend fun listAll(): List<ParsedEventRecord>
 }
 
 /**

@@ -24,4 +24,7 @@ class RoomParsedEventRepository(
     override suspend fun deleteByRawSmsId(rawSmsId: String) {
         dao.deleteByRawSmsId(rawSmsId)
     }
+
+    override suspend fun listAll(): List<ParsedEventRecord> =
+        dao.listAll().map(ParsedEventMapper::toRecord)
 }

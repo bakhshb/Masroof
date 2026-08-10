@@ -4,9 +4,16 @@ import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
+import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
@@ -20,7 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 
 /**
- * Minimal manual composition root for P6.
+ * Minimal manual composition root for P6–P7.
  *
  * No DI framework. Application-scoped database and repositories.
  * Does not use fallbackToDestructiveMigration.
@@ -40,13 +47,39 @@ class AppContainer(
             appContext,
             MasroofDatabase::class.java,
             MasroofDatabase.NAME,
-        ).build()
+        )
+            .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+            .build()
 
     val rawSmsRepository: RawSmsRepository =
         RoomRawSmsRepository(database.rawSmsDao())
 
     val parsedEventRepository: ParsedEventRepository =
         RoomParsedEventRepository(database.parsedEventDao())
+
+    val accountRegistryRepository: AccountRegistryRepository =
+        RoomAccountRegistryRepository(database.accountRegistryDao())
+
+    val cardRegistryRepository: CardRegistryRepository =
+        RoomCardRegistryRepository(database.cardRegistryDao())
+
+    val ownershipDiscoveryService: OwnershipDiscoveryService =
+        OwnershipDiscoveryService(
+            accountRegistry = accountRegistryRepository,
+            cardRegistry = cardRegistryRepository,
+        )
+
+    val ownershipResolver: OwnershipResolver =
+        OwnershipResolver(
+            accountRegistry = accountRegistryRepository,
+            cardRegistry = cardRegistryRepository,
+        )
+
+    val ownershipConfirmationService: OwnershipConfirmationService =
+        OwnershipConfirmationService(
+            accountRegistry = accountRegistryRepository,
+            cardRegistry = cardRegistryRepository,
+        )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
 
@@ -58,6 +91,7 @@ class AppContainer(
             parsedEventRepository = parsedEventRepository,
             bankDetector = bankDetector,
             parseGateway = parsingPipeline,
+            ownershipDiscovery = ownershipDiscoveryService,
         )
 
     val smsDataSource: SmsDataSource =
@@ -68,6 +102,18 @@ class AppContainer(
             dataSource = smsDataSource,
             ingestionService = smsIngestionService,
         )
+
+    /**
+     * Discovers ownership candidates from all already-persisted ParsedEvents.
+     */
+    suspend fun discoverFromStoredEvents(): Int {
+        var count = 0
+        for (record in parsedEventRepository.listAll()) {
+            ownershipDiscoveryService.observe(record.event)
+            count++
+        }
+        return count
+    }
 
     fun close() {
         applicationScope.cancel()

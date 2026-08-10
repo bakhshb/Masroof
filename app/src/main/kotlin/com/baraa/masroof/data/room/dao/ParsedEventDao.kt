@@ -24,6 +24,9 @@ interface ParsedEventDao {
     @Query("SELECT COUNT(*) FROM parsed_event")
     suspend fun count(): Int
 
+    @Query("SELECT * FROM parsed_event ORDER BY id")
+    suspend fun listAll(): List<ParsedEventEntity>
+
     /**
      * Replace the current parse result for a RawSms (same or new event id).
      * Deletes any existing row for [entity.rawSmsId], then inserts [entity].

@@ -56,9 +56,10 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
-    // Room schema export for future migrations (new rewrite schema only).
+    // Room schema export for migrations (new rewrite schema only).
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("test").assets.srcDir("$projectDir/schemas")
     }
 }
 

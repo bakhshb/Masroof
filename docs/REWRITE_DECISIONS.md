@@ -88,3 +88,16 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) may
   reconcile within a 5s receivedAt tolerance on exact sender+bodyHash; same-source
   rows are never merged by that rule alone.
+
+## 9. P7 — Account/card ownership registry
+
+- Schema **version = 2** with Migration(1, 2) creating `account_registry` and
+  `card_registry` only (no destructive migration; P5/P6 evidence preserved).
+- Account identity = `bankId + maskedNumber`; card identity = `bankId + last4`.
+- Discovery observes role-aware user-side candidates as `OwnershipStatus.UNKNOWN`.
+- Confirmation APIs set OWNED / EXTERNAL / clear→UNKNOWN; observation never
+  overwrites explicit ownership.
+- `Bank.UNKNOWN` references are not discovered (no cross-bank suffix matching).
+- `BankNetworkType` is never used to infer ownership.
+- No FinancialTransaction persistence, matching, or UI in P7.
+
