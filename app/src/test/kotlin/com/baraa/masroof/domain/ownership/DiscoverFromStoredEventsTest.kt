@@ -13,12 +13,14 @@ import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import kotlinx.coroutines.runBlocking
@@ -40,6 +42,7 @@ class DiscoverFromStoredEventsTest {
     private lateinit var db: MasroofDatabase
     private lateinit var discovery: OwnershipDiscoveryService
     private lateinit var accounts: RoomAccountRegistryRepository
+    private lateinit var cards: RoomCardRegistryRepository
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var rawRepo: RoomRawSmsRepository
 
@@ -50,7 +53,7 @@ class DiscoverFromStoredEventsTest {
             .allowMainThreadQueries()
             .build()
         accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        cards = RoomCardRegistryRepository(db.cardRegistryDao())
         discovery = OwnershipDiscoveryService(accounts, cards)
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
@@ -62,31 +65,73 @@ class DiscoverFromStoredEventsTest {
     }
 
     @Test
-    fun discoverFromStoredEvents_observesPersistedTransfers() = runBlocking {
-        val body = "transfer"
-        val sms = RawSms(
-            id = "android-sms:hist-1",
-            sender = "AlJazira",
-            body = body,
-            receivedAt = Instant.parse("2026-08-01T10:00:00Z"),
-            deviceMessageId = "hist-1",
-            bodyHash = SmsBodyHasher.sha256Hex(body),
+    fun discoverFromStoredEvents_abRerun_isGloballyIdempotent() = runBlocking {
+        persistTransferIn(
+            smsId = "android-sms:A",
+            deviceId = "A",
+            eventId = "pe-A",
+            wife = "wife1",
+            user = "3001",
+            at = Instant.parse("2026-08-01T10:00:00Z"),
         )
-        rawRepo.insertIfAbsent(sms)
+        persistPurchase(
+            smsId = "android-sms:B",
+            deviceId = "B",
+            eventId = "pe-B",
+            account = "3001",
+            card = "7271",
+            at = Instant.parse("2026-08-01T11:00:00Z"),
+        )
 
-        val wife = AccountReference(Bank.BANK_ALJAZIRA, "wife1")
-        val user = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        suspend fun runBacklog() {
+            for (record in parsedRepo.listAll()) {
+                discovery.observe(record.event)
+            }
+        }
+
+        runBacklog()
+        val accountAfterFirst = accounts.get(AccountReference(Bank.BANK_ALJAZIRA, "3001"))!!
+        val cardAfterFirst = cards.get(CardReference(Bank.BANK_ALJAZIRA, "7271"))!!
+        assertNull(accounts.get(AccountReference(Bank.BANK_ALJAZIRA, "wife1")))
+
+        runBacklog()
+        assertEquals(accountAfterFirst, accounts.get(AccountReference(Bank.BANK_ALJAZIRA, "3001")))
+        assertEquals(cardAfterFirst, cards.get(CardReference(Bank.BANK_ALJAZIRA, "7271")))
+        assertEquals(1, accounts.listAll().size)
+        assertEquals(1, cards.listAll().size)
+        assertEquals(OwnershipStatus.UNKNOWN, accountAfterFirst.ownership)
+    }
+
+    private suspend fun persistTransferIn(
+        smsId: String,
+        deviceId: String,
+        eventId: String,
+        wife: String,
+        user: String,
+        at: Instant,
+    ) {
+        val body = "transfer-$deviceId"
+        rawRepo.insertIfAbsent(
+            RawSms(
+                id = smsId,
+                sender = "AlJazira",
+                body = body,
+                receivedAt = at,
+                deviceMessageId = deviceId,
+                bodyHash = SmsBodyHasher.sha256Hex(body),
+            ),
+        )
         parsedRepo.save(
             ParsedEvent(
-                id = "pe-hist-1",
-                rawSmsId = sms.id,
+                id = eventId,
+                rawSmsId = smsId,
                 bank = Bank.BANK_ALJAZIRA,
                 messageFamily = MessageFamily.TRANSFER_IN,
                 direction = MoneyDirection.INCOMING,
                 amount = Money(BigDecimal("100"), Currency.SAR),
                 purchaseChannel = null,
-                sourceAccountRef = wife,
-                destinationAccountRef = user,
+                sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, wife),
+                destinationAccountRef = AccountReference(Bank.BANK_ALJAZIRA, user),
                 cardRef = null,
                 merchant = null,
                 counterparty = null,
@@ -96,20 +141,46 @@ class DiscoverFromStoredEventsTest {
                 parseStatus = ParseStatus.SUCCESS,
             ),
         )
+    }
 
-        var count = 0
-        for (record in parsedRepo.listAll()) {
-            discovery.observe(record.event)
-            count++
-        }
-        assertEquals(1, count)
-        assertNull(accounts.get(wife))
-        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(user))
-
-        // Re-run must stay idempotent for same rawSmsId
-        for (record in parsedRepo.listAll()) {
-            discovery.observe(record.event)
-        }
-        assertEquals(1, accounts.get(user)!!.evidenceCount)
+    private suspend fun persistPurchase(
+        smsId: String,
+        deviceId: String,
+        eventId: String,
+        account: String,
+        card: String,
+        at: Instant,
+    ) {
+        val body = "purchase-$deviceId"
+        rawRepo.insertIfAbsent(
+            RawSms(
+                id = smsId,
+                sender = "AlJazira",
+                body = body,
+                receivedAt = at,
+                deviceMessageId = deviceId,
+                bodyHash = SmsBodyHasher.sha256Hex(body),
+            ),
+        )
+        parsedRepo.save(
+            ParsedEvent(
+                id = eventId,
+                rawSmsId = smsId,
+                bank = Bank.BANK_ALJAZIRA,
+                messageFamily = MessageFamily.PURCHASE,
+                direction = MoneyDirection.OUTGOING,
+                amount = Money(BigDecimal("51.99"), Currency.SAR),
+                purchaseChannel = PurchaseChannel.ONLINE,
+                sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, account),
+                destinationAccountRef = null,
+                cardRef = CardReference(Bank.BANK_ALJAZIRA, card),
+                merchant = "Keeta",
+                counterparty = null,
+                occurredAt = null,
+                bankNetworkType = null,
+                confidence = Confidence(1.0),
+                parseStatus = ParseStatus.SUCCESS,
+            ),
+        )
     }
 }

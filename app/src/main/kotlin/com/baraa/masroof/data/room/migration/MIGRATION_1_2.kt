@@ -16,7 +16,6 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
               `ownershipStatus` TEXT NOT NULL,
               `firstSeenRawSmsId` TEXT,
               `lastSeenRawSmsId` TEXT,
-              `evidenceCount` INTEGER NOT NULL,
               PRIMARY KEY(`bankId`, `maskedNumber`)
             )
             """.trimIndent(),
@@ -36,7 +35,6 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
               `ownershipStatus` TEXT NOT NULL,
               `firstSeenRawSmsId` TEXT,
               `lastSeenRawSmsId` TEXT,
-              `evidenceCount` INTEGER NOT NULL,
               PRIMARY KEY(`bankId`, `last4`)
             )
             """.trimIndent(),

@@ -97,7 +97,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Discovery observes role-aware user-side candidates as `OwnershipStatus.UNKNOWN`.
 - Confirmation APIs set OWNED / EXTERNAL / clear→UNKNOWN; observation never
   overwrites explicit ownership.
-- `Bank.UNKNOWN` references are not discovered (no cross-bank suffix matching).
+- No `evidenceCount`: observation metadata is `firstSeenRawSmsId` /
+  `lastSeenRawSmsId` only so backlog re-runs stay idempotent.
+- Registry inserts use `OnConflictStrategy.IGNORE` (atomic create-if-absent).
+- `Bank.UNKNOWN` is never persisted or confirmed in ownership registries
+  (not a durable identity; cross-message linking is P8).
 - `BankNetworkType` is never used to infer ownership.
 - No FinancialTransaction persistence, matching, or UI in P7.
 

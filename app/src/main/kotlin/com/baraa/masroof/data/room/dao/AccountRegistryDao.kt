@@ -8,18 +8,23 @@ import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 
 @Dao
 interface AccountRegistryDao {
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun insert(entity: AccountRegistryEntity)
+    /** Atomic create-if-absent. Returns -1 when the composite key already exists. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(entity: AccountRegistryEntity): Long
 
+    /**
+     * Observation metadata only — never touches [AccountRegistryEntity.ownershipStatus].
+     * Preserves existing [firstSeenRawSmsId] when already set.
+     */
     @Query(
         """
         UPDATE account_registry
         SET lastSeenRawSmsId = :rawSmsId,
-            evidenceCount = evidenceCount + 1
+            firstSeenRawSmsId = COALESCE(firstSeenRawSmsId, :rawSmsId)
         WHERE bankId = :bankId AND maskedNumber = :maskedNumber
         """,
     )
-    suspend fun touchEvidence(bankId: String, maskedNumber: String, rawSmsId: String): Int
+    suspend fun touchObservation(bankId: String, maskedNumber: String, rawSmsId: String): Int
 
     @Query(
         """
@@ -33,6 +38,25 @@ interface AccountRegistryDao {
         maskedNumber: String,
         ownershipStatus: String,
     ): Int
+
+    /**
+     * Atomically ensure the row exists and set ownership.
+     * On conflict, only [ownershipStatus] is updated — observation metadata is kept.
+     */
+    @Query(
+        """
+        INSERT INTO account_registry
+          (bankId, maskedNumber, ownershipStatus, firstSeenRawSmsId, lastSeenRawSmsId)
+        VALUES (:bankId, :maskedNumber, :ownershipStatus, NULL, NULL)
+        ON CONFLICT(bankId, maskedNumber) DO UPDATE SET
+          ownershipStatus = :ownershipStatus
+        """,
+    )
+    suspend fun upsertOwnership(
+        bankId: String,
+        maskedNumber: String,
+        ownershipStatus: String,
+    )
 
     @Query(
         """

@@ -3,6 +3,7 @@ package com.baraa.masroof.data.room
 import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
@@ -14,25 +15,37 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 import java.time.Instant
 
 /**
- * Real 1→2 migration against an on-disk v1 SQLite database (not a fresh v2 DB).
+ * Migration proof against the **committed** exported Room schema
+ * `schemas/.../MasroofDatabase/1.json` (not a hand-maintained SQL duplicate).
+ *
+ * Flow: apply exported v1 createSql → insert evidence → [MIGRATION_1_2] →
+ * open Room v2 (schema validation) and assert evidence + registries.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class Migration1To2Test {
 
-    private val testDbName = "migration-1-2-test.db"
+    private val testDbName = "migration-1-2-exported.db"
 
     @Test
-    fun migrate1To2_preservesEvidence_andCreatesRegistries() = runBlocking {
+    fun migrate1To2_fromExportedSchema_preservesEvidence() = runBlocking {
+        val schemaFile = File("schemas/com.baraa.masroof.data.room.MasroofDatabase/1.json")
+        assertTrue("committed exported v1 schema must exist", schemaFile.isFile)
+
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(testDbName)
 
@@ -41,14 +54,13 @@ class Migration1To2Test {
         val bodyHash = SmsBodyHasher.sha256Hex(body)
         val dedupeKey = "AlJazira|${receivedAt.toEpochMilli()}|$bodyHash"
 
-        // Build a genuine schema-v1 database, insert evidence, then migrate.
         val openHelper = FrameworkSQLiteOpenHelperFactory().create(
-            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+            SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(testDbName)
                 .callback(
-                    object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                    object : SupportSQLiteOpenHelper.Callback(1) {
                         override fun onCreate(db: SupportSQLiteDatabase) {
-                            createV1Schema(db)
+                            applyExportedSchema(db, schemaFile)
                         }
 
                         override fun onUpgrade(
@@ -129,12 +141,17 @@ class Migration1To2Test {
             assertTrue(found.contains("account_registry"))
             assertTrue(found.contains("card_registry"))
 
+            // Validate migrated schema matches exported v2 createSql for registries.
+            val schema2 = File("schemas/com.baraa.masroof.data.room.MasroofDatabase/2.json")
+            assertTrue(schema2.isFile)
+            assertTrue(schema2.readText().contains("account_registry"))
+            assertTrue(!schema2.readText().contains("evidenceCount"))
+
             val accountRepo = RoomAccountRegistryRepository(roomDb.accountRegistryDao())
             val ref = AccountReference(Bank.BANK_ALJAZIRA, "3001")
             accountRepo.observe(ref, "android-sms:1")
             assertEquals(OwnershipStatus.UNKNOWN, accountRepo.resolve(ref))
 
-            val preserved = RoomRawSmsRepository(roomDb.rawSmsDao()).getById("android-sms:1")
             assertEquals(
                 RawSms(
                     id = "android-sms:1",
@@ -144,7 +161,7 @@ class Migration1To2Test {
                     deviceMessageId = "1",
                     bodyHash = bodyHash,
                 ),
-                preserved,
+                RoomRawSmsRepository(roomDb.rawSmsDao()).getById("android-sms:1"),
             )
         } finally {
             roomDb.close()
@@ -152,67 +169,26 @@ class Migration1To2Test {
         }
     }
 
-    private fun createV1Schema(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS `raw_sms` (
-              `id` TEXT NOT NULL,
-              `sender` TEXT NOT NULL,
-              `body` TEXT NOT NULL,
-              `receivedAtEpochMillis` INTEGER NOT NULL,
-              `deviceMessageId` TEXT,
-              `bodyHash` TEXT NOT NULL,
-              `dedupeKey` TEXT NOT NULL,
-              PRIMARY KEY(`id`)
-            )
-            """.trimIndent(),
-        )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_raw_sms_dedupeKey` ON `raw_sms` (`dedupeKey`)",
-        )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_raw_sms_deviceMessageId` ON `raw_sms` (`deviceMessageId`)",
-        )
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS `parsed_event` (
-              `id` TEXT NOT NULL,
-              `rawSmsId` TEXT NOT NULL,
-              `bankId` TEXT NOT NULL,
-              `messageFamily` TEXT NOT NULL,
-              `direction` TEXT,
-              `amountDecimal` TEXT,
-              `amountCurrency` TEXT,
-              `purchaseChannel` TEXT,
-              `sourceAccountBankId` TEXT,
-              `sourceAccountMaskedNumber` TEXT,
-              `destinationAccountBankId` TEXT,
-              `destinationAccountMaskedNumber` TEXT,
-              `cardBankId` TEXT,
-              `cardLast4` TEXT,
-              `merchant` TEXT,
-              `counterparty` TEXT,
-              `occurredAtEpochMillis` INTEGER,
-              `bankNetworkType` TEXT,
-              `confidenceScore` REAL NOT NULL,
-              `confidenceReasons` TEXT NOT NULL,
-              `parseStatus` TEXT NOT NULL,
-              `transactionReference` TEXT,
-              `availableBalanceDecimal` TEXT,
-              `availableBalanceCurrency` TEXT,
-              `outstandingBalanceDecimal` TEXT,
-              `outstandingBalanceCurrency` TEXT,
-              `biller` TEXT,
-              `billerCode` TEXT,
-              `occurredAtLocal` TEXT,
-              PRIMARY KEY(`id`),
-              FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`)
-                ON UPDATE CASCADE ON DELETE RESTRICT
-            )
-            """.trimIndent(),
-        )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_parsed_event_rawSmsId` ON `parsed_event` (`rawSmsId`)",
-        )
+    private fun applyExportedSchema(db: SupportSQLiteDatabase, schemaFile: File) {
+        val root = Json.parseToJsonElement(schemaFile.readText()).jsonObject
+        val database = root.getValue("database").jsonObject
+        assertEquals(1, database.getValue("version").jsonPrimitive.content.toInt())
+
+        val entities = database.getValue("entities").jsonArray
+        for (entityEl in entities) {
+            val entity = entityEl.jsonObject
+            val tableName = entity.getValue("tableName").jsonPrimitive.content
+            val createSql = entity.getValue("createSql").jsonPrimitive.content
+                .replace("\${TABLE_NAME}", tableName)
+            db.execSQL(createSql)
+
+            val indices = entity["indices"]?.jsonArray.orEmpty()
+            for (indexEl in indices) {
+                val index = indexEl.jsonObject
+                val indexSql = index.getValue("createSql").jsonPrimitive.content
+                    .replace("\${TABLE_NAME}", tableName)
+                db.execSQL(indexSql)
+            }
+        }
     }
 }

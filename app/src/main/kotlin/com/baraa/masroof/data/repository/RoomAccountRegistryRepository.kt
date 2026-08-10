@@ -6,58 +6,44 @@ import com.baraa.masroof.data.room.mapper.RegistryMapper
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.ownership.RegistryIdentity
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 
 class RoomAccountRegistryRepository(
     private val dao: AccountRegistryDao,
 ) : AccountRegistryRepository {
     override suspend fun observe(reference: AccountReference, rawSmsId: String) {
-        val bankId = reference.bank.id
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return
         val masked = reference.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return
 
-        val existing = dao.get(bankId, masked)
-        if (existing == null) {
-            dao.insert(
-                AccountRegistryEntity(
-                    bankId = bankId,
-                    maskedNumber = masked,
-                    ownershipStatus = OwnershipStatus.UNKNOWN.name,
-                    firstSeenRawSmsId = rawSmsId,
-                    lastSeenRawSmsId = rawSmsId,
-                    evidenceCount = 1,
-                ),
-            )
-            return
-        }
-        // Idempotent for the same SMS evidence; never rewrite ownership.
-        if (existing.lastSeenRawSmsId == rawSmsId) return
-        dao.touchEvidence(bankId, masked, rawSmsId)
+        val bankId = reference.bank.id
+        // Atomic create-if-absent as UNKNOWN. Never overwrites ownership on conflict.
+        dao.insertIfAbsent(
+            AccountRegistryEntity(
+                bankId = bankId,
+                maskedNumber = masked,
+                ownershipStatus = OwnershipStatus.UNKNOWN.name,
+                firstSeenRawSmsId = rawSmsId,
+                lastSeenRawSmsId = rawSmsId,
+            ),
+        )
+        // Observation metadata only — ownershipStatus is untouched.
+        dao.touchObservation(bankId, masked, rawSmsId)
     }
 
     override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
-        val bankId = reference.bank.id
+        RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.setOwnership")
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required to set ownership" }
 
-        val existing = dao.get(bankId, masked)
-        if (existing == null) {
-            dao.insert(
-                AccountRegistryEntity(
-                    bankId = bankId,
-                    maskedNumber = masked,
-                    ownershipStatus = status.name,
-                    firstSeenRawSmsId = null,
-                    lastSeenRawSmsId = null,
-                    evidenceCount = 0,
-                ),
-            )
-        } else {
-            dao.updateOwnership(bankId, masked, status.name)
-        }
+        // Single atomic UPSERT: discovery cannot leave UNKNOWN after this wins,
+        // and observation metadata is preserved on conflict.
+        dao.upsertOwnership(reference.bank.id, masked, status.name)
     }
 
     override suspend fun resolve(reference: AccountReference): OwnershipStatus {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return OwnershipStatus.UNKNOWN
         val masked = reference.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return OwnershipStatus.UNKNOWN
         val entry = dao.get(reference.bank.id, masked) ?: return OwnershipStatus.UNKNOWN
@@ -65,6 +51,7 @@ class RoomAccountRegistryRepository(
     }
 
     override suspend fun get(reference: AccountReference): AccountRegistryEntry? {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return null
         val masked = reference.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return null
         return dao.get(reference.bank.id, masked)?.let(RegistryMapper::toAccountEntry)

@@ -139,6 +139,114 @@ class OwnershipDiscoveryServiceTest {
     }
 
     @Test
+    fun cardPayment_discoversSourceAndCard() = runBlocking {
+        val account = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val card = CardReference(Bank.BANK_ALJAZIRA, "7271")
+        val other = AccountReference(Bank.BANK_ALJAZIRA, "9999")
+        discovery.observe(
+            event(
+                family = MessageFamily.CARD_PAYMENT,
+                rawSmsId = "cp-1",
+                source = account,
+                destination = other,
+                card = card,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(account))
+        assertEquals(OwnershipStatus.UNKNOWN, cards.resolve(card))
+        assertNull(accounts.get(other))
+    }
+
+    @Test
+    fun withdrawal_discoversSourceOnly() = runBlocking {
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val dest = AccountReference(Bank.BANK_ALJAZIRA, "atm")
+        discovery.observe(
+            event(
+                family = MessageFamily.WITHDRAWAL,
+                rawSmsId = "wd-1",
+                source = source,
+                destination = dest,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(source))
+        assertNull(accounts.get(dest))
+        assertEquals(0, cards.listAll().size)
+    }
+
+    @Test
+    fun balanceNotice_prefersSourceThenDestination() = runBlocking {
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        discovery.observe(
+            event(
+                family = MessageFamily.BALANCE_NOTICE,
+                rawSmsId = "bal-1",
+                source = source,
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "ignored"),
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(source))
+        assertNull(accounts.get(AccountReference(Bank.BANK_ALJAZIRA, "ignored")))
+
+        val destOnly = AccountReference(Bank.BANK_ALJAZIRA, "3002")
+        discovery.observe(
+            event(
+                family = MessageFamily.BALANCE_NOTICE,
+                rawSmsId = "bal-2",
+                destination = destOnly,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(destOnly))
+    }
+
+    @Test
+    fun refund_discoversDestinationAndCard_notSourceFallback() = runBlocking {
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "ext-src")
+        val dest = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val card = CardReference(Bank.BANK_ALJAZIRA, "7271")
+        discovery.observe(
+            event(
+                family = MessageFamily.REFUND,
+                rawSmsId = "rf-1",
+                source = source,
+                destination = dest,
+                card = card,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(dest))
+        assertEquals(OwnershipStatus.UNKNOWN, cards.resolve(card))
+        assertNull(accounts.get(source))
+
+        // No destination → still must NOT discover source
+        discovery.observe(
+            event(
+                family = MessageFamily.REFUND,
+                rawSmsId = "rf-2",
+                source = source,
+                card = card,
+            ),
+        )
+        assertNull(accounts.get(source))
+        assertEquals(OwnershipStatus.UNKNOWN, cards.resolve(card))
+    }
+
+    @Test
+    fun fee_discoversSourceAndCard() = runBlocking {
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val card = CardReference(Bank.BANK_ALJAZIRA, "7271")
+        discovery.observe(
+            event(
+                family = MessageFamily.FEE,
+                rawSmsId = "fee-1",
+                source = source,
+                card = card,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(source))
+        assertEquals(OwnershipStatus.UNKNOWN, cards.resolve(card))
+    }
+
+    @Test
     fun otpAndNonFinancial_noCandidates() = runBlocking {
         discovery.observe(
             event(

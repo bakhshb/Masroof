@@ -15,7 +15,6 @@ object RegistryMapper {
             ownership = OwnershipStatus.valueOf(entity.ownershipStatus),
             firstSeenRawSmsId = entity.firstSeenRawSmsId,
             lastSeenRawSmsId = entity.lastSeenRawSmsId,
-            evidenceCount = entity.evidenceCount,
         )
 
     fun toCardEntry(entity: CardRegistryEntity): CardRegistryEntry =
@@ -25,6 +24,5 @@ object RegistryMapper {
             ownership = OwnershipStatus.valueOf(entity.ownershipStatus),
             firstSeenRawSmsId = entity.firstSeenRawSmsId,
             lastSeenRawSmsId = entity.lastSeenRawSmsId,
-            evidenceCount = entity.evidenceCount,
         )
 }

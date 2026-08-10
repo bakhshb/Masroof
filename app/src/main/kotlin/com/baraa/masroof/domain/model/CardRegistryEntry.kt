@@ -11,5 +11,4 @@ data class CardRegistryEntry(
     val ownership: OwnershipStatus,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
-    val evidenceCount: Int,
 )

@@ -6,6 +6,8 @@ import androidx.room.Index
 /**
  * Durable account ownership registry row.
  * Composite identity: [bankId] + [maskedNumber].
+ *
+ * [Bank.UNKNOWN][com.baraa.masroof.domain.model.Bank.UNKNOWN] must never be stored.
  */
 @Entity(
     tableName = "account_registry",
@@ -20,5 +22,4 @@ data class AccountRegistryEntity(
     val ownershipStatus: String,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
-    val evidenceCount: Int,
 )

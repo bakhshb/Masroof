@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,6 +91,26 @@ class OwnershipResolverAndScenariosTest {
     }
 
     @Test
+    fun ownedD360_doesNotMakeUnknownSameDigitsOwned() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
+        assertEquals(
+            OwnershipStatus.OWNED,
+            resolver.resolveAccount(AccountReference(Bank("D360"), "6810")),
+        )
+        assertEquals(
+            OwnershipStatus.UNKNOWN,
+            resolver.resolveAccount(AccountReference(Bank.UNKNOWN, "6810")),
+        )
+        try {
+            confirmation.confirmAccountOwned(AccountReference(Bank.UNKNOWN, "6810"))
+            fail("expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            // expected
+        }
+        assertEquals(1, accounts.listAll().size)
+    }
+
+    @Test
     fun scenarioA_ownAljaziraAccounts_ownedToOwned() = runBlocking {
         val a = AccountReference(Bank.BANK_ALJAZIRA, "3001")
         val b = AccountReference(Bank.BANK_ALJAZIRA, "3002")
@@ -103,7 +124,6 @@ class OwnershipResolverAndScenariosTest {
             TransferOwnershipType.SELF_TRANSFER,
             TransferOwnershipResolver.resolve(source, dest),
         )
-        // INTRA_BANK must not be what drove the classification
         assertNotEquals(BankNetworkType.INTRA_BANK, TransferOwnershipType.SELF_TRANSFER)
     }
 
@@ -121,7 +141,6 @@ class OwnershipResolverAndScenariosTest {
             TransferOwnershipType.EXTERNAL_INCOMING,
             TransferOwnershipResolver.resolve(source, dest),
         )
-        // Same bank / INTRA_BANK must not force SELF_TRANSFER
         assertNotEquals(
             TransferOwnershipType.SELF_TRANSFER,
             TransferOwnershipResolver.resolve(source, dest),
@@ -133,7 +152,6 @@ class OwnershipResolverAndScenariosTest {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
         val source = resolver.resolveAccount(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        // Parser exposes external side as Bank.UNKNOWN / 6810
         val dest = resolver.resolveAccount(AccountReference(Bank.UNKNOWN, "6810"))
         assertEquals(OwnershipStatus.OWNED, source)
         assertEquals(OwnershipStatus.UNKNOWN, dest)
@@ -144,19 +162,20 @@ class OwnershipResolverAndScenariosTest {
     }
 
     @Test
-    fun scenarioD_externalRecipient() = runBlocking {
+    fun scenarioD_externalRecipientStaysUnknownBank_unresolved() = runBlocking {
         val sourceRef = AccountReference(Bank.BANK_ALJAZIRA, "3001")
         val destRef = AccountReference(Bank.UNKNOWN, "0593")
         confirmation.confirmAccountOwned(sourceRef)
-        confirmation.markAccountExternal(destRef)
+        // Bank.UNKNOWN must not become a durable EXTERNAL/OWNED registry identity
         val source = resolver.resolveAccount(sourceRef)
         val dest = resolver.resolveAccount(destRef)
         assertEquals(OwnershipStatus.OWNED, source)
-        assertEquals(OwnershipStatus.EXTERNAL, dest)
+        assertEquals(OwnershipStatus.UNKNOWN, dest)
         assertEquals(
-            TransferOwnershipType.EXTERNAL_OUTGOING,
+            TransferOwnershipType.UNKNOWN,
             TransferOwnershipResolver.resolve(source, dest),
         )
+        assertEquals(1, accounts.listAll().size)
     }
 
     @Test

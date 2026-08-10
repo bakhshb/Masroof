@@ -67,6 +67,16 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// Keep MigrationTestHelper assets identical to committed Room schema exports.
+tasks.register<Copy>("syncRoomSchemasToTestAssets") {
+    from(layout.projectDirectory.dir("schemas"))
+    into(layout.projectDirectory.dir("src/test/assets"))
+}
+
+tasks.matching { it.name.contains("UnitTest") }.configureEach {
+    dependsOn("syncRoomSchemasToTestAssets")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 2,
-    "identityHash": "1fcd8c307ed40eb08c05be225425bc6e",
+    "version": 1,
+    "identityHash": "9f1325285d3e2a7233e8d49df25fbd69",
     "entities": [
       {
         "tableName": "raw_sms",
@@ -288,124 +288,12 @@
             ]
           }
         ]
-      },
-      {
-        "tableName": "account_registry",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bankId` TEXT NOT NULL, `maskedNumber` TEXT NOT NULL, `ownershipStatus` TEXT NOT NULL, `firstSeenRawSmsId` TEXT, `lastSeenRawSmsId` TEXT, PRIMARY KEY(`bankId`, `maskedNumber`))",
-        "fields": [
-          {
-            "fieldPath": "bankId",
-            "columnName": "bankId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "maskedNumber",
-            "columnName": "maskedNumber",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "ownershipStatus",
-            "columnName": "ownershipStatus",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "firstSeenRawSmsId",
-            "columnName": "firstSeenRawSmsId",
-            "affinity": "TEXT",
-            "notNull": false
-          },
-          {
-            "fieldPath": "lastSeenRawSmsId",
-            "columnName": "lastSeenRawSmsId",
-            "affinity": "TEXT",
-            "notNull": false
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "bankId",
-            "maskedNumber"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_account_registry_bankId_maskedNumber",
-            "unique": true,
-            "columnNames": [
-              "bankId",
-              "maskedNumber"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_account_registry_bankId_maskedNumber` ON `${TABLE_NAME}` (`bankId`, `maskedNumber`)"
-          }
-        ],
-        "foreignKeys": []
-      },
-      {
-        "tableName": "card_registry",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bankId` TEXT NOT NULL, `last4` TEXT NOT NULL, `ownershipStatus` TEXT NOT NULL, `firstSeenRawSmsId` TEXT, `lastSeenRawSmsId` TEXT, PRIMARY KEY(`bankId`, `last4`))",
-        "fields": [
-          {
-            "fieldPath": "bankId",
-            "columnName": "bankId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "last4",
-            "columnName": "last4",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "ownershipStatus",
-            "columnName": "ownershipStatus",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "firstSeenRawSmsId",
-            "columnName": "firstSeenRawSmsId",
-            "affinity": "TEXT",
-            "notNull": false
-          },
-          {
-            "fieldPath": "lastSeenRawSmsId",
-            "columnName": "lastSeenRawSmsId",
-            "affinity": "TEXT",
-            "notNull": false
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "bankId",
-            "last4"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_card_registry_bankId_last4",
-            "unique": true,
-            "columnNames": [
-              "bankId",
-              "last4"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_card_registry_bankId_last4` ON `${TABLE_NAME}` (`bankId`, `last4`)"
-          }
-        ],
-        "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1fcd8c307ed40eb08c05be225425bc6e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9f1325285d3e2a7233e8d49df25fbd69')"
     ]
   }
 }

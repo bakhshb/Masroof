@@ -64,12 +64,10 @@ class OwnershipDiscoveryService(
             }
 
             MessageFamily.REFUND -> {
-                // User destination container when clearly present
+                // Only clearly identified user destination / card — never a
+                // generic source fallback when destination is absent.
                 event.destinationAccountRef?.let(accounts::add)
                 event.cardRef?.let(cards::add)
-                if (event.destinationAccountRef == null) {
-                    event.sourceAccountRef?.let(accounts::add)
-                }
             }
 
             MessageFamily.FEE -> {

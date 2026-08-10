@@ -6,6 +6,8 @@ import androidx.room.Index
 /**
  * Durable card ownership registry row.
  * Composite identity: [bankId] + [last4].
+ *
+ * [Bank.UNKNOWN][com.baraa.masroof.domain.model.Bank.UNKNOWN] must never be stored.
  */
 @Entity(
     tableName = "card_registry",
@@ -20,5 +22,4 @@ data class CardRegistryEntity(
     val ownershipStatus: String,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
-    val evidenceCount: Int,
 )
