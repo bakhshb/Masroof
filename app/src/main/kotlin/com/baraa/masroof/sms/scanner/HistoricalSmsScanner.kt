@@ -87,7 +87,7 @@ class HistoricalSmsScanner(
                             continue
                         }
 
-                        when (ingestionService.ingest(rawSms)) {
+                        when (val outcome = ingestionService.ingest(rawSms)) {
                             is SmsIngestionResult.Duplicate -> duplicates++
                             is SmsIngestionResult.NotRelevant -> notRelevant++
                             is SmsIngestionResult.Parsed -> {
@@ -111,7 +111,11 @@ class HistoricalSmsScanner(
                                 failed++
                             }
                             is SmsIngestionResult.Failed -> {
-                                inserted++
+                                // rawSmsId == null → RawSms never persisted
+                                // rawSmsId != null → RawSms already stored; later step failed
+                                if (outcome.rawSmsId != null) {
+                                    inserted++
+                                }
                                 failed++
                             }
                         }

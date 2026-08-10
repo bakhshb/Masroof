@@ -11,7 +11,6 @@ import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Duration

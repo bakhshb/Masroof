@@ -30,8 +30,9 @@ interface RawSmsDao {
     /**
      * Cross-source live↔historical near-duplicate lookup.
      *
-     * When [requireDeviceMessageIdNull] is true, finds historical rows
-     * (deviceMessageId NOT NULL). When false, finds live rows (deviceMessageId IS NULL).
+     * When [requireDeviceMessageIdNull] is true, finds live rows
+     * (deviceMessageId IS NULL). When false, finds historical rows
+     * (deviceMessageId IS NOT NULL).
      */
     @Query(
         """

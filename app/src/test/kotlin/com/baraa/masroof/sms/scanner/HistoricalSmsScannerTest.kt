@@ -8,6 +8,10 @@ import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.repository.RawSmsInsertResult
+import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
@@ -147,6 +151,80 @@ class HistoricalSmsScannerTest {
         assertEquals(2, result.skippedMalformed)
         assertEquals(1, result.parsed)
         assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun failedWithNullRawSmsId_incrementsFailedOnly_notInserted() = runBlocking {
+        val failingRawRepo = object : RawSmsRepository {
+            override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult {
+                throw IllegalStateException("db down")
+            }
+
+            override suspend fun getById(id: String): RawSms? = null
+            override suspend fun existsById(id: String): Boolean = false
+            override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
+            override suspend fun findCrossSourceNearDuplicate(
+                sender: String,
+                bodyHash: String,
+                fromInclusive: Instant,
+                toInclusive: Instant,
+                lookingForLiveRow: Boolean,
+            ): RawSms? = null
+        }
+        val svc = SmsIngestionService(
+            rawSmsRepository = failingRawRepo,
+            parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+        )
+        val source = FakeSmsDataSource(
+            listOf(
+                InboxRow.Valid(
+                    ProviderSmsRecord(
+                        "10",
+                        "AlJazira",
+                        purchaseBody(),
+                        Instant.parse("2026-08-01T00:00:00Z"),
+                    ),
+                ),
+            ),
+        )
+        val result = HistoricalSmsScanner(source, svc).scan()
+        assertEquals(1, result.scanned)
+        assertEquals(0, result.inserted)
+        assertEquals(1, result.failed)
+        assertEquals(0, result.parsed)
+        assertNull(result.failure)
+    }
+
+    @Test
+    fun failedWithPersistedRawSmsId_incrementsInsertedAndFailed() = runBlocking {
+        val exploding = SmsParseGateway { throw IllegalStateException("parse boom") }
+        val svc = SmsIngestionService(
+            rawSmsRepository = RoomRawSmsRepository(db.rawSmsDao()),
+            parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = exploding,
+        )
+        val source = FakeSmsDataSource(
+            listOf(
+                InboxRow.Valid(
+                    ProviderSmsRecord(
+                        "11",
+                        "AlJazira",
+                        purchaseBody(),
+                        Instant.parse("2026-08-01T00:00:00Z"),
+                    ),
+                ),
+            ),
+        )
+        val result = HistoricalSmsScanner(source, svc).scan()
+        assertEquals(1, result.scanned)
+        assertEquals(1, result.inserted)
+        assertEquals(1, result.failed)
+        assertEquals(0, result.parsed)
+        assertEquals(1, db.rawSmsDao().count())
+        assertNull(result.failure)
     }
 
     private fun purchaseBody() = """
