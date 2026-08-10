@@ -1,10 +1,13 @@
-package com.baraa.masroof.domain.repository
+package com.baraa.masroof.parsing.repository
 
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 
 /**
- * Domain-facing ParsedEvent persistence. Implementations live in the data layer.
+ * Parsing-facing persistence for structured parse output.
+ *
+ * Lives under parsing (not domain) because [ParsedEventDetails] is a parsing-layer
+ * type. Implementations live in the data layer.
  *
  * Supports replace-by-rawSmsId for future reprocessing without event history.
  */

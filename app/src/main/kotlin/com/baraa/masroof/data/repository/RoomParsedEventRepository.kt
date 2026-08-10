@@ -3,9 +3,9 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.mapper.ParsedEventMapper
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.repository.ParsedEventRecord
-import com.baraa.masroof.domain.repository.ParsedEventRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 
 class RoomParsedEventRepository(
     private val dao: ParsedEventDao,

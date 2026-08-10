@@ -9,20 +9,17 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 class RoomRawSmsRepository(
     private val dao: RawSmsDao,
 ) : RawSmsRepository {
+    /**
+     * Duplicate protection is atomic via SQLite unique constraints + IGNORE.
+     * Expected duplicates return [RawSmsInsertResult.AlreadyExists] without throwing.
+     */
     override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult {
-        if (dao.existsById(rawSms.id)) {
-            return RawSmsInsertResult.AlreadyExists
+        val rowId = dao.insertIfAbsent(RawSmsMapper.toEntity(rawSms))
+        return if (rowId == -1L) {
+            RawSmsInsertResult.AlreadyExists
+        } else {
+            RawSmsInsertResult.Inserted
         }
-        val deviceId = rawSms.deviceMessageId
-        if (deviceId != null && dao.findByDeviceMessageId(deviceId) != null) {
-            return RawSmsInsertResult.AlreadyExists
-        }
-        val entity = RawSmsMapper.toEntity(rawSms)
-        if (dao.findByDedupeKey(entity.dedupeKey) != null) {
-            return RawSmsInsertResult.AlreadyExists
-        }
-        dao.insert(entity)
-        return RawSmsInsertResult.Inserted
     }
 
     override suspend fun getById(id: String): RawSms? =

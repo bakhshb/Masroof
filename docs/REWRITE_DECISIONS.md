@@ -69,3 +69,7 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   plus unique nullable `deviceMessageId` (SQLite allows multiple NULLs).
 - FK `parsed_event.rawSmsId → raw_sms.id` with **RESTRICT**: deleting parsed
   rows must not cascade-delete raw evidence.
+- `RawSmsRepository.insertIfAbsent` is atomic via `OnConflictStrategy.IGNORE`
+  (no check-then-insert race).
+- `ParsedEventRepository` lives under `parsing.repository` (not domain), because
+  it carries `ParsedEventDetails`.

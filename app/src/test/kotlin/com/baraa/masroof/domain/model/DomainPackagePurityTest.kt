@@ -42,4 +42,29 @@ class DomainPackagePurityTest {
             }
         }
     }
+
+    @Test
+    fun domainSources_doNotImportHigherLayers() {
+        val domainRoot = File("src/main/kotlin/com/baraa/masroof/domain")
+        assertTrue(domainRoot.isDirectory)
+        val forbidden = listOf(
+            "import com.baraa.masroof.parsing",
+            "import com.baraa.masroof.bank",
+            "import com.baraa.masroof.data",
+            "import com.baraa.masroof.presentation",
+            "import androidx.room",
+            "import android.",
+        )
+        domainRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .forEach { file ->
+                val text = file.readText()
+                forbidden.forEach { needle ->
+                    assertFalse(
+                        "${file.path} must not contain '$needle' (domain must not depend on higher layers)",
+                        text.contains(needle),
+                    )
+                }
+            }
+    }
 }

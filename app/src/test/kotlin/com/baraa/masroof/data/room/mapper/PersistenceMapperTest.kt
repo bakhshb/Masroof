@@ -136,9 +136,29 @@ class PersistenceMapperTest {
     fun localDateTime_doesNotBecomeZuluInstant() {
         val details = ParsedEventDetails(occurredAtLocal = LocalDateTime.parse("2026-08-03T14:32:00"))
         val entity = ParsedEventMapper.toEntity(minimalEvent(), details)
-        assertEquals("2026-08-03T14:32:00", entity.occurredAtLocal)
         assertNull(entity.occurredAtEpochMillis)
         assertNull(ParsedEventMapper.toDomainEvent(entity).occurredAt)
+        assertEquals(
+            LocalDateTime.parse("2026-08-03T14:32:00"),
+            ParsedEventMapper.toDetails(entity).occurredAtLocal,
+        )
+    }
+
+    @Test
+    fun localDateTime_preservesFractionalSecondsAndShortForms() {
+        listOf(
+            "2026-08-03T14:32",
+            "2026-08-03T14:32:00",
+            "2026-08-03T14:32:00.123456789",
+        ).forEach { text ->
+            val original = LocalDateTime.parse(text)
+            val entity = ParsedEventMapper.toEntity(
+                minimalEvent(),
+                ParsedEventDetails(occurredAtLocal = original),
+            )
+            assertEquals(original, ParsedEventMapper.toDetails(entity).occurredAtLocal)
+            assertNull(entity.occurredAtEpochMillis)
+        }
     }
 
     @Test

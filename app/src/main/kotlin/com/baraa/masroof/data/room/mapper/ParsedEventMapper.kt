@@ -11,16 +11,12 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel
-import com.baraa.masroof.domain.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 object ParsedEventMapper {
-    private val LOCAL_DATE_TIME: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
-
     fun toEntity(event: ParsedEvent, details: ParsedEventDetails): ParsedEventEntity {
         val (amountDecimal, amountCurrency) = MoneyPersistence.toColumns(event.amount)
         val (availableDecimal, availableCurrency) = MoneyPersistence.toColumns(details.availableBalance)
@@ -56,7 +52,8 @@ object ParsedEventMapper {
             outstandingBalanceCurrency = outstandingCurrency,
             biller = details.biller,
             billerCode = details.billerCode,
-            occurredAtLocal = details.occurredAtLocal?.format(LOCAL_DATE_TIME),
+            // LocalDateTime.toString() is ISO-8601 local; preserves fractional seconds.
+            occurredAtLocal = details.occurredAtLocal?.toString(),
         )
     }
 
@@ -109,7 +106,7 @@ object ParsedEventMapper {
             ),
             biller = entity.biller,
             billerCode = entity.billerCode,
-            occurredAtLocal = entity.occurredAtLocal?.let { LocalDateTime.parse(it, LOCAL_DATE_TIME) },
+            occurredAtLocal = entity.occurredAtLocal?.let { LocalDateTime.parse(it) },
         )
 
     fun encodeReasons(reasons: List<String>): String {

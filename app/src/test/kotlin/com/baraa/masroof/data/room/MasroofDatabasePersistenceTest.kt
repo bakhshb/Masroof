@@ -20,6 +20,9 @@ import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,7 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDateTime
-
+import java.util.concurrent.atomic.AtomicInteger
 /**
  * In-memory Room persistence tests (Robolectric). Verifies real SQLite behavior
  * for RawSms dedupe and ParsedEvent + details round-trips.
@@ -104,6 +107,79 @@ class MasroofDatabasePersistenceTest {
         assertEquals(RawSmsInsertResult.Inserted, rawSmsRepo.insertIfAbsent(a))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(b))
         assertEquals(a, rawSmsRepo.findByDeviceMessageId("device-9"))
+    }
+
+    @Test
+    fun rawSms_concurrentIdenticalInserts_areAtomic() = runBlocking {
+        val sms = sampleSms(id = "conc-1", deviceMessageId = "conc-device-1")
+        val inserted = AtomicInteger(0)
+        val alreadyExists = AtomicInteger(0)
+        val jobs = (1..32).map {
+            async(Dispatchers.IO) {
+                when (rawSmsRepo.insertIfAbsent(sms)) {
+                    RawSmsInsertResult.Inserted -> inserted.incrementAndGet()
+                    RawSmsInsertResult.AlreadyExists -> alreadyExists.incrementAndGet()
+                }
+            }
+        }
+        jobs.awaitAll()
+        assertEquals(1, inserted.get())
+        assertEquals(31, alreadyExists.get())
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(sms, rawSmsRepo.getById(sms.id))
+    }
+
+    @Test
+    fun rawSms_concurrentSameDeviceMessageId_areAtomic() = runBlocking {
+        val inserted = AtomicInteger(0)
+        val alreadyExists = AtomicInteger(0)
+        val jobs = (1..24).map { i ->
+            async(Dispatchers.IO) {
+                val sms = sampleSms(
+                    id = "dev-conc-$i",
+                    deviceMessageId = "shared-device",
+                    body = "body-$i",
+                    receivedAt = Instant.ofEpochMilli(i.toLong()),
+                )
+                when (rawSmsRepo.insertIfAbsent(sms)) {
+                    RawSmsInsertResult.Inserted -> inserted.incrementAndGet()
+                    RawSmsInsertResult.AlreadyExists -> alreadyExists.incrementAndGet()
+                }
+            }
+        }
+        jobs.awaitAll()
+        assertEquals(1, inserted.get())
+        assertEquals(23, alreadyExists.get())
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun rawSms_concurrentSameDedupeKey_areAtomic() = runBlocking {
+        val receivedAt = Instant.parse("2026-08-10T12:00:00Z")
+        val body = "identical-body"
+        val bodyHash = "hash-$body"
+        val inserted = AtomicInteger(0)
+        val alreadyExists = AtomicInteger(0)
+        val jobs = (1..24).map { i ->
+            async(Dispatchers.IO) {
+                val sms = RawSms(
+                    id = "dedupe-conc-$i",
+                    sender = "AlJazira",
+                    body = body,
+                    receivedAt = receivedAt,
+                    deviceMessageId = null,
+                    bodyHash = bodyHash,
+                )
+                when (rawSmsRepo.insertIfAbsent(sms)) {
+                    RawSmsInsertResult.Inserted -> inserted.incrementAndGet()
+                    RawSmsInsertResult.AlreadyExists -> alreadyExists.incrementAndGet()
+                }
+            }
+        }
+        jobs.awaitAll()
+        assertEquals(1, inserted.get())
+        assertEquals(23, alreadyExists.get())
+        assertEquals(1, db.rawSmsDao().count())
     }
 
     @Test
