@@ -5,6 +5,9 @@ package com.baraa.masroof.domain.model
  *
  * Numeric thresholds for automatic vs review decisions are intentionally not
  * encoded here (DOMAIN §6); they belong to later tested policy.
+ *
+ * Persistence (P5) joins [reasons] with U+001E. Reasons must not contain that
+ * character; the Room mapper fail-fasts if they do.
  */
 data class Confidence(
     val score: Double,
