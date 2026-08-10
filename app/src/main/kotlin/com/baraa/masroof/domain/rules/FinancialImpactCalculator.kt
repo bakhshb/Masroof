@@ -39,19 +39,21 @@ object FinancialImpactCalculator {
                 )
 
             FinancialTransactionType.EXTERNAL_TRANSFER_IN ->
-                // Cash inflow, but not automatically income (D-004, §12).
+                // Not automatically income (D-004, §12). Cash direction alone does
+                // not determine net worth (loan, gift, reimbursement, etc.).
                 FinancialImpact(
                     countsAsExpense = false,
                     countsAsIncome = false,
-                    netWorthEffect = NetWorthEffect.INCREASE,
+                    netWorthEffect = NetWorthEffect.UNRESOLVED,
                 )
 
             FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
-                // Cash outflow, but not automatically expense (D-005, §11).
+                // Not automatically expense (D-005, §11). Cash direction alone does
+                // not determine net worth (loan repayment, spending, investment, etc.).
                 FinancialImpact(
                     countsAsExpense = false,
                     countsAsIncome = false,
-                    netWorthEffect = NetWorthEffect.DECREASE,
+                    netWorthEffect = NetWorthEffect.UNRESOLVED,
                 )
 
             FinancialTransactionType.REFUND ->

@@ -141,6 +141,7 @@ class TransactionClassifierTest {
         assertEquals(TransferOwnershipType.EXTERNAL_INCOMING, classified.transferOwnership)
         assertFalse(classified.impact.countsAsIncome)
         assertFalse(classified.impact.countsAsExpense)
+        assertEquals(NetWorthEffect.UNRESOLVED, classified.impact.netWorthEffect)
     }
 
     @Test
@@ -158,6 +159,37 @@ class TransactionClassifierTest {
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, classified.transactionType)
         assertEquals(TransferOwnershipType.EXTERNAL_OUTGOING, classified.transferOwnership)
         assertFalse(classified.impact.countsAsExpense)
+        assertFalse(classified.impact.countsAsIncome)
+        assertEquals(NetWorthEffect.UNRESOLVED, classified.impact.netWorthEffect)
+    }
+
+    @Test
+    fun externalTransfers_doNotInferNetWorthFromCashDirection() {
+        val incoming = FinancialImpactCalculator.forType(FinancialTransactionType.EXTERNAL_TRANSFER_IN)
+        val outgoing = FinancialImpactCalculator.forType(FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
+
+        assertFalse(incoming.countsAsExpense)
+        assertFalse(incoming.countsAsIncome)
+        assertEquals(NetWorthEffect.UNRESOLVED, incoming.netWorthEffect)
+
+        assertFalse(outgoing.countsAsExpense)
+        assertFalse(outgoing.countsAsIncome)
+        assertEquals(NetWorthEffect.UNRESOLVED, outgoing.netWorthEffect)
+    }
+
+    @Test
+    fun billPayment_doesNotSilentlyBecomeExpense() {
+        val result = TransactionClassifier.classify(
+            ClassificationContext(messageFamily = MessageFamily.BILL_PAYMENT),
+        )
+
+        assertTrue(result is ClassificationResult.NeedsReview)
+        val review = result as ClassificationResult.NeedsReview
+        assertTrue(review.tentativeType != FinancialTransactionType.EXPENSE)
+        assertEquals(null, review.tentativeType)
+        assertFalse(review.impact.countsAsExpense)
+        assertFalse(review.impact.countsAsIncome)
+        assertEquals(NetWorthEffect.UNRESOLVED, review.impact.netWorthEffect)
     }
 
     @Test
