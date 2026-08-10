@@ -3,14 +3,12 @@ package com.baraa.masroof.parsing.fixtures
 import kotlinx.serialization.Serializable
 
 /**
- * On-disk Bank AlJazira fixture schema for future P4 parser tests.
+ * On-disk Bank AlJazira fixture schema for parser contract tests.
  *
  * Must not encode ownership or SELF_TRANSFER expectations.
  *
  * Extra extracted fields ([transactionReference], balances, [biller], …) are
- * fixture-level parse expectations. DOMAIN [com.baraa.masroof.domain.model.ParsedEvent]
- * does not currently carry all of them — that mismatch is intentional for P3 and
- * must be resolved before/at P4 without silently mapping biller→merchant.
+ * asserted via parsing-layer [com.baraa.masroof.parsing.model.ParsedEventDetails].
  */
 @Serializable
 data class AlJaziraFixture(
@@ -19,7 +17,9 @@ data class AlJaziraFixture(
     val body: String,
     val expected: AlJaziraFixtureExpected,
     val notes: String? = null,
-)
+) {
+    override fun toString(): String = id
+}
 
 @Serializable
 data class AlJaziraFixtureExpected(

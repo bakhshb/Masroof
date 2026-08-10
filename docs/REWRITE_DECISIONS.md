@@ -37,3 +37,23 @@ Example:
 
 No Room database in P0. Persistence is introduced after the domain model is
 stable in a later phase.
+
+## 5. P4 — Parse-time details vs domain ParsedEvent
+
+Bank AlJazira fixtures assert parse-time facts that DOMAIN `ParsedEvent` does
+not currently carry: `transactionReference`, `availableBalance`,
+`outstandingBalance`, `biller`, `billerCode`, and offset-less local timestamps.
+
+**Decision:** keep these on a narrowly typed parsing-layer model
+`ParsedEventDetails`, attached to `ParseResult` / `ParsedEventDraft`. Do **not**
+silently map biller→merchant, reference→counterparty, or balances→amount.
+Do **not** extend DOMAIN.md / domain `ParsedEvent` in P4 for these fields.
+
+## 6. P4 — Local SMS date-time vs Instant
+
+Fixtures represent local timestamps without an offset (e.g. `2026-08-03T14:32:00`).
+DOMAIN `ParsedEvent.occurredAt` is `Instant?`.
+
+**Decision:** store local values in `ParsedEventDetails.occurredAtLocal`
+(`LocalDateTime`). Leave `ParsedEvent.occurredAt` null at parse time rather than
+pretending local wall time is UTC (`…Z`). Timezone policy is deferred.

@@ -17,6 +17,12 @@ import java.time.Instant
  * Intermediate parse draft before validation finalizes a [ParsedEvent].
  *
  * Must never carry ownership or [com.baraa.masroof.domain.model.FinancialTransactionType].
+ *
+ * [details] holds typed parse-time facts not modeled on [ParsedEvent].
+ * [amountCandidates] / [selectedAmount] preserve extraction provenance for V-001…V-007.
+ *
+ * [occurredAt] ([Instant]) is intentionally unused when only a local SMS timestamp
+ * is known; use [ParsedEventDetails.occurredAtLocal] instead.
  */
 data class ParsedEventDraft(
     val rawSmsId: String,
@@ -34,11 +40,17 @@ data class ParsedEventDraft(
     val bankNetworkType: BankNetworkType? = null,
     val confidence: Confidence? = null,
     val parseStatus: ParseStatus? = null,
+    val details: ParsedEventDetails = ParsedEventDetails(),
+    val amountCandidates: List<AmountCandidate> = emptyList(),
+    val selectedAmount: AmountCandidate? = null,
 ) {
     /**
      * Builds a [ParsedEvent] only when required identity fields are present and a
      * declared [ParseStatus.SUCCESS] draft is complete enough for automatic use
      * (financial families must carry an amount).
+     *
+     * Callers that emit [ParseResult.Success] must go through
+     * [com.baraa.masroof.parsing.finalize.ParseFinalizer] so validation runs first.
      */
     fun toParsedEvent(id: String): ParsedEvent {
         val family = requireNotNull(messageFamily) { "messageFamily required to build ParsedEvent" }
