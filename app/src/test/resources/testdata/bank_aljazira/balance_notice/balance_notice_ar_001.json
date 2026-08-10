@@ -7,7 +7,8 @@
     "messageFamily": "BALANCE_NOTICE",
     "sourceAccountLast4": "3001",
     "occurredAt": "2026-08-03T08:00:00",
-    "parseStatus": "NON_FINANCIAL"
+    "parseStatus": "NON_FINANCIAL",
+    "availableBalance": "17230.03"
   },
   "notes": "Balance notice is not an expense/transaction amount fixture."
 }

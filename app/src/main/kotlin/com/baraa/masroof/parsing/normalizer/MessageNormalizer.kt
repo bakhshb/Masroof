@@ -2,6 +2,7 @@ package com.baraa.masroof.parsing.normalizer
 
 import com.baraa.masroof.parsing.model.NormalizedSms
 import java.text.Normalizer
+import java.util.Locale
 
 /**
  * Bank-agnostic SMS text normalizer.
@@ -16,16 +17,14 @@ class MessageNormalizer {
         val withLineEndings = withLatinDigits
             .replace("\r\n", "\n")
             .replace('\r', '\n')
-        val withColonVariants = withLineEndings
-            .replace('\uFF1A', ':') // fullwidth colon
-            .replace('\u061B', ';') // Arabic semicolon kept as semicolon; colons only here
-            .replace('\u0703', ':') // Syriac colon-like (if present)
+        // Fullwidth colon appears in some Latin/CJK SMS variants; fixture-safe.
+        val withColonVariants = withLineEndings.replace('\uFF1A', ':')
         val normalizedLines = withColonVariants
             .lineSequence()
             .map { line -> collapseInternalSpaces(line.trim()) }
             .toList()
         val normalizedBody = normalizedLines.joinToString("\n")
-        val comparisonBody = normalizedBody.lowercase()
+        val comparisonBody = normalizedBody.lowercase(Locale.ROOT)
         return NormalizedSms(
             originalBody = originalBody,
             normalizedBody = normalizedBody,

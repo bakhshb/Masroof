@@ -12,7 +12,8 @@
     "cardLast4": "7271",
     "merchant": "Keeta",
     "occurredAt": "2026-08-03T14:32:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "availableBalance": "17230.03"
   },
   "notes": "Canonical card-before-amount / balance-after regression shape."
 }

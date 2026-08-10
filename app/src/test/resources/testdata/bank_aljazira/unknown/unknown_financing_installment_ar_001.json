@@ -10,7 +10,8 @@
     "currency": "SAR",
     "sourceAccountLast4": "3001",
     "occurredAt": "2026-07-27T01:12:00",
-    "parseStatus": "REVIEW_REQUIRED"
+    "parseStatus": "REVIEW_REQUIRED",
+    "outstandingBalance": "3633.36"
   },
   "notes": "No dedicated MessageFamily for financing installment in current specs; review."
 }

@@ -51,36 +51,23 @@ class DefaultParsedEventValidatorTest {
     }
 
     @Test
-    fun amountEqualToCardLast4_isV001Error() {
+    fun amountNumericallyEqualToLast4_isNotRejected() {
+        // Coincidental equality is allowed; V-001/V-002 need extractor provenance (P4).
         val result = validator.validate(
             ParsedEventDraft(
                 rawSmsId = "sms-3",
                 bank = Bank.BANK_ALJAZIRA,
-                messageFamily = MessageFamily.PURCHASE,
-                amount = Money.of("7271.00", Currency.SAR),
-                cardRef = CardReference(Bank.BANK_ALJAZIRA, "7271"),
-                merchant = "Shop",
-                confidence = Confidence(0.5),
-                parseStatus = ParseStatus.PARTIAL,
-            ),
-        )
-        assertTrue(result.errors.any { it.code == "V-001" })
-    }
-
-    @Test
-    fun amountEqualToAccountLast4_isV002Error() {
-        val result = validator.validate(
-            ParsedEventDraft(
-                rawSmsId = "sms-4",
-                bank = Bank.BANK_ALJAZIRA,
                 messageFamily = MessageFamily.TRANSFER_OUT,
-                amount = Money.of("3001", Currency.SAR),
+                amount = Money.of("3001.00", Currency.SAR),
                 sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-                confidence = Confidence(0.5),
-                parseStatus = ParseStatus.PARTIAL,
+                cardRef = CardReference(Bank.BANK_ALJAZIRA, "3001"),
+                confidence = Confidence(0.9),
+                parseStatus = ParseStatus.SUCCESS,
             ),
         )
-        assertTrue(result.errors.any { it.code == "V-002" })
+        assertTrue(result.errors.none { it.code == "V-001" })
+        assertTrue(result.errors.none { it.code == "V-002" })
+        assertTrue(result.isAcceptableForAutomaticUse)
     }
 
     @Test

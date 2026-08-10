@@ -14,9 +14,8 @@ import com.baraa.masroof.domain.model.PurchaseChannel
 import java.time.Instant
 
 /**
- * Mutable-construction-friendly intermediate parse draft.
+ * Intermediate parse draft before validation finalizes a [ParsedEvent].
  *
- * Used before validation finalizes a [ParsedEvent]. Fields may be incomplete.
  * Must never carry ownership or [com.baraa.masroof.domain.model.FinancialTransactionType].
  */
 data class ParsedEventDraft(
@@ -36,11 +35,23 @@ data class ParsedEventDraft(
     val confidence: Confidence? = null,
     val parseStatus: ParseStatus? = null,
 ) {
+    /**
+     * Builds a [ParsedEvent] only when required identity fields are present and a
+     * declared [ParseStatus.SUCCESS] draft is complete enough for automatic use
+     * (financial families must carry an amount).
+     */
     fun toParsedEvent(id: String): ParsedEvent {
         val family = requireNotNull(messageFamily) { "messageFamily required to build ParsedEvent" }
         val resolvedBank = requireNotNull(bank) { "bank required to build ParsedEvent" }
         val status = requireNotNull(parseStatus) { "parseStatus required to build ParsedEvent" }
         val conf = requireNotNull(confidence) { "confidence required to build ParsedEvent" }
+
+        if (status == ParseStatus.SUCCESS && family.isFinancialFamily && amount == null) {
+            throw IllegalArgumentException(
+                "Cannot build SUCCESS ParsedEvent for financial family $family without amount",
+            )
+        }
+
         return ParsedEvent(
             id = id,
             rawSmsId = rawSmsId,
@@ -60,4 +71,23 @@ data class ParsedEventDraft(
             parseStatus = status,
         )
     }
+
+    private val MessageFamily.isFinancialFamily: Boolean
+        get() = when (this) {
+            MessageFamily.PURCHASE,
+            MessageFamily.TRANSFER_IN,
+            MessageFamily.TRANSFER_OUT,
+            MessageFamily.CARD_PAYMENT,
+            MessageFamily.BILL_PAYMENT,
+            MessageFamily.WITHDRAWAL,
+            MessageFamily.REFUND,
+            MessageFamily.FEE,
+            -> true
+
+            MessageFamily.BALANCE_NOTICE,
+            MessageFamily.OTP,
+            MessageFamily.NON_FINANCIAL,
+            MessageFamily.UNKNOWN,
+            -> false
+        }
 }

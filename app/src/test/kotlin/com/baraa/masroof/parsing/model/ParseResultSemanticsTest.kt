@@ -9,24 +9,27 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.validator.ValidationFinding
 import com.baraa.masroof.parsing.validator.ValidationSeverity
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
 class ParseResultSemanticsTest {
 
-    @Test
-    fun success_isDistinctFromReviewAndInvalid() {
-        val event = ParsedEventDraft(
+    private fun event(status: ParseStatus, amount: Money? = Money.of("10.00", Currency.SAR)) =
+        ParsedEventDraft(
             rawSmsId = "sms-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.PURCHASE,
-            amount = Money.of("10.00", Currency.SAR),
+            amount = amount,
+            merchant = "Shop",
             confidence = Confidence(0.9),
-            parseStatus = ParseStatus.SUCCESS,
+            parseStatus = status,
         ).toParsedEvent("evt-1")
 
-        val success: ParseResult = ParseResult.Success(event)
+    @Test
+    fun success_isDistinctFromReviewAndInvalid() {
+        val success: ParseResult = ParseResult.Success(event(ParseStatus.SUCCESS))
         val review: ParseResult = ParseResult.ReviewRequired(
             draft = null,
             event = null,
@@ -38,16 +41,56 @@ class ParseResultSemanticsTest {
                 ValidationFinding("V-009", "missing amount", ValidationSeverity.ERROR),
             ),
         )
-        val nonFinancial: ParseResult = ParseResult.NonFinancial("otp")
-        val unsupported: ParseResult = ParseResult.Unsupported("other_bank")
-
         assertTrue(success is ParseResult.Success)
         assertTrue(review is ParseResult.ReviewRequired)
         assertTrue(invalid is ParseResult.Invalid)
-        assertTrue(nonFinancial is ParseResult.NonFinancial)
-        assertTrue(unsupported is ParseResult.Unsupported)
         assertFalse(success::class == review::class)
-        assertFalse(success::class == invalid::class)
+    }
+
+    @Test
+    fun success_rejectsNonSuccessParseStatus() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ParseResult.Success(event(ParseStatus.REVIEW_REQUIRED))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ParseResult.Success(event(ParseStatus.PARTIAL))
+        }
+    }
+
+    @Test
+    fun partial_rejectsNonPartialEventStatus() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ParseResult.Partial(
+                draft = ParsedEventDraft(rawSmsId = "sms-x"),
+                event = event(ParseStatus.SUCCESS),
+                findings = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun reviewRequired_rejectsNonReviewEventStatus() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ParseResult.ReviewRequired(
+                draft = null,
+                event = event(ParseStatus.SUCCESS),
+                findings = emptyList(),
+                reasons = listOf("x"),
+            )
+        }
+    }
+
+    @Test
+    fun toParsedEvent_rejectsSuccessWithoutAmountForFinancialFamily() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ParsedEventDraft(
+                rawSmsId = "sms-2",
+                bank = Bank.BANK_ALJAZIRA,
+                messageFamily = MessageFamily.PURCHASE,
+                confidence = Confidence(0.5),
+                parseStatus = ParseStatus.SUCCESS,
+            ).toParsedEvent("evt-bad")
+        }
     }
 
     @Test

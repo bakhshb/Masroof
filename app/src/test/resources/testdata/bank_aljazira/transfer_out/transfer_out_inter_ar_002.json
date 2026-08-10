@@ -13,7 +13,8 @@
     "destinationAccountLast4": "0107",
     "counterparty": "TEST_BENEFICIARY_2",
     "occurredAt": "2026-07-27T07:42:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "transactionReference": "TEST_REFERENCE_2"
   },
   "notes": "Same family as transfer_out_inter_ar_001 with different values only."
 }

@@ -12,7 +12,9 @@
     "cardLast4": "3478",
     "merchant": "TEST_SHOP_A",
     "occurredAt": "2026-08-02T12:04:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "availableBalance": "17373.27",
+    "outstandingBalance": "1826.12"
   },
   "notes": "Card last4 and balance/due must NOT become amount."
 }

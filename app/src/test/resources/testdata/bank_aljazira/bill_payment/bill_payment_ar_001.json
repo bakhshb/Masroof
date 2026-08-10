@@ -9,8 +9,8 @@
     "amount": "210.00",
     "currency": "SAR",
     "sourceAccountLast4": "3001",
-    "merchant": "TEST_BILLER",
     "occurredAt": "2026-08-03T16:40:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "biller": "TEST_BILLER"
   }
 }

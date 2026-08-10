@@ -43,7 +43,7 @@ class MessageNormalizerTest {
     @Test
     fun comparisonBodyIsLowercase() {
         val result = normalizer.normalize("Internet Purchase Amount: 10.00 SAR")
-        assertEquals(result.normalizedBody.lowercase(), result.comparisonBody)
+        assertEquals(result.normalizedBody.lowercase(java.util.Locale.ROOT), result.comparisonBody)
     }
 
     @Test

@@ -12,7 +12,9 @@
     "cardLast4": "7271",
     "merchant": "TEST_SHOP_C",
     "occurredAt": "2026-07-30T09:08:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "availableBalance": "18346.84",
+    "outstandingBalance": "802.62"
   },
   "notes": "Critical regression: card 7271 must not be amount; balances are not amount."
 }

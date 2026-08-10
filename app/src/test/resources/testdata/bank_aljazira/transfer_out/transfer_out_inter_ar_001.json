@@ -13,7 +13,8 @@
     "destinationAccountLast4": "0593",
     "counterparty": "TEST_BENEFICIARY",
     "occurredAt": "2026-08-01T12:26:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "transactionReference": "TEST_REFERENCE_1"
   },
   "notes": "Source account and destination IBAN suffix must remain distinct."
 }

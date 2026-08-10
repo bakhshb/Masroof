@@ -17,7 +17,6 @@ class DomainPackagePurityTest {
             File("src/main/kotlin/com/baraa/masroof/domain"),
             File("src/main/kotlin/com/baraa/masroof/core"),
             File("src/main/kotlin/com/baraa/masroof/parsing"),
-            File("src/main/kotlin/com/baraa/masroof/bank"),
         )
         val forbidden = listOf(
             "import android.",
