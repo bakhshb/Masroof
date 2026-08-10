@@ -2,12 +2,15 @@ package com.baraa.masroof.bank.aljazira
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
+import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.model.AmountCandidate
 import com.baraa.masroof.parsing.model.AmountSourceKind
+import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.ParsedEventDraft
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -25,6 +28,7 @@ import java.time.Instant
 class AlJaziraParserRegressionTest {
     private val pipeline = AlJaziraParsingPipeline()
     private val validator = DefaultParsedEventValidator()
+    private val detector = AlJaziraBankDetector()
 
     @Test
     fun cardLast4BeforeAmount_doesNotBecomeAmount() {
@@ -64,7 +68,7 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
-    fun sourceDestinationAndReference_stayDistinct() {
+    fun transferOutInter_sourceAlJazira_destinationUnknown() {
         val result = parse(
             """
             عملية حوالة مالية صادرة مقبولة
@@ -78,14 +82,37 @@ class AlJaziraParserRegressionTest {
             """.trimIndent(),
         ) as ParseResult.Success
         assertEquals("3002", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
         assertEquals("0593", result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(Bank.UNKNOWN, result.event.destinationAccountRef?.bank)
         assertEquals(Money.of("13258.00", Currency.SAR), result.event.amount)
         assertEquals("TEST_REFERENCE_1", result.details.transactionReference)
-        assertTrue(result.event.sourceAccountRef?.maskedNumber != result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
     }
 
     @Test
-    fun intraBankTransfer_isNotSelfTransfer() {
+    fun transferInInter_externalSourceUnknown_destinationAlJazira() {
+        val result = parse(
+            """
+            حوالة واردة: محلية
+            عبر: بنك الرياض
+            مبلغ: SAR 100.00
+            إلى: 3001
+            اسم المرسل: TEST_COMPANY
+            رقم حساب المرسل: 8888
+            البنك المرسل: بنك الرياض
+            في: 2026-08-03 09:12
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+        assertEquals("8888", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals(Bank.UNKNOWN, result.event.sourceAccountRef?.bank)
+        assertEquals("3001", result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
+    }
+
+    @Test
+    fun transferInIntra_bothAccountsBankAlJazira() {
         val result = parse(
             """
             حوالة واردة داخلية
@@ -99,6 +126,10 @@ class AlJaziraParserRegressionTest {
         ) as ParseResult.Success
         assertEquals(MessageFamily.TRANSFER_IN, result.event.messageFamily)
         assertEquals(BankNetworkType.INTRA_BANK, result.event.bankNetworkType)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
+        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
+        assertEquals("3003", result.event.destinationAccountRef?.maskedNumber)
         assertFalse(result.toString().contains("SELF_TRANSFER"))
     }
 
@@ -116,6 +147,35 @@ class AlJaziraParserRegressionTest {
             """.trimIndent(),
         ) as ParseResult.Success
         assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
+        assertNull(result.event.sourceAccountRef)
+    }
+
+    @Test
+    fun nonTransferLocalAccounts_remainBankAlJazira() {
+        val purchase = parse(
+            """
+            شراء من نقاط البيع
+            بطاقة مدى: 2210
+            لدى: TEST_GROCER
+            بمبلغ: 120.00 SAR
+            خصمت من حساب: 3001
+            في: 11:05 01-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(Bank.BANK_ALJAZIRA, purchase.event.sourceAccountRef?.bank)
+        assertEquals("3001", purchase.event.sourceAccountRef?.maskedNumber)
+
+        val bill = parse(
+            """
+            سداد فاتورة
+            المفوتر: TEST_BILLER
+            بمبلغ: 210.00 SAR
+            من حساب: 3001
+            في: 2026-08-03 16:40
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(Bank.BANK_ALJAZIRA, bill.event.sourceAccountRef?.bank)
     }
 
     @Test
@@ -146,6 +206,7 @@ class AlJaziraParserRegressionTest {
         ) as ParseResult.Success
         assertEquals(MessageFamily.CARD_PAYMENT, result.event.messageFamily)
         assertTrue(result.event.messageFamily != MessageFamily.PURCHASE)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
     }
 
     @Test
@@ -171,6 +232,7 @@ class AlJaziraParserRegressionTest {
         assertEquals(MessageFamily.BALANCE_NOTICE, result.event?.messageFamily)
         assertNull(result.event?.amount)
         assertEquals(Money.of("17230.03", Currency.SAR), result.details.availableBalance)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event?.sourceAccountRef?.bank)
     }
 
     @Test
@@ -202,23 +264,107 @@ class AlJaziraParserRegressionTest {
     @Test
     fun coincidentalAmountEqualToLast4_isNotUniversallyRejected() {
         val money = Money.of("3001.00", Currency.SAR)
+        val selected = AmountCandidate(money, "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
         val draft = ParsedEventDraft(
             rawSmsId = "coin-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.TRANSFER_OUT,
             amount = money,
-            sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            confidence = com.baraa.masroof.domain.model.Confidence(0.9),
+            sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            confidence = Confidence(0.9),
             parseStatus = ParseStatus.SUCCESS,
-            amountCandidates = listOf(
-                AmountCandidate(money, "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT),
-            ),
-            selectedAmount = AmountCandidate(money, "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT),
+            amountCandidates = listOf(selected),
+            selectedAmount = selected,
         )
         val validation = validator.validate(draft)
         assertTrue(validation.errors.none { it.code == "V-001" })
         assertTrue(validation.errors.none { it.code == "V-002" })
         assertTrue(validation.isAcceptableForAutomaticUse)
+    }
+
+    @Test
+    fun amountProvenance_valueMismatch_isRejected() {
+        val draftAmount = Money.of("100.00", Currency.SAR)
+        val selectedValue = Money.of("200.00", Currency.SAR)
+        val selected = AmountCandidate(selectedValue, "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
+        val draft = ParsedEventDraft(
+            rawSmsId = "mismatch-1",
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.PURCHASE,
+            amount = draftAmount,
+            merchant = "Shop",
+            confidence = Confidence(0.9),
+            parseStatus = ParseStatus.SUCCESS,
+            amountCandidates = listOf(selected),
+            selectedAmount = selected,
+        )
+        val validation = validator.validate(draft)
+        assertTrue(validation.errors.any { it.code == "AMOUNT_VALUE_MISMATCH" })
+        assertFalse(validation.isAcceptableForAutomaticUse)
+    }
+
+    @Test
+    fun sameMoneyFromTwoEvidences_isNotV007() {
+        val money = Money.of("100.00", Currency.SAR)
+        val a = AmountCandidate(money, "بمبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
+        val b = AmountCandidate(money, "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
+        val draft = ParsedEventDraft(
+            rawSmsId = "same-1",
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.PURCHASE,
+            amount = money,
+            merchant = "Shop",
+            confidence = Confidence(0.9),
+            parseStatus = ParseStatus.SUCCESS,
+            amountCandidates = listOf(a, b),
+            selectedAmount = a,
+        )
+        val validation = validator.validate(draft)
+        assertTrue(validation.errors.none { it.code == "V-007" })
+        assertTrue(validation.isAcceptableForAutomaticUse)
+    }
+
+    @Test
+    fun distinctMoneyValues_triggerV007() {
+        val a = AmountCandidate(Money.of("100.00", Currency.SAR), "بمبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
+        val b = AmountCandidate(Money.of("200.00", Currency.SAR), "مبلغ", AmountSourceKind.TRANSACTION_AMOUNT)
+        val draft = ParsedEventDraft(
+            rawSmsId = "ambig-1",
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.PURCHASE,
+            amount = null,
+            merchant = "Shop",
+            confidence = Confidence(0.5),
+            parseStatus = ParseStatus.REVIEW_REQUIRED,
+            amountCandidates = listOf(a, b),
+            selectedAmount = null,
+        )
+        val validation = validator.validate(draft)
+        assertTrue(validation.errors.any { it.code == "V-007" })
+    }
+
+    @Test
+    fun exactAlJaziraSender_isDetected() {
+        val result = detector.detect("AlJazira", "body")
+        assertTrue(result is BankDetectionResult.Detected)
+        assertEquals(Bank.BANK_ALJAZIRA, (result as BankDetectionResult.Detected).bank)
+    }
+
+    @Test
+    fun nearMissSenders_areNotAlJazira() {
+        listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
+            val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")
+            assertTrue("$sender should be Unknown", detection is BankDetectionResult.Unknown)
+            val parse = pipeline.parse(
+                SmsParseInput(
+                    rawSmsId = "near-$sender",
+                    sender = sender,
+                    body = "شراء عبر الانترنت بمبلغ: 10.00 SAR",
+                    receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+                ),
+            )
+            assertTrue("$sender should be Unsupported", parse is ParseResult.Unsupported)
+        }
     }
 
     @Test

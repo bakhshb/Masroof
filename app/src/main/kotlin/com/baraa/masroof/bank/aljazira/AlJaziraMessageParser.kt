@@ -59,10 +59,20 @@ class AlJaziraMessageParser(
         val classification = classifier.classify(normalized)
         val amountCandidates = amountExtractor.extract(normalized)
         val txnAmounts = amountCandidates.filter { it.sourceKind == AmountSourceKind.TRANSACTION_AMOUNT }
-        val selectedAmount = txnAmounts.singleOrNull()
+        val distinctTxnValues = txnAmounts.map { it.value }.distinct()
+        val selectedAmount = when {
+            distinctTxnValues.isEmpty() -> null
+            distinctTxnValues.size == 1 -> txnAmounts.first { it.value == distinctTxnValues.single() }
+            else -> null // multiple distinct Money values → finalize as review via V-007
+        }
         val balances = balanceExtractor.extract(normalized)
         val card = cardExtractor.extract(normalized, bank)
-        val accounts = accountExtractor.extract(normalized, bank)
+        val accounts = accountExtractor.extract(
+            sms = normalized,
+            localBank = bank,
+            family = classification.family,
+            networkType = classification.bankNetworkType,
+        )
         val biller = billerExtractor.extract(normalized)
         val reference = referenceExtractor.extract(normalized)
         val occurredLocal = dateTimeExtractor.extract(normalized)

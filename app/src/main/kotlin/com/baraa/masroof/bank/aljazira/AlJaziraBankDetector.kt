@@ -7,24 +7,22 @@ import com.baraa.masroof.parsing.model.BankDetectionResult
 import java.util.Locale
 
 /**
- * Deterministic Bank AlJazira detection from fixture-supported sender evidence.
+ * Conservative Bank AlJazira detection via exact normalized sender match only.
  *
- * Does not treat arbitrary banking-looking SMS as AlJazira.
+ * False negative is preferred over false positive. No substring matching.
  */
 class AlJaziraBankDetector : BankDetector {
     override fun detect(sender: String, body: String): BankDetectionResult {
         val normalizedSender = sender.trim().lowercase(Locale.ROOT)
-        for (form in SENDER_FORMS) {
-            if (normalizedSender == form || normalizedSender.contains(form)) {
-                return BankDetectionResult.Detected(
-                    bank = Bank.BANK_ALJAZIRA,
-                    confidence = Confidence(
-                        score = if (normalizedSender == form) 1.0 else 0.9,
-                        reasons = listOf("sender_match:$form"),
-                    ),
-                    evidence = listOf("sender:$sender"),
-                )
-            }
+        if (normalizedSender in EXACT_SENDERS) {
+            return BankDetectionResult.Detected(
+                bank = Bank.BANK_ALJAZIRA,
+                confidence = Confidence(
+                    score = 1.0,
+                    reasons = listOf("exact_sender:$normalizedSender"),
+                ),
+                evidence = listOf("sender:$sender"),
+            )
         }
         return BankDetectionResult.Unknown(
             reasons = listOf("sender_not_recognized_as_bank_aljazira"),
@@ -32,13 +30,9 @@ class AlJaziraBankDetector : BankDetector {
     }
 
     companion object {
-        /** Fixture / known AlJazira sender forms only. */
-        private val SENDER_FORMS = listOf(
+        /** Fixture-proven exact sender forms only (normalized). */
+        private val EXACT_SENDERS = setOf(
             "aljazira",
-            "al-jazira",
-            "bank aljazira",
-            "bank al-jazira",
-            "jazira",
         )
     }
 }

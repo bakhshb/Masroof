@@ -13,6 +13,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDraft
  * [ParsedEventDraft.selectedAmount] / [ParsedEventDraft.amountCandidates]).
  *
  * Numeric coincidence between a legitimate amount and a last4 is **not** an error.
+ * V-007 fires only for multiple **distinct** transaction Money values.
  */
 class DefaultParsedEventValidator : ParsedEventValidator {
     override fun validate(draft: ParsedEventDraft): ValidationResult {
@@ -53,18 +54,17 @@ class DefaultParsedEventValidator : ParsedEventValidator {
         val hasProvenanceContext =
             draft.selectedAmount != null || draft.amountCandidates.isNotEmpty()
         if (!hasProvenanceContext) {
-            // Drafts without extractor provenance (e.g. unit fixtures) skip V-001…V-007.
             return findings
         }
 
         val txnCandidates = draft.amountCandidates.filter {
             it.sourceKind == AmountSourceKind.TRANSACTION_AMOUNT
         }
-
-        if (txnCandidates.size > 1) {
+        val distinctTxnValues = txnCandidates.map { it.value }.distinct()
+        if (distinctTxnValues.size > 1) {
             findings += ValidationFinding(
                 code = "V-007",
-                message = "Multiple plausible transaction amounts; cannot disambiguate safely",
+                message = "Multiple distinct plausible transaction amounts; cannot disambiguate safely",
                 severity = ValidationSeverity.ERROR,
             )
         }
@@ -78,6 +78,20 @@ class DefaultParsedEventValidator : ParsedEventValidator {
                     severity = ValidationSeverity.ERROR,
                 )
             } else {
+                if (selected.value != draft.amount) {
+                    findings += ValidationFinding(
+                        code = "AMOUNT_VALUE_MISMATCH",
+                        message = "selectedAmount.value ${selected.value} does not equal draft.amount ${draft.amount}",
+                        severity = ValidationSeverity.ERROR,
+                    )
+                }
+                if (draft.amountCandidates.none { it == selected }) {
+                    findings += ValidationFinding(
+                        code = "AMOUNT_PROVENANCE_ORPHAN",
+                        message = "selectedAmount is not present in amountCandidates",
+                        severity = ValidationSeverity.ERROR,
+                    )
+                }
                 when (selected.sourceKind) {
                     AmountSourceKind.CARD_LAST4 -> findings += finding(
                         "V-001",

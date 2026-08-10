@@ -62,6 +62,7 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
         assertEquals(fixture.id, expected.sourceAccountLast4, e.sourceAccountRef?.maskedNumber)
         assertEquals(fixture.id, expected.destinationAccountLast4, e.destinationAccountRef?.maskedNumber)
+        assertAccountBankScope(fixture.id, expected.bankNetworkType, expected.messageFamily, e)
         assertEquals(fixture.id, expected.cardLast4, e.cardRef?.last4)
         assertEquals(fixture.id, expected.merchant, e.merchant)
         assertEquals(fixture.id, expected.counterparty, e.counterparty)
@@ -90,6 +91,34 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
         assertFalse(result.toString().contains("SELF_TRANSFER"))
         assertFalse(result.toString().contains(TransferOwnershipType.SELF_TRANSFER.name))
+    }
+
+    /**
+     * AccountReference.bank is bank-scoped identity, not ownership.
+     * INTER_BANK external side → [Bank.UNKNOWN]; local AlJazira side → BANK_ALJAZIRA.
+     */
+    private fun assertAccountBankScope(
+        fixtureId: String,
+        networkType: String?,
+        messageFamily: String,
+        event: ParsedEvent,
+    ) {
+        val source = event.sourceAccountRef
+        val destination = event.destinationAccountRef
+        when {
+            networkType == "INTER_BANK" && messageFamily == "TRANSFER_OUT" -> {
+                source?.let { assertEquals(fixtureId, Bank.BANK_ALJAZIRA, it.bank) }
+                destination?.let { assertEquals(fixtureId, Bank.UNKNOWN, it.bank) }
+            }
+            networkType == "INTER_BANK" && messageFamily == "TRANSFER_IN" -> {
+                source?.let { assertEquals(fixtureId, Bank.UNKNOWN, it.bank) }
+                destination?.let { assertEquals(fixtureId, Bank.BANK_ALJAZIRA, it.bank) }
+            }
+            else -> {
+                source?.let { assertEquals(fixtureId, Bank.BANK_ALJAZIRA, it.bank) }
+                destination?.let { assertEquals(fixtureId, Bank.BANK_ALJAZIRA, it.bank) }
+            }
+        }
     }
 
     private fun unpack(result: ParseResult): Pair<ParsedEvent?, ParsedEventDetails?> = when (result) {
