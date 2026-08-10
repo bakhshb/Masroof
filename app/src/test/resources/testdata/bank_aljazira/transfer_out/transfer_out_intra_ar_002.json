@@ -1,0 +1,18 @@
+{
+  "id": "transfer_out_intra_ar_002",
+  "sender": "AlJazira",
+  "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 100.00\nإلى: 3002\nفي: 2026-08-10 09:00",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_OUT",
+    "direction": "OUTGOING",
+    "amount": "100.00",
+    "currency": "SAR",
+    "bankNetworkType": "INTRA_BANK",
+    "sourceAccountLast4": "3001",
+    "destinationAccountLast4": "3002",
+    "occurredAt": "2026-08-10T09:00:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Own 3001→3002 parse-time only; not SELF_TRANSFER expected."
+}

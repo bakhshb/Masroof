@@ -1,0 +1,19 @@
+{
+  "id": "transfer_in_intra_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة واردة داخلية\nمبلغ: SAR 4,445.67\nإلى: 3003\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-08-03 10:38",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_IN",
+    "direction": "INCOMING",
+    "amount": "4445.67",
+    "currency": "SAR",
+    "bankNetworkType": "INTRA_BANK",
+    "sourceAccountLast4": "3001",
+    "destinationAccountLast4": "3003",
+    "counterparty": "TEST_PERSON",
+    "occurredAt": "2026-08-03T10:38:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Intra-bank wording must NOT imply SELF_TRANSFER in expected output."
+}

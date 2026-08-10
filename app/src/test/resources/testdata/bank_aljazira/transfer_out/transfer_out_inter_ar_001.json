@@ -1,0 +1,19 @@
+{
+  "id": "transfer_out_inter_ar_001",
+  "sender": "AlJazira",
+  "body": "عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3002\nالى: TEST_BENEFICIARY\nمبلغ العملية: 13,258.00 SAR\nالمعرف البديل \\الايبان : 0593\n[البنك العربي الوطني]\nفي: 2026-08-01 12:26\nرقم المعاملة: TEST_REFERENCE_1",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_OUT",
+    "direction": "OUTGOING",
+    "amount": "13258.00",
+    "currency": "SAR",
+    "bankNetworkType": "INTER_BANK",
+    "sourceAccountLast4": "3002",
+    "destinationAccountLast4": "0593",
+    "counterparty": "TEST_BENEFICIARY",
+    "occurredAt": "2026-08-01T12:26:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Source account and destination IBAN suffix must remain distinct."
+}

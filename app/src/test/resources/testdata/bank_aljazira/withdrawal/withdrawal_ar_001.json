@@ -1,0 +1,15 @@
+{
+  "id": "withdrawal_ar_001",
+  "sender": "AlJazira",
+  "body": "سحب نقدي\nمن حساب: 3001\nبمبلغ: 500.00 SAR\nفي: 2026-08-02 20:15",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "WITHDRAWAL",
+    "direction": "OUTGOING",
+    "amount": "500.00",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "occurredAt": "2026-08-02T20:15:00",
+    "parseStatus": "SUCCESS"
+  }
+}

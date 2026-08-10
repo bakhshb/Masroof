@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -62,9 +63,8 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
-<<<<<<< HEAD
-=======
+
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
->>>>>>> origin/cursor/domain-rules-p2-01c5
 }

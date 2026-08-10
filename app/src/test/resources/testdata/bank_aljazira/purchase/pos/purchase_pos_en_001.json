@@ -1,0 +1,17 @@
+{
+  "id": "purchase_pos_en_001",
+  "sender": "AlJazira",
+  "body": "POS Purchase\nCard: 4521\nAt: TEST_MERCHANT_POS\nAmount: 89.50 SAR\nDate: 2026-08-01 18:20",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "89.50",
+    "currency": "SAR",
+    "purchaseChannel": "POS",
+    "cardLast4": "4521",
+    "merchant": "TEST_MERCHANT_POS",
+    "occurredAt": "2026-08-01T18:20:00",
+    "parseStatus": "SUCCESS"
+  }
+}

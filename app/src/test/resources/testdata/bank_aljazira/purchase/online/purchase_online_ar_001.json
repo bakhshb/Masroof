@@ -1,0 +1,18 @@
+{
+  "id": "purchase_online_ar_001",
+  "sender": "AlJazira",
+  "body": "شراء عبر الانترنت\nبطاقة: 7271\nلدى: Keeta\nبمبلغ: 51.99 SAR\nفي: 14:32 03-08-2026\nالرصيد المتاح: SAR 17230.03",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "51.99",
+    "currency": "SAR",
+    "purchaseChannel": "ONLINE",
+    "cardLast4": "7271",
+    "merchant": "Keeta",
+    "occurredAt": "2026-08-03T14:32:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Canonical card-before-amount / balance-after regression shape."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "transfer_in_salary_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة واردة راتب\nمبلغ: SAR 3,191.68\nإلى: 3001\nاسم المرسل: وزارة الحج والعمرة\nالبنك المرسل: بنك الجزيرة\nفي: 2026-07-27 01:12",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_IN",
+    "direction": "INCOMING",
+    "amount": "3191.68",
+    "currency": "SAR",
+    "bankNetworkType": "INTRA_BANK",
+    "destinationAccountLast4": "3001",
+    "counterparty": "وزارة الحج والعمرة",
+    "occurredAt": "2026-07-27T01:12:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Parse as TRANSFER_IN only. Salary/income treatment is domain, not parse expected."
+}

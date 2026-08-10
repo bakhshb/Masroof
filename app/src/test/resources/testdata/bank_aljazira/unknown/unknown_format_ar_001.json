@@ -1,0 +1,11 @@
+{
+  "id": "unknown_format_ar_001",
+  "sender": "AlJazira",
+  "body": "تنبيه بنك الجزيرة: حدث تحديث في خدماتك. راجع التطبيق للتفاصيل.",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "UNKNOWN",
+    "parseStatus": "REVIEW_REQUIRED"
+  },
+  "notes": "Recognized bank sender, unrecognized financial format → review."
+}

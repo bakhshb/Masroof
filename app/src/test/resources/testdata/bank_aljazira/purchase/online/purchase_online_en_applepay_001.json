@@ -1,0 +1,18 @@
+{
+  "id": "purchase_online_en_applepay_001",
+  "sender": "AlJazira",
+  "body": "Online Purchase Apple Pay Credit Card: 8332 at :TEST_SHOP_B of : 34.25 SAR on : 2026-08-02 12:31 Available Balance is: 17339.02 SAR Due Amount: 1826.12 SAR",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "34.25",
+    "currency": "SAR",
+    "purchaseChannel": "ONLINE",
+    "cardLast4": "8332",
+    "merchant": "TEST_SHOP_B",
+    "occurredAt": "2026-08-02T12:31:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Irregular spacing preserved. PurchaseChannel stays ONLINE (Apple Pay not a separate channel in accepted decisions)."
+}

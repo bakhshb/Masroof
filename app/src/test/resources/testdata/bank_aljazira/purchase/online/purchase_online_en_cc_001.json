@@ -1,0 +1,18 @@
+{
+  "id": "purchase_online_en_cc_001",
+  "sender": "AlJazira",
+  "body": "Internet Purchase Credit card: 3478 of: 41.30 SAR At TEST_SHOP_A on: 2026-08-02 12:04\nAvailable Balance: 17373.27 SAR Due Amount: 1826.12 SAR",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "41.30",
+    "currency": "SAR",
+    "purchaseChannel": "ONLINE",
+    "cardLast4": "3478",
+    "merchant": "TEST_SHOP_A",
+    "occurredAt": "2026-08-02T12:04:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Card last4 and balance/due must NOT become amount."
+}

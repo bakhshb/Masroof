@@ -1,0 +1,11 @@
+{
+  "id": "otp_ar_001",
+  "sender": "AlJazira",
+  "body": "رمز التحقق الخاص بك هو 482911. لا تشاركه مع أي شخص.",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "OTP",
+    "parseStatus": "NON_FINANCIAL"
+  },
+  "notes": "OTP must not become a financial ParsedEvent."
+}

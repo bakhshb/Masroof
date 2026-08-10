@@ -1,0 +1,17 @@
+{
+  "id": "card_payment_ar_001",
+  "sender": "AlJazira",
+  "body": "سداد بطاقة ائتمانية\nمن حساب: 3001\nبطاقة: 7271\nبمبلغ: 802.62 SAR\nفي: 2026-08-04 09:00",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "CARD_PAYMENT",
+    "direction": "OUTGOING",
+    "amount": "802.62",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "cardLast4": "7271",
+    "occurredAt": "2026-08-04T09:00:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Parse family only. CREDIT_CARD_PAYMENT financial type is domain."
+}

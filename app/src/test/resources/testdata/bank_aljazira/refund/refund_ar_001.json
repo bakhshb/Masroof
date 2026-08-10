@@ -1,0 +1,16 @@
+{
+  "id": "refund_ar_001",
+  "sender": "AlJazira",
+  "body": "استرداد مبلغ\nبطاقة: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 25.00 SAR\nفي: 2026-08-05 13:10",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "REFUND",
+    "direction": "INCOMING",
+    "amount": "25.00",
+    "currency": "SAR",
+    "cardLast4": "7271",
+    "merchant": "TEST_SHOP_C",
+    "occurredAt": "2026-08-05T13:10:00",
+    "parseStatus": "SUCCESS"
+  }
+}

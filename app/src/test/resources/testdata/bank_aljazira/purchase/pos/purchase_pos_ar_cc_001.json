@@ -1,0 +1,18 @@
+{
+  "id": "purchase_pos_ar_cc_001",
+  "sender": "AlJazira",
+  "body": "شراء عبر نقاط البيع (Samsung Pay)\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 178.02 SAR\nفي: 09:08 30-07-2026\nالرصيد المتاح: 18346.84 SAR\nإجمالي المبلغ المستحق:802.62 SAR",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "178.02",
+    "currency": "SAR",
+    "purchaseChannel": "POS",
+    "cardLast4": "7271",
+    "merchant": "TEST_SHOP_C",
+    "occurredAt": "2026-07-30T09:08:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Critical regression: card 7271 must not be amount; balances are not amount."
+}

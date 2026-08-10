@@ -1,0 +1,17 @@
+{
+  "id": "transfer_in_inter_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة واردة: محلية\nعبر: بنك الرياض\nمبلغ: SAR 4,445.67\nإلى: 3001\nاسم المرسل: TEST_COMPANY\nالبنك المرسل: بنك الرياض\nفي: 2026-08-03 09:12",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_IN",
+    "direction": "INCOMING",
+    "amount": "4445.67",
+    "currency": "SAR",
+    "bankNetworkType": "INTER_BANK",
+    "destinationAccountLast4": "3001",
+    "counterparty": "TEST_COMPANY",
+    "occurredAt": "2026-08-03T09:12:00",
+    "parseStatus": "SUCCESS"
+  }
+}

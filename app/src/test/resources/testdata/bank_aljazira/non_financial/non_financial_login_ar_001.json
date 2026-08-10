@@ -1,0 +1,10 @@
+{
+  "id": "non_financial_login_ar_001",
+  "sender": "AlJazira",
+  "body": "تم تسجيل الدخول إلى حسابك بنجاح عبر تطبيق بنك الجزيرة.",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "NON_FINANCIAL",
+    "parseStatus": "NON_FINANCIAL"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "transfer_out_inter_ar_002",
+  "sender": "AlJazira",
+  "body": "عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3001\nالى: TEST_BENEFICIARY_2\nمبلغ العملية: 500.00 SAR\nالمعرف البديل \\الايبان : 0107\n[البنك الأهلي السعودي]\nفي: 2026-07-27 07:42\nرقم المعاملة: TEST_REFERENCE_2",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_OUT",
+    "direction": "OUTGOING",
+    "amount": "500.00",
+    "currency": "SAR",
+    "bankNetworkType": "INTER_BANK",
+    "sourceAccountLast4": "3001",
+    "destinationAccountLast4": "0107",
+    "counterparty": "TEST_BENEFICIARY_2",
+    "occurredAt": "2026-07-27T07:42:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Same family as transfer_out_inter_ar_001 with different values only."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "fee_ar_001",
+  "sender": "AlJazira",
+  "body": "رسوم خدمة\nخصمت من حساب: 3001\nبمبلغ: 5.00 SAR\nفي: 2026-08-01 00:05",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "FEE",
+    "direction": "OUTGOING",
+    "amount": "5.00",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "occurredAt": "2026-08-01T00:05:00",
+    "parseStatus": "SUCCESS"
+  }
+}

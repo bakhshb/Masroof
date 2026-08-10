@@ -1,0 +1,16 @@
+{
+  "id": "bill_payment_ar_001",
+  "sender": "AlJazira",
+  "body": "سداد فاتورة\nالمفوتر: TEST_BILLER\nبمبلغ: 210.00 SAR\nمن حساب: 3001\nفي: 2026-08-03 16:40",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "BILL_PAYMENT",
+    "direction": "OUTGOING",
+    "amount": "210.00",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "merchant": "TEST_BILLER",
+    "occurredAt": "2026-08-03T16:40:00",
+    "parseStatus": "SUCCESS"
+  }
+}

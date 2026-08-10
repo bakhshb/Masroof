@@ -1,0 +1,18 @@
+{
+  "id": "purchase_pos_ar_debit_001",
+  "sender": "AlJazira",
+  "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_GROCER\nبمبلغ: 120.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 01-08-2026",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "120.00",
+    "currency": "SAR",
+    "purchaseChannel": "POS",
+    "sourceAccountLast4": "3001",
+    "cardLast4": "2210",
+    "merchant": "TEST_GROCER",
+    "occurredAt": "2026-08-01T11:05:00",
+    "parseStatus": "SUCCESS"
+  }
+}
