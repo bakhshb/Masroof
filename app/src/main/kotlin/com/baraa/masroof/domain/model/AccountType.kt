@@ -1,15 +1,13 @@
 package com.baraa.masroof.domain.model
 
 /**
- * Kind of [Account] container.
+ * Kind of [Account] currently in product scope (PRD §7.3).
  *
- * Drawn from PRD account support (current, savings, wallets, investment later).
- * DOMAIN.md references [AccountType] without listing members.
+ * Investment and other future containers are deferred until the product
+ * requires them — they are not invented here.
  */
 enum class AccountType {
     CURRENT,
     SAVINGS,
     WALLET,
-    INVESTMENT,
-    OTHER,
 }

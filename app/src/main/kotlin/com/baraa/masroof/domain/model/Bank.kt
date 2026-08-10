@@ -1,17 +1,21 @@
 package com.baraa.masroof.domain.model
 
 /**
- * Financial institution recognized by Masroof.
+ * Stable identifier for a financial institution.
  *
- * Only [BANK_ALJAZIRA] is in scope for the first parser. Other values exist so
- * cross-bank ownership scenarios can be expressed in the domain without
- * collapsing bank identity into free-form strings.
+ * Not a closed enum of every Saudi bank. Known constants cover the current
+ * product need ([BANK_ALJAZIRA]) and unresolved detection ([UNKNOWN]). Other
+ * institutions are expressible as `Bank("D360")` (etc.) so cross-bank owned
+ * transfers can be modeled without multi-bank parsing or expanding a fixed list.
  */
-enum class Bank {
-    BANK_ALJAZIRA,
-    D360,
-    SNB,
-    STC_BANK,
-    ALRAJHI,
-    UNKNOWN,
+@JvmInline
+value class Bank(val id: String) {
+    init {
+        require(id.isNotBlank()) { "Bank id must not be blank" }
+    }
+
+    companion object {
+        val BANK_ALJAZIRA: Bank = Bank("BANK_ALJAZIRA")
+        val UNKNOWN: Bank = Bank("UNKNOWN")
+    }
 }

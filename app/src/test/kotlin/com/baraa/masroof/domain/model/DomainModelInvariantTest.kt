@@ -3,6 +3,7 @@ package com.baraa.masroof.domain.model
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -21,6 +22,20 @@ class DomainModelInvariantTest {
         }
         Confidence(score = 0.0)
         Confidence(score = 1.0, reasons = listOf("exact match"))
+    }
+
+    @Test
+    fun bank_isStableIdNotClosedEnum() {
+        assertEquals(Bank.BANK_ALJAZIRA, Bank("BANK_ALJAZIRA"))
+        assertEquals(Bank.UNKNOWN, Bank("UNKNOWN"))
+        // Cross-bank owned transfers can name another institution without a
+        // hardcoded enum member or multi-bank parser.
+        val d360 = Bank("D360")
+        assertNotEquals(Bank.BANK_ALJAZIRA, d360)
+        assertEquals("D360", d360.id)
+        assertThrows(IllegalArgumentException::class.java) {
+            Bank("  ")
+        }
     }
 
     @Test
@@ -66,7 +81,6 @@ class DomainModelInvariantTest {
             counterparty = "Wife Name",
             categoryId = null,
             linkedParsedEventIds = listOf("evt-1"),
-            status = TransactionStatus.CONFIRMED,
         )
         val selfTransfer = FinancialTransaction(
             id = "tx-self",
@@ -74,12 +88,11 @@ class DomainModelInvariantTest {
             amount = Money.of("100.00", Currency.SAR),
             occurredAt = Instant.parse("2026-08-03T11:00:00Z"),
             sourceContainerId = "acct-3001",
-            destinationContainerId = "acct-3002",
+            destinationContainerId = "acct-d360",
             merchant = null,
             counterparty = null,
             categoryId = null,
             linkedParsedEventIds = listOf("evt-a", "evt-b"),
-            status = TransactionStatus.CONFIRMED,
         )
 
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, externalIn.type)
