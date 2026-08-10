@@ -10,10 +10,14 @@ import com.baraa.masroof.parsing.validator.ValidationFinding
  *
  * [ParsedEvent.parseStatus] must agree with the sealed variant when an event is present.
  * Does not encode ownership, self-transfer, expense/income, or net-worth meaning.
+ *
+ * [ParsedEventDetails] carries typed parse-time facts (reference, balances, biller,
+ * local timestamp) that are not on [ParsedEvent].
  */
 sealed interface ParseResult {
     data class Success(
         val event: ParsedEvent,
+        val details: ParsedEventDetails = ParsedEventDetails(),
     ) : ParseResult {
         init {
             require(event.parseStatus == ParseStatus.SUCCESS) {
@@ -26,6 +30,7 @@ sealed interface ParseResult {
         val draft: ParsedEventDraft,
         val event: ParsedEvent?,
         val findings: List<ValidationFinding>,
+        val details: ParsedEventDetails = ParsedEventDetails(),
     ) : ParseResult {
         init {
             if (event != null) {
@@ -41,6 +46,7 @@ sealed interface ParseResult {
         val event: ParsedEvent?,
         val findings: List<ValidationFinding>,
         val reasons: List<String>,
+        val details: ParsedEventDetails = ParsedEventDetails(),
     ) : ParseResult {
         init {
             if (event != null) {
@@ -54,7 +60,17 @@ sealed interface ParseResult {
     data class NonFinancial(
         val reason: String,
         val confidence: Confidence? = null,
-    ) : ParseResult
+        val event: ParsedEvent? = null,
+        val details: ParsedEventDetails = ParsedEventDetails(),
+    ) : ParseResult {
+        init {
+            if (event != null) {
+                require(event.parseStatus == ParseStatus.NON_FINANCIAL) {
+                    "ParseResult.NonFinancial event must have parseStatus NON_FINANCIAL, was ${event.parseStatus}"
+                }
+            }
+        }
+    }
 
     data class Unsupported(
         val reason: String,
