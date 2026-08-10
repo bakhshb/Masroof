@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.migration.MIGRATION_1_2
+import com.baraa.masroof.data.room.migration.MIGRATION_2_3
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -32,8 +33,8 @@ import java.time.Instant
  * Migration proof against the **committed** exported Room schema
  * `schemas/.../MasroofDatabase/1.json` (not a hand-maintained SQL duplicate).
  *
- * Flow: apply exported v1 createSql → insert evidence → [MIGRATION_1_2] →
- * open Room v2 (schema validation) and assert evidence + registries.
+ * Flow: exported v1 → [MIGRATION_1_2] (assert registries) → [MIGRATION_2_3] →
+ * open current Room and assert evidence survives.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -113,11 +114,25 @@ class Migration1To2Test {
             assertEquals(1, db.version)
             MIGRATION_1_2.migrate(db)
             db.version = 2
+
+            val registryTables = db.query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('account_registry','card_registry')",
+            )
+            val foundAtV2 = mutableSetOf<String>()
+            registryTables.use {
+                while (it.moveToNext()) foundAtV2 += it.getString(0)
+            }
+            assertTrue(foundAtV2.contains("account_registry"))
+            assertTrue(foundAtV2.contains("card_registry"))
+
+            // Continue to current Room version so schema validation succeeds.
+            MIGRATION_2_3.migrate(db)
+            db.version = 3
         }
         openHelper.close()
 
         val roomDb = Room.databaseBuilder(context, MasroofDatabase::class.java, testDbName)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
             .allowMainThreadQueries()
             .build()
 
@@ -141,7 +156,6 @@ class Migration1To2Test {
             assertTrue(found.contains("account_registry"))
             assertTrue(found.contains("card_registry"))
 
-            // Validate migrated schema matches exported v2 createSql for registries.
             val schema2 = File("schemas/com.baraa.masroof.data.room.MasroofDatabase/2.json")
             assertTrue(schema2.isFile)
             assertTrue(schema2.readText().contains("account_registry"))

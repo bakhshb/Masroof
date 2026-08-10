@@ -4,18 +4,22 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.dao.CardRegistryDao
+import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
+import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
+import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.migration.MIGRATION_1_2
+import com.baraa.masroof.data.room.migration.MIGRATION_2_3
 
 /**
- * Clean rewrite persistence schema — version 2 (P7 ownership registries).
+ * Clean rewrite persistence schema — version 3 (P8 financial transactions).
  *
- * Migration 1→2 adds account_registry and card_registry only.
+ * Migrations: 1→2 ownership registries; 2→3 financial_transaction + source links.
  * Does not use destructive migration.
  */
 @Database(
@@ -24,8 +28,10 @@ import com.baraa.masroof.data.room.migration.MIGRATION_1_2
         ParsedEventEntity::class,
         AccountRegistryEntity::class,
         CardRegistryEntity::class,
+        FinancialTransactionEntity::class,
+        FinancialTransactionRawSmsLinkEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -37,9 +43,11 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun cardRegistryDao(): CardRegistryDao
 
+    abstract fun financialTransactionDao(): FinancialTransactionDao
+
     companion object {
         const val NAME: String = "masroof.db"
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
     }
 }
