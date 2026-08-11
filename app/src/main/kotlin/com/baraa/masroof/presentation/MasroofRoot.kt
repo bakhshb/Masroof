@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,9 +34,29 @@ fun MasroofRoot(
     onOpenAppSettings: () -> Unit,
 ) {
     val onboardingState by onboardingViewModel.uiState.collectAsState()
+    val reviewState by reviewViewModel.uiState.collectAsState()
     var homeDestination by rememberSaveable { mutableStateOf(HomeDestination.Dashboard) }
 
     if (onboardingState.step == OnboardingStep.HOME) {
+        BackHandler {
+            when (homeDestination) {
+                HomeDestination.AllTransactions ->
+                    homeDestination = HomeDestination.Dashboard
+
+                HomeDestination.Review ->
+                    if (reviewState.selectedDetail != null) {
+                        reviewViewModel.closeDetail()
+                    } else {
+                        homeDestination = HomeDestination.Dashboard
+                        dashboardViewModel.refresh()
+                    }
+
+                HomeDestination.Dashboard -> {
+                    // Consume system back on the home screen — do not exit the app.
+                }
+            }
+        }
+
         when (homeDestination) {
             HomeDestination.Dashboard -> DashboardRoute(
                 viewModel = dashboardViewModel,
