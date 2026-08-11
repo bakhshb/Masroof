@@ -31,6 +31,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 @Composable
 fun DashboardRoute(
     viewModel: DashboardViewModel,
+    onOpenReview: () -> Unit = {},
 ) {
     // Load only when dashboard becomes visible (e.g. after onboarding HOME).
     LaunchedEffect(Unit) {
@@ -44,6 +45,7 @@ fun DashboardRoute(
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refresh,
         onRescan = viewModel::rescanSms,
+        onOpenReview = onOpenReview,
     )
 }
 
@@ -55,6 +57,7 @@ private fun DashboardScreen(
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
     onRescan: () -> Unit,
+    onOpenReview: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -172,10 +175,19 @@ private fun DashboardScreen(
                     )
                 }
 
-                Text(
-                    stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                if (summary.reviewRequiredCount > 0) {
+                    Button(
+                        onClick = onOpenReview,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount))
+                    }
+                } else {
+                    Text(
+                        stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
 
                 if (state.error != null) {
                     Text(stringResource(R.string.dashboard_load_error))

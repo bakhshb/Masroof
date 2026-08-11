@@ -21,6 +21,8 @@ import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
 import com.baraa.masroof.presentation.onboarding.OnboardingPermissionPolicy
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModelFactory
+import com.baraa.masroof.presentation.review.ReviewViewModel
+import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.theme.MasroofTheme
 
 /**
@@ -39,6 +41,10 @@ class MainActivity : ComponentActivity() {
 
     private val dashboardViewModel: DashboardViewModel by viewModels {
         DashboardViewModelFactory(container = container)
+    }
+
+    private val reviewViewModel: ReviewViewModel by viewModels {
+        ReviewViewModelFactory(container = container)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     MasroofRoot(
                         onboardingViewModel = onboardingViewModel,
                         dashboardViewModel = dashboardViewModel,
+                        reviewViewModel = reviewViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },
