@@ -32,9 +32,11 @@ class AlJaziraBankDetector : BankDetector {
     }
 
     internal companion object {
-        /** Fixture-proven exact sender forms only (after normalization). */
+        /** Fixture-proven and device-observed exact sender forms (after normalization). */
         val EXACT_SENDERS = setOf(
             "aljazira",
+            "jazirabank",
+            "bankaljazira",
         )
 
         internal fun normalizeSender(sender: String): String {

@@ -18,11 +18,21 @@ class AlJaziraBankDetectorTest {
             "Al Jazira",
             "AlJazira-AD",
             "Al-Jazira-AD",
+            "Jazira Bank",
+            "Jazira-Bank",
+            "Bank AlJazira",
+            "Bank Al Jazira",
+            "Jazira Bank-AD",
         ).forEach { sender ->
             val result = detector.detect(sender, "body")
             assertTrue("$sender should be Detected", result is BankDetectionResult.Detected)
             assertEquals(Bank.BANK_ALJAZIRA, (result as BankDetectionResult.Detected).bank)
         }
+    }
+
+    @Test
+    fun jaziraBankSender_normalizesToAllowedForm() {
+        assertEquals("jazirabank", AlJaziraBankDetector.normalizeSender("Jazira Bank"))
     }
 
     @Test
