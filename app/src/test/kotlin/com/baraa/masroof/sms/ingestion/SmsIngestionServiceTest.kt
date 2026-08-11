@@ -308,6 +308,8 @@ class SmsIngestionServiceTest {
                 endExclusive: java.time.Instant,
             ): List<FinancialTransaction> = emptyList()
             override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+            override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
+            override suspend fun update(transaction: FinancialTransaction): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
         val cards = RoomCardRegistryRepository(db.cardRegistryDao())
@@ -467,6 +469,8 @@ class SmsIngestionServiceTest {
                 endExclusive: java.time.Instant,
             ): List<FinancialTransaction> = emptyList()
             override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+            override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
+            override suspend fun update(transaction: FinancialTransaction): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
         val cards = RoomCardRegistryRepository(db.cardRegistryDao())

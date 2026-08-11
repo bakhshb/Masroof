@@ -18,6 +18,7 @@ class DashboardViewModelFactory(
         return DashboardViewModel(
             overviewLoader = container.dashboardService,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
+            reclassificationService = container.transactionReclassificationService,
             zoneId = zoneId,
             clock = clock,
         ) as T

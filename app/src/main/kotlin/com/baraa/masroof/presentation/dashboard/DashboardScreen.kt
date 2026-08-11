@@ -41,6 +41,7 @@ fun DashboardRoute(
     viewModel: DashboardViewModel,
     onOpenReview: () -> Unit = {},
     onOpenAllTransactions: () -> Unit = {},
+    onOpenTransaction: (String) -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -55,6 +56,7 @@ fun DashboardRoute(
         onRescan = viewModel::rescanSms,
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
+        onOpenTransaction = onOpenTransaction,
     )
 }
 
@@ -68,6 +70,7 @@ private fun DashboardScreen(
     onRescan: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -223,7 +226,7 @@ private fun DashboardScreen(
                     }
                 } else {
                     state.recentTransactions.forEach { row ->
-                        TransactionRow(row)
+                        TransactionRow(row, onClick = { onOpenTransaction(row.id) })
                         Spacer(Modifier.height(4.dp))
                     }
                     IconTextButtonOutlined(

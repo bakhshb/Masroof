@@ -7,6 +7,7 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
@@ -157,6 +158,13 @@ class AppContainer(
             reviewQueueUpdater = reviewQueueUpdater,
             manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
+        )
+
+    val transactionReclassificationService: TransactionReclassificationService =
+        TransactionReclassificationService(
+            financialTransactionRepository = financialTransactionRepository,
+            effectiveParsedEventProvider = effectiveParsedEventProvider,
+            ownershipResolver = ownershipResolver,
         )
 
     val dashboardService: DashboardService =

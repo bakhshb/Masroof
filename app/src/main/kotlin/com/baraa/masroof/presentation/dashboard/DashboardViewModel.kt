@@ -3,7 +3,10 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.transaction.ReclassificationResult
+import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import kotlinx.coroutines.CancellationException
@@ -23,6 +26,7 @@ import java.util.Locale
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
+    private val reclassificationService: TransactionReclassificationService,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -84,7 +88,60 @@ class DashboardViewModel(
         }
     }
 
-    private fun load(period: FinancialPeriod) {
+    fun openTransactionDetail(transactionId: String) {
+        _uiState.update {
+            it.copy(
+                selectedTransactionId = transactionId,
+                reclassifySuccess = false,
+                reclassifyError = null,
+            )
+        }
+    }
+
+    fun closeTransactionDetail() {
+        _uiState.update {
+            it.copy(
+                selectedTransactionId = null,
+                reclassifying = false,
+                reclassifySuccess = false,
+                reclassifyError = null,
+            )
+        }
+    }
+
+    fun reclassifySelectedTransaction(newType: FinancialTransactionType) {
+        val transactionId = _uiState.value.selectedTransactionId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(reclassifying = true, reclassifySuccess = false, reclassifyError = null) }
+            when (val result = reclassificationService.reclassify(transactionId, newType)) {
+                is ReclassificationResult.Success -> {
+                    refreshPreservingSelection()
+                    _uiState.update {
+                        it.copy(
+                            reclassifying = false,
+                            reclassifySuccess = true,
+                            reclassifyError = null,
+                        )
+                    }
+                }
+                is ReclassificationResult.Rejected -> {
+                    _uiState.update {
+                        it.copy(
+                            reclassifying = false,
+                            reclassifyError = result.reason,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshPreservingSelection() {
+        val selectedId = _uiState.value.selectedTransactionId
+        load(activePeriod, preserveSelectionId = selectedId)
+    }
+
+    private fun load(period: FinancialPeriod, preserveSelectionId: String? = null) {
         val samePeriodRefresh =
             _uiState.value.period == period && _uiState.value.summary?.period == period
 
@@ -128,6 +185,7 @@ class DashboardViewModel(
                         allTransactions = previews,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
+                        selectedTransactionId = preserveSelectionId,
                     )
                 }
             } catch (ce: CancellationException) {

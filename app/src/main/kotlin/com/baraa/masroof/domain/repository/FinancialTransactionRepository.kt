@@ -33,6 +33,10 @@ interface FinancialTransactionRepository {
     ): List<FinancialTransaction>
 
     suspend fun isRawSmsLinked(rawSmsId: String): Boolean
+
+    suspend fun listRawSmsIds(transactionId: String): List<String>
+
+    suspend fun update(transaction: FinancialTransaction): Boolean
 }
 
 sealed interface FinancialTransactionSaveResult {

@@ -28,6 +28,7 @@ fun TransactionListScreen(
     periodLabel: String,
     transactions: List<TransactionPreviewUi>,
     onBack: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -74,7 +75,7 @@ fun TransactionListScreen(
                     Spacer(Modifier.height(4.dp))
                 }
                 items(transactions, key = { it.id }) { row ->
-                    TransactionRow(row)
+                    TransactionRow(row, onClick = { onOpenTransaction(row.id) })
                 }
                 item { Spacer(Modifier.height(16.dp)) }
             }
