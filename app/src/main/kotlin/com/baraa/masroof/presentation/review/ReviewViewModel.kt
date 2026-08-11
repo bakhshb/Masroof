@@ -126,6 +126,10 @@ class ReviewViewModel(
         }
     }
 
+    fun resolveAsIgnored() {
+        resolveAsNonFinancial()
+    }
+
     fun resolveAsNonFinancial() {
         val reviewId = _uiState.value.selectedDetail?.id ?: return
         runAction {
@@ -264,7 +268,7 @@ class ReviewViewModel(
             showExternalTransferAction = pendingMatch && isTransferOut,
             showIncomingIncomeAction = pendingMatch && isTransferIn,
             showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW && !dismissNonFinancial,
-            showDismissNonFinancialAction = dismissNonFinancial,
+            showDismissNonFinancialAction = review.kind == ReviewKind.NEEDS_REVIEW,
         )
     }
 }

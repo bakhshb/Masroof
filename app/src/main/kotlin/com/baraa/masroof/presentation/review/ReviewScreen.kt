@@ -54,7 +54,7 @@ fun ReviewRoute(
             onResolveType = viewModel::resolveAsFinancialType,
             onResolveExternal = viewModel::resolveAsExternalTransfer,
             onResolvePair = viewModel::resolveSelfTransferPair,
-            onDismissNonFinancial = viewModel::resolveAsNonFinancial,
+            onDismissNonFinancial = viewModel::resolveAsIgnored,
         )
     } else {
         ReviewListScreen(
@@ -257,30 +257,7 @@ private fun ReviewDetailScreen(
                     enabled = !resolving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.review_action_dismiss_non_financial))
-                }
-            }
-
-            when (message) {
-                ReviewMessage.RESOLVED -> Text(
-                    stringResource(R.string.review_resolved),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                ReviewMessage.STILL_NEEDS_REVIEW -> Text(
-                    stringResource(R.string.review_still_pending),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                null -> Unit
-            }
-            if (error == ReviewError.ACTION_FAILED) {
-                Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
-                actionErrorDetail?.let { reason ->
-                    val detailRes = ReviewReasonLabels.labelRes(reason)
-                    Text(
-                        detailRes?.let { stringResource(it) } ?: reason,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    Text(stringResource(R.string.review_action_ignore))
                 }
             }
 
@@ -330,6 +307,29 @@ private fun ReviewDetailScreen(
                             candidate.amountLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
+                }
+            }
+
+            when (message) {
+                ReviewMessage.RESOLVED -> Text(
+                    stringResource(R.string.review_resolved),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                ReviewMessage.STILL_NEEDS_REVIEW -> Text(
+                    stringResource(R.string.review_still_pending),
+                    color = MaterialTheme.colorScheme.error,
+                )
+                null -> Unit
+            }
+            if (error == ReviewError.ACTION_FAILED) {
+                Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
+                actionErrorDetail?.let { reason ->
+                    val detailRes = ReviewReasonLabels.labelRes(reason)
+                    Text(
+                        detailRes?.let { stringResource(it) } ?: reason,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
 
