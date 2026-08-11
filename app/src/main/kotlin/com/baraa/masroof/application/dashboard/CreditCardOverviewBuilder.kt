@@ -22,6 +22,7 @@ object CreditCardOverviewBuilder {
         parsedRecords: List<ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
         primaryCurrency: Currency = Currency.SAR,
+        sarEquivalents: Map<String, Money> = emptyMap(),
     ): CreditCardsOverview {
         val creditCardMeta = mutableMapOf<String, CardReference>()
         val snapshotCandidates = mutableListOf<SnapshotCandidate>()
@@ -49,20 +50,23 @@ object CreditCardOverviewBuilder {
         val spendingGross = mutableMapOf<String, Money>()
         val refunds = mutableMapOf<String, Money>()
         for (tx in periodTransactions) {
-            if (tx.amount.currency != primaryCurrency) continue
+            val amount = when {
+                tx.amount.currency == primaryCurrency -> tx.amount
+                else -> sarEquivalents[tx.id] ?: continue
+            }
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
                 FinancialTransactionType.FEE,
                 -> {
                     val cardId = tx.sourceContainerId ?: continue
                     if (cardId !in creditCardMeta) continue
-                    spendingGross[cardId] = (spendingGross[cardId] ?: Money.zero(primaryCurrency)) + tx.amount
+                    spendingGross[cardId] = (spendingGross[cardId] ?: Money.zero(primaryCurrency)) + amount
                 }
 
                 FinancialTransactionType.REFUND -> {
                     val cardId = tx.destinationContainerId ?: continue
                     if (cardId !in creditCardMeta) continue
-                    refunds[cardId] = (refunds[cardId] ?: Money.zero(primaryCurrency)) + tx.amount
+                    refunds[cardId] = (refunds[cardId] ?: Money.zero(primaryCurrency)) + amount
                 }
 
                 else -> Unit

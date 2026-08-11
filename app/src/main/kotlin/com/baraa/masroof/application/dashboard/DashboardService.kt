@@ -41,23 +41,31 @@ class DashboardService(
             endExclusive = endExclusive,
         )
         val reviewRequiredCount = reviewRepository.listRequired().size
-        val summary = MonthlyFinancialSummaryCalculator.summarize(
-            period = period,
-            transactions = transactions,
-            reviewRequiredCount = reviewRequiredCount,
-            primaryCurrency = primaryCurrency,
-        )
         val parsedRecords = parsedEventRepository.listAll()
         val rawSmsById = parsedRecords
             .map { it.event.rawSmsId }
             .distinct()
             .mapNotNull { id -> rawSmsRepository.getById(id)?.let { id to it } }
             .toMap()
+        val sarEquivalents = TransactionSarEquivalentResolver.resolve(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = primaryCurrency,
+        )
+        val summary = MonthlyFinancialSummaryCalculator.summarize(
+            period = period,
+            transactions = transactions,
+            reviewRequiredCount = reviewRequiredCount,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+        )
         val creditCards = CreditCardOverviewBuilder.build(
             periodTransactions = transactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
         )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(

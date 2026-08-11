@@ -54,6 +54,7 @@ fun DashboardRoute(
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refresh,
         onRescan = viewModel::rescanSms,
+        onReparseStored = viewModel::reparseStoredEvents,
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
@@ -68,6 +69,7 @@ private fun DashboardScreen(
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
     onRescan: () -> Unit,
+    onReparseStored: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
@@ -248,23 +250,46 @@ private fun DashboardScreen(
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = MasroofIcons.warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.size(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = MasroofIcons.warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.size(6.dp))
+                            Text(
+                                stringResource(
+                                    R.string.dashboard_excluded_other_currency,
+                                    summary.excludedOtherCurrencyCount,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                         Text(
-                            stringResource(
-                                R.string.dashboard_excluded_other_currency,
-                                summary.excludedOtherCurrencyCount,
-                            ),
+                            stringResource(R.string.dashboard_excluded_other_currency_hint),
                             style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
+
+                IconTextButtonOutlined(
+                    onClick = onReparseStored,
+                    icon = MasroofIcons.rescan,
+                    text = if (state.reparsingStored) {
+                        stringResource(R.string.dashboard_reparse_stored_running)
+                    } else {
+                        stringResource(R.string.dashboard_reparse_stored)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.dashboard_reparse_stored_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
                 if (summary.reviewRequiredCount > 0) {
                     IconTextButton(

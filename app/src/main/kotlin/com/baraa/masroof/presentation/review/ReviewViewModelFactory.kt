@@ -19,6 +19,13 @@ class ReviewViewModelFactory(
         return ReviewViewModel(
             reviewWorkflowService = container.reviewWorkflowService,
             detailLoader = loader,
+            reparseStoredSms = { rawSmsId ->
+                val raw = container.rawSmsRepository.getById(rawSmsId)
+                if (raw != null) {
+                    container.smsIngestionService.reparseStored(raw)
+                    container.refreshReviewQueue()
+                }
+            },
         ) as T
     }
 }

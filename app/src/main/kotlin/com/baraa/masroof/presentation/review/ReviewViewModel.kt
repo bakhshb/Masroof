@@ -23,6 +23,7 @@ import java.util.Locale
 class ReviewViewModel(
     private val reviewWorkflowService: ReviewWorkflowService,
     private val detailLoader: ReviewDetailLoader,
+    private val reparseStoredSms: suspend (String) -> Unit,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReviewUiState())
@@ -84,9 +85,16 @@ class ReviewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null, message = null) }
             try {
-                val detail = detailLoader.loadDetail(reviewId) ?: run {
+                var detail = detailLoader.loadDetail(reviewId) ?: run {
                     _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
                     return@launch
+                }
+                if (detail.review.reasons.contains("missing_amount")) {
+                    reparseStoredSms(detail.review.rawSmsId)
+                    detail = detailLoader.loadDetail(reviewId) ?: run {
+                        _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                        return@launch
+                    }
                 }
                 val pairCandidates = if (detail.review.kind == ReviewKind.PENDING_MATCH) {
                     detailLoader.loadPairCandidates(reviewId).map(::toListItem)

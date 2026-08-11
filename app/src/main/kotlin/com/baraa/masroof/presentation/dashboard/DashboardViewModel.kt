@@ -26,6 +26,7 @@ import java.util.Locale
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
+    private val reparseStoredEventsService: suspend () -> Int,
     private val reclassificationService: TransactionReclassificationService,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -63,6 +64,23 @@ class DashboardViewModel(
     fun goToCurrentPeriod() {
         activePeriod = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         load(activePeriod)
+    }
+
+    fun reparseStoredEvents() {
+        if (rescanJob?.isActive == true) return
+        rescanJob = viewModelScope.launch {
+            _uiState.update { it.copy(reparsingStored = true) }
+            try {
+                reparseStoredEventsService()
+                refresh()
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                // Best-effort; dashboard refresh still runs on success path only.
+            } finally {
+                _uiState.update { it.copy(reparsingStored = false) }
+            }
+        }
     }
 
     fun rescanSms() {

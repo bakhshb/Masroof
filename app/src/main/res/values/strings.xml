@@ -86,6 +86,10 @@
     <string name="review_reason_paired_transaction_not_supported">عملية مربوطة بحوالتين — لا يمكن إعادة تصنيفها حالياً</string>
     <string name="dashboard_empty_period">لا توجد عمليات في هذه الفترة</string>
     <string name="dashboard_excluded_other_currency">تم استبعاد %1$d عملية بعملة أخرى من الإجماليات.</string>
+    <string name="dashboard_excluded_other_currency_hint">عمليات USD تُحسب بالريال تلقائياً عند وجود سعر الصرف في الرسالة.</string>
+    <string name="dashboard_reparse_stored">إعادة تحليل الرسائل المحفوظة</string>
+    <string name="dashboard_reparse_stored_running">جاري إعادة التحليل…</string>
+    <string name="dashboard_reparse_stored_hint">يُحدّث المبالغ (مثل USD 23) دون إعادة استيراد من الجهاز.</string>
     <string name="dashboard_review_required">تحتاج مراجعة: %1$d</string>
     <string name="dashboard_back_to_current">العودة للشهر الحالي</string>
     <string name="dashboard_load_error">تعذر تحميل الملخص المالي</string>

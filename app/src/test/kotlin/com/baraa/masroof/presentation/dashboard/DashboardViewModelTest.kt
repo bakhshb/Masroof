@@ -349,6 +349,7 @@ class DashboardViewModelTest {
         DashboardViewModel(
             overviewLoader = loader,
             rescanService = { SmsScanResult() },
+            reparseStoredEventsService = { 0 },
             reclassificationService = TransactionReclassificationService(
                 financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
                     override suspend fun save(

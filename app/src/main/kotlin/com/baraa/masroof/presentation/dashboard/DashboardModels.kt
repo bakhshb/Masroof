@@ -36,6 +36,7 @@ data class DashboardUiState(
     val error: DashboardError? = null,
     val rescanning: Boolean = false,
     val rescanStatus: SmsRescanStatus? = null,
+    val reparsingStored: Boolean = false,
     val selectedTransactionId: String? = null,
     val reclassifying: Boolean = false,
     val reclassifyError: String? = null,
