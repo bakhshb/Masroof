@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.review
 
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.MessageFamily
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,7 +15,6 @@ class ReviewDismissRulesTest {
                 messageFamily = MessageFamily.UNKNOWN,
                 reasons = listOf("unknown_message_family"),
                 body = "اسم المستفيد : TEST\nحالة: غير نشط",
-                hasAmount = false,
             ),
         )
     }
@@ -25,19 +26,23 @@ class ReviewDismissRulesTest {
                 messageFamily = MessageFamily.UNKNOWN,
                 reasons = listOf("unknown_message_family"),
                 body = "عملية غير معروفة",
-                hasAmount = true,
+                amount = Money.of("100", Currency.SAR),
             ),
         )
     }
 
     @Test
-    fun unknownWithMoneyWordingButNoParsedAmount_staysForManualClassification() {
-        assertFalse(
+    fun statementNoticeWithZeroAmount_isDismissible() {
+        assertTrue(
             shouldOfferNonFinancialDismiss(
                 messageFamily = MessageFamily.UNKNOWN,
                 reasons = listOf("unknown_message_family"),
-                body = "عملية بمبلغ: 15000.00 SAR",
-                hasAmount = false,
+                body = """
+                    بطاقة إئتمانية: إصدار كشف حساب
+                    إجمالي المبلغ المستحق: SAR 0.00
+                    تاريخ الاستحقاق: 07/09/2026
+                """.trimIndent(),
+                amount = Money.of("0.00", Currency.SAR),
             ),
         )
     }

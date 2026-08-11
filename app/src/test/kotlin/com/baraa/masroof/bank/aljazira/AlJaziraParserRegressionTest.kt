@@ -387,6 +387,22 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun creditCardStatementNotice_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            بطاقة إئتمانية: إصدار كشف حساب
+            بطاقة: 7271 بطاقة إئتمانية
+            إجمالي المبلغ المستحق: SAR 0.00
+            تاريخ الاستحقاق: 07/09/2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun beneficiaryStatusNotice_isNonFinancialWithoutAmount() {
         val result = parse(
             """

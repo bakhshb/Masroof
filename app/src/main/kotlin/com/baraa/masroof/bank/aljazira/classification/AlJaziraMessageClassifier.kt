@@ -73,6 +73,15 @@ class AlJaziraMessageClassifier {
                     confidence = 1.0,
                 )
 
+            text.contains("إصدار كشف حساب") ||
+                text.contains("كشف حساب") ||
+                (text.contains("تاريخ الاستحقاق") && text.contains("المبلغ المستحق")) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("statement_notice"),
+                    confidence = 1.0,
+                )
+
             text.contains("قسط تمويل") || text.contains("خصم: قسط") ->
                 return AlJaziraClassification(
                     family = MessageFamily.UNKNOWN,

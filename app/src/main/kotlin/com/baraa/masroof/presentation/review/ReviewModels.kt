@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.review
 
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
@@ -105,14 +106,14 @@ fun shouldOfferNonFinancialDismiss(
     messageFamily: MessageFamily?,
     reasons: List<String>,
     body: String,
-    hasAmount: Boolean = false,
+    amount: Money? = null,
 ): Boolean {
     if (reasons.any { it == "non_financial_or_informational_message" }) {
         return true
     }
     return InformationalMessagePolicy.shouldAutoIgnore(
         messageFamily = messageFamily,
-        hasParsedAmount = hasAmount,
+        parsedAmount = amount,
         smsBody = body,
     )
 }
