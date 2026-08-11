@@ -11,6 +11,7 @@ import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
+import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
@@ -22,6 +23,7 @@ import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
@@ -125,6 +127,12 @@ class AppContainer(
             clock = clock,
         )
 
+    val manualReviewResolutionRepository: ManualReviewResolutionRepository =
+        RoomManualReviewResolutionRepository(
+            database = database,
+            financialTransactionRepository = financialTransactionRepository,
+        )
+
     val reviewWorkflowService: ReviewWorkflowService =
         ReviewWorkflowService(
             reviewRepository = reviewRepository,
@@ -135,6 +143,7 @@ class AppContainer(
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             reconciliationService = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
+            manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
         )
 

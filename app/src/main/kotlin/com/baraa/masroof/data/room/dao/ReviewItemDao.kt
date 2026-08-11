@@ -57,12 +57,15 @@ interface ReviewItemDao {
         val existing = findByRawSmsId(entity.rawSmsId)
             ?: getById(entity.id)
             ?: return entity
+
+        // Durable history: never reopen RESOLVED rows from queue refresh.
+        if (existing.status == "RESOLVED") {
+            return existing
+        }
+
         if (existing.status == entity.status &&
             existing.kind == entity.kind &&
-            existing.reasons == entity.reasons &&
-            existing.resolvedAtEpochMillis == null &&
-            existing.resolutionKind == null &&
-            existing.resolvedTransactionId == null
+            existing.reasons == entity.reasons
         ) {
             return existing
         }
@@ -72,20 +75,40 @@ interface ReviewItemDao {
             status = entity.status,
             reasons = entity.reasons,
             updatedAtEpochMillis = entity.updatedAtEpochMillis,
-            resolvedAtEpochMillis = null,
-            resolutionKind = null,
-            resolvedTransactionId = null,
+            resolvedAtEpochMillis = existing.resolvedAtEpochMillis,
+            resolutionKind = existing.resolutionKind,
+            resolvedTransactionId = existing.resolvedTransactionId,
         )
         return existing.copy(
             kind = entity.kind,
             status = entity.status,
             reasons = entity.reasons,
             updatedAtEpochMillis = entity.updatedAtEpochMillis,
-            resolvedAtEpochMillis = null,
-            resolutionKind = null,
-            resolvedTransactionId = null,
         )
     }
+
+    /**
+     * Resolve only when the row is still REQUIRED. Returns rows updated (0 or 1).
+     */
+    @Query(
+        """
+        UPDATE review_item SET
+          status = :status,
+          updatedAtEpochMillis = :updatedAtEpochMillis,
+          resolvedAtEpochMillis = :resolvedAtEpochMillis,
+          resolutionKind = :resolutionKind,
+          resolvedTransactionId = :resolvedTransactionId
+        WHERE id = :id AND status = 'REQUIRED'
+        """,
+    )
+    suspend fun resolveIfRequired(
+        id: String,
+        status: String,
+        resolutionKind: String,
+        resolvedAtEpochMillis: Long,
+        resolvedTransactionId: String?,
+        updatedAtEpochMillis: Long,
+    ): Int
 
     @Transaction
     suspend fun markResolvedAtomic(
@@ -97,16 +120,40 @@ interface ReviewItemDao {
         updatedAtEpochMillis: Long,
     ): ReviewItemEntity? {
         val existing = getById(id) ?: return null
-        updateRow(
+        if (existing.status == "RESOLVED") {
+            // Allow upgrading auto-settlement metadata to an explicit USER_* kind.
+            if (existing.resolutionKind == "AUTO_NO_LONGER_REQUIRED" &&
+                resolutionKind != "AUTO_NO_LONGER_REQUIRED"
+            ) {
+                updateRow(
+                    id = id,
+                    kind = existing.kind,
+                    status = status,
+                    reasons = existing.reasons,
+                    updatedAtEpochMillis = updatedAtEpochMillis,
+                    resolvedAtEpochMillis = resolvedAtEpochMillis,
+                    resolutionKind = resolutionKind,
+                    resolvedTransactionId = resolvedTransactionId ?: existing.resolvedTransactionId,
+                )
+                return existing.copy(
+                    status = status,
+                    updatedAtEpochMillis = updatedAtEpochMillis,
+                    resolvedAtEpochMillis = resolvedAtEpochMillis,
+                    resolutionKind = resolutionKind,
+                    resolvedTransactionId = resolvedTransactionId ?: existing.resolvedTransactionId,
+                )
+            }
+            return existing
+        }
+        val updated = resolveIfRequired(
             id = id,
-            kind = existing.kind,
             status = status,
-            reasons = existing.reasons,
-            updatedAtEpochMillis = updatedAtEpochMillis,
-            resolvedAtEpochMillis = resolvedAtEpochMillis,
             resolutionKind = resolutionKind,
+            resolvedAtEpochMillis = resolvedAtEpochMillis,
             resolvedTransactionId = resolvedTransactionId,
+            updatedAtEpochMillis = updatedAtEpochMillis,
         )
+        if (updated == 0) return null
         return existing.copy(
             status = status,
             updatedAtEpochMillis = updatedAtEpochMillis,

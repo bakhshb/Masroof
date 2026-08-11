@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -17,11 +18,13 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
+import com.baraa.masroof.domain.repository.ManualReviewResolutionResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.sms.time.InstantClock
+import java.util.UUID
 
 /**
  * Backend review / user-resolution APIs for future UI.
@@ -36,7 +39,11 @@ class ReviewWorkflowService(
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val reconciliationService: TransactionReconciliationService,
     private val reviewQueueUpdater: ReviewQueueUpdater,
+    private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
     private val clock: InstantClock,
+    private val newCorrectionId: () -> String = {
+        UserCorrectionIdFactory.create(UUID.randomUUID().toString())
+    },
 ) {
     suspend fun refreshReviewQueue() {
         val report = reconciliationService.reconcileStoredEventsDetailed()
@@ -74,7 +81,7 @@ class ReviewWorkflowService(
 
         val now = clock.now()
         val correction = UserCorrection(
-            id = "correction:${review.rawSmsId}:${now.toEpochMilli()}",
+            id = newCorrectionId(),
             targetRawSmsId = review.rawSmsId,
             correctedType = correctedType,
             correctedAmount = correctedAmount,
@@ -96,7 +103,7 @@ class ReviewWorkflowService(
                 resolutionKind = ReviewResolutionKind.USER_CORRECTION,
                 resolvedAt = clock.now(),
                 resolvedTransactionId = tx.id,
-            ) ?: updated
+            ) ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
             return ReviewWorkflowResult.Success(
                 review = marked,
                 transaction = tx,
@@ -173,11 +180,14 @@ class ReviewWorkflowService(
             categoryId = null,
             linkedParsedEventIds = listOf(event.id),
         )
-        return persistManualResolution(
-            review = review,
-            transaction = tx,
-            rawSmsIds = listOf(review.rawSmsId),
-            resolutionKind = ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
+        return mapPersistResult(
+            manualReviewResolutionRepository.persistSingleResolution(
+                transaction = tx,
+                rawSmsIds = listOf(review.rawSmsId),
+                reviewId = review.id,
+                resolutionKind = ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
+                resolvedAt = clock.now(),
+            ),
         )
     }
 
@@ -268,35 +278,16 @@ class ReviewWorkflowService(
             return ReviewWorkflowResult.Rejected("pair_assembly_failed")
         }
 
-        return when (
-            financialTransactionRepository.save(outcome.transaction, outcome.rawSmsIds)
-        ) {
-            FinancialTransactionSaveResult.Saved,
-            FinancialTransactionSaveResult.AlreadyExists,
-            -> {
-                val now = clock.now()
-                val outMarked = reviewRepository.markResolved(
-                    id = outReview.id,
-                    resolutionKind = ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
-                    resolvedAt = now,
-                    resolvedTransactionId = outcome.transaction.id,
-                ) ?: outReview
-                val inMarked = reviewRepository.markResolved(
-                    id = inReview.id,
-                    resolutionKind = ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
-                    resolvedAt = now,
-                    resolvedTransactionId = outcome.transaction.id,
-                ) ?: inReview
-                ReviewWorkflowResult.Success(
-                    review = outMarked,
-                    transaction = outcome.transaction,
-                    pairedReview = inMarked,
-                )
-            }
-
-            is FinancialTransactionSaveResult.Conflict ->
-                ReviewWorkflowResult.Rejected("link_conflict")
-        }
+        return mapPersistResult(
+            manualReviewResolutionRepository.persistPairResolution(
+                transaction = outcome.transaction,
+                rawSmsIds = outcome.rawSmsIds,
+                firstReviewId = outReview.id,
+                secondReviewId = inReview.id,
+                resolutionKind = ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
+                resolvedAt = clock.now(),
+            ),
+        )
     }
 
     suspend fun resolveAsFinancialType(
@@ -363,35 +354,36 @@ class ReviewWorkflowService(
             categoryId = null,
             linkedParsedEventIds = listOf(event.id),
         )
-        return persistManualResolution(
-            review = review,
-            transaction = tx,
-            rawSmsIds = listOf(review.rawSmsId),
-            resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
+        return mapPersistResult(
+            manualReviewResolutionRepository.persistSingleResolution(
+                transaction = tx,
+                rawSmsIds = listOf(review.rawSmsId),
+                reviewId = review.id,
+                resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
+                resolvedAt = clock.now(),
+            ),
         )
     }
 
-    private suspend fun persistManualResolution(
-        review: ReviewItem,
-        transaction: FinancialTransaction,
-        rawSmsIds: List<String>,
-        resolutionKind: ReviewResolutionKind,
-    ): ReviewWorkflowResult =
-        when (financialTransactionRepository.save(transaction, rawSmsIds)) {
-            FinancialTransactionSaveResult.Saved,
-            FinancialTransactionSaveResult.AlreadyExists,
-            -> {
-                val marked = reviewRepository.markResolved(
-                    id = review.id,
-                    resolutionKind = resolutionKind,
-                    resolvedAt = clock.now(),
-                    resolvedTransactionId = transaction.id,
-                ) ?: review
-                ReviewWorkflowResult.Success(review = marked, transaction = transaction)
-            }
+    private fun mapPersistResult(result: ManualReviewResolutionResult): ReviewWorkflowResult =
+        when (result) {
+            is ManualReviewResolutionResult.Success ->
+                ReviewWorkflowResult.Success(
+                    review = result.reviews.first(),
+                    transaction = result.transaction,
+                    pairedReview = result.reviews.getOrNull(1),
+                )
 
-            is FinancialTransactionSaveResult.Conflict ->
-                ReviewWorkflowResult.Rejected("link_conflict")
+            is ManualReviewResolutionResult.Conflict ->
+                ReviewWorkflowResult.Rejected(
+                    when {
+                        result.existingTransactionId != null -> "raw_sms_already_finalized"
+                        else -> result.reason
+                    },
+                )
+
+            is ManualReviewResolutionResult.Failed ->
+                ReviewWorkflowResult.Rejected(result.reason)
         }
 
     companion object {
