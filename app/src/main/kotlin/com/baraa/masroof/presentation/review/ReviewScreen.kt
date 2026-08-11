@@ -251,6 +251,16 @@ private fun ReviewDetailScreen(
                 )
             }
 
+            if (detail.showDismissNonFinancialAction) {
+                Button(
+                    onClick = onDismissNonFinancial,
+                    enabled = !resolving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.review_action_dismiss_non_financial))
+                }
+            }
+
             when (message) {
                 ReviewMessage.RESOLVED -> Text(
                     stringResource(R.string.review_resolved),
@@ -271,16 +281,6 @@ private fun ReviewDetailScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
-                }
-            }
-
-            if (detail.showDismissNonFinancialAction) {
-                Button(
-                    onClick = onDismissNonFinancial,
-                    enabled = !resolving,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.review_action_dismiss_non_financial))
                 }
             }
 

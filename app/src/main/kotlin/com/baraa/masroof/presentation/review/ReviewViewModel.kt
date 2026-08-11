@@ -54,6 +54,7 @@ class ReviewViewModel(
                         messageFamily = summary.messageFamily,
                         reasons = summary.review.reasons,
                         body = summary.body.orEmpty(),
+                        hasAmount = summary.amount != null,
                     )
                 }
                 var dismissed = 0
@@ -215,6 +216,7 @@ class ReviewViewModel(
             messageFamily = summary.messageFamily,
             reasons = review.reasons,
             body = summary.body.orEmpty(),
+            hasAmount = summary.amount != null,
         )
         return ReviewListItemUi(
             id = review.id,
@@ -241,6 +243,7 @@ class ReviewViewModel(
             messageFamily = family,
             reasons = review.reasons,
             body = detail.body.orEmpty(),
+            hasAmount = detail.amount != null,
         )
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"

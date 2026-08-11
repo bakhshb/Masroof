@@ -387,6 +387,24 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun beneficiaryStatusNotice_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            اسم المستفيد : براء ف بن
+            الاسم المختصر : حسابي D360
+            حالة: غير نشط
+            حساب: SA2036036036045864332670
+            بنك: D360 بنك
+            في : 14:04 2026-07-29
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun mokafatyLoyaltyPoints_isNonFinancialWithoutAmount() {
         val result = parse(
             "إجمالي رصيد نقاطك في برنامج مكافآتي هو 9966.04 نقطة.",

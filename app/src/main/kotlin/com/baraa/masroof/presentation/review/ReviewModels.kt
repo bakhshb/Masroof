@@ -108,21 +108,49 @@ private val NON_FINANCIAL_BODY_MARKERS = listOf(
     "مكافآتي",
     "رصيد نقاطك",
     "برنامج مكاف",
+    "اسم المستفيد",
+    "الاسم المختصر",
+    "حالة: غير نشط",
+    "حالة : غير نشط",
+    "تم إضافة المستفيد",
+    "إضافة مستفيد",
+    "تنبيه أمني",
+    "تنويه",
 )
 
 fun looksLikeNonFinancialSms(body: String): Boolean =
     NON_FINANCIAL_BODY_MARKERS.any { body.contains(it) }
 
+private fun String.containsMoneyIndicators(): Boolean =
+    contains("sar", ignoreCase = true) ||
+        contains("ر.س") ||
+        contains("ريال") ||
+        contains("مبلغ") ||
+        contains("بمبلغ") ||
+        contains("القيمة:") ||
+        contains("القسط")
+
 fun shouldOfferNonFinancialDismiss(
     messageFamily: MessageFamily?,
     reasons: List<String>,
     body: String,
+    hasAmount: Boolean = false,
 ): Boolean {
-    if (messageFamily == MessageFamily.OTP || messageFamily == MessageFamily.NON_FINANCIAL) {
+    if (messageFamily == MessageFamily.OTP ||
+        messageFamily == MessageFamily.NON_FINANCIAL ||
+        messageFamily == MessageFamily.BALANCE_NOTICE
+    ) {
         return true
     }
     if (reasons.any { it == "non_financial_or_informational_message" }) {
         return true
     }
-    return looksLikeNonFinancialSms(body)
+    if (looksLikeNonFinancialSms(body)) {
+        return true
+    }
+    // Unknown SMS without a parsed amount and without money wording is informational.
+    if (messageFamily == MessageFamily.UNKNOWN && !hasAmount && !body.containsMoneyIndicators()) {
+        return true
+    }
+    return false
 }

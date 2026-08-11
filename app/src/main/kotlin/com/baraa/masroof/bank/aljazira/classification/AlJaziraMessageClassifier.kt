@@ -55,6 +55,17 @@ class AlJaziraMessageClassifier {
                     confidence = 1.0,
                 )
 
+            text.contains("اسم المستفيد") ||
+                text.contains("الاسم المختصر") ||
+                text.contains("تم إضافة المستفيد") ||
+                text.contains("إضافة مستفيد") ||
+                (text.contains("حالة") && text.contains("غير نشط")) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("beneficiary_notice"),
+                    confidence = 1.0,
+                )
+
             text.contains("إشعار رصيد") || text.contains("اشعار رصيد") ->
                 return AlJaziraClassification(
                     family = MessageFamily.BALANCE_NOTICE,
