@@ -265,9 +265,12 @@ class ReviewViewModel(
             counterparty = detail.counterparty,
             reasonLabels = review.reasons,
             pairCandidates = pairCandidates,
-            showExternalTransferAction = pendingMatch && isTransferOut,
+            showExternalTransferAction = (isTransferOut || isTransferIn) &&
+                (pendingMatch || review.kind == ReviewKind.NEEDS_REVIEW),
             showIncomingIncomeAction = pendingMatch && isTransferIn,
-            showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW && !dismissNonFinancial,
+            showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW &&
+                !dismissNonFinancial &&
+                family !in TRANSFER_MESSAGE_FAMILIES,
             showDismissNonFinancialAction = review.kind == ReviewKind.NEEDS_REVIEW,
         )
     }

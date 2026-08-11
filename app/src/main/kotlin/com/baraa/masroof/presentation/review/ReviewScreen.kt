@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MessageFamily
 
 @Composable
 fun ReviewRoute(
@@ -280,7 +281,15 @@ private fun ReviewDetailScreen(
                     enabled = !resolving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.review_action_external_transfer))
+                    Text(
+                        stringResource(
+                            when (detail.messageFamily) {
+                                MessageFamily.TRANSFER_IN -> R.string.review_action_external_transfer_in
+                                MessageFamily.TRANSFER_OUT -> R.string.review_action_external_transfer_out
+                                else -> R.string.review_action_external_transfer
+                            },
+                        ),
+                    )
                 }
             }
 

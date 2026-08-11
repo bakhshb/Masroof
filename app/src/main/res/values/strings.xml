@@ -51,6 +51,8 @@
     <string name="bank_unknown">بنك غير معروف</string>
 
     <string name="dashboard_net_spending">صافي المصروفات</string>
+    <string name="dashboard_period_summary_hint">ملخص حركة الفترة — لا يعرض رصيد الحساب البنكي</string>
+    <string name="dashboard_net_cash_flow">صافي التغير النقدي</string>
     <string name="dashboard_gross_before_refunds">قبل الاستردادات: %1$s</string>
     <string name="dashboard_income">الدخل</string>
     <string name="dashboard_refunds">الاستردادات</string>
@@ -107,7 +109,9 @@
     <string name="review_sms_body">نص الرسالة</string>
     <string name="review_actions_title">اختر نوع العملية</string>
     <string name="review_action_external_transfer">تحويل خارجي (ليس بين حساباتي)</string>
-    <string name="review_action_incoming_income">دخل وارد (من خارج حساباتي)</string>
+    <string name="review_action_external_transfer_in">تحويل وارد خارجي (ليس دخلًا)</string>
+    <string name="review_action_external_transfer_out">تحويل صادر خارجي</string>
+    <string name="review_action_incoming_income">دخل (راتب أو مكافأة)</string>
     <string name="review_action_dismiss_non_financial">تجاهل (رسالة معلوماتية)</string>
     <string name="review_action_ignore">تجاهل (ليس عملية مالية)</string>
     <string name="review_dismiss_all_informational">تجاهل %1$d رسالة معلوماتية</string>

@@ -67,6 +67,12 @@ val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(
     FinancialTransactionType.FEE,
 )
 
+/** Transfers use dedicated external-transfer / pair actions instead of generic type buttons. */
+val TRANSFER_MESSAGE_FAMILIES: Set<MessageFamily> = setOf(
+    MessageFamily.TRANSFER_IN,
+    MessageFamily.TRANSFER_OUT,
+)
+
 fun MessageFamily?.toUiLabelRes(): Int? =
     when (this) {
         MessageFamily.PURCHASE -> com.baraa.masroof.R.string.review_family_purchase

@@ -67,6 +67,11 @@ private fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            stringResource(R.string.dashboard_period_summary_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         PeriodSelector(
             label = state.periodLabel,
@@ -127,6 +132,16 @@ private fun DashboardScreen(
                         title = stringResource(R.string.dashboard_refunds),
                         value = summary.refunds,
                     )
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.dashboard_net_cash_flow), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            MoneyUiFormatter.format(summary.netCashFlow),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                 }
 
                 Text(stringResource(R.string.dashboard_money_movement), style = MaterialTheme.typography.titleMedium)

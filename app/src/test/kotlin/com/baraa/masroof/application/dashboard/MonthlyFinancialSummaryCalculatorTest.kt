@@ -109,6 +109,20 @@ class MonthlyFinancialSummaryCalculatorTest {
     }
 
     @Test
+    fun netCashFlow_externalFlowsMinusSpending() {
+        val summary = summarize(
+            tx(FinancialTransactionType.INCOME, "1000"),
+            tx(FinancialTransactionType.EXTERNAL_TRANSFER_IN, "200"),
+            tx(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "300"),
+            tx(FinancialTransactionType.EXPENSE, "100"),
+        )
+        assertEquals(
+            SignedMoneyAmount(BigDecimal("800.00"), Currency.SAR),
+            summary.netCashFlow,
+        )
+    }
+
+    @Test
     fun adjustmentAndUnknown_excludedFromTotals_butCountedInTransactionCount() {
         val summary = summarize(
             tx(FinancialTransactionType.ADJUSTMENT, "40"),
