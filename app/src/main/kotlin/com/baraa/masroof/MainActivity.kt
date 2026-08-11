@@ -16,13 +16,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.baraa.masroof.presentation.MasroofRoot
+import com.baraa.masroof.presentation.dashboard.DashboardViewModel
+import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
 import com.baraa.masroof.presentation.onboarding.OnboardingPermissionPolicy
-import com.baraa.masroof.presentation.onboarding.OnboardingRoute
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModelFactory
 
 /**
- * P10 launcher: onboarding + setup completion placeholder.
+ * Launcher: P10 onboarding until complete, then P11 monthly dashboard.
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
@@ -33,6 +35,10 @@ class MainActivity : ComponentActivity() {
             onboardingPreferencesRepository = container.onboardingPreferencesRepository,
             permissionStateProvider = { hasSmsPermissions() },
         )
+    }
+
+    private val dashboardViewModel: DashboardViewModel by viewModels {
+        DashboardViewModelFactory(container = container)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,8 +61,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    OnboardingRoute(
-                        viewModel = onboardingViewModel,
+                    MasroofRoot(
+                        onboardingViewModel = onboardingViewModel,
+                        dashboardViewModel = dashboardViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },
@@ -70,6 +77,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         onboardingViewModel.reloadFromCurrentState()
+        if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
+            dashboardViewModel.refresh()
+        }
     }
 
     private fun hasSmsPermissions(): Boolean =
