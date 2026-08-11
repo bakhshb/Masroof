@@ -35,19 +35,46 @@ class ReviewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {
+                applySummaries(detailLoader.loadSummaries())
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+            }
+        }
+    }
+
+    fun dismissAllInformational() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
+            try {
                 val summaries = detailLoader.loadSummaries()
-                val items = summaries.map(::toListItem)
+                val dismissible = summaries.filter { summary ->
+                    shouldOfferNonFinancialDismiss(
+                        messageFamily = summary.messageFamily,
+                        reasons = summary.review.reasons,
+                        body = summary.body.orEmpty(),
+                    )
+                }
+                var dismissed = 0
+                for (summary in dismissible) {
+                    when (reviewWorkflowService.resolveAsNonFinancial(summary.review.id)) {
+                        is ReviewWorkflowResult.Success -> dismissed++
+                        is ReviewWorkflowResult.Rejected -> Unit
+                    }
+                }
+                applySummaries(detailLoader.loadSummaries())
                 _uiState.update {
                     it.copy(
-                        loading = false,
-                        items = items,
-                        error = null,
+                        resolving = false,
+                        message = if (dismissed > 0) ReviewMessage.RESOLVED else it.message,
+                        error = if (dismissed == 0 && dismissible.isNotEmpty()) ReviewError.ACTION_FAILED else null,
                     )
                 }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
-                _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
             }
         }
     }
@@ -154,13 +181,27 @@ class ReviewViewModel(
 
     private suspend fun refreshAfterAction(message: ReviewMessage, closeDetail: Boolean) {
         val summaries = detailLoader.loadSummaries()
+        val items = summaries.map(::toListItem)
         _uiState.update {
             it.copy(
                 loading = false,
                 resolving = false,
-                items = summaries.map(::toListItem),
+                items = items,
+                informationalDismissCount = items.count { item -> item.dismissibleAsNonFinancial },
                 selectedDetail = if (closeDetail) null else it.selectedDetail,
                 message = message,
+                error = null,
+            )
+        }
+    }
+
+    private fun applySummaries(summaries: List<ReviewDetailLoader.ReviewSummary>) {
+        val items = summaries.map(::toListItem)
+        _uiState.update {
+            it.copy(
+                loading = false,
+                items = items,
+                informationalDismissCount = items.count { item -> item.dismissibleAsNonFinancial },
                 error = null,
             )
         }
@@ -170,6 +211,11 @@ class ReviewViewModel(
         val review = summary.review
         val dateLabel = summary.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"
+        val dismissible = shouldOfferNonFinancialDismiss(
+            messageFamily = summary.messageFamily,
+            reasons = review.reasons,
+            body = summary.body.orEmpty(),
+        )
         return ReviewListItemUi(
             id = review.id,
             kind = review.kind,
@@ -178,6 +224,7 @@ class ReviewViewModel(
             amountLabel = summary.amount?.let(MoneyUiFormatter::format),
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
+            dismissibleAsNonFinancial = dismissible,
         )
     }
 

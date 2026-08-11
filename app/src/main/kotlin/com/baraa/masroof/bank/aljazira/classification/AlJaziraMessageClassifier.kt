@@ -46,6 +46,15 @@ class AlJaziraMessageClassifier {
                     confidence = 1.0,
                 )
 
+            text.contains("مكافآتي") ||
+                text.contains("رصيد نقاطك") ||
+                text.contains("برنامج مكاف") ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("loyalty_points_notice"),
+                    confidence = 1.0,
+                )
+
             text.contains("إشعار رصيد") || text.contains("اشعار رصيد") ->
                 return AlJaziraClassification(
                     family = MessageFamily.BALANCE_NOTICE,

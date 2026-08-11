@@ -387,6 +387,18 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun mokafatyLoyaltyPoints_isNonFinancialWithoutAmount() {
+        val result = parse(
+            "إجمالي رصيد نقاطك في برنامج مكافآتي هو 9966.04 نقطة.",
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun nearMissSenders_areNotAlJazira() {
         listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")

@@ -109,6 +109,7 @@
     <string name="review_action_external_transfer">تحويل خارجي (ليس بين حساباتي)</string>
     <string name="review_action_incoming_income">دخل وارد (من خارج حساباتي)</string>
     <string name="review_action_dismiss_non_financial">تجاهل (رسالة معلوماتية)</string>
+    <string name="review_dismiss_all_informational">تجاهل %1$d رسالة معلوماتية</string>
     <string name="review_pair_candidates">مطابقة مع حوالة مقابلة</string>
     <string name="review_pair_with">مطابقة مع: %1$s</string>
     <string name="review_kind_needs_review">يحتاج تصنيف</string>

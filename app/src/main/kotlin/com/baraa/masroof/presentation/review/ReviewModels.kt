@@ -12,6 +12,7 @@ data class ReviewListItemUi(
     val amountLabel: String?,
     val dateLabel: String,
     val reasonLabel: String,
+    val dismissibleAsNonFinancial: Boolean = false,
 )
 
 data class ReviewDetailUi(
@@ -37,6 +38,7 @@ data class ReviewDetailUi(
 data class ReviewUiState(
     val loading: Boolean = true,
     val items: List<ReviewListItemUi> = emptyList(),
+    val informationalDismissCount: Int = 0,
     val selectedDetail: ReviewDetailUi? = null,
     val resolving: Boolean = false,
     val error: ReviewError? = null,
@@ -103,6 +105,9 @@ private val NON_FINANCIAL_BODY_MARKERS = listOf(
     "لإضافة المستفيد",
     "رمز التحقق",
     "تم تسجيل الدخول",
+    "مكافآتي",
+    "رصيد نقاطك",
+    "برنامج مكاف",
 )
 
 fun looksLikeNonFinancialSms(body: String): Boolean =

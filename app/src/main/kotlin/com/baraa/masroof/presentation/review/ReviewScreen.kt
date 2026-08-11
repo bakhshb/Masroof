@@ -62,6 +62,7 @@ fun ReviewRoute(
             onBack = onBack,
             onRefresh = viewModel::refresh,
             onOpen = viewModel::openDetail,
+            onDismissAllInformational = viewModel::dismissAllInformational,
         )
     }
 }
@@ -73,6 +74,7 @@ private fun ReviewListScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
+    onDismissAllInformational: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -135,6 +137,22 @@ private fun ReviewListScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
+                    }
+                    if (state.informationalDismissCount > 0) {
+                        item {
+                            Button(
+                                onClick = onDismissAllInformational,
+                                enabled = !state.resolving,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    stringResource(
+                                        R.string.review_dismiss_all_informational,
+                                        state.informationalDismissCount,
+                                    ),
+                                )
+                            }
+                        }
                     }
                     items(state.items, key = { it.id }) { item ->
                         ReviewListCard(item = item, onClick = { onOpen(item.id) })

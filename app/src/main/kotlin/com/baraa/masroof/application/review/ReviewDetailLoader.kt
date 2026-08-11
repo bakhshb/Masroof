@@ -21,6 +21,7 @@ class ReviewDetailLoader(
         val amount: Money?,
         val messageFamily: MessageFamily?,
         val receivedAt: Instant?,
+        val body: String?,
     )
 
     data class ReviewDetail(
@@ -80,6 +81,7 @@ class ReviewDetailLoader(
             amount = detail.amount,
             messageFamily = detail.messageFamily,
             receivedAt = detail.receivedAt,
+            body = detail.body,
         )
     }
 

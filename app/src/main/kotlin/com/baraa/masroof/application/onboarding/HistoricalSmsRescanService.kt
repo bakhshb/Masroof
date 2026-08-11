@@ -25,9 +25,7 @@ class HistoricalSmsRescanService(
 
         val result = container.historicalSmsScanner.scan(receivedAfter)
         if (result.failure == null) {
-            container.discoverFromStoredEvents()
-            container.reconcileStoredEvents()
-            container.refreshReviewQueue()
+            container.reparseAllStoredEvents()
         }
         return result
     }
