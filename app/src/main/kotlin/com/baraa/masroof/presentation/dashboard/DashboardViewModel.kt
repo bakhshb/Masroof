@@ -22,6 +22,7 @@ import java.util.Locale
 
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
+    private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -32,6 +33,7 @@ class DashboardViewModel(
         FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
 
     private var loadJob: Job? = null
+    private var rescanJob: Job? = null
 
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
@@ -53,6 +55,29 @@ class DashboardViewModel(
     fun goToCurrentPeriod() {
         activePeriod = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         load(activePeriod)
+    }
+
+    fun rescanSms() {
+        if (rescanJob?.isActive == true) return
+        rescanJob = viewModelScope.launch {
+            _uiState.update { it.copy(rescanning = true, rescanStatus = null) }
+            try {
+                val result = rescanService()
+                val status = when {
+                    result.failure != null -> SmsRescanStatus.FAILED
+                    result.parsed == 0 && result.scanned == 0 -> SmsRescanStatus.NO_MESSAGES
+                    result.parsed == 0 && result.notRelevant == result.scanned -> SmsRescanStatus.NO_BANK_SMS
+                    result.parsed == 0 -> SmsRescanStatus.NO_TRANSACTIONS
+                    else -> SmsRescanStatus.OK
+                }
+                _uiState.update { it.copy(rescanning = false, rescanStatus = status) }
+                refresh()
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(rescanning = false, rescanStatus = SmsRescanStatus.FAILED) }
+            }
+        }
     }
 
     private fun load(period: FinancialPeriod) {

@@ -43,6 +43,7 @@ fun DashboardRoute(
         onNext = viewModel::goToNextPeriod,
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refresh,
+        onRescan = viewModel::rescanSms,
     )
 }
 
@@ -53,6 +54,7 @@ private fun DashboardScreen(
     onNext: () -> Unit,
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
+    onRescan: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -134,6 +136,26 @@ private fun DashboardScreen(
                 Text(stringResource(R.string.dashboard_recent_title), style = MaterialTheme.typography.titleMedium)
                 if (summary.transactionCount == 0) {
                     Text(stringResource(R.string.dashboard_empty_period))
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = onRescan,
+                        enabled = !state.rescanning,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            if (state.rescanning) {
+                                stringResource(R.string.dashboard_rescanning)
+                            } else {
+                                stringResource(R.string.dashboard_rescan_sms)
+                            },
+                        )
+                    }
+                    state.rescanStatus?.let { status ->
+                        Text(
+                            rescanStatusMessage(status),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 } else {
                     state.recentTransactions.forEach { row ->
                         RecentRow(row)
@@ -237,6 +259,18 @@ private fun RecentRow(row: TransactionPreviewUi) {
     }
     Spacer(Modifier.height(4.dp))
 }
+
+@Composable
+private fun rescanStatusMessage(status: SmsRescanStatus): String =
+    stringResource(
+        when (status) {
+            SmsRescanStatus.OK -> R.string.dashboard_rescan_ok
+            SmsRescanStatus.NO_MESSAGES -> R.string.dashboard_rescan_no_messages
+            SmsRescanStatus.NO_BANK_SMS -> R.string.dashboard_rescan_no_bank_sms
+            SmsRescanStatus.NO_TRANSACTIONS -> R.string.dashboard_rescan_no_transactions
+            SmsRescanStatus.FAILED -> R.string.dashboard_rescan_failed
+        },
+    )
 
 @Composable
 private fun typeLabel(type: FinancialTransactionType): String =

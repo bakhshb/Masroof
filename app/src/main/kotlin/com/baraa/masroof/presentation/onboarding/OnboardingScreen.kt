@@ -245,7 +245,7 @@ private fun ImportingStep(modifier: Modifier, state: OnboardingUiState, onRetry:
             is ImportState.Completed -> {
                 Text(stringResource(R.string.onboarding_import_done))
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.onboarding_import_counts, importState.result.scanned, importState.result.parsed, importState.result.duplicates, importState.result.failed))
+                Text(stringResource(R.string.onboarding_import_counts, importState.result.scanned, importState.result.parsed, importState.result.duplicates, importState.result.failed, importState.result.notRelevant))
             }
             is ImportState.PermissionError -> {
                 Text(stringResource(R.string.onboarding_permission_denied_short))
@@ -276,6 +276,32 @@ private fun OwnershipStep(
             Text(stringResource(R.string.onboarding_ownership_title), style = MaterialTheme.typography.headlineSmall)
             if (state.hasUnknownCandidates) {
                 Text(stringResource(R.string.onboarding_ownership_must_resolve))
+            }
+            val importResult = (state.importState as? ImportState.Completed)?.result
+            if (importResult != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(
+                        R.string.onboarding_import_counts,
+                        importResult.scanned,
+                        importResult.parsed,
+                        importResult.duplicates,
+                        importResult.failed,
+                        importResult.notRelevant,
+                    ),
+                )
+                if (importResult.parsed == 0) {
+                    Text(
+                        if (importResult.scanned == 0) {
+                            stringResource(R.string.onboarding_import_empty_inbox)
+                        } else if (importResult.notRelevant == importResult.scanned) {
+                            stringResource(R.string.onboarding_import_no_bank_sms)
+                        } else {
+                            stringResource(R.string.onboarding_import_no_transactions)
+                        },
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
         item { Text(stringResource(R.string.onboarding_accounts_section), style = MaterialTheme.typography.titleMedium) }

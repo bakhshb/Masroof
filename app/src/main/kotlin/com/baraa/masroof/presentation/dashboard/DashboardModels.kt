@@ -29,10 +29,20 @@ data class DashboardUiState(
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,
     val error: DashboardError? = null,
+    val rescanning: Boolean = false,
+    val rescanStatus: SmsRescanStatus? = null,
 )
 
 enum class DashboardError {
     LOAD_FAILED,
+}
+
+enum class SmsRescanStatus {
+    OK,
+    NO_MESSAGES,
+    NO_BANK_SMS,
+    NO_TRANSACTIONS,
+    FAILED,
 }
 
 object TransactionTypePresentation {

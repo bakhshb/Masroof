@@ -21,7 +21,10 @@
     <string name="onboarding_start_import">بدء الاستيراد</string>
     <string name="onboarding_import_scanning">جاري فحص الرسائل…</string>
     <string name="onboarding_import_done">اكتمل الاستيراد</string>
-    <string name="onboarding_import_counts">تم فحص %1$d • مستورد %2$d • مكرر %3$d • فشل %4$d</string>
+    <string name="onboarding_import_counts">تم فحص %1$d • مستورد %2$d • مكرر %3$d • فشل %4$d • غير بنك الجزيرة %5$d</string>
+    <string name="onboarding_import_empty_inbox">لم يُعثر على رسائل في الفترة المحددة. جرّب تاريخًا أقدم.</string>
+    <string name="onboarding_import_no_bank_sms">لم تُعثر على رسائل بنك الجزيرة. تأكد أن الرسائل البنكية موجودة في صندوق الوارد.</string>
+    <string name="onboarding_import_no_transactions">وُجدت رسائل لكن لم تُحوَّل إلى عمليات. قد تحتاج تأكيد الملكية أو مراجعة لاحقة.</string>
     <string name="onboarding_provider_error">تعذر قراءة الرسائل</string>
     <string name="onboarding_retry">إعادة المحاولة</string>
 
@@ -63,6 +66,13 @@
     <string name="dashboard_back_to_current">العودة للشهر الحالي</string>
     <string name="dashboard_load_error">تعذر تحميل الملخص المالي</string>
     <string name="dashboard_retry">إعادة المحاولة</string>
+    <string name="dashboard_rescan_sms">إعادة استيراد الرسائل</string>
+    <string name="dashboard_rescanning">جاري استيراد الرسائل…</string>
+    <string name="dashboard_rescan_ok">تم استيراد الرسائل بنجاح</string>
+    <string name="dashboard_rescan_no_messages">لا توجد رسائل في الفترة المحددة</string>
+    <string name="dashboard_rescan_no_bank_sms">لا توجد رسائل بنك الجزيرة في صندوق الوارد</string>
+    <string name="dashboard_rescan_no_transactions">وُجدت رسائل لكن لم تُحوَّل إلى عمليات بعد</string>
+    <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
     <string name="dashboard_direction_out">صادر</string>
     <string name="dashboard_direction_in">وارد</string>
     <string name="dashboard_direction_neutral">تحويل</string>

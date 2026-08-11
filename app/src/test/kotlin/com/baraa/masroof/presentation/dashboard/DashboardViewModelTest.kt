@@ -10,6 +10,7 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -54,7 +55,7 @@ class DashboardViewModelTest {
     fun constructingViewModel_doesNotLoadUntilExplicitRefresh() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         advanceUntilIdle()
 
         assertTrue(loader.calls.isEmpty())
@@ -66,7 +67,7 @@ class DashboardViewModelTest {
     fun successfulCurrentPeriodLoad() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -85,7 +86,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         // Simulated pre-onboarding empty overview available if eagerly queried.
         loader.put(currentPeriod, overview(currentPeriod, spending = "0.00", transactionCount = 0))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         advanceUntilIdle()
         assertTrue(loader.calls.isEmpty())
         assertNull(vm.uiState.value.summary)
@@ -104,7 +105,7 @@ class DashboardViewModelTest {
     fun navigatingToAnotherPeriod_clearsOldSummaryUnderNewLabel() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -130,7 +131,7 @@ class DashboardViewModelTest {
     fun newPeriodLoadFailure_doesNotShowOldSummaryUnderNewLabel() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -150,7 +151,7 @@ class DashboardViewModelTest {
     fun retryAfterFailure_retriesSelectedPeriod() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -177,7 +178,7 @@ class DashboardViewModelTest {
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -203,7 +204,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -229,7 +230,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -256,7 +257,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "12.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "8.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
         assertPeriodSummaryInvariant(vm.uiState.value)
@@ -294,7 +295,7 @@ class DashboardViewModelTest {
                 isCurrentPeriod = true,
             ),
         )
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
         val preview = vm.uiState.value.recentTransactions.single()
@@ -328,6 +329,14 @@ class DashboardViewModelTest {
             isCurrentPeriod = period == currentPeriod,
         )
     }
+
+    private fun viewModel(loader: FakeLoader): DashboardViewModel =
+        DashboardViewModel(
+            overviewLoader = loader,
+            rescanService = { SmsScanResult() },
+            zoneId = zone,
+            clock = clock,
+        )
 
     private class FakeLoader : DashboardOverviewLoader {
         private val overviews = mutableMapOf<FinancialPeriod, DashboardOverview>()
