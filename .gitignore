@@ -17,6 +17,7 @@ captures/
 # Keystore files
 *.jks
 *.keystore
+keystore.properties
 
 # Orchestration runtime state
 .orch/
