@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.baraa.masroof.application.onboarding.HistoricalSmsRescanService
 import com.baraa.masroof.application.AppContainer
 import java.time.Clock
 import java.time.ZoneId
@@ -16,6 +17,9 @@ class DashboardViewModelFactory(
         require(modelClass.isAssignableFrom(DashboardViewModel::class.java))
         return DashboardViewModel(
             overviewLoader = container.dashboardService,
+            rescanService = { HistoricalSmsRescanService(container).rescan() },
+            reparseStoredEventsService = { container.reparseAllStoredEvents() },
+            reclassificationService = container.transactionReclassificationService,
             zoneId = zoneId,
             clock = clock,
         ) as T

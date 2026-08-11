@@ -72,6 +72,12 @@ class SmsIngestionService(
         }
     }
 
+    /**
+     * Re-runs parse for an already-stored RawSms and replaces its ParsedEvent.
+     * Used after parser improvements to refresh the review queue without duplicating evidence.
+     */
+    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult = parseAndPersist(rawSms)
+
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
         val receivedAt = rawSms.receivedAt
         val from = receivedAt.minus(CROSS_SOURCE_RECEIVED_AT_TOLERANCE)

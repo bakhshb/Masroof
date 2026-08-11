@@ -587,6 +587,49 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun unknownInformationalNotice_isAutoIgnored() = runBlocking {
+        val body = """
+            اسم المستفيد : براء ف بن
+            الاسم المختصر : حسابي D360
+            حالة: غير نشط
+            حساب: SA2036036036045864332670
+            بنك: D360 بنك
+            في : 14:04 2026-07-29
+        """.trimIndent()
+        persistEvent(
+            smsId = "sms-info",
+            event = event(
+                id = "pe-info",
+                rawSmsId = "sms-info",
+                family = MessageFamily.UNKNOWN,
+                amount = null,
+            ),
+            body = body,
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, ftRepo.listAll().size)
+        assertTrue(summary.ignored >= 1)
+        assertEquals(0, summary.needsReview)
+    }
+
+    @Test
+    fun unknownWithMoneyInBodyButNoParsedAmount_stillNeedsReview() = runBlocking {
+        persistEvent(
+            smsId = "sms-parse-fail",
+            event = event(
+                id = "pe-parse-fail",
+                rawSmsId = "sms-parse-fail",
+                family = MessageFamily.UNKNOWN,
+                amount = null,
+            ),
+            body = "عملية غير معروفة بمبلغ: 15000.00 SAR",
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, ftRepo.listAll().size)
+        assertTrue(summary.needsReview >= 1)
+    }
+
+    @Test
     fun balanceAndNonFinancial_ignored() = runBlocking {
         persistEvent(
             smsId = "sms-bal",
@@ -710,8 +753,8 @@ class TransactionReconciliationServiceTest {
         event: ParsedEvent,
         details: ParsedEventDetails = ParsedEventDetails(),
         at: Instant = Instant.parse("2026-08-01T12:00:00Z"),
+        body: String = "body-$smsId",
     ) {
-        val body = "body-$smsId"
         rawRepo.insertIfAbsent(
             RawSms(
                 id = smsId,

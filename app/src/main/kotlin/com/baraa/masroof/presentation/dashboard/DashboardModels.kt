@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -7,6 +8,8 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 enum class TransactionDirectionUi {
     OUTWARD,
     INWARD,
+    INCOME,
+    TRANSFER_IN,
     NEUTRAL,
 }
 
@@ -26,13 +29,30 @@ data class DashboardUiState(
     val period: FinancialPeriod? = null,
     val periodLabel: String = "",
     val summary: MonthlyFinancialSummary? = null,
+    val creditCards: CreditCardsOverview? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
+    val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,
     val error: DashboardError? = null,
+    val rescanning: Boolean = false,
+    val rescanStatus: SmsRescanStatus? = null,
+    val reparsingStored: Boolean = false,
+    val selectedTransactionId: String? = null,
+    val reclassifying: Boolean = false,
+    val reclassifyError: String? = null,
+    val reclassifySuccess: Boolean = false,
 )
 
 enum class DashboardError {
     LOAD_FAILED,
+}
+
+enum class SmsRescanStatus {
+    OK,
+    NO_MESSAGES,
+    NO_BANK_SMS,
+    NO_TRANSACTIONS,
+    FAILED,
 }
 
 object TransactionTypePresentation {
@@ -46,8 +66,12 @@ object TransactionTypePresentation {
             -> TransactionDirectionUi.OUTWARD
 
             FinancialTransactionType.INCOME,
-            FinancialTransactionType.REFUND,
+            -> TransactionDirectionUi.INCOME
+
             FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            -> TransactionDirectionUi.TRANSFER_IN
+
+            FinancialTransactionType.REFUND,
             -> TransactionDirectionUi.INWARD
 
             FinancialTransactionType.SELF_TRANSFER,

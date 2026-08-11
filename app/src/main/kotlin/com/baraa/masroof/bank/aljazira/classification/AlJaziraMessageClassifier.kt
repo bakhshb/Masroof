@@ -23,10 +23,19 @@ class AlJaziraMessageClassifier {
         val text = sms.comparisonBody
 
         when {
-            text.contains("رمز التحقق") || text.contains("otp") ->
+            text.contains("رمز التحقق") ||
+                text.contains("otp") ||
+                text.contains("رمز التفعيل") ||
+                text.contains("لإضافة المستفيد") ->
                 return AlJaziraClassification(
-                    family = MessageFamily.OTP,
-                    evidence = listOf("otp_indicator"),
+                    family = if (text.contains("رمز التفعيل") || text.contains("لإضافة المستفيد")) {
+                        MessageFamily.NON_FINANCIAL
+                    } else {
+                        MessageFamily.OTP
+                    },
+                    evidence = listOf(
+                        if (text.contains("رمز التفعيل")) "activation_code" else "otp_indicator",
+                    ),
                     confidence = 1.0,
                 )
 
@@ -37,10 +46,39 @@ class AlJaziraMessageClassifier {
                     confidence = 1.0,
                 )
 
+            text.contains("مكافآتي") ||
+                text.contains("رصيد نقاطك") ||
+                text.contains("برنامج مكاف") ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("loyalty_points_notice"),
+                    confidence = 1.0,
+                )
+
+            text.contains("اسم المستفيد") ||
+                text.contains("الاسم المختصر") ||
+                text.contains("تم إضافة المستفيد") ||
+                text.contains("إضافة مستفيد") ||
+                (text.contains("حالة") && text.contains("غير نشط")) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("beneficiary_notice"),
+                    confidence = 1.0,
+                )
+
             text.contains("إشعار رصيد") || text.contains("اشعار رصيد") ->
                 return AlJaziraClassification(
                     family = MessageFamily.BALANCE_NOTICE,
                     evidence = listOf("balance_notice"),
+                    confidence = 1.0,
+                )
+
+            text.contains("إصدار كشف حساب") ||
+                text.contains("كشف حساب") ||
+                (text.contains("تاريخ الاستحقاق") && text.contains("المبلغ المستحق")) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.NON_FINANCIAL,
+                    evidence = listOf("statement_notice"),
                     confidence = 1.0,
                 )
 
@@ -76,6 +114,24 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
+            isPosPurchase(text) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.PURCHASE,
+                    direction = MoneyDirection.OUTGOING,
+                    purchaseChannel = PurchaseChannel.POS,
+                    evidence = listOf("purchase_pos"),
+                    confidence = 0.95,
+                )
+
+            isOnlinePurchase(text) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.PURCHASE,
+                    direction = MoneyDirection.OUTGOING,
+                    purchaseChannel = PurchaseChannel.ONLINE,
+                    evidence = listOf("purchase_online"),
+                    confidence = 0.95,
+                )
+
             text.contains("رسوم") ->
                 return AlJaziraClassification(
                     family = MessageFamily.FEE,
@@ -92,7 +148,9 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("حوالة واردة") || text.contains("incoming transfer") ->
+            text.contains("حوالة واردة") ||
+                text.contains("حوالة مالية واردة") ||
+                text.contains("incoming transfer") ->
                 return AlJaziraClassification(
                     family = MessageFamily.TRANSFER_IN,
                     direction = MoneyDirection.INCOMING,
@@ -109,24 +167,6 @@ class AlJaziraMessageClassifier {
                     direction = MoneyDirection.OUTGOING,
                     bankNetworkType = detectNetwork(text, incoming = false),
                     evidence = listOf("transfer_out"),
-                    confidence = 0.95,
-                )
-
-            isPosPurchase(text) ->
-                return AlJaziraClassification(
-                    family = MessageFamily.PURCHASE,
-                    direction = MoneyDirection.OUTGOING,
-                    purchaseChannel = PurchaseChannel.POS,
-                    evidence = listOf("purchase_pos"),
-                    confidence = 0.95,
-                )
-
-            isOnlinePurchase(text) ->
-                return AlJaziraClassification(
-                    family = MessageFamily.PURCHASE,
-                    direction = MoneyDirection.OUTGOING,
-                    purchaseChannel = PurchaseChannel.ONLINE,
-                    evidence = listOf("purchase_online"),
                     confidence = 0.95,
                 )
 

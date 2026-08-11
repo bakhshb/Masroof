@@ -28,5 +28,6 @@ object MoneyUiFormatter {
     fun currencyLabel(currency: Currency): String =
         when (currency) {
             Currency.SAR -> "ر.س"
+            Currency.USD -> "USD"
         }
 }

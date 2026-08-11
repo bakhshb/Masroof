@@ -351,6 +351,126 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun transferInInter_newAcceptedFormat_depositedToAccountAndValueLabel() {
+        val result = parse(
+            """
+            عملية حوالة مالية واردة
+            أودعت إلى حساب: 3001
+            القيمة: 1,000.00 SAR
+            من: نجاه ط. بنتن
+            [بنك الرياض]
+            خصمت من حساب : 9941
+            في: 21:21 30-07-2026
+            رقم المعاملة: 2BTMS12121410751
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.TRANSFER_IN, result.event.messageFamily)
+        assertEquals(Money.of("1000.00", Currency.SAR), result.event.amount)
+        assertEquals("3001", result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
+        assertNull(result.event.sourceAccountRef)
+        assertEquals("نجاه ط. بنتن", result.event.counterparty)
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+        assertEquals(ParseStatus.SUCCESS, result.event.parseStatus)
+    }
+
+    @Test
+    fun activationCode_isNonFinancialWithoutAmount() {
+        val result = parse(
+            "رمز التفعيل : 3083 لإضافة المستفيد (عبر التطبيق) : (براء فائز بن صالح بخش)",
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun onlinePurchaseUsdAmount_isParsed() {
+        val result = parse(
+            """
+            شراء عبر الانترنت
+            بطاقة ائتمانية: 7271
+            لدى: CURSOR, AI POWERED IDE
+            بمبلغ: USD 23.00
+            في: 2026-08-06 20:22
+            الدولة: USA
+            رسوم العمليات الدولية: 1.99
+            سعر الصرف: 3.756957
+            الرصيد المتاح: SAR 16958.89
+            إجمالي المبلغ المستحق: SAR 2694.32
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("23.00", Currency.USD), result.event.amount)
+        assertEquals("CURSOR, AI POWERED IDE", result.event.merchant)
+    }
+
+    @Test
+    fun englishRefund_midLineAmount_isParsed() {
+        val result = parse(
+            """
+            Credit Card: Refund
+            Card: Credit Number: 8332
+            From: Tamara
+            Amount: 75.65 SAR
+            Balance: 17230.68 SAR
+            Date: 2026-08-05 17:41
+            Due Amount: 2694.32 SAR
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.REFUND, result.event.messageFamily)
+        assertEquals(Money.of("75.65", Currency.SAR), result.event.amount)
+    }
+
+    @Test
+    fun creditCardStatementNotice_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            بطاقة إئتمانية: إصدار كشف حساب
+            بطاقة: 7271 بطاقة إئتمانية
+            إجمالي المبلغ المستحق: SAR 0.00
+            تاريخ الاستحقاق: 07/09/2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun beneficiaryStatusNotice_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            اسم المستفيد : براء ف بن
+            الاسم المختصر : حسابي D360
+            حالة: غير نشط
+            حساب: SA2036036036045864332670
+            بنك: D360 بنك
+            في : 14:04 2026-07-29
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun mokafatyLoyaltyPoints_isNonFinancialWithoutAmount() {
+        val result = parse(
+            "إجمالي رصيد نقاطك في برنامج مكافآتي هو 9966.04 نقطة.",
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun nearMissSenders_areNotAlJazira() {
         listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")

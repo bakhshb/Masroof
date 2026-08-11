@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
@@ -22,6 +21,9 @@ import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
 import com.baraa.masroof.presentation.onboarding.OnboardingPermissionPolicy
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModelFactory
+import com.baraa.masroof.presentation.review.ReviewViewModel
+import com.baraa.masroof.presentation.review.ReviewViewModelFactory
+import com.baraa.masroof.presentation.theme.MasroofTheme
 
 /**
  * Launcher: P10 onboarding until complete, then P11 monthly dashboard.
@@ -41,10 +43,14 @@ class MainActivity : ComponentActivity() {
         DashboardViewModelFactory(container = container)
     }
 
+    private val reviewViewModel: ReviewViewModel by viewModels {
+        ReviewViewModelFactory(container = container)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            MasroofTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -64,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     MasroofRoot(
                         onboardingViewModel = onboardingViewModel,
                         dashboardViewModel = dashboardViewModel,
+                        reviewViewModel = reviewViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },

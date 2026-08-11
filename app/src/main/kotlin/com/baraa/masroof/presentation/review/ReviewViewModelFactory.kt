@@ -1,0 +1,31 @@
+package com.baraa.masroof.presentation.review
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.review.ReviewDetailLoader
+
+class ReviewViewModelFactory(
+    private val container: AppContainer,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        require(modelClass.isAssignableFrom(ReviewViewModel::class.java))
+        val loader = ReviewDetailLoader(
+            reviewWorkflowService = container.reviewWorkflowService,
+            rawSmsRepository = container.rawSmsRepository,
+            effectiveParsedEventProvider = container.effectiveParsedEventProvider,
+        )
+        return ReviewViewModel(
+            reviewWorkflowService = container.reviewWorkflowService,
+            detailLoader = loader,
+            reparseStoredSms = { rawSmsId ->
+                val raw = container.rawSmsRepository.getById(rawSmsId)
+                if (raw != null) {
+                    container.smsIngestionService.reparseStored(raw)
+                    container.refreshReviewQueue()
+                }
+            },
+        ) as T
+    }
+}

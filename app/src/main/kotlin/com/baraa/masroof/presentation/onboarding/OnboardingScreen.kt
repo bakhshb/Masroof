@@ -8,14 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -28,12 +29,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.presentation.common.IconTextButton
+import com.baraa.masroof.presentation.common.IconTextButtonOutlined
+import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.SectionHeader
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -115,16 +122,27 @@ private fun WelcomeStep(modifier: Modifier, onStart: () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Icon(
+            imageVector = MasroofIcons.appLogo,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(64.dp),
+        )
+        Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.onboarding_welcome_title), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.onboarding_welcome_body))
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.onboarding_welcome_local_only))
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.onboarding_start))
-        }
+        IconTextButton(
+            onClick = onStart,
+            icon = MasroofIcons.appLogo,
+            text = stringResource(R.string.onboarding_start),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -138,19 +156,33 @@ private fun PermissionStep(
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Icon(
+            imageVector = MasroofIcons.sms,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(56.dp),
+        )
+        Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.onboarding_permission_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.onboarding_permission_body))
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.onboarding_allow))
-        }
+        IconTextButton(
+            onClick = onRequestPermissions,
+            icon = MasroofIcons.sms,
+            text = stringResource(R.string.onboarding_allow),
+            modifier = Modifier.fillMaxWidth(),
+        )
         if (denied) {
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.onboarding_open_settings))
-            }
+            IconTextButtonOutlined(
+                onClick = onOpenSettings,
+                icon = MasroofIcons.warning,
+                text = stringResource(R.string.onboarding_open_settings),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -168,7 +200,10 @@ private fun ImportDateStep(
     val selected = state.selectedImportDate ?: LocalDate.now()
 
     Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
-        Text(stringResource(R.string.onboarding_import_date_title), style = MaterialTheme.typography.headlineSmall)
+        SectionHeader(
+            title = stringResource(R.string.onboarding_import_date_title),
+            icon = MasroofIcons.calendar,
+        )
         Spacer(Modifier.height(16.dp))
         DateOptionRow(state.selectedDateOption == ImportDateOption.CURRENT_MONTH_START, stringResource(R.string.onboarding_date_current_month)) {
             onSelectDateOption(ImportDateOption.CURRENT_MONTH_START)
@@ -186,13 +221,13 @@ private fun ImportDateStep(
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.onboarding_selected_date, selected.toString()))
         Spacer(Modifier.height(20.dp))
-        Button(
+        IconTextButton(
             onClick = onContinue,
             enabled = state.importState !is ImportState.Scanning,
+            icon = MasroofIcons.rescan,
+            text = stringResource(R.string.onboarding_start_import),
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.onboarding_start_import))
-        }
+        )
     }
 
     if (showDatePicker) {
@@ -224,9 +259,20 @@ private fun ImportDateStep(
 
 @Composable
 private fun DateOptionRow(selected: Boolean, title: String, onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start,
+    ) {
         RadioButton(selected = selected, onClick = onClick)
-        Text(title, modifier = Modifier.padding(top = 12.dp))
+        Icon(
+            imageVector = MasroofIcons.calendar,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(title, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
@@ -235,27 +281,57 @@ private fun ImportingStep(modifier: Modifier, state: OnboardingUiState, onRetry:
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when (val importState = state.importState) {
             is ImportState.Scanning, ImportState.Idle -> {
                 CircularProgressIndicator()
                 Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.onboarding_import_scanning))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.rescan,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.onboarding_import_scanning))
+                }
             }
             is ImportState.Completed -> {
+                Icon(
+                    imageVector = MasroofIcons.success,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.onboarding_import_done))
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.onboarding_import_counts, importState.result.scanned, importState.result.parsed, importState.result.duplicates, importState.result.failed))
+                Text(stringResource(R.string.onboarding_import_counts, importState.result.scanned, importState.result.parsed, importState.result.duplicates, importState.result.failed, importState.result.notRelevant))
             }
             is ImportState.PermissionError -> {
+                Icon(
+                    imageVector = MasroofIcons.warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.onboarding_permission_denied_short))
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onRetry) { Text(stringResource(R.string.onboarding_retry)) }
+                IconTextButton(onClick = onRetry, icon = MasroofIcons.retry, text = stringResource(R.string.onboarding_retry))
             }
             is ImportState.ProviderError -> {
+                Icon(
+                    imageVector = MasroofIcons.error,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.onboarding_provider_error))
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onRetry) { Text(stringResource(R.string.onboarding_retry)) }
+                IconTextButton(onClick = onRetry, icon = MasroofIcons.retry, text = stringResource(R.string.onboarding_retry))
             }
         }
     }
@@ -273,12 +349,62 @@ private fun OwnershipStep(
 ) {
     LazyColumn(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text(stringResource(R.string.onboarding_ownership_title), style = MaterialTheme.typography.headlineSmall)
+            SectionHeader(
+                title = stringResource(R.string.onboarding_ownership_title),
+                icon = MasroofIcons.ownership,
+            )
             if (state.hasUnknownCandidates) {
                 Text(stringResource(R.string.onboarding_ownership_must_resolve))
             }
+            val importResult = (state.importState as? ImportState.Completed)?.result
+            if (importResult != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(
+                        R.string.onboarding_import_counts,
+                        importResult.scanned,
+                        importResult.parsed,
+                        importResult.duplicates,
+                        importResult.failed,
+                        importResult.notRelevant,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
+                )
+                if (importResult.parsed == 0) {
+                    Text(
+                        if (importResult.scanned == 0) {
+                            stringResource(R.string.onboarding_import_empty_inbox)
+                        } else if (importResult.notRelevant == importResult.scanned) {
+                            stringResource(R.string.onboarding_import_no_bank_sms)
+                        } else {
+                            stringResource(R.string.onboarding_import_no_transactions)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Start,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    if (importResult.distinctSenders.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.onboarding_import_senders_seen),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start,
+                        )
+                        importResult.distinctSenders.forEach { sender ->
+                            Text(
+                                "• $sender",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                            )
+                        }
+                    }
+                }
+            }
         }
-        item { Text(stringResource(R.string.onboarding_accounts_section), style = MaterialTheme.typography.titleMedium) }
+        item { SectionHeader(title = stringResource(R.string.onboarding_accounts_section), icon = MasroofIcons.externalIn) }
         items(state.accounts) { candidate ->
             CandidateCard(
                 candidate = candidate,
@@ -288,7 +414,7 @@ private fun OwnershipStep(
                 onExternal = { onSetAccountExternal(candidate) },
             )
         }
-        item { Text(stringResource(R.string.onboarding_cards_section), style = MaterialTheme.typography.titleMedium) }
+        item { SectionHeader(title = stringResource(R.string.onboarding_cards_section), icon = MasroofIcons.cardPayment) }
         items(state.cards) { candidate ->
             CandidateCard(
                 candidate = candidate,
@@ -299,13 +425,13 @@ private fun OwnershipStep(
             )
         }
         item {
-            Button(
+            IconTextButton(
                 onClick = onFinalize,
                 enabled = !state.hasUnknownCandidates && !state.finalizing,
+                icon = MasroofIcons.success,
+                text = stringResource(R.string.onboarding_finalize),
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.onboarding_finalize))
-            }
+            )
         }
     }
 }
@@ -320,10 +446,23 @@ private fun CandidateCard(
 ) {
     Card {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                if (candidate.bank == Bank.BANK_ALJAZIRA) stringResource(R.string.bank_aljazira)
-                else stringResource(R.string.bank_unknown),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (candidate.kind == OwnershipCandidateUi.CandidateKind.ACCOUNT) {
+                        MasroofIcons.externalIn
+                    } else {
+                        MasroofIcons.cardPayment
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    if (candidate.bank == Bank.BANK_ALJAZIRA) stringResource(R.string.bank_aljazira)
+                    else stringResource(R.string.bank_unknown),
+                )
+            }
             val label = if (candidate.kind == OwnershipCandidateUi.CandidateKind.ACCOUNT) {
                 stringResource(R.string.onboarding_account_suffix, candidate.suffix)
             } else {
@@ -331,16 +470,34 @@ private fun CandidateCard(
             }
             Text(label)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onOwned) { Text(ownedLabel) }
-                Button(onClick = onExternal) { Text(externalLabel) }
+                IconTextButton(onClick = onOwned, icon = MasroofIcons.success, text = ownedLabel)
+                IconTextButton(onClick = onExternal, icon = MasroofIcons.warning, text = externalLabel)
             }
-            Text(
-                when (candidate.ownership) {
-                    OwnershipStatus.OWNED -> stringResource(R.string.onboarding_status_owned)
-                    OwnershipStatus.EXTERNAL -> stringResource(R.string.onboarding_status_external)
-                    OwnershipStatus.UNKNOWN -> stringResource(R.string.onboarding_status_unknown)
-                },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val statusIcon = when (candidate.ownership) {
+                    OwnershipStatus.OWNED -> MasroofIcons.success
+                    OwnershipStatus.EXTERNAL -> MasroofIcons.warning
+                    OwnershipStatus.UNKNOWN -> MasroofIcons.error
+                }
+                Icon(
+                    imageVector = statusIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = when (candidate.ownership) {
+                        OwnershipStatus.OWNED -> MaterialTheme.colorScheme.primary
+                        OwnershipStatus.EXTERNAL -> MaterialTheme.colorScheme.onSurfaceVariant
+                        OwnershipStatus.UNKNOWN -> MaterialTheme.colorScheme.error
+                    },
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(
+                    when (candidate.ownership) {
+                        OwnershipStatus.OWNED -> stringResource(R.string.onboarding_status_owned)
+                        OwnershipStatus.EXTERNAL -> stringResource(R.string.onboarding_status_external)
+                        OwnershipStatus.UNKNOWN -> stringResource(R.string.onboarding_status_unknown)
+                    },
+                )
+            }
         }
     }
 }
@@ -350,14 +507,25 @@ private fun CompletionStep(modifier: Modifier, state: OnboardingUiState, onEnter
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Icon(
+            imageVector = MasroofIcons.success,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(64.dp),
+        )
+        Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.onboarding_done_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.onboarding_done_counts, state.ownedAccountsCount, state.ownedCardsCount, state.reviewRequiredCount))
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onEnterApp, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.onboarding_enter_app))
-        }
+        IconTextButton(
+            onClick = onEnterApp,
+            icon = MasroofIcons.appLogo,
+            text = stringResource(R.string.onboarding_enter_app),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -366,7 +534,15 @@ private fun HomePlaceholder(modifier: Modifier, state: OnboardingUiState) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Icon(
+            imageVector = MasroofIcons.appLogo,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp),
+        )
+        Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.home_setup_complete))

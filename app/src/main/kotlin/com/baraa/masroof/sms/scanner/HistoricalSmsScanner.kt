@@ -23,6 +23,8 @@ data class SmsScanResult(
     val notRelevant: Int = 0,
     val skippedMalformed: Int = 0,
     val failed: Int = 0,
+    /** Distinct inbox sender addresses seen during scan (for diagnostics). */
+    val distinctSenders: List<String> = emptyList(),
     val failure: SmsScanFailure? = null,
 )
 
@@ -56,6 +58,7 @@ class HistoricalSmsScanner(
         var notRelevant = 0
         var skippedMalformed = 0
         var failed = 0
+        val sendersSeen = linkedSetOf<String>()
 
         fun snapshot(failure: SmsScanFailure?) = SmsScanResult(
             scanned = scanned,
@@ -68,6 +71,7 @@ class HistoricalSmsScanner(
             notRelevant = notRelevant,
             skippedMalformed = skippedMalformed,
             failed = failed,
+            distinctSenders = sendersSeen.take(12),
             failure = failure,
         )
 
@@ -80,6 +84,7 @@ class HistoricalSmsScanner(
                         skippedMalformed++
                     }
                     is InboxRow.Valid -> {
+                        sendersSeen += row.record.sender
                         val rawSms = try {
                             AndroidSmsMapper.toRawSms(row.record)
                         } catch (_: IllegalArgumentException) {

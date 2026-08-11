@@ -1,15 +1,21 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.DashboardOverview
+import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -54,7 +60,7 @@ class DashboardViewModelTest {
     fun constructingViewModel_doesNotLoadUntilExplicitRefresh() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         advanceUntilIdle()
 
         assertTrue(loader.calls.isEmpty())
@@ -66,7 +72,7 @@ class DashboardViewModelTest {
     fun successfulCurrentPeriodLoad() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -85,7 +91,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         // Simulated pre-onboarding empty overview available if eagerly queried.
         loader.put(currentPeriod, overview(currentPeriod, spending = "0.00", transactionCount = 0))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         advanceUntilIdle()
         assertTrue(loader.calls.isEmpty())
         assertNull(vm.uiState.value.summary)
@@ -104,7 +110,7 @@ class DashboardViewModelTest {
     fun navigatingToAnotherPeriod_clearsOldSummaryUnderNewLabel() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -130,7 +136,7 @@ class DashboardViewModelTest {
     fun newPeriodLoadFailure_doesNotShowOldSummaryUnderNewLabel() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -150,7 +156,7 @@ class DashboardViewModelTest {
     fun retryAfterFailure_retriesSelectedPeriod() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -177,7 +183,7 @@ class DashboardViewModelTest {
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -203,7 +209,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -229,7 +235,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
 
@@ -256,7 +262,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "12.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "8.00"))
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
         assertPeriodSummaryInvariant(vm.uiState.value)
@@ -290,11 +296,12 @@ class DashboardViewModelTest {
             DashboardOverview(
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
-                recentTransactions = listOf(tx),
+                transactions = listOf(tx),
+                creditCards = emptyCreditCards(),
                 isCurrentPeriod = true,
             ),
         )
-        val vm = DashboardViewModel(loader, zone, clock)
+        val vm = viewModel(loader)
         vm.refresh()
         advanceUntilIdle()
         val preview = vm.uiState.value.recentTransactions.single()
@@ -324,10 +331,82 @@ class DashboardViewModelTest {
                 spendingNet = SignedMoneyAmount.of(amount),
                 transactionCount = transactionCount,
             ),
-            recentTransactions = emptyList(),
+            transactions = emptyList(),
+            creditCards = emptyCreditCards(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
+
+    private fun emptyCreditCards(): CreditCardsOverview =
+        CreditCardsOverview(
+            cards = emptyList(),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            currency = Currency.SAR,
+        )
+
+    private fun viewModel(loader: FakeLoader): DashboardViewModel =
+        DashboardViewModel(
+            overviewLoader = loader,
+            rescanService = { SmsScanResult() },
+            reparseStoredEventsService = { 0 },
+            reclassificationService = TransactionReclassificationService(
+                financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
+                    override suspend fun save(
+                        transaction: FinancialTransaction,
+                        rawSmsIds: Collection<String>,
+                    ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
+
+                    override suspend fun getById(id: String) = null
+                    override suspend fun findByRawSmsId(rawSmsId: String) = null
+                    override suspend fun listAll() = emptyList<FinancialTransaction>()
+                    override suspend fun listOccurredBetween(
+                        startInclusive: java.time.Instant,
+                        endExclusive: java.time.Instant,
+                    ) = emptyList<FinancialTransaction>()
+
+                    override suspend fun isRawSmsLinked(rawSmsId: String) = false
+                    override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
+                    override suspend fun update(transaction: FinancialTransaction) = false
+                },
+                effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
+                    object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
+                        override suspend fun save(
+                            event: com.baraa.masroof.domain.model.ParsedEvent,
+                            details: com.baraa.masroof.parsing.model.ParsedEventDetails,
+                        ) = Unit
+
+                        override suspend fun getById(id: String) = null
+                        override suspend fun findByRawSmsId(rawSmsId: String) = null
+                        override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
+                        override suspend fun listAll() = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
+                    },
+                    object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
+                        override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
+                        override suspend fun latestForRawSmsId(rawSmsId: String) = null
+                        override suspend fun listForRawSmsId(rawSmsId: String) = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
+                    },
+                ),
+                ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
+                    object : com.baraa.masroof.domain.repository.AccountRegistryRepository {
+                        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
+                        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
+                        override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
+                        override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
+                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
+                    },
+                    object : com.baraa.masroof.domain.repository.CardRegistryRepository {
+                        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
+                        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) = Unit
+                        override suspend fun resolve(reference: CardReference) = OwnershipStatus.UNKNOWN
+                        override suspend fun get(ref: com.baraa.masroof.domain.model.CardReference) = null
+                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.CardRegistryEntry>()
+                    },
+                ),
+            ),
+            zoneId = zone,
+            clock = clock,
+        )
 
     private class FakeLoader : DashboardOverviewLoader {
         private val overviews = mutableMapOf<FinancialPeriod, DashboardOverview>()
@@ -356,7 +435,13 @@ class DashboardViewModelTest {
                 ?: DashboardOverview(
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
-                    recentTransactions = emptyList(),
+                    transactions = emptyList(),
+                    creditCards = CreditCardsOverview(
+                        cards = emptyList(),
+                        aggregateDueAmount = null,
+                        aggregateDueUpdatedAt = null,
+                        currency = Currency.SAR,
+                    ),
                     isCurrentPeriod = false,
                 )
         }

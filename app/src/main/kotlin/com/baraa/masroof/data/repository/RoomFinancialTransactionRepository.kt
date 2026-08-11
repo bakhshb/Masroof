@@ -63,6 +63,25 @@ class RoomFinancialTransactionRepository(
     override suspend fun isRawSmsLinked(rawSmsId: String): Boolean =
         dao.findLinkByRawSmsId(rawSmsId) != null
 
+    override suspend fun listRawSmsIds(transactionId: String): List<String> =
+        dao.listRawSmsIdsForTransaction(transactionId)
+
+    override suspend fun update(transaction: FinancialTransaction): Boolean {
+        val entity = FinancialTransactionMapper.toEntity(transaction)
+        return dao.updateTransaction(
+            id = entity.id,
+            type = entity.type,
+            amountDecimal = entity.amountDecimal,
+            amountCurrency = entity.amountCurrency,
+            occurredAtEpochMillis = entity.occurredAtEpochMillis,
+            sourceContainerId = entity.sourceContainerId,
+            destinationContainerId = entity.destinationContainerId,
+            merchant = entity.merchant,
+            counterparty = entity.counterparty,
+            categoryId = entity.categoryId,
+        ) > 0
+    }
+
     private suspend fun reconstruct(
         entity: com.baraa.masroof.data.room.entity.FinancialTransactionEntity,
     ): FinancialTransaction {

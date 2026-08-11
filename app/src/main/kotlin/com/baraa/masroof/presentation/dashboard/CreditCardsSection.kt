@@ -1,0 +1,146 @@
+package com.baraa.masroof.presentation.dashboard
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
+import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.SectionHeader
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+@Composable
+fun CreditCardsSection(
+    overview: CreditCardsOverview,
+    zoneId: ZoneId,
+    modifier: Modifier = Modifier,
+) {
+    if (!overview.hasContent) return
+
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeader(
+            title = stringResource(R.string.dashboard_credit_cards_title),
+            icon = MasroofIcons.cardPayment,
+        )
+        Text(
+            stringResource(R.string.dashboard_credit_cards_snapshot_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        overview.aggregateDueAmount?.let { due ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.dashboard_credit_card_aggregate_due),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        MoneyUiFormatter.format(due),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    overview.aggregateDueUpdatedAt?.let { at ->
+                        Text(
+                            stringResource(
+                                R.string.dashboard_credit_card_updated,
+                                formatSnapshotTime(at, zoneId, dateFormatter),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        overview.cards.forEach { row ->
+            CreditCardRowCard(row, zoneId, dateFormatter)
+        }
+    }
+}
+
+@Composable
+private fun CreditCardRowCard(
+    row: CreditCardDashboardRow,
+    zoneId: ZoneId,
+    dateFormatter: DateTimeFormatter,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.cardPayment,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    stringResource(R.string.dashboard_credit_card_last4, row.last4),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+
+            SnapshotMetricRow(
+                label = stringResource(R.string.dashboard_credit_card_period_spending),
+                value = MoneyUiFormatter.format(row.periodSpendingNet),
+            )
+
+            row.snapshot?.availableBalance?.let { available ->
+                SnapshotMetricRow(
+                    label = stringResource(R.string.dashboard_credit_card_available),
+                    value = MoneyUiFormatter.format(available),
+                )
+            }
+
+            row.snapshot?.updatedAt?.let { at ->
+                Text(
+                    stringResource(
+                        R.string.dashboard_credit_card_updated,
+                        formatSnapshotTime(at, zoneId, dateFormatter),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnapshotMetricRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun formatSnapshotTime(
+    instant: Instant,
+    zoneId: ZoneId,
+    formatter: DateTimeFormatter,
+): String = formatter.format(instant.atZone(zoneId))

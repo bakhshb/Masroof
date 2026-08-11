@@ -290,6 +290,27 @@ class ReviewWorkflowService(
         )
     }
 
+    suspend fun resolveAsIgnored(reviewId: String): ReviewWorkflowResult =
+        resolveAsNonFinancial(reviewId)
+
+    suspend fun resolveAsNonFinancial(reviewId: String): ReviewWorkflowResult {
+        val review = reviewRepository.getById(reviewId)
+            ?: return ReviewWorkflowResult.Rejected("review_not_found")
+        if (review.status != ReviewStatus.REQUIRED) {
+            return ReviewWorkflowResult.Rejected("review_not_required")
+        }
+        if (financialTransactionRepository.isRawSmsLinked(review.rawSmsId)) {
+            return ReviewWorkflowResult.Rejected("raw_sms_already_finalized")
+        }
+        val marked = reviewRepository.markResolved(
+            id = review.id,
+            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+            resolvedAt = clock.now(),
+            resolvedTransactionId = null,
+        ) ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
+        return ReviewWorkflowResult.Success(review = marked, transaction = null)
+    }
+
     suspend fun resolveAsFinancialType(
         reviewId: String,
         type: FinancialTransactionType,

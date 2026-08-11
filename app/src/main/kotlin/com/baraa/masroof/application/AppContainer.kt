@@ -7,6 +7,7 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
@@ -33,6 +34,7 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
+import com.baraa.masroof.sms.ingestion.SmsIngestionResult
 import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.scanner.HistoricalSmsScanner
 import com.baraa.masroof.sms.time.InstantClock
@@ -158,10 +160,19 @@ class AppContainer(
             clock = clock,
         )
 
+    val transactionReclassificationService: TransactionReclassificationService =
+        TransactionReclassificationService(
+            financialTransactionRepository = financialTransactionRepository,
+            effectiveParsedEventProvider = effectiveParsedEventProvider,
+            ownershipResolver = ownershipResolver,
+        )
+
     val dashboardService: DashboardService =
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
             reviewRepository = reviewRepository,
+            parsedEventRepository = parsedEventRepository,
+            rawSmsRepository = rawSmsRepository,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
@@ -205,6 +216,26 @@ class AppContainer(
 
     suspend fun refreshReviewQueue() =
         reviewWorkflowService.refreshReviewQueue()
+
+    /**
+     * Re-parses every stored RawSms that already has a ParsedEvent row.
+     * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
+     */
+    suspend fun reparseAllStoredEvents(): Int {
+        var count = 0
+        for (record in parsedEventRepository.listAll()) {
+            val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
+            when (smsIngestionService.reparseStored(raw)) {
+                is SmsIngestionResult.Duplicate -> Unit
+                is SmsIngestionResult.Failed -> Unit
+                else -> count++
+            }
+        }
+        discoverFromStoredEvents()
+        reconcileStoredEvents()
+        refreshReviewQueue()
+        return count
+    }
 
     fun close() {
         applicationScope.cancel()

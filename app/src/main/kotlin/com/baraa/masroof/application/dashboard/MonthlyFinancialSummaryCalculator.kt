@@ -17,12 +17,11 @@ object MonthlyFinancialSummaryCalculator {
         transactions: List<FinancialTransaction>,
         reviewRequiredCount: Int,
         primaryCurrency: Currency = Currency.SAR,
+        sarEquivalents: Map<String, Money> = emptyMap(),
     ): MonthlyFinancialSummary {
-        val inPrimary = transactions.filter { it.amount.currency == primaryCurrency }
-        // Total period count answers "how many transactions exist"; SAR totals stay currency-scoped.
-        // Domain Currency currently includes SAR only, so excludedOtherCurrencyCount stays 0 until
-        // another currency is added to the canonical enum (no FX conversion in P11).
-        val excludedOtherCurrencyCount = transactions.size - inPrimary.size
+        val excludedOtherCurrencyCount = transactions.count { tx ->
+            tx.amount.currency != primaryCurrency && tx.id !in sarEquivalents
+        }
 
         var spendingGross = Money.zero(primaryCurrency)
         var refunds = Money.zero(primaryCurrency)
@@ -33,32 +32,33 @@ object MonthlyFinancialSummaryCalculator {
         var cashWithdrawals = Money.zero(primaryCurrency)
         var selfTransfers = Money.zero(primaryCurrency)
 
-        for (tx in inPrimary) {
+        for (tx in transactions) {
+            val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
                 FinancialTransactionType.FEE,
-                -> spendingGross = spendingGross + tx.amount
+                -> spendingGross = spendingGross + amount
 
                 FinancialTransactionType.REFUND ->
-                    refunds = refunds + tx.amount
+                    refunds = refunds + amount
 
                 FinancialTransactionType.INCOME ->
-                    income = income + tx.amount
+                    income = income + amount
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN ->
-                    externalTransfersIn = externalTransfersIn + tx.amount
+                    externalTransfersIn = externalTransfersIn + amount
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
-                    externalTransfersOut = externalTransfersOut + tx.amount
+                    externalTransfersOut = externalTransfersOut + amount
 
                 FinancialTransactionType.CREDIT_CARD_PAYMENT ->
-                    creditCardPayments = creditCardPayments + tx.amount
+                    creditCardPayments = creditCardPayments + amount
 
                 FinancialTransactionType.CASH_WITHDRAWAL ->
-                    cashWithdrawals = cashWithdrawals + tx.amount
+                    cashWithdrawals = cashWithdrawals + amount
 
                 FinancialTransactionType.SELF_TRANSFER ->
-                    selfTransfers = selfTransfers + tx.amount
+                    selfTransfers = selfTransfers + amount
 
                 FinancialTransactionType.ADJUSTMENT,
                 FinancialTransactionType.UNKNOWN,
@@ -82,5 +82,14 @@ object MonthlyFinancialSummaryCalculator {
             reviewRequiredCount = reviewRequiredCount,
             excludedOtherCurrencyCount = excludedOtherCurrencyCount,
         )
+    }
+
+    private fun effectiveAmount(
+        tx: FinancialTransaction,
+        primaryCurrency: Currency,
+        sarEquivalents: Map<String, Money>,
+    ): Money? {
+        if (tx.amount.currency == primaryCurrency) return tx.amount
+        return sarEquivalents[tx.id]
     }
 }

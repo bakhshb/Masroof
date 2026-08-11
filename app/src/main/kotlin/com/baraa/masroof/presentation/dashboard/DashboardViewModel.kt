@@ -3,7 +3,10 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.transaction.ReclassificationResult
+import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import kotlinx.coroutines.CancellationException
@@ -22,6 +25,9 @@ import java.util.Locale
 
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
+    private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
+    private val reparseStoredEventsService: suspend () -> Int,
+    private val reclassificationService: TransactionReclassificationService,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -32,9 +38,14 @@ class DashboardViewModel(
         FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
 
     private var loadJob: Job? = null
+    private var rescanJob: Job? = null
 
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
+
+    companion object {
+        const val RECENT_TRANSACTION_LIMIT: Int = 5
+    }
 
     fun refresh() {
         load(activePeriod)
@@ -55,7 +66,100 @@ class DashboardViewModel(
         load(activePeriod)
     }
 
-    private fun load(period: FinancialPeriod) {
+    fun reparseStoredEvents() {
+        if (rescanJob?.isActive == true) return
+        rescanJob = viewModelScope.launch {
+            _uiState.update { it.copy(reparsingStored = true) }
+            try {
+                reparseStoredEventsService()
+                refresh()
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                // Best-effort; dashboard refresh still runs on success path only.
+            } finally {
+                _uiState.update { it.copy(reparsingStored = false) }
+            }
+        }
+    }
+
+    fun rescanSms() {
+        if (rescanJob?.isActive == true) return
+        rescanJob = viewModelScope.launch {
+            _uiState.update { it.copy(rescanning = true, rescanStatus = null) }
+            try {
+                val result = rescanService()
+                val status = when {
+                    result.failure != null -> SmsRescanStatus.FAILED
+                    result.parsed == 0 && result.scanned == 0 -> SmsRescanStatus.NO_MESSAGES
+                    result.parsed == 0 && result.notRelevant == result.scanned -> SmsRescanStatus.NO_BANK_SMS
+                    result.parsed == 0 -> SmsRescanStatus.NO_TRANSACTIONS
+                    else -> SmsRescanStatus.OK
+                }
+                _uiState.update { it.copy(rescanning = false, rescanStatus = status) }
+                refresh()
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(rescanning = false, rescanStatus = SmsRescanStatus.FAILED) }
+            }
+        }
+    }
+
+    fun openTransactionDetail(transactionId: String) {
+        _uiState.update {
+            it.copy(
+                selectedTransactionId = transactionId,
+                reclassifySuccess = false,
+                reclassifyError = null,
+            )
+        }
+    }
+
+    fun closeTransactionDetail() {
+        _uiState.update {
+            it.copy(
+                selectedTransactionId = null,
+                reclassifying = false,
+                reclassifySuccess = false,
+                reclassifyError = null,
+            )
+        }
+    }
+
+    fun reclassifySelectedTransaction(newType: FinancialTransactionType) {
+        val transactionId = _uiState.value.selectedTransactionId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(reclassifying = true, reclassifySuccess = false, reclassifyError = null) }
+            when (val result = reclassificationService.reclassify(transactionId, newType)) {
+                is ReclassificationResult.Success -> {
+                    refreshPreservingSelection()
+                    _uiState.update {
+                        it.copy(
+                            reclassifying = false,
+                            reclassifySuccess = true,
+                            reclassifyError = null,
+                        )
+                    }
+                }
+                is ReclassificationResult.Rejected -> {
+                    _uiState.update {
+                        it.copy(
+                            reclassifying = false,
+                            reclassifyError = result.reason,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshPreservingSelection() {
+        val selectedId = _uiState.value.selectedTransactionId
+        load(activePeriod, preserveSelectionId = selectedId)
+    }
+
+    private fun load(period: FinancialPeriod, preserveSelectionId: String? = null) {
         val samePeriodRefresh =
             _uiState.value.period == period && _uiState.value.summary?.period == period
 
@@ -76,7 +180,9 @@ class DashboardViewModel(
                         period = period,
                         periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                         summary = null,
+                        creditCards = null,
                         recentTransactions = emptyList(),
+                        allTransactions = emptyList(),
                     )
                 }
             }
@@ -87,15 +193,19 @@ class DashboardViewModel(
                 if (period != activePeriod) {
                     return@launch
                 }
+                val previews = overview.transactions.map(::toPreview)
                 _uiState.update {
                     it.copy(
                         loading = false,
                         period = overview.period,
                         periodLabel = FinancialPeriodUiFormatter.formatRange(overview.period),
                         summary = overview.summary,
-                        recentTransactions = overview.recentTransactions.map(::toPreview),
+                        creditCards = overview.creditCards,
+                        recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
+                        allTransactions = previews,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
+                        selectedTransactionId = preserveSelectionId,
                     )
                 }
             } catch (ce: CancellationException) {
@@ -119,7 +229,9 @@ class DashboardViewModel(
                             period = period,
                             periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                             summary = null,
+                            creditCards = null,
                             recentTransactions = emptyList(),
+                            allTransactions = emptyList(),
                         )
                     }
                 }

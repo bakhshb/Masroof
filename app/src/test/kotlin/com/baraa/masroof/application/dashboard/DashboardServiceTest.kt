@@ -7,11 +7,18 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.RawSmsInsertResult
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,7 +43,7 @@ class DashboardServiceTest {
                 tx("p1", FinancialTransactionType.CREDIT_CARD_PAYMENT, "100", start.plusSeconds(7200)),
             ),
         )
-        val service = DashboardService(ftRepo, FakeReviewRepo(), zone, clock)
+        val service = dashboardService(ftRepo, FakeReviewRepo())
         val overview = service.loadOverview(period)
         assertEquals(Money.of("100.00", Currency.SAR), overview.summary.spendingGross)
         assertEquals(SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)), overview.summary.spendingNet)
@@ -48,11 +55,9 @@ class DashboardServiceTest {
     fun selfTransfer_regression() = runBlocking {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val service = DashboardService(
+        val service = dashboardService(
             FakeFtRepo(listOf(tx("s1", FinancialTransactionType.SELF_TRANSFER, "500", start.plusSeconds(10)))),
             FakeReviewRepo(),
-            zone,
-            clock,
         )
         val overview = service.loadOverview(period)
         assertEquals(Money.of("500.00", Currency.SAR), overview.summary.selfTransfers)
@@ -64,7 +69,7 @@ class DashboardServiceTest {
     fun wifeExternalTransferIn_notIncome() = runBlocking {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val service = DashboardService(
+        val service = dashboardService(
             FakeFtRepo(
                 listOf(
                     tx(
@@ -77,8 +82,6 @@ class DashboardServiceTest {
                 ),
             ),
             FakeReviewRepo(),
-            zone,
-            clock,
         )
         val overview = service.loadOverview(period)
         assertEquals(Money.of("250.00", Currency.SAR), overview.summary.externalTransfersIn)
@@ -91,11 +94,9 @@ class DashboardServiceTest {
             startDate = LocalDate.parse("2026-07-27"),
             endDateExclusive = LocalDate.parse("2026-08-27"),
         )
-        val service = DashboardService(
+        val service = dashboardService(
             FakeFtRepo(emptyList()),
             FakeReviewRepo(requiredCount = 3),
-            zone,
-            clock,
         )
         val overview = service.loadOverview(period)
         assertEquals(3, overview.summary.reviewRequiredCount)
@@ -109,7 +110,7 @@ class DashboardServiceTest {
         )
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
-        val service = DashboardService(
+        val service = dashboardService(
             FakeFtRepo(
                 listOf(
                     tx("before", FinancialTransactionType.EXPENSE, "1", start.minusSeconds(1)),
@@ -120,23 +121,60 @@ class DashboardServiceTest {
                 ),
             ),
             FakeReviewRepo(),
-            zone,
-            clock,
         )
         val overview = service.loadOverview(period)
         assertEquals(2, overview.summary.transactionCount)
         assertEquals(Money.of("5.00", Currency.SAR), overview.summary.spendingGross)
-        assertEquals(listOf("inside", "start"), overview.recentTransactions.map { it.id })
+        assertEquals(listOf("inside", "start"), overview.transactions.map { it.id })
     }
 
     @Test
     fun loadCurrentOverview_marksCurrentPeriod() = runBlocking {
-        val service = DashboardService(FakeFtRepo(emptyList()), FakeReviewRepo(), zone, clock)
+        val service = dashboardService(FakeFtRepo(emptyList()), FakeReviewRepo())
         val overview = service.loadCurrentOverview()
         assertTrue(overview.isCurrentPeriod)
         val previous = FinancialPeriodPolicy.previous(overview.period)
         val older = service.loadOverview(previous)
         assertFalse(older.isCurrentPeriod)
+    }
+
+    private fun dashboardService(
+        ftRepo: FinancialTransactionRepository,
+        reviewRepo: ReviewRepository,
+    ): DashboardService =
+        DashboardService(
+            financialTransactionRepository = ftRepo,
+            reviewRepository = reviewRepo,
+            parsedEventRepository = FakeParsedRepo(),
+            rawSmsRepository = FakeRawRepo(),
+            zoneId = zone,
+            clock = clock,
+        )
+
+    private class FakeParsedRepo(
+        private val records: List<ParsedEventRecord> = emptyList(),
+    ) : ParsedEventRepository {
+        override suspend fun save(event: ParsedEvent, details: ParsedEventDetails) = Unit
+        override suspend fun getById(id: String): ParsedEventRecord? = null
+        override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
+        override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
+        override suspend fun listAll(): List<ParsedEventRecord> = records
+    }
+
+    private class FakeRawRepo(
+        private val byId: Map<String, RawSms> = emptyMap(),
+    ) : RawSmsRepository {
+        override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = RawSmsInsertResult.Inserted
+        override suspend fun getById(id: String): RawSms? = byId[id]
+        override suspend fun existsById(id: String): Boolean = byId.containsKey(id)
+        override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
+        override suspend fun findCrossSourceNearDuplicate(
+            sender: String,
+            bodyHash: String,
+            fromInclusive: Instant,
+            toInclusive: Instant,
+            lookingForLiveRow: Boolean,
+        ): RawSms? = null
     }
 
     private fun tx(
@@ -178,6 +216,8 @@ class DashboardServiceTest {
                 .sortedWith(compareByDescending<FinancialTransaction> { it.occurredAt }.thenByDescending { it.id })
 
         override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
+        override suspend fun update(transaction: FinancialTransaction): Boolean = false
     }
 
     private class FakeReviewRepo(
