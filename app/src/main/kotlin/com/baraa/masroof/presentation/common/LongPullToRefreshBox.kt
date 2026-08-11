@@ -23,6 +23,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -31,12 +35,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Default pull distance before refresh triggers (~2× a typical short pull). */
+/** Default pull distance before refresh can trigger on release (~2× a typical short pull). */
 val LongPullToRefreshThreshold: Dp = 160.dp
 
 /**
- * Pull-to-refresh wrapper with a deliberately high threshold so accidental short
- * drags do not reload the dashboard.
+ * Pull-to-refresh wrapper with a high threshold and release-to-confirm behavior:
+ * drag down, optionally hold, then lift to refresh. Pulling back up before release cancels.
  */
 @Composable
 fun LongPullToRefreshBox(
@@ -51,6 +55,7 @@ fun LongPullToRefreshBox(
     val thresholdPx = with(LocalDensity.current) { threshold.toPx() }
     val maxPullPx = thresholdPx * 1.25f
     val isRefreshingState = rememberUpdatedState(isRefreshing)
+    val onRefreshState = rememberUpdatedState(onRefresh)
 
     val nestedScrollConnection = remember(scrollState, thresholdPx) {
         object : NestedScrollConnection {
@@ -76,10 +81,9 @@ fun LongPullToRefreshBox(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (!isRefreshingState.value && pullDistance >= thresholdPx) {
-                    onRefresh()
+                if (!isRefreshingState.value && pullDistance > 0f && pullDistance < thresholdPx) {
+                    pullDistance = 0f
                 }
-                pullDistance = 0f
                 return Velocity.Zero
             }
         }
@@ -94,6 +98,21 @@ fun LongPullToRefreshBox(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .pointerInput(thresholdPx) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                    } while (event.changes.any { it.pressed })
+
+                    if (!isRefreshingState.value) {
+                        if (pullDistance >= thresholdPx) {
+                            onRefreshState.value()
+                        }
+                        pullDistance = 0f
+                    }
+                }
+            }
             .nestedScroll(nestedScrollConnection),
     ) {
         Box(
@@ -111,18 +130,23 @@ fun LongPullToRefreshBox(
         )
 
         if (pullDistance > 0f || isRefreshing) {
+            val isReady = pullDistance >= thresholdPx
             CircularProgressIndicator(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp)
                     .alpha(
-                        if (isRefreshing) {
-                            1f
-                        } else {
-                            min(1f, pullDistance / thresholdPx)
+                        when {
+                            isRefreshing -> 1f
+                            isReady -> 1f
+                            else -> min(1f, pullDistance / thresholdPx)
                         },
                     ),
-                color = MaterialTheme.colorScheme.primary,
+                color = if (isReady && !isRefreshing) {
+                    MaterialTheme.colorScheme.secondary
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
             )
         }
     }
