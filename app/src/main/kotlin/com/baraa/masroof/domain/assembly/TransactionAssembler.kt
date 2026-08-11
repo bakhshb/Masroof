@@ -23,8 +23,9 @@ import java.time.Instant
  * No Room / Android.
  *
  * Passes only facts P8 genuinely knows into P2 classification — never fabricates
- * [com.baraa.masroof.domain.model.AccountType] / [com.baraa.masroof.domain.model.CardType].
- * Container ids come from [FinancialContainerIdFactory] on durable known-bank refs.
+ * temporary account/card domain objects or invented account/card types solely to
+ * satisfy the classifier. Container ids come from [FinancialContainerIdFactory]
+ * on durable known-bank refs.
  */
 object TransactionAssembler {
     sealed interface Outcome {

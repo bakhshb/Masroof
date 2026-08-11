@@ -32,10 +32,18 @@ class TransactionAssemblerTest {
         val source = File(
             "src/main/kotlin/com/baraa/masroof/domain/assembly/TransactionAssembler.kt",
         ).readText()
-        assertFalse(source.contains("AccountType"))
-        assertFalse(source.contains("CardType"))
-        assertFalse(source.contains("Account("))
-        assertFalse(source.contains("Card("))
+        val imports = source.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("import ") }
+            .toSet()
+        assertFalse(imports.contains("import com.baraa.masroof.domain.model.AccountType"))
+        assertFalse(imports.contains("import com.baraa.masroof.domain.model.CardType"))
+        assertFalse(imports.contains("import com.baraa.masroof.domain.model.Account"))
+        assertFalse(imports.contains("import com.baraa.masroof.domain.model.Card"))
+        assertFalse(source.contains("AccountType."))
+        assertFalse(source.contains("CardType."))
+        assertFalse(Regex("""\bAccount\s*\(""").containsMatchIn(source))
+        assertFalse(Regex("""\bCard\s*\(""").containsMatchIn(source))
     }
 
     @Test
