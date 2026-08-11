@@ -8,6 +8,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.RawSms
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,6 +23,7 @@ import java.time.Instant
 @Config(sdk = [28])
 class FinancialTransactionPeriodQueryTest {
     private lateinit var db: MasroofDatabase
+    private lateinit var rawRepo: RoomRawSmsRepository
     private lateinit var repo: RoomFinancialTransactionRepository
 
     @Before
@@ -30,6 +32,7 @@ class FinancialTransactionPeriodQueryTest {
         db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
             .allowMainThreadQueries()
             .build()
+        rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         repo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
     }
 
@@ -54,7 +57,18 @@ class FinancialTransactionPeriodQueryTest {
     }
 
     private suspend fun save(tx: FinancialTransaction) {
-        repo.save(tx, listOf("raw-${tx.id}"))
+        val rawId = "raw-${tx.id}"
+        rawRepo.insertIfAbsent(
+            RawSms(
+                id = rawId,
+                sender = "ALJAZIRA",
+                body = "body-${tx.id}",
+                receivedAt = tx.occurredAt,
+                deviceMessageId = null,
+                bodyHash = "hash-${tx.id}",
+            ),
+        )
+        repo.save(tx, listOf(rawId))
     }
 
     private fun tx(id: String, at: Instant): FinancialTransaction =
