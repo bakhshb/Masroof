@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,8 +50,9 @@ fun LongPullToRefreshBox(
     var pullDistance by remember { mutableFloatStateOf(0f) }
     val thresholdPx = with(LocalDensity.current) { threshold.toPx() }
     val maxPullPx = thresholdPx * 1.25f
+    val isRefreshingState = rememberUpdatedState(isRefreshing)
 
-    val nestedScrollConnection = remember(thresholdPx) {
+    val nestedScrollConnection = remember(scrollState, thresholdPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (pullDistance > 0f && available.y < 0f) {
@@ -66,7 +68,7 @@ fun LongPullToRefreshBox(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                if (!isRefreshing && scrollState.value == 0 && available.y > 0f) {
+                if (!isRefreshingState.value && scrollState.value == 0 && available.y > 0f) {
                     pullDistance = min(pullDistance + available.y, maxPullPx)
                     return Offset(0f, available.y)
                 }
@@ -74,7 +76,7 @@ fun LongPullToRefreshBox(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (!isRefreshing && pullDistance >= thresholdPx) {
+                if (!isRefreshingState.value && pullDistance >= thresholdPx) {
                     onRefresh()
                 }
                 pullDistance = 0f
