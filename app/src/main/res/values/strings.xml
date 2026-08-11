@@ -58,6 +58,7 @@
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
     <string name="dashboard_recent_title">العمليات الأخيرة</string>
     <string name="dashboard_empty_period">لا توجد عمليات في هذه الفترة</string>
+    <string name="dashboard_excluded_other_currency">تم استبعاد %1$d عملية بعملة أخرى من الإجماليات.</string>
     <string name="dashboard_review_required">تحتاج مراجعة: %1$d</string>
     <string name="dashboard_back_to_current">العودة للشهر الحالي</string>
     <string name="dashboard_load_error">تعذر تحميل الملخص المالي</string>

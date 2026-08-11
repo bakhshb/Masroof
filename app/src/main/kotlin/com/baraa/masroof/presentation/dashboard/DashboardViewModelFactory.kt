@@ -15,7 +15,7 @@ class DashboardViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(DashboardViewModel::class.java))
         return DashboardViewModel(
-            dashboardService = container.dashboardService,
+            overviewLoader = container.dashboardService,
             zoneId = zoneId,
             clock = clock,
         ) as T

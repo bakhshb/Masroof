@@ -2,11 +2,13 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.baraa.masroof.application.dashboard.DashboardService
+import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +21,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class DashboardViewModel(
-    private val dashboardService: DashboardService,
+    private val overviewLoader: DashboardOverviewLoader,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -28,6 +30,8 @@ class DashboardViewModel(
 
     private var activePeriod: FinancialPeriod =
         FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
+
+    private var loadJob: Job? = null
 
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
@@ -56,18 +60,37 @@ class DashboardViewModel(
     }
 
     private fun load(period: FinancialPeriod) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    loading = true,
-                    error = null,
-                    period = period,
-                    periodLabel = FinancialPeriodUiFormatter.formatRange(period),
-                )
+        val samePeriodRefresh =
+            _uiState.value.period == period && _uiState.value.summary?.period == period
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update { current ->
+                if (samePeriodRefresh) {
+                    current.copy(
+                        loading = true,
+                        error = null,
+                        period = period,
+                        periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                    )
+                } else {
+                    current.copy(
+                        loading = true,
+                        error = null,
+                        period = period,
+                        periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                        summary = null,
+                        recentTransactions = emptyList(),
+                    )
+                }
             }
+
             try {
-                val overview = dashboardService.loadOverview(period)
-                activePeriod = overview.period
+                val overview = overviewLoader.loadOverview(period)
+                ensureActive()
+                if (period != activePeriod) {
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(
                         loading = false,
@@ -82,11 +105,27 @@ class DashboardViewModel(
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
-                _uiState.update {
-                    it.copy(
-                        loading = false,
-                        error = DashboardError.LOAD_FAILED,
-                    )
+                if (period != activePeriod) {
+                    return@launch
+                }
+                _uiState.update { current ->
+                    if (samePeriodRefresh) {
+                        current.copy(
+                            loading = false,
+                            error = DashboardError.LOAD_FAILED,
+                            period = period,
+                            periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                        )
+                    } else {
+                        current.copy(
+                            loading = false,
+                            error = DashboardError.LOAD_FAILED,
+                            period = period,
+                            periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                            summary = null,
+                            recentTransactions = emptyList(),
+                        )
+                    }
                 }
             }
         }
@@ -95,7 +134,6 @@ class DashboardViewModel(
     private fun toPreview(tx: FinancialTransaction): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
-            ?: tx.type.name
         val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
         return TransactionPreviewUi(
             id = tx.id,

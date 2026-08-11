@@ -1,0 +1,318 @@
+package com.baraa.masroof.presentation.dashboard
+
+import com.baraa.masroof.application.dashboard.DashboardOverview
+import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.core.money.Money
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class DashboardViewModelTest {
+    private val dispatcher = StandardTestDispatcher()
+    private val zone = ZoneId.of("Asia/Riyadh")
+    private val clock = Clock.fixed(Instant.parse("2026-08-11T08:00:00Z"), zone)
+    private val currentPeriod = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
+    private val previousPeriod = FinancialPeriodPolicy.previous(currentPeriod)
+    private val previous2Period = FinancialPeriodPolicy.previous(previousPeriod)
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun successfulCurrentPeriodLoad() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.loading)
+        assertNull(state.error)
+        assertEquals(currentPeriod, state.period)
+        assertNotNull(state.summary)
+        assertEquals(currentPeriod, state.summary!!.period)
+        assertEquals(Money.of("100.00", Currency.SAR), state.summary!!.spendingGross)
+        assertTrue(state.isCurrentPeriod)
+    }
+
+    @Test
+    fun navigatingToAnotherPeriod_clearsOldSummaryUnderNewLabel() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        val gate = loader.enqueueGate(previousPeriod)
+        loader.put(previousPeriod, overview(previousPeriod, spending = "40.00"))
+        vm.goToPreviousPeriod()
+        advanceUntilIdle()
+
+        val loadingState = vm.uiState.value
+        assertEquals(previousPeriod, loadingState.period)
+        assertEquals(FinancialPeriodUiFormatter.formatRange(previousPeriod), loadingState.periodLabel)
+        assertTrue(loadingState.loading)
+        assertNull(loadingState.summary)
+        assertTrue(loadingState.recentTransactions.isEmpty())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertPeriodSummaryInvariant(vm.uiState.value)
+        assertEquals(Money.of("40.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
+    }
+
+    @Test
+    fun newPeriodLoadFailure_doesNotShowOldSummaryUnderNewLabel() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        loader.failNextPeriod = previousPeriod
+        vm.goToPreviousPeriod()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(previousPeriod, state.period)
+        assertEquals(FinancialPeriodUiFormatter.formatRange(previousPeriod), state.periodLabel)
+        assertNull(state.summary)
+        assertEquals(DashboardError.LOAD_FAILED, state.error)
+        assertFalse(state.loading)
+    }
+
+    @Test
+    fun retryAfterFailure_retriesSelectedPeriod() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        loader.failNextPeriod = previousPeriod
+        vm.goToPreviousPeriod()
+        advanceUntilIdle()
+        assertEquals(DashboardError.LOAD_FAILED, vm.uiState.value.error)
+
+        loader.put(previousPeriod, overview(previousPeriod, spending = "55.00"))
+        vm.refresh()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(previousPeriod, state.period)
+        assertNull(state.error)
+        assertEquals(Money.of("55.00", Currency.SAR), state.summary!!.spendingGross)
+        assertPeriodSummaryInvariant(state)
+        assertTrue(loader.calls.count { it == previousPeriod } >= 2)
+    }
+
+    @Test
+    fun rapidPreviousPrevious_onlyLatestRequestWins() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
+        loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        val gateP1 = loader.enqueueGate(previousPeriod)
+        val gateP2 = loader.enqueueGate(previous2Period)
+        vm.goToPreviousPeriod() // P1
+        vm.goToPreviousPeriod() // P2, cancels P1
+        advanceUntilIdle()
+
+        gateP2.complete(Unit)
+        gateP1.complete(Unit)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(previous2Period, state.period)
+        assertEquals(Money.of("30.00", Currency.SAR), state.summary!!.spendingGross)
+        assertPeriodSummaryInvariant(state)
+        assertNull(state.error)
+    }
+
+    @Test
+    fun previousThenCurrentBeforePreviousReturns_currentRemainsFinal() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        val gatePrevious = loader.enqueueGate(previousPeriod)
+        val gateCurrent = loader.enqueueGate(currentPeriod)
+        vm.goToPreviousPeriod()
+        vm.goToCurrentPeriod()
+        advanceUntilIdle()
+
+        gateCurrent.complete(Unit)
+        gatePrevious.complete(Unit)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(currentPeriod, state.period)
+        assertEquals(Money.of("10.00", Currency.SAR), state.summary!!.spendingGross)
+        assertTrue(state.isCurrentPeriod)
+        assertPeriodSummaryInvariant(state)
+    }
+
+    @Test
+    fun cancelledObsoleteLoad_doesNotSetLoadFailed() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        loader.failNextPeriod = previousPeriod
+        val gateP1 = loader.enqueueGate(previousPeriod)
+        val gateP2 = loader.enqueueGate(previous2Period)
+        vm.goToPreviousPeriod()
+        vm.goToPreviousPeriod()
+        advanceUntilIdle()
+
+        gateP1.complete(Unit)
+        gateP2.complete(Unit)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(previous2Period, state.period)
+        assertNull(state.error)
+        assertNotNull(state.summary)
+        assertPeriodSummaryInvariant(state)
+    }
+
+    @Test
+    fun summaryPeriodMatchesStatePeriodWheneverSummaryPresent() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "12.00"))
+        loader.put(previousPeriod, overview(previousPeriod, spending = "8.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+        assertPeriodSummaryInvariant(vm.uiState.value)
+
+        vm.goToPreviousPeriod()
+        advanceUntilIdle()
+        assertPeriodSummaryInvariant(vm.uiState.value)
+
+        vm.goToCurrentPeriod()
+        advanceUntilIdle()
+        assertPeriodSummaryInvariant(vm.uiState.value)
+    }
+
+    @Test
+    fun previewTitleFallsBackWithoutEnumName() = runTest {
+        val loader = FakeLoader()
+        val tx = FinancialTransaction(
+            id = "tx1",
+            type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            amount = Money.of("100.00", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-01T10:00:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = emptyList(),
+        )
+        loader.put(
+            currentPeriod,
+            DashboardOverview(
+                period = currentPeriod,
+                summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
+                recentTransactions = listOf(tx),
+                isCurrentPeriod = true,
+            ),
+        )
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+        val preview = vm.uiState.value.recentTransactions.single()
+        assertNull(preview.title)
+        assertEquals(FinancialTransactionType.CREDIT_CARD_PAYMENT, preview.type)
+        assertFalse(preview.amountLabel.contains("CREDIT_CARD_PAYMENT"))
+    }
+
+    private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
+        val summary = state.summary
+        if (summary != null) {
+            assertEquals(state.period, summary.period)
+        }
+    }
+
+    private fun overview(period: FinancialPeriod, spending: String): DashboardOverview {
+        val base = MonthlyFinancialSummary.empty(period, Currency.SAR)
+        val amount = Money.of(spending, Currency.SAR)
+        return DashboardOverview(
+            period = period,
+            summary = base.copy(
+                spendingGross = amount,
+                spendingNet = com.baraa.masroof.application.dashboard.SignedMoneyAmount.of(amount),
+                transactionCount = 1,
+            ),
+            recentTransactions = emptyList(),
+            isCurrentPeriod = period == currentPeriod,
+        )
+    }
+
+    private class FakeLoader : DashboardOverviewLoader {
+        private val overviews = mutableMapOf<FinancialPeriod, DashboardOverview>()
+        private val gates = mutableMapOf<FinancialPeriod, CompletableDeferred<Unit>>()
+        val calls = mutableListOf<FinancialPeriod>()
+        var failNextPeriod: FinancialPeriod? = null
+
+        fun put(period: FinancialPeriod, overview: DashboardOverview) {
+            overviews[period] = overview
+        }
+
+        fun enqueueGate(period: FinancialPeriod): CompletableDeferred<Unit> {
+            val gate = CompletableDeferred<Unit>()
+            gates[period] = gate
+            return gate
+        }
+
+        override suspend fun loadOverview(period: FinancialPeriod): DashboardOverview {
+            calls += period
+            gates.remove(period)?.await()
+            if (failNextPeriod == period) {
+                failNextPeriod = null
+                error("load failed for $period")
+            }
+            return overviews[period]
+                ?: DashboardOverview(
+                    period = period,
+                    summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
+                    recentTransactions = emptyList(),
+                    isCurrentPeriod = false,
+                )
+        }
+    }
+}

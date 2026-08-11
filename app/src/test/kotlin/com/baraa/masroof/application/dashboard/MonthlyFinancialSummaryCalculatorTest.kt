@@ -109,7 +109,7 @@ class MonthlyFinancialSummaryCalculatorTest {
     }
 
     @Test
-    fun adjustmentAndUnknown_excludedFromTotals() {
+    fun adjustmentAndUnknown_excludedFromTotals_butCountedInTransactionCount() {
         val summary = summarize(
             tx(FinancialTransactionType.ADJUSTMENT, "40"),
             tx(FinancialTransactionType.UNKNOWN, "10"),
@@ -117,6 +117,20 @@ class MonthlyFinancialSummaryCalculatorTest {
         )
         assertEquals(Money.of("5.00", Currency.SAR), summary.spendingGross)
         assertEquals(3, summary.transactionCount)
+        assertEquals(0, summary.excludedOtherCurrencyCount)
+    }
+
+    @Test
+    fun transactionCount_isTotalPeriodSize_notOnlyPrimaryTotalsContributors() {
+        // Currency enum is SAR-only today; structural count uses full list size so a
+        // future non-SAR currency can set excludedOtherCurrencyCount without changing
+        // "how many transactions exist" semantics.
+        val summary = summarize(
+            tx(FinancialTransactionType.EXPENSE, "10"),
+            tx(FinancialTransactionType.SELF_TRANSFER, "20"),
+        )
+        assertEquals(2, summary.transactionCount)
+        assertEquals(0, summary.excludedOtherCurrencyCount)
     }
 
     private fun summarize(vararg transactions: FinancialTransaction): MonthlyFinancialSummary =

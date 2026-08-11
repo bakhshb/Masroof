@@ -12,7 +12,8 @@ enum class TransactionDirectionUi {
 
 data class TransactionPreviewUi(
     val id: String,
-    val title: String,
+    /** Merchant/counterparty when present; Compose falls back to Arabic type label when null. */
+    val title: String?,
     val amountLabel: String,
     val dateLabel: String,
     val type: FinancialTransactionType,

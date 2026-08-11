@@ -129,12 +129,20 @@ private fun DashboardScreen(
                 Text(stringResource(R.string.dashboard_recent_title), style = MaterialTheme.typography.titleMedium)
                 if (summary.transactionCount == 0) {
                     Text(stringResource(R.string.dashboard_empty_period))
-                } else if (state.recentTransactions.isEmpty()) {
-                    Text(stringResource(R.string.dashboard_empty_period))
                 } else {
                     state.recentTransactions.forEach { row ->
                         RecentRow(row)
                     }
+                }
+
+                if (summary.excludedOtherCurrencyCount > 0) {
+                    Text(
+                        stringResource(
+                            R.string.dashboard_excluded_other_currency,
+                            summary.excludedOtherCurrencyCount,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
 
                 Text(
@@ -205,7 +213,7 @@ private fun RecentRow(row: TransactionPreviewUi) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(row.title, style = MaterialTheme.typography.titleSmall)
+                Text(row.title ?: typeLabel(row.type), style = MaterialTheme.typography.titleSmall)
                 Text(row.amountLabel)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

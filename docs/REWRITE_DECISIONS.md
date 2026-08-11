@@ -161,7 +161,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   INCOME separate; EXTERNAL_TRANSFER_IN/OUT, SELF_TRANSFER, CREDIT_CARD_PAYMENT,
   CASH_WITHDRAWAL are separate movement buckets (not spending/income).
 - ADJUSTMENT/UNKNOWN excluded from primary totals; no FX conversion; primary currency
-  is SAR-scoped.
+  is SAR-scoped. `transactionCount` is total period FinancialTransaction count;
+  `excludedOtherCurrencyCount` tracks rows omitted from SAR totals (always 0 while
+  Currency enum is SAR-only).
+- Period navigation cancels in-flight loads and never shows a stale summary under a
+  different period label.
 - No account balance, net worth, budgets, categories, review UI, or full transaction
   list in P11. Room remains version 4 (DAO range query only).
 

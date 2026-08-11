@@ -19,6 +19,9 @@ object MonthlyFinancialSummaryCalculator {
         primaryCurrency: Currency = Currency.SAR,
     ): MonthlyFinancialSummary {
         val inPrimary = transactions.filter { it.amount.currency == primaryCurrency }
+        // Total period count answers "how many transactions exist"; SAR totals stay currency-scoped.
+        // Domain Currency currently includes SAR only, so excludedOtherCurrencyCount stays 0 until
+        // another currency is added to the canonical enum (no FX conversion in P11).
         val excludedOtherCurrencyCount = transactions.size - inPrimary.size
 
         var spendingGross = Money.zero(primaryCurrency)
@@ -75,7 +78,7 @@ object MonthlyFinancialSummaryCalculator {
             creditCardPayments = creditCardPayments,
             cashWithdrawals = cashWithdrawals,
             selfTransfers = selfTransfers,
-            transactionCount = inPrimary.size,
+            transactionCount = transactions.size,
             reviewRequiredCount = reviewRequiredCount,
             excludedOtherCurrencyCount = excludedOtherCurrencyCount,
         )
