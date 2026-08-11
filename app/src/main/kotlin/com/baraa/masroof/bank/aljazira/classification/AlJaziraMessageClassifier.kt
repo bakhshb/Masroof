@@ -114,6 +114,24 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
+            isPosPurchase(text) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.PURCHASE,
+                    direction = MoneyDirection.OUTGOING,
+                    purchaseChannel = PurchaseChannel.POS,
+                    evidence = listOf("purchase_pos"),
+                    confidence = 0.95,
+                )
+
+            isOnlinePurchase(text) ->
+                return AlJaziraClassification(
+                    family = MessageFamily.PURCHASE,
+                    direction = MoneyDirection.OUTGOING,
+                    purchaseChannel = PurchaseChannel.ONLINE,
+                    evidence = listOf("purchase_online"),
+                    confidence = 0.95,
+                )
+
             text.contains("رسوم") ->
                 return AlJaziraClassification(
                     family = MessageFamily.FEE,
@@ -149,24 +167,6 @@ class AlJaziraMessageClassifier {
                     direction = MoneyDirection.OUTGOING,
                     bankNetworkType = detectNetwork(text, incoming = false),
                     evidence = listOf("transfer_out"),
-                    confidence = 0.95,
-                )
-
-            isPosPurchase(text) ->
-                return AlJaziraClassification(
-                    family = MessageFamily.PURCHASE,
-                    direction = MoneyDirection.OUTGOING,
-                    purchaseChannel = PurchaseChannel.POS,
-                    evidence = listOf("purchase_pos"),
-                    confidence = 0.95,
-                )
-
-            isOnlinePurchase(text) ->
-                return AlJaziraClassification(
-                    family = MessageFamily.PURCHASE,
-                    direction = MoneyDirection.OUTGOING,
-                    purchaseChannel = PurchaseChannel.ONLINE,
-                    evidence = listOf("purchase_online"),
                     confidence = 0.95,
                 )
 

@@ -387,6 +387,44 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun onlinePurchaseUsdAmount_isParsed() {
+        val result = parse(
+            """
+            شراء عبر الانترنت
+            بطاقة ائتمانية: 7271
+            لدى: CURSOR, AI POWERED IDE
+            بمبلغ: USD 23.00
+            في: 2026-08-06 20:22
+            الدولة: USA
+            رسوم العمليات الدولية: 1.99
+            سعر الصرف: 3.756957
+            الرصيد المتاح: SAR 16958.89
+            إجمالي المبلغ المستحق: SAR 2694.32
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("23.00", Currency.USD), result.event.amount)
+        assertEquals("CURSOR, AI POWERED IDE", result.event.merchant)
+    }
+
+    @Test
+    fun englishRefund_midLineAmount_isParsed() {
+        val result = parse(
+            """
+            Credit Card: Refund
+            Card: Credit Number: 8332
+            From: Tamara
+            Amount: 75.65 SAR
+            Balance: 17230.68 SAR
+            Date: 2026-08-05 17:41
+            Due Amount: 2694.32 SAR
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.REFUND, result.event.messageFamily)
+        assertEquals(Money.of("75.65", Currency.SAR), result.event.amount)
+    }
+
+    @Test
     fun creditCardStatementNotice_isNonFinancialWithoutAmount() {
         val result = parse(
             """

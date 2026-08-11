@@ -36,10 +36,10 @@ class AmountExtractor {
             "القسط" to Regex("""القسط""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             // "مبلغ" after more-specific labels; avoid matching داخل "مبلغ العملية" / balances via word boundary-ish
             "مبلغ" to Regex("""(?<![\p{L}])مبلغ(?!\s*العملية)(?!\s*المتبقي)""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            // Line-anchored "Amount:" only — never "Due Amount" / "Available Balance".
+            // Avoid "Due Amount" / "Available Balance" lines.
             "amount" to Regex(
-                """(?:^|\n)\s*amount""" + MoneyTokens.moneyAfterLabel.pattern,
-                setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE),
+                """(?<!due\s)(?<![\p{L}])amount""" + MoneyTokens.moneyAfterLabel.pattern,
+                RegexOption.IGNORE_CASE,
             ),
             "of" to Regex("""(?<![\p{L}])of""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
         )

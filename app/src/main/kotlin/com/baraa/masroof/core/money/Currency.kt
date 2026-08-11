@@ -8,4 +8,5 @@ package com.baraa.masroof.core.money
  */
 enum class Currency {
     SAR,
+    USD,
 }
