@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.review
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 
 data class ReviewListItemUi(
     val id: String,
@@ -100,57 +101,18 @@ fun ReviewKind.toUiLabelRes(): Int =
         ReviewKind.PENDING_MATCH -> com.baraa.masroof.R.string.review_kind_pending_match
     }
 
-private val NON_FINANCIAL_BODY_MARKERS = listOf(
-    "رمز التفعيل",
-    "لإضافة المستفيد",
-    "رمز التحقق",
-    "تم تسجيل الدخول",
-    "مكافآتي",
-    "رصيد نقاطك",
-    "برنامج مكاف",
-    "اسم المستفيد",
-    "الاسم المختصر",
-    "حالة: غير نشط",
-    "حالة : غير نشط",
-    "تم إضافة المستفيد",
-    "إضافة مستفيد",
-    "تنبيه أمني",
-    "تنويه",
-)
-
-fun looksLikeNonFinancialSms(body: String): Boolean =
-    NON_FINANCIAL_BODY_MARKERS.any { body.contains(it) }
-
-private fun String.containsMoneyIndicators(): Boolean =
-    contains("sar", ignoreCase = true) ||
-        contains("ر.س") ||
-        contains("ريال") ||
-        contains("مبلغ") ||
-        contains("بمبلغ") ||
-        contains("القيمة:") ||
-        contains("القسط")
-
 fun shouldOfferNonFinancialDismiss(
     messageFamily: MessageFamily?,
     reasons: List<String>,
     body: String,
     hasAmount: Boolean = false,
 ): Boolean {
-    if (messageFamily == MessageFamily.OTP ||
-        messageFamily == MessageFamily.NON_FINANCIAL ||
-        messageFamily == MessageFamily.BALANCE_NOTICE
-    ) {
-        return true
-    }
     if (reasons.any { it == "non_financial_or_informational_message" }) {
         return true
     }
-    if (looksLikeNonFinancialSms(body)) {
-        return true
-    }
-    // Unknown SMS without a parsed amount and without money wording is informational.
-    if (messageFamily == MessageFamily.UNKNOWN && !hasAmount && !body.containsMoneyIndicators()) {
-        return true
-    }
-    return false
+    return InformationalMessagePolicy.shouldAutoIgnore(
+        messageFamily = messageFamily,
+        hasParsedAmount = hasAmount,
+        smsBody = body,
+    )
 }

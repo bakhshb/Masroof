@@ -8,6 +8,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
@@ -103,12 +104,15 @@ class TransactionReconciliationService(
                 MessageFamily.TRANSFER_IN,
                 MessageFamily.TRANSFER_OUT,
                 -> {
-                    val single = TransactionAssembler.assembleSingle(
+                    val single = finalizeAssemblyOutcome(
                         event = event,
-                        receivedAt = receivedAt,
-                        sourceOwnership = sourceOwn,
-                        destinationOwnership = destOwn,
-                        cardOwnership = cardOwn,
+                        outcome = TransactionAssembler.assembleSingle(
+                            event = event,
+                            receivedAt = receivedAt,
+                            sourceOwnership = sourceOwn,
+                            destinationOwnership = destOwn,
+                            cardOwnership = cardOwn,
+                        ),
                     )
                     when (single) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -159,12 +163,15 @@ class TransactionReconciliationService(
 
                 else -> {
                     when (
-                        val outcome = TransactionAssembler.assembleSingle(
+                        val outcome = finalizeAssemblyOutcome(
                             event = event,
-                            receivedAt = receivedAt,
-                            sourceOwnership = sourceOwn,
-                            destinationOwnership = destOwn,
-                            cardOwnership = cardOwn,
+                            outcome = TransactionAssembler.assembleSingle(
+                                event = event,
+                                receivedAt = receivedAt,
+                                sourceOwnership = sourceOwn,
+                                destinationOwnership = destOwn,
+                                cardOwnership = cardOwn,
+                            ),
                         )
                     ) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -309,6 +316,21 @@ class TransactionReconciliationService(
             FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
+
+    private suspend fun finalizeAssemblyOutcome(
+        event: ParsedEvent,
+        outcome: TransactionAssembler.Outcome,
+    ): TransactionAssembler.Outcome {
+        if (outcome !is TransactionAssembler.Outcome.NeedsReview) {
+            return outcome
+        }
+        val body = rawSmsRepository.getById(event.rawSmsId)?.body.orEmpty()
+        return if (InformationalMessagePolicy.shouldAutoIgnore(event, body)) {
+            TransactionAssembler.Outcome.Ignored
+        } else {
+            outcome
+        }
+    }
 
     private enum class PersistOutcome { Saved, Already, Failed }
 }

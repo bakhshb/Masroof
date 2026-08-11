@@ -824,6 +824,7 @@ class ReviewWorkflowServiceTest {
                 family = MessageFamily.UNKNOWN,
                 amount = null,
             ),
+            body = "عملية غير معروفة بمبلغ: 100.00 SAR",
         )
         workflow.refreshReviewQueue()
         val result = workflow.resolveAsNonFinancial(
@@ -835,13 +836,30 @@ class ReviewWorkflowServiceTest {
         assertEquals(0, ftRepo.listAll().size)
     }
 
+    @Test
+    fun refreshReviewQueue_autoIgnoresInformationalUnknown() = runBlocking {
+        persistEvent(
+            smsId = "sms-info",
+            event = event(
+                id = "pe-info",
+                rawSmsId = "sms-info",
+                family = MessageFamily.UNKNOWN,
+                amount = null,
+            ),
+            body = "اسم المستفيد : TEST\nحالة: غير نشط",
+        )
+        workflow.refreshReviewQueue()
+        assertTrue(workflow.listRequiredReviews().none { it.rawSmsId == "sms-info" })
+        assertNull(reviewRepo.findByRawSmsId("sms-info"))
+    }
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,
         details: ParsedEventDetails = ParsedEventDetails(),
         at: Instant = Instant.parse("2026-08-01T12:00:00Z"),
+        body: String = "body-$smsId",
     ) {
-        val body = "body-$smsId"
         rawRepo.insertIfAbsent(
             RawSms(
                 id = smsId,
