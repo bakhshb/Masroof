@@ -1,4 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">مصروف</string>
+    <string name="onboarding_welcome_title">مرحبًا بك في مصروف</string>
+    <string name="onboarding_welcome_body">يقرأ مصروف الرسائل البنكية الموجودة على جهازك ويحوّلها إلى معاملات مالية منظمة.</string>
+    <string name="onboarding_welcome_local_only">تتم المعالجة محليًا على جهازك. لا يحتاج مصروف إلى صلاحية إرسال الرسائل.</string>
+    <string name="onboarding_start">ابدأ</string>
+
+    <string name="onboarding_permission_title">السماح بقراءة الرسائل البنكية</string>
+    <string name="onboarding_permission_body">يحتاج مصروف إلى الوصول للرسائل للتعرّف على العمليات البنكية واستيرادها إلى التطبيق.</string>
+    <string name="onboarding_allow">السماح</string>
+    <string name="onboarding_open_settings">فتح إعدادات التطبيق</string>
+    <string name="onboarding_permission_denied_short">تم رفض صلاحية الرسائل.</string>
+
+    <string name="onboarding_import_date_title">من أي تاريخ تريد استيراد العمليات؟</string>
+    <string name="onboarding_date_current_month">بداية الشهر الحالي</string>
+    <string name="onboarding_date_last_30">آخر 30 يوم</string>
+    <string name="onboarding_date_last_27">من آخر يوم 27</string>
+    <string name="onboarding_date_custom">تاريخ مخصص</string>
+    <string name="onboarding_selected_date">التاريخ المحدد: %1$s</string>
+    <string name="onboarding_start_import">بدء الاستيراد</string>
+    <string name="onboarding_import_scanning">جاري فحص الرسائل…</string>
+    <string name="onboarding_import_done">اكتمل الاستيراد</string>
+    <string name="onboarding_import_counts">تم فحص %1$d • مستورد %2$d • مكرر %3$d • فشل %4$d</string>
+    <string name="onboarding_provider_error">تعذر قراءة الرسائل</string>
+    <string name="onboarding_retry">إعادة المحاولة</string>
+
+    <string name="onboarding_ownership_title">تأكيد ملكية الحسابات والبطاقات</string>
+    <string name="onboarding_ownership_must_resolve">حدد ملكية الحسابات والبطاقات المكتشفة للمتابعة.</string>
+    <string name="onboarding_accounts_section">الحسابات المكتشفة</string>
+    <string name="onboarding_cards_section">البطاقات المكتشفة</string>
+    <string name="onboarding_account_suffix">حساب ينتهي بـ %1$s</string>
+    <string name="onboarding_card_suffix">بطاقة تنتهي بـ %1$s</string>
+    <string name="onboarding_is_mine_account">حسابي</string>
+    <string name="onboarding_is_mine_card">بطاقتي</string>
+    <string name="onboarding_not_mine">ليس لي</string>
+    <string name="onboarding_status_owned">الملكية: حساب/بطاقة خاصة بي</string>
+    <string name="onboarding_status_external">الملكية: ليست لي</string>
+    <string name="onboarding_status_unknown">الملكية: غير محددة</string>
+    <string name="onboarding_finalize">إنهاء الإعداد</string>
+
+    <string name="onboarding_done_title">تم إعداد مصروف</string>
+    <string name="onboarding_done_counts">حسابات مملوكة: %1$d • بطاقات مملوكة: %2$d • عمليات تحتاج مراجعة: %3$d</string>
+    <string name="onboarding_enter_app">الدخول إلى مصروف</string>
+    <string name="home_setup_complete">اكتمل الإعداد</string>
+    <string name="bank_aljazira">بنك الجزيرة</string>
+    <string name="bank_unknown">بنك غير معروف</string>
 </resources>
