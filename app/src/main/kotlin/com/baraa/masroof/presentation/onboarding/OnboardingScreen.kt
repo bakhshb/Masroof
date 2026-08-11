@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
@@ -289,6 +290,8 @@ private fun OwnershipStep(
                         importResult.failed,
                         importResult.notRelevant,
                     ),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
                 )
                 if (importResult.parsed == 0) {
                     Text(
@@ -299,8 +302,27 @@ private fun OwnershipStep(
                         } else {
                             stringResource(R.string.onboarding_import_no_transactions)
                         },
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Start,
                         color = MaterialTheme.colorScheme.error,
                     )
+                    if (importResult.distinctSenders.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.onboarding_import_senders_seen),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start,
+                        )
+                        importResult.distinctSenders.forEach { sender ->
+                            Text(
+                                "• $sender",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                            )
+                        }
+                    }
                 }
             }
         }
