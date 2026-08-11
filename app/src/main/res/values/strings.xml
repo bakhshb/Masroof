@@ -57,7 +57,9 @@
     <string name="dashboard_income">الدخل</string>
     <string name="dashboard_refunds">الاستردادات</string>
     <string name="dashboard_money_movement">حركة الأموال</string>
-    <string name="dashboard_external_in">تحويلات واردة</string>
+    <string name="dashboard_external_in">تحويلات واردة خارجية</string>
+    <string name="dashboard_external_in_hint">حوالات من خارج حساباتك — لا تشمل ما صُنّف «دخل»</string>
+    <string name="dashboard_combined_incoming">إجمالي الوارد (دخل + تحويلات)</string>
     <string name="dashboard_external_out">تحويلات صادرة</string>
     <string name="dashboard_card_payments">سداد البطاقات</string>
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
@@ -82,6 +84,9 @@
     <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
     <string name="dashboard_direction_out">صادر</string>
     <string name="dashboard_direction_in">وارد</string>
+    <string name="dashboard_direction_income">دخل</string>
+    <string name="dashboard_direction_transfer_in">تحويل وارد</string>
+    <string name="dashboard_direction_transfer_out">تحويل صادر</string>
     <string name="dashboard_direction_neutral">تحويل</string>
 
     <string name="txn_type_expense">مصروف</string>

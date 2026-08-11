@@ -7,6 +7,8 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 enum class TransactionDirectionUi {
     OUTWARD,
     INWARD,
+    INCOME,
+    TRANSFER_IN,
     NEUTRAL,
 }
 
@@ -57,8 +59,12 @@ object TransactionTypePresentation {
             -> TransactionDirectionUi.OUTWARD
 
             FinancialTransactionType.INCOME,
-            FinancialTransactionType.REFUND,
+            -> TransactionDirectionUi.INCOME
+
             FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            -> TransactionDirectionUi.TRANSFER_IN
+
+            FinancialTransactionType.REFUND,
             -> TransactionDirectionUi.INWARD
 
             FinancialTransactionType.SELF_TRANSFER,

@@ -179,7 +179,19 @@ private fun DashboardScreen(
                     title = stringResource(R.string.dashboard_money_movement),
                     icon = MasroofIcons.moneyMovement,
                 )
+                MovementRow(
+                    stringResource(R.string.dashboard_combined_incoming),
+                    summary.combinedIncoming,
+                    MasroofIcons.income,
+                )
                 MovementRow(stringResource(R.string.dashboard_external_in), summary.externalTransfersIn, MasroofIcons.externalIn)
+                if (summary.income.amount.signum() > 0 && summary.externalTransfersIn.amount.signum() == 0) {
+                    Text(
+                        stringResource(R.string.dashboard_external_in_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 MovementRow(stringResource(R.string.dashboard_external_out), summary.externalTransfersOut, MasroofIcons.externalOut)
                 MovementRow(stringResource(R.string.dashboard_card_payments), summary.creditCardPayments, MasroofIcons.cardPayment)
                 MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)

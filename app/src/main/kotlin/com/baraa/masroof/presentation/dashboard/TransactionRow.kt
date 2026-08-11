@@ -45,10 +45,12 @@ fun TransactionRow(row: TransactionPreviewUi, modifier: Modifier = Modifier) {
                     Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val directionIcon = when (row.direction) {
-                        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
-                        TransactionDirectionUi.INWARD -> MasroofIcons.externalIn
-                        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
+                    val (directionIcon, directionLabelRes) = when (row.direction) {
+                        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut to R.string.dashboard_direction_out
+                        TransactionDirectionUi.INWARD -> MasroofIcons.refunds to R.string.dashboard_direction_in
+                        TransactionDirectionUi.INCOME -> MasroofIcons.income to R.string.dashboard_direction_income
+                        TransactionDirectionUi.TRANSFER_IN -> MasroofIcons.externalIn to R.string.dashboard_direction_transfer_in
+                        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer to R.string.dashboard_direction_neutral
                     }
                     Icon(
                         imageVector = directionIcon,
@@ -58,11 +60,7 @@ fun TransactionRow(row: TransactionPreviewUi, modifier: Modifier = Modifier) {
                     )
                     Spacer(Modifier.size(4.dp))
                     Text(
-                        when (row.direction) {
-                            TransactionDirectionUi.OUTWARD -> stringResource(R.string.dashboard_direction_out)
-                            TransactionDirectionUi.INWARD -> stringResource(R.string.dashboard_direction_in)
-                            TransactionDirectionUi.NEUTRAL -> stringResource(R.string.dashboard_direction_neutral)
-                        },
+                        stringResource(directionLabelRes),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }

@@ -25,6 +25,10 @@ data class MonthlyFinancialSummary(
     val reviewRequiredCount: Int,
     val excludedOtherCurrencyCount: Int = 0,
 ) {
+    /** Salary/reward income plus external inbound transfers (separate buckets in UI). */
+    val combinedIncoming: Money
+        get() = income + externalTransfersIn
+
     /**
      * Period net cash change from external flows and spending (excludes self-transfers,
      * card payments, and cash withdrawals which are neutral internal movements).

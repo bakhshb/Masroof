@@ -109,6 +109,15 @@ class MonthlyFinancialSummaryCalculatorTest {
     }
 
     @Test
+    fun combinedIncoming_sumsIncomeAndExternalIn() {
+        val summary = summarize(
+            tx(FinancialTransactionType.INCOME, "28093.33"),
+            tx(FinancialTransactionType.EXTERNAL_TRANSFER_IN, "200"),
+        )
+        assertEquals(Money.of("28293.33", Currency.SAR), summary.combinedIncoming)
+    }
+
+    @Test
     fun netCashFlow_externalFlowsMinusSpending() {
         val summary = summarize(
             tx(FinancialTransactionType.INCOME, "1000"),
