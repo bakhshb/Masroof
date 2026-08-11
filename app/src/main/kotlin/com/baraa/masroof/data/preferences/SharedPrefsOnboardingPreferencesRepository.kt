@@ -6,6 +6,13 @@ import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 class SharedPrefsOnboardingPreferencesRepository(
     private val prefs: SharedPreferences,
 ) : OnboardingPreferencesRepository {
+    override fun isOnboardingStarted(): Boolean =
+        prefs.getBoolean(KEY_ONBOARDING_STARTED, false)
+
+    override fun setOnboardingStarted(started: Boolean) {
+        prefs.edit().putBoolean(KEY_ONBOARDING_STARTED, started).apply()
+    }
+
     override fun isOnboardingCompleted(): Boolean =
         prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
 
@@ -39,6 +46,7 @@ class SharedPrefsOnboardingPreferencesRepository(
 
     companion object {
         const val PREFS_NAME: String = "onboarding_prefs"
+        private const val KEY_ONBOARDING_STARTED = "onboarding_started"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_IMPORT_START_EPOCH_MILLIS = "historical_import_start_epoch_millis"
         private const val KEY_IMPORT_COMPLETED = "historical_import_completed"

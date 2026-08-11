@@ -186,7 +186,11 @@ private fun ImportDateStep(
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.onboarding_selected_date, selected.toString()))
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onContinue,
+            enabled = state.importState !is ImportState.Scanning,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(stringResource(R.string.onboarding_start_import))
         }
     }

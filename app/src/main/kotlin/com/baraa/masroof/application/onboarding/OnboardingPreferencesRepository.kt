@@ -6,6 +6,10 @@ package com.baraa.masroof.application.onboarding
  * Runtime permission truth still comes from Android checks.
  */
 interface OnboardingPreferencesRepository {
+    fun isOnboardingStarted(): Boolean
+
+    fun setOnboardingStarted(started: Boolean)
+
     fun isOnboardingCompleted(): Boolean
 
     fun setOnboardingCompleted(completed: Boolean)

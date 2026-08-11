@@ -12,6 +12,8 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +39,7 @@ class OnboardingViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+    private var importJob: Job? = null
 
     init {
         reloadFromCurrentState()
@@ -45,17 +48,19 @@ class OnboardingViewModel(
     fun reloadFromCurrentState() {
         viewModelScope.launch {
             val permissionGranted = permissionStateProvider()
+            val started = onboardingPrefs.isOnboardingStarted()
             val completed = onboardingPrefs.isOnboardingCompleted()
             val savedEpoch = onboardingPrefs.getHistoricalImportStartEpochMillis()
             val savedDate = savedEpoch?.let {
                 Instant.ofEpochMilli(it).atZone(zoneId).toLocalDate()
             }
+            val importCompleted = onboardingPrefs.isHistoricalImportCompleted()
 
             val step = when {
                 completed -> OnboardingStep.HOME
+                !started -> OnboardingStep.WELCOME
                 !permissionGranted -> OnboardingStep.PERMISSION
-                savedDate == null -> OnboardingStep.IMPORT_DATE
-                !onboardingPrefs.isHistoricalImportCompleted() -> OnboardingStep.IMPORTING
+                !importCompleted -> OnboardingStep.IMPORT_DATE
                 else -> OnboardingStep.OWNERSHIP
             }
 
@@ -65,28 +70,52 @@ class OnboardingViewModel(
                     onboardingCompleted = completed,
                     selectedImportDate = savedDate ?: ImportDatePolicy.last27th(LocalDate.now(clock)),
                     selectedDateOption = if (savedDate == null) ImportDateOption.LAST_27TH else it.selectedDateOption,
-                    step = if (completed) OnboardingStep.HOME else step,
+                    step = step,
+                    importState = if (step == OnboardingStep.IMPORTING) ImportState.Scanning else ImportState.Idle,
                 )
             }
 
-            if (step == OnboardingStep.OWNERSHIP || completed) {
+            if (step == OnboardingStep.OWNERSHIP || step == OnboardingStep.HOME) {
                 loadCandidatesAndCounts()
             }
         }
     }
 
     fun onStartClicked() {
+        onboardingPrefs.setOnboardingStarted(true)
+        val permissionGranted = permissionStateProvider()
         _uiState.update {
-            it.copy(step = if (it.permissionGranted) OnboardingStep.IMPORT_DATE else OnboardingStep.PERMISSION)
+            it.copy(
+                permissionGranted = permissionGranted,
+                step = if (permissionGranted) OnboardingStep.IMPORT_DATE else OnboardingStep.PERMISSION,
+                error = if (permissionGranted) null else OnboardingError.PERMISSION_DENIED,
+            )
         }
     }
 
     fun onPermissionResult(granted: Boolean) {
         _uiState.update {
+            val nextStep = when (it.step) {
+                OnboardingStep.PERMISSION -> if (granted) OnboardingStep.IMPORT_DATE else OnboardingStep.PERMISSION
+                OnboardingStep.IMPORT_DATE,
+                OnboardingStep.IMPORTING,
+                -> if (granted) it.step else OnboardingStep.PERMISSION
+                OnboardingStep.WELCOME,
+                OnboardingStep.OWNERSHIP,
+                OnboardingStep.FINALIZE,
+                OnboardingStep.HOME,
+                -> it.step
+            }
             it.copy(
                 permissionGranted = granted,
-                step = if (granted) OnboardingStep.IMPORT_DATE else OnboardingStep.PERMISSION,
-                error = if (granted) null else OnboardingError.PERMISSION_DENIED,
+                step = nextStep,
+                error = if (!granted && nextStep == OnboardingStep.PERMISSION) {
+                    OnboardingError.PERMISSION_DENIED
+                } else if (granted && it.error == OnboardingError.PERMISSION_DENIED) {
+                    null
+                } else {
+                    it.error
+                },
             )
         }
     }
@@ -118,37 +147,65 @@ class OnboardingViewModel(
     }
 
     fun startImport() {
-        viewModelScope.launch {
-            val selectedDate = _uiState.value.selectedImportDate ?: ImportDatePolicy.last27th(LocalDate.now(clock))
-            val startInstant = ImportDatePolicy.toStartOfDayInstant(selectedDate, zoneId)
+        if (importJob?.isActive == true || _uiState.value.importState is ImportState.Scanning) {
+            return
+        }
 
-            onboardingPrefs.setHistoricalImportStartEpochMillis(startInstant.toEpochMilli())
-            _uiState.update { it.copy(step = OnboardingStep.IMPORTING, importState = ImportState.Scanning, error = null) }
+        importJob = viewModelScope.launch {
+            try {
+                val selectedDate = _uiState.value.selectedImportDate ?: ImportDatePolicy.last27th(LocalDate.now(clock))
+                val startInstant = ImportDatePolicy.toStartOfDayInstant(selectedDate, zoneId)
 
-            val result = historicalImportGateway.scan(receivedAfter = startInstant)
-            val state = result.toImportState()
-            _uiState.update { it.copy(importState = state) }
+                onboardingPrefs.setHistoricalImportStartEpochMillis(startInstant.toEpochMilli())
+                onboardingPrefs.setHistoricalImportCompleted(false)
+                _uiState.update { it.copy(step = OnboardingStep.IMPORTING, importState = ImportState.Scanning, error = null) }
 
-            when (state) {
-                is ImportState.Completed -> {
-                    onboardingPrefs.setHistoricalImportCompleted(true)
-                    discoverFromStoredEvents()
-                    loadCandidatesAndCounts()
-                    _uiState.update { it.copy(step = OnboardingStep.OWNERSHIP) }
-                }
-                is ImportState.PermissionError -> {
-                    _uiState.update {
-                        it.copy(
-                            step = OnboardingStep.PERMISSION,
-                            error = OnboardingError.PERMISSION_DENIED,
-                        )
+                val result = historicalImportGateway.scan(receivedAfter = startInstant)
+                val state = result.toImportState()
+                _uiState.update { it.copy(importState = state) }
+
+                when (state) {
+                    is ImportState.Completed -> {
+                        try {
+                            discoverFromStoredEvents()
+                            loadCandidatesAndCounts()
+                            onboardingPrefs.setHistoricalImportCompleted(true)
+                            _uiState.update { it.copy(step = OnboardingStep.OWNERSHIP) }
+                        } catch (ce: CancellationException) {
+                            throw ce
+                        } catch (_: Exception) {
+                            onboardingPrefs.setHistoricalImportCompleted(false)
+                            _uiState.update {
+                                it.copy(
+                                    importState = ImportState.ProviderError("post_scan_setup_failed"),
+                                    error = OnboardingError.IMPORT_FAILED,
+                                )
+                            }
+                        }
+                    }
+                    is ImportState.PermissionError -> {
+                        _uiState.update {
+                            it.copy(
+                                step = OnboardingStep.PERMISSION,
+                                error = OnboardingError.PERMISSION_DENIED,
+                            )
+                        }
+                    }
+                    is ImportState.ProviderError -> {
+                        _uiState.update { it.copy(error = OnboardingError.SMS_PROVIDER_ERROR) }
+                    }
+                    else -> {
+                        _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }
                     }
                 }
-                is ImportState.ProviderError -> {
-                    _uiState.update { it.copy(error = OnboardingError.SMS_PROVIDER_ERROR) }
-                }
-                else -> {
-                    _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        importState = ImportState.ProviderError("scan_failed"),
+                        error = OnboardingError.IMPORT_FAILED,
+                    )
                 }
             }
         }
@@ -188,8 +245,7 @@ class OnboardingViewModel(
 
     fun finalizeOnboarding() {
         viewModelScope.launch {
-            val state = _uiState.value
-            if (state.hasUnknownCandidates) {
+            if (hasUnknownCandidatesInRepositories()) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
                 return@launch
             }
@@ -209,6 +265,16 @@ class OnboardingViewModel(
                 _uiState.update { it.copy(finalizing = false, error = OnboardingError.FINALIZATION_FAILED) }
             }
         }
+    }
+
+    private suspend fun hasUnknownCandidatesInRepositories(): Boolean {
+        val hasUnknownAccounts = accountRegistryRepository.listAll().any {
+            it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN
+        }
+        val hasUnknownCards = cardRegistryRepository.listAll().any {
+            it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN
+        }
+        return hasUnknownAccounts || hasUnknownCards
     }
 
     fun enterApp() {

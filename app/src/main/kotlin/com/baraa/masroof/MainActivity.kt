@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -56,10 +55,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    LaunchedEffect(Unit) {
-                        onboardingViewModel.onPermissionResult(hasSmsPermissions())
-                    }
-
                     OnboardingRoute(
                         viewModel = onboardingViewModel,
                         onRequestPermissions = {
@@ -74,7 +69,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        onboardingViewModel.onPermissionResult(hasSmsPermissions())
         onboardingViewModel.reloadFromCurrentState()
     }
 

@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import kotlinx.coroutines.CompletableDeferred
 import com.baraa.masroof.sms.scanner.SmsScanFailure
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.Dispatchers
@@ -69,10 +70,110 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun selectedDate_passesCorrectInstantBoundary() = runTest {
-        val fixture = Fixture()
+    fun freshInstall_permissionDenied_stillWelcome() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.WELCOME, fixture.vm.uiState.value.step)
+    }
+
+    @Test
+    fun freshInstall_permissionGranted_stillWelcome() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.WELCOME, fixture.vm.uiState.value.step)
+    }
+
+    @Test
+    fun startClicked_permissionDenied_routesPermission() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.PERMISSION, fixture.vm.uiState.value.step)
+        assertTrue(fixture.prefs.isOnboardingStarted())
+    }
+
+    @Test
+    fun startClicked_permissionGranted_routesImportDate() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.IMPORT_DATE, fixture.vm.uiState.value.step)
+        assertTrue(fixture.prefs.isOnboardingStarted())
+    }
+
+    @Test
+    fun restartAfterStartBeforePermission_routesPermission() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.PERMISSION, restartVm.uiState.value.step)
+    }
+
+    @Test
+    fun restartAfterPermissionGranted_routesImportDate() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.IMPORT_DATE, restartVm.uiState.value.step)
+    }
+
+    @Test
+    fun completedOnboarding_routesHome() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        fixture.prefs.setOnboardingCompleted(true)
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.HOME, restartVm.uiState.value.step)
+    }
+
+    @Test
+    fun permissionRefreshWhileWelcome_doesNotSkipWelcome() = runTest {
+        val fixture = Fixture(permissionGranted = false)
         advanceUntilIdle()
         fixture.vm.onPermissionResult(true)
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.WELCOME, fixture.vm.uiState.value.step)
+    }
+
+    @Test
+    fun permissionRefreshWhileHome_doesNotRestartOnboarding() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        fixture.prefs.setOnboardingCompleted(true)
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        restartVm.onPermissionResult(false)
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.HOME, restartVm.uiState.value.step)
+    }
+
+    @Test
+    fun importDate_permissionRevoked_routesPermission() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        fixture.vm.onPermissionResult(false)
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.PERMISSION, fixture.vm.uiState.value.step)
+    }
+
+    @Test
+    fun selectedDate_passesCorrectInstantBoundary() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.selectCustomDate(LocalDate.parse("2026-08-03"))
         fixture.vm.startImport()
         advanceUntilIdle()
@@ -84,17 +185,116 @@ class OnboardingViewModelTest {
 
     @Test
     fun futureCustomDate_rejected() = runTest {
-        val fixture = Fixture(now = Instant.parse("2026-08-11T08:00:00Z"))
-        fixture.vm.onPermissionResult(true)
+        val fixture = Fixture(now = Instant.parse("2026-08-11T08:00:00Z"), permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.selectCustomDate(LocalDate.parse("2026-08-12"))
         advanceUntilIdle()
         assertEquals(OnboardingError.INVALID_FUTURE_DATE, fixture.vm.uiState.value.error)
     }
 
     @Test
+    fun persistedIncompleteImport_routesToImportDateNotEndlessImporting() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        fixture.prefs.setOnboardingStarted(true)
+        fixture.prefs.setHistoricalImportStartEpochMillis(LocalDate.parse("2026-08-03").atStartOfDay(fixture.zone).toInstant().toEpochMilli())
+        fixture.prefs.setHistoricalImportCompleted(false)
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.IMPORT_DATE, restartVm.uiState.value.step)
+        assertTrue(restartVm.uiState.value.importState is ImportState.Idle)
+    }
+
+    @Test
+    fun persistedIncompleteImport_restoresSavedDate() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        val savedDate = LocalDate.parse("2026-08-03")
+        fixture.prefs.setOnboardingStarted(true)
+        fixture.prefs.setHistoricalImportStartEpochMillis(savedDate.atStartOfDay(fixture.zone).toInstant().toEpochMilli())
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        assertEquals(savedDate, restartVm.uiState.value.selectedImportDate)
+    }
+
+    @Test
+    fun explicitRetryAfterRestart_startsScan() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        fixture.prefs.setOnboardingStarted(true)
+        fixture.prefs.setHistoricalImportStartEpochMillis(LocalDate.parse("2026-08-03").atStartOfDay(fixture.zone).toInstant().toEpochMilli())
+        fixture.prefs.setHistoricalImportCompleted(false)
+        val restartVm = fixture.newViewModel()
+        restartVm.reloadFromCurrentState()
+        advanceUntilIdle()
+        restartVm.startImport()
+        advanceUntilIdle()
+        assertEquals(1, fixture.gateway.calls)
+    }
+
+    @Test
+    fun doubleStartWhileScanning_onlyOneGatewayCall() = runTest {
+        val fixture = Fixture(permissionGranted = true, gateway = FakeImportGateway(blockFirstCall = true))
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        fixture.vm.startImport()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        assertEquals(1, fixture.gateway.calls)
+        fixture.gateway.completeBlockedCall()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun retryAfterProviderError_allowsSecondGatewayCall() = runTest {
+        val gateway = FakeImportGateway(
+            initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x")),
+            nextResult = SmsScanResult(scanned = 1, parsed = 1, duplicates = 0),
+        )
+        val fixture = Fixture(permissionGranted = true, gateway = gateway)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        assertEquals(2, fixture.gateway.calls)
+    }
+
+    @Test
+    fun discoveryFailureAfterScanSuccess_doesNotPersistImportCompleted() = runTest {
+        val fixture = Fixture(permissionGranted = true, discoverShouldFail = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        assertFalse(fixture.prefs.isHistoricalImportCompleted())
+        assertEquals(OnboardingError.IMPORT_FAILED, fixture.vm.uiState.value.error)
+    }
+
+    @Test
+    fun retryAfterDiscoveryFailure_succeedsSafely() = runTest {
+        val fixture = Fixture(permissionGranted = true, discoverShouldFail = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        fixture.discoverShouldFail = false
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        assertTrue(fixture.prefs.isHistoricalImportCompleted())
+        assertEquals(OnboardingStep.OWNERSHIP, fixture.vm.uiState.value.step)
+    }
+
+    @Test
     fun importSuccess_advancesToOwnership() = runTest {
-        val fixture = Fixture()
-        fixture.vm.onPermissionResult(true)
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         assertEquals(OnboardingStep.OWNERSHIP, fixture.vm.uiState.value.step)
@@ -103,8 +303,12 @@ class OnboardingViewModelTest {
 
     @Test
     fun providerFailure_showsRetryState() = runTest {
-        val fixture = Fixture(scanResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x")))
-        fixture.vm.onPermissionResult(true)
+        val fixture = Fixture(
+            permissionGranted = true,
+            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x"))),
+        )
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         assertTrue(fixture.vm.uiState.value.importState is ImportState.ProviderError)
@@ -113,26 +317,21 @@ class OnboardingViewModelTest {
 
     @Test
     fun permissionFailure_returnsPermissionStep() = runTest {
-        val fixture = Fixture(scanResult = SmsScanResult(failure = SmsScanFailure.PermissionDenied))
-        fixture.vm.onPermissionResult(true)
+        val fixture = Fixture(
+            permissionGranted = true,
+            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.PermissionDenied)),
+        )
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         assertEquals(OnboardingStep.PERMISSION, fixture.vm.uiState.value.step)
     }
 
     @Test
-    fun retryImport_isSafeAndDoesNotResetState() = runTest {
-        val fixture = Fixture(scanResult = SmsScanResult(scanned = 2, parsed = 1, duplicates = 1))
-        fixture.vm.onPermissionResult(true)
-        fixture.vm.startImport()
-        fixture.vm.startImport()
-        advanceUntilIdle()
-        assertEquals(2, fixture.gateway.calls)
-    }
-
-    @Test
     fun unknownCandidatesShown_bankUnknownHidden() = runTest {
         val fixture = Fixture(
+            permissionGranted = true,
             accounts = mutableListOf(
                 AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
                 AccountRegistryEntry(Bank.UNKNOWN, "9999", OwnershipStatus.UNKNOWN, null, null),
@@ -141,7 +340,8 @@ class OnboardingViewModelTest {
                 CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.UNKNOWN, null, null),
             ),
         )
-        fixture.vm.onPermissionResult(true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         assertEquals(1, fixture.vm.uiState.value.accounts.size)
@@ -152,11 +352,13 @@ class OnboardingViewModelTest {
     @Test
     fun ownershipActions_callP7AndCanRevise() = runTest {
         val fixture = Fixture(
+            permissionGranted = true,
             accounts = mutableListOf(
                 AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
             ),
         )
-        fixture.vm.onPermissionResult(true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         val account = fixture.vm.uiState.value.accounts.single()
@@ -171,19 +373,22 @@ class OnboardingViewModelTest {
     @Test
     fun unresolvedUnknown_blocksFinalize_zeroCandidatesAllows() = runTest {
         val fixture = Fixture(
+            permissionGranted = true,
             accounts = mutableListOf(
                 AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
             ),
         )
-        fixture.vm.onPermissionResult(true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         fixture.vm.finalizeOnboarding()
         advanceUntilIdle()
         assertFalse(fixture.prefs.isOnboardingCompleted())
 
-        val noCandidates = Fixture(accounts = mutableListOf(), cards = mutableListOf())
-        noCandidates.vm.onPermissionResult(true)
+        val noCandidates = Fixture(permissionGranted = true, accounts = mutableListOf(), cards = mutableListOf())
+        advanceUntilIdle()
+        noCandidates.vm.onStartClicked()
         noCandidates.vm.startImport()
         advanceUntilIdle()
         noCandidates.vm.finalizeOnboarding()
@@ -193,8 +398,9 @@ class OnboardingViewModelTest {
 
     @Test
     fun finalization_refreshesAndPersistsCompletion_andRestartRoutesHome() = runTest {
-        val fixture = Fixture(accounts = mutableListOf())
-        fixture.vm.onPermissionResult(true)
+        val fixture = Fixture(permissionGranted = true, accounts = mutableListOf())
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.startImport()
         advanceUntilIdle()
         fixture.vm.finalizeOnboarding()
@@ -210,10 +416,23 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun importStartDate_persistsAcrossRestart() = runTest {
-        val fixture = Fixture()
+    fun finalizeRechecksRepositoryState_beforeCompleting() = runTest {
+        val fixture = Fixture(permissionGranted = true, accounts = mutableListOf())
         advanceUntilIdle()
-        fixture.vm.onPermissionResult(true)
+        fixture.vm.onStartClicked()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        fixture.accountRepo.addUnknown("3001")
+        fixture.vm.finalizeOnboarding()
+        advanceUntilIdle()
+        assertFalse(fixture.prefs.isOnboardingCompleted())
+    }
+
+    @Test
+    fun importStartDate_persistsAcrossRestart() = runTest {
+        val fixture = Fixture(permissionGranted = true)
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
         fixture.vm.selectCustomDate(LocalDate.parse("2026-08-03"))
         fixture.vm.startImport()
         advanceUntilIdle()
@@ -225,7 +444,9 @@ class OnboardingViewModelTest {
 
     private class Fixture(
         now: Instant = Instant.parse("2026-08-11T08:00:00Z"),
-        scanResult: SmsScanResult = SmsScanResult(scanned = 10, parsed = 6, duplicates = 2),
+        permissionGranted: Boolean = true,
+        gateway: FakeImportGateway = FakeImportGateway(),
+        discoverShouldFail: Boolean = false,
         accounts: MutableList<AccountRegistryEntry> = mutableListOf(),
         cards: MutableList<CardRegistryEntry> = mutableListOf(),
     ) {
@@ -234,7 +455,9 @@ class OnboardingViewModelTest {
         val accountRepo = FakeAccountRepo(accounts)
         val cardRepo = FakeCardRepo(cards)
         val reviewRepo = FakeReviewRepo()
-        val gateway = FakeImportGateway(scanResult)
+        val gateway = gateway
+        var permissionGranted: Boolean = permissionGranted
+        var discoverShouldFail: Boolean = discoverShouldFail
         var refreshed: Boolean = false
 
         val vm: OnboardingViewModel = newViewModel(now)
@@ -247,9 +470,12 @@ class OnboardingViewModelTest {
                 cardRegistryRepository = cardRepo,
                 ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo),
                 reviewRepository = reviewRepo,
-                discoverFromStoredEvents = { 0 },
+                discoverFromStoredEvents = {
+                    if (discoverShouldFail) error("discover failed")
+                    0
+                },
                 refreshReviewQueue = { refreshed = true },
-                permissionStateProvider = { true },
+                permissionStateProvider = { permissionGranted },
                 zoneId = zone,
                 clock = Clock.fixed(now, zone),
             )
@@ -257,9 +483,14 @@ class OnboardingViewModelTest {
     }
 
     private class FakeOnboardingPrefs : OnboardingPreferencesRepository {
+        var started = false
         var done = false
         var start: Long? = null
         var imported = false
+        override fun isOnboardingStarted(): Boolean = started
+        override fun setOnboardingStarted(started: Boolean) {
+            this.started = started
+        }
         override fun isOnboardingCompleted(): Boolean = done
         override fun setOnboardingCompleted(completed: Boolean) {
             done = completed
@@ -275,14 +506,29 @@ class OnboardingViewModelTest {
     }
 
     private class FakeImportGateway(
-        private var result: SmsScanResult,
+        initialResult: SmsScanResult = SmsScanResult(scanned = 10, parsed = 6, duplicates = 2),
+        private val nextResult: SmsScanResult? = null,
+        private val blockFirstCall: Boolean = false,
     ) : HistoricalImportGateway {
+        private var result: SmsScanResult = initialResult
+        private var blocked: CompletableDeferred<Unit>? = null
         var lastReceivedAfter: Instant? = null
         var calls: Int = 0
         override suspend fun scan(receivedAfter: Instant?): SmsScanResult {
             calls++
             lastReceivedAfter = receivedAfter
-            return result
+            if (blockFirstCall && calls == 1) {
+                blocked = CompletableDeferred()
+                blocked?.await()
+            }
+            val current = result
+            if (nextResult != null) {
+                result = nextResult
+            }
+            return current
+        }
+        fun completeBlockedCall() {
+            blocked?.complete(Unit)
         }
     }
 
@@ -301,6 +547,9 @@ class OnboardingViewModelTest {
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? =
             entries.firstOrNull { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
+        fun addUnknown(maskedNumber: String) {
+            entries += AccountRegistryEntry(Bank.BANK_ALJAZIRA, maskedNumber, OwnershipStatus.UNKNOWN, null, null)
+        }
     }
 
     private class FakeCardRepo(
