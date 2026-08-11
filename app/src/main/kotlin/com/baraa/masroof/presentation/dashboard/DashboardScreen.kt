@@ -200,6 +200,13 @@ private fun DashboardScreen(
                 MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)
                 MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
 
+                state.creditCards?.let { creditCards ->
+                    CreditCardsSection(
+                        overview = creditCards,
+                        zoneId = java.time.ZoneId.systemDefault(),
+                    )
+                }
+
                 SectionHeader(
                     title = stringResource(R.string.dashboard_recent_title),
                     icon = MasroofIcons.recentTransactions,

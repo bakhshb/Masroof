@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -28,6 +29,7 @@ data class DashboardUiState(
     val period: FinancialPeriod? = null,
     val periodLabel: String = "",
     val summary: MonthlyFinancialSummary? = null,
+    val creditCards: CreditCardsOverview? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
     val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,

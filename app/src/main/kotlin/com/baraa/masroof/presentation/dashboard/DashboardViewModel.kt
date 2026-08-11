@@ -162,6 +162,7 @@ class DashboardViewModel(
                         period = period,
                         periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                         summary = null,
+                        creditCards = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
                     )
@@ -181,6 +182,7 @@ class DashboardViewModel(
                         period = overview.period,
                         periodLabel = FinancialPeriodUiFormatter.formatRange(overview.period),
                         summary = overview.summary,
+                        creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
                         isCurrentPeriod = overview.isCurrentPeriod,
@@ -209,6 +211,7 @@ class DashboardViewModel(
                             period = period,
                             periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                             summary = null,
+                            creditCards = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
                         )

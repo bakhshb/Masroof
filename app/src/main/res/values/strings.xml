@@ -62,6 +62,13 @@
     <string name="dashboard_combined_incoming">إجمالي الوارد (دخل + تحويلات)</string>
     <string name="dashboard_external_out">تحويلات صادرة</string>
     <string name="dashboard_card_payments">سداد البطاقات</string>
+    <string name="dashboard_credit_cards_title">البطاقات الائتمانية</string>
+    <string name="dashboard_credit_cards_snapshot_hint">من رسائل البنك — لقطة من آخر رسالة بطاقة، وليس رصيداً لحظياً</string>
+    <string name="dashboard_credit_card_last4">بطاقة ···%1$s</string>
+    <string name="dashboard_credit_card_period_spending">منصرف الفترة</string>
+    <string name="dashboard_credit_card_available">الرصيد المتاح للبطاقة</string>
+    <string name="dashboard_credit_card_aggregate_due">إجمالي المستحق (آخر رسالة)</string>
+    <string name="dashboard_credit_card_updated">محدّث: %1$s</string>
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
     <string name="dashboard_recent_title">العمليات الأخيرة</string>

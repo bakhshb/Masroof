@@ -171,6 +171,8 @@ class AppContainer(
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
             reviewRepository = reviewRepository,
+            parsedEventRepository = parsedEventRepository,
+            rawSmsRepository = rawSmsRepository,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()

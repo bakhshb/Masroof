@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.DashboardOverview
+import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
@@ -296,6 +297,7 @@ class DashboardViewModelTest {
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
                 transactions = listOf(tx),
+                creditCards = emptyCreditCards(),
                 isCurrentPeriod = true,
             ),
         )
@@ -330,9 +332,18 @@ class DashboardViewModelTest {
                 transactionCount = transactionCount,
             ),
             transactions = emptyList(),
+            creditCards = emptyCreditCards(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
+
+    private fun emptyCreditCards(): CreditCardsOverview =
+        CreditCardsOverview(
+            cards = emptyList(),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            currency = Currency.SAR,
+        )
 
     private fun viewModel(loader: FakeLoader): DashboardViewModel =
         DashboardViewModel(
@@ -424,6 +435,12 @@ class DashboardViewModelTest {
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
                     transactions = emptyList(),
+                    creditCards = CreditCardsOverview(
+                        cards = emptyList(),
+                        aggregateDueAmount = null,
+                        aggregateDueUpdatedAt = null,
+                        currency = Currency.SAR,
+                    ),
                     isCurrentPeriod = false,
                 )
         }
