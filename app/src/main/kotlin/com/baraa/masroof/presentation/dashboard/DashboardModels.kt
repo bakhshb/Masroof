@@ -27,6 +27,7 @@ data class DashboardUiState(
     val periodLabel: String = "",
     val summary: MonthlyFinancialSummary? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
+    val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,
     val error: DashboardError? = null,
     val rescanning: Boolean = false,

@@ -38,6 +38,10 @@ class DashboardViewModel(
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
 
+    companion object {
+        const val RECENT_TRANSACTION_LIMIT: Int = 5
+    }
+
     fun refresh() {
         load(activePeriod)
     }
@@ -102,6 +106,7 @@ class DashboardViewModel(
                         periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                         summary = null,
                         recentTransactions = emptyList(),
+                        allTransactions = emptyList(),
                     )
                 }
             }
@@ -112,13 +117,15 @@ class DashboardViewModel(
                 if (period != activePeriod) {
                     return@launch
                 }
+                val previews = overview.transactions.map(::toPreview)
                 _uiState.update {
                     it.copy(
                         loading = false,
                         period = overview.period,
                         periodLabel = FinancialPeriodUiFormatter.formatRange(overview.period),
                         summary = overview.summary,
-                        recentTransactions = overview.recentTransactions.map(::toPreview),
+                        recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
+                        allTransactions = previews,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                     )
@@ -145,6 +152,7 @@ class DashboardViewModel(
                             periodLabel = FinancialPeriodUiFormatter.formatRange(period),
                             summary = null,
                             recentTransactions = emptyList(),
+                            allTransactions = emptyList(),
                         )
                     }
                 }

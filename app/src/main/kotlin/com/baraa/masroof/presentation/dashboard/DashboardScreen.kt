@@ -28,7 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
@@ -41,6 +40,7 @@ import com.baraa.masroof.presentation.common.SummaryMiniCard
 fun DashboardRoute(
     viewModel: DashboardViewModel,
     onOpenReview: () -> Unit = {},
+    onOpenAllTransactions: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -54,6 +54,7 @@ fun DashboardRoute(
         onRetry = viewModel::refresh,
         onRescan = viewModel::rescanSms,
         onOpenReview = onOpenReview,
+        onOpenAllTransactions = onOpenAllTransactions,
     )
 }
 
@@ -66,6 +67,7 @@ private fun DashboardScreen(
     onRetry: () -> Unit,
     onRescan: () -> Unit,
     onOpenReview: () -> Unit,
+    onOpenAllTransactions: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -209,8 +211,18 @@ private fun DashboardScreen(
                     }
                 } else {
                     state.recentTransactions.forEach { row ->
-                        RecentRow(row)
+                        TransactionRow(row)
+                        Spacer(Modifier.height(4.dp))
                     }
+                    IconTextButtonOutlined(
+                        onClick = onOpenAllTransactions,
+                        icon = MasroofIcons.recentTransactions,
+                        text = stringResource(
+                            R.string.dashboard_view_all_transactions,
+                            summary.transactionCount,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
@@ -334,57 +346,6 @@ private fun MovementRow(title: String, value: Money, icon: androidx.compose.ui.g
 }
 
 @Composable
-private fun RecentRow(row: TransactionPreviewUi) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                imageVector = MasroofIcons.transactionType(row.type),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp).padding(top = 2.dp),
-            )
-            Spacer(Modifier.size(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(row.title ?: typeLabel(row.type), style = MaterialTheme.typography.titleSmall)
-                    Text(row.amountLabel)
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(typeLabel(row.type), style = MaterialTheme.typography.bodySmall)
-                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val directionIcon = when (row.direction) {
-                        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
-                        TransactionDirectionUi.INWARD -> MasroofIcons.externalIn
-                        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
-                    }
-                    Icon(
-                        imageVector = directionIcon,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.size(4.dp))
-                    Text(
-                        when (row.direction) {
-                            TransactionDirectionUi.OUTWARD -> stringResource(R.string.dashboard_direction_out)
-                            TransactionDirectionUi.INWARD -> stringResource(R.string.dashboard_direction_in)
-                            TransactionDirectionUi.NEUTRAL -> stringResource(R.string.dashboard_direction_neutral)
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-        }
-    }
-    Spacer(Modifier.height(4.dp))
-}
-
-@Composable
 private fun rescanStatusMessage(status: SmsRescanStatus): String =
     stringResource(
         when (status) {
@@ -393,23 +354,5 @@ private fun rescanStatusMessage(status: SmsRescanStatus): String =
             SmsRescanStatus.NO_BANK_SMS -> R.string.dashboard_rescan_no_bank_sms
             SmsRescanStatus.NO_TRANSACTIONS -> R.string.dashboard_rescan_no_transactions
             SmsRescanStatus.FAILED -> R.string.dashboard_rescan_failed
-        },
-    )
-
-@Composable
-private fun typeLabel(type: FinancialTransactionType): String =
-    stringResource(
-        when (type) {
-            FinancialTransactionType.EXPENSE -> R.string.txn_type_expense
-            FinancialTransactionType.INCOME -> R.string.txn_type_income
-            FinancialTransactionType.SELF_TRANSFER -> R.string.txn_type_self_transfer
-            FinancialTransactionType.EXTERNAL_TRANSFER_IN -> R.string.txn_type_external_in
-            FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> R.string.txn_type_external_out
-            FinancialTransactionType.CREDIT_CARD_PAYMENT -> R.string.txn_type_card_payment
-            FinancialTransactionType.REFUND -> R.string.txn_type_refund
-            FinancialTransactionType.CASH_WITHDRAWAL -> R.string.txn_type_cash_withdrawal
-            FinancialTransactionType.FEE -> R.string.txn_type_fee
-            FinancialTransactionType.ADJUSTMENT -> R.string.txn_type_adjustment
-            FinancialTransactionType.UNKNOWN -> R.string.txn_type_unknown
         },
     )

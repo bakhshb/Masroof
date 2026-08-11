@@ -13,7 +13,8 @@ import java.time.ZoneId
 data class DashboardOverview(
     val period: FinancialPeriod,
     val summary: MonthlyFinancialSummary,
-    val recentTransactions: List<FinancialTransaction>,
+    /** All transactions in the selected period, newest first. */
+    val transactions: List<FinancialTransaction>,
     val isCurrentPeriod: Boolean,
 )
 
@@ -26,7 +27,6 @@ class DashboardService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
-    private val recentLimit: Int = DEFAULT_RECENT_LIMIT,
 ) : DashboardOverviewLoader {
     override suspend fun loadOverview(period: FinancialPeriod): DashboardOverview {
         val startInclusive = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId)
@@ -42,20 +42,15 @@ class DashboardService(
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
         )
-        val recent = transactions.take(recentLimit)
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(
             period = period,
             summary = summary,
-            recentTransactions = recent,
+            transactions = transactions,
             isCurrentPeriod = period == current,
         )
     }
 
     suspend fun loadCurrentOverview(): DashboardOverview =
         loadOverview(FinancialPeriodPolicy.periodContaining(LocalDate.now(clock)))
-
-    companion object {
-        const val DEFAULT_RECENT_LIMIT: Int = 5
-    }
 }

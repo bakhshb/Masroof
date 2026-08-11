@@ -1,0 +1,90 @@
+package com.baraa.masroof.presentation.dashboard
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.baraa.masroof.R
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.presentation.common.MasroofIcons
+
+@Composable
+fun TransactionRow(row: TransactionPreviewUi, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = MasroofIcons.transactionType(row.type),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp).padding(top = 2.dp),
+            )
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(row.title ?: transactionTypeLabel(row.type), style = MaterialTheme.typography.titleSmall)
+                    Text(row.amountLabel)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(transactionTypeLabel(row.type), style = MaterialTheme.typography.bodySmall)
+                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val directionIcon = when (row.direction) {
+                        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
+                        TransactionDirectionUi.INWARD -> MasroofIcons.externalIn
+                        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
+                    }
+                    Icon(
+                        imageVector = directionIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        when (row.direction) {
+                            TransactionDirectionUi.OUTWARD -> stringResource(R.string.dashboard_direction_out)
+                            TransactionDirectionUi.INWARD -> stringResource(R.string.dashboard_direction_in)
+                            TransactionDirectionUi.NEUTRAL -> stringResource(R.string.dashboard_direction_neutral)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun transactionTypeLabel(type: FinancialTransactionType): String =
+    stringResource(
+        when (type) {
+            FinancialTransactionType.EXPENSE -> R.string.txn_type_expense
+            FinancialTransactionType.INCOME -> R.string.txn_type_income
+            FinancialTransactionType.SELF_TRANSFER -> R.string.txn_type_self_transfer
+            FinancialTransactionType.EXTERNAL_TRANSFER_IN -> R.string.txn_type_external_in
+            FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> R.string.txn_type_external_out
+            FinancialTransactionType.CREDIT_CARD_PAYMENT -> R.string.txn_type_card_payment
+            FinancialTransactionType.REFUND -> R.string.txn_type_refund
+            FinancialTransactionType.CASH_WITHDRAWAL -> R.string.txn_type_cash_withdrawal
+            FinancialTransactionType.FEE -> R.string.txn_type_fee
+            FinancialTransactionType.ADJUSTMENT -> R.string.txn_type_adjustment
+            FinancialTransactionType.UNKNOWN -> R.string.txn_type_unknown
+        },
+    )

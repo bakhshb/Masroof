@@ -63,6 +63,10 @@
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
     <string name="dashboard_recent_title">العمليات الأخيرة</string>
+    <string name="dashboard_view_all_transactions">عرض كل العمليات (%1$d)</string>
+    <string name="transaction_list_title">عمليات الفترة</string>
+    <string name="transaction_list_period">الفترة: %1$s</string>
+    <string name="transaction_list_count">%1$d عملية في هذه الفترة</string>
     <string name="dashboard_empty_period">لا توجد عمليات في هذه الفترة</string>
     <string name="dashboard_excluded_other_currency">تم استبعاد %1$d عملية بعملة أخرى من الإجماليات.</string>
     <string name="dashboard_review_required">تحتاج مراجعة: %1$d</string>

@@ -291,7 +291,7 @@ class DashboardViewModelTest {
             DashboardOverview(
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
-                recentTransactions = listOf(tx),
+                transactions = listOf(tx),
                 isCurrentPeriod = true,
             ),
         )
@@ -325,7 +325,7 @@ class DashboardViewModelTest {
                 spendingNet = SignedMoneyAmount.of(amount),
                 transactionCount = transactionCount,
             ),
-            recentTransactions = emptyList(),
+            transactions = emptyList(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
@@ -365,7 +365,7 @@ class DashboardViewModelTest {
                 ?: DashboardOverview(
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
-                    recentTransactions = emptyList(),
+                    transactions = emptyList(),
                     isCurrentPeriod = false,
                 )
         }

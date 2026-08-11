@@ -8,6 +8,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
+import com.baraa.masroof.presentation.dashboard.TransactionListScreen
 import com.baraa.masroof.presentation.onboarding.OnboardingRoute
 import com.baraa.masroof.presentation.onboarding.OnboardingStep
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
@@ -17,6 +18,7 @@ import com.baraa.masroof.presentation.review.ReviewViewModel
 private enum class HomeDestination {
     Dashboard,
     Review,
+    AllTransactions,
 }
 
 /**
@@ -38,6 +40,7 @@ fun MasroofRoot(
             HomeDestination.Dashboard -> DashboardRoute(
                 viewModel = dashboardViewModel,
                 onOpenReview = { homeDestination = HomeDestination.Review },
+                onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
             )
             HomeDestination.Review -> ReviewRoute(
                 viewModel = reviewViewModel,
@@ -46,6 +49,14 @@ fun MasroofRoot(
                     dashboardViewModel.refresh()
                 },
             )
+            HomeDestination.AllTransactions -> {
+                val dashboardState by dashboardViewModel.uiState.collectAsState()
+                TransactionListScreen(
+                    periodLabel = dashboardState.periodLabel,
+                    transactions = dashboardState.allTransactions,
+                    onBack = { homeDestination = HomeDestination.Dashboard },
+                )
+            }
         }
     } else {
         homeDestination = HomeDestination.Dashboard

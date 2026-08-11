@@ -126,7 +126,7 @@ class DashboardServiceTest {
         val overview = service.loadOverview(period)
         assertEquals(2, overview.summary.transactionCount)
         assertEquals(Money.of("5.00", Currency.SAR), overview.summary.spendingGross)
-        assertEquals(listOf("inside", "start"), overview.recentTransactions.map { it.id })
+        assertEquals(listOf("inside", "start"), overview.transactions.map { it.id })
     }
 
     @Test
