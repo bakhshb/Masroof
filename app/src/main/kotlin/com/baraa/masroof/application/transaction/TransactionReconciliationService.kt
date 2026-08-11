@@ -1,11 +1,13 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
@@ -28,30 +30,45 @@ data class ReconciliationSummary(
 
 /**
  * Orchestrates ownership-aware matching/assembly and FinancialTransaction persistence.
+ *
+ * When [effectiveParsedEventProvider] is present, reconciliation uses corrected
+ * projections without mutating stored ParsedEvent rows.
  */
 class TransactionReconciliationService(
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val ownershipResolver: OwnershipResolver,
+    private val effectiveParsedEventProvider: EffectiveParsedEventProvider? = null,
 ) {
-    suspend fun reconcileStoredEvents(): ReconciliationSummary {
-        val records = parsedEventRepository.listAll()
-        return reconcileRecords(records)
+    suspend fun reconcileStoredEvents(): ReconciliationSummary =
+        reconcileStoredEventsDetailed().summary
+
+    suspend fun reconcileStoredEventsDetailed(): ReconciliationReport {
+        val records = loadRecords()
+        return reconcileRecordsDetailed(records)
     }
 
     /**
      * Reconcile after a newly saved ParsedEvent. Failures are swallowed by callers
      * that treat P8 as derived processing.
      */
-    suspend fun reconcileAfterParsedEvent(event: ParsedEvent): ReconciliationSummary {
-        val records = parsedEventRepository.listAll()
-        return reconcileRecords(records)
+    suspend fun reconcileAfterParsedEvent(event: ParsedEvent): ReconciliationSummary =
+        reconcileAfterParsedEventDetailed(event).summary
+
+    suspend fun reconcileAfterParsedEventDetailed(event: ParsedEvent): ReconciliationReport {
+        // Full backlog reconcile keeps pair matching correct after live ingest.
+        val records = loadRecords()
+        return reconcileRecordsDetailed(records)
     }
 
-    private suspend fun reconcileRecords(
+    private suspend fun loadRecords(): List<ParsedEventRecord> =
+        effectiveParsedEventProvider?.listAllEffective()
+            ?: parsedEventRepository.listAll()
+
+    private suspend fun reconcileRecordsDetailed(
         records: List<ParsedEventRecord>,
-    ): ReconciliationSummary {
+    ): ReconciliationReport {
         var assembledSingle = 0
         var matchedPairs = 0
         var pendingMatch = 0
@@ -61,11 +78,14 @@ class TransactionReconciliationService(
         var failed = 0
 
         val unresolvedTransfers = mutableListOf<TransferMatchCandidate>()
+        val reviewCandidates = mutableListOf<ReconciliationReviewCandidate>()
+        val settledRawSmsIds = linkedSetOf<String>()
 
         for (record in records) {
             val event = record.event
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
                 alreadyLinked++
+                settledRawSmsIds += event.rawSmsId
                 continue
             }
 
@@ -95,8 +115,16 @@ class TransactionReconciliationService(
                             when (
                                 persist(single.transaction, single.rawSmsIds)
                             ) {
-                                PersistOutcome.Saved -> assembledSingle++
-                                PersistOutcome.Already -> alreadyLinked++
+                                PersistOutcome.Saved -> {
+                                    assembledSingle++
+                                    settledRawSmsIds += event.rawSmsId
+                                }
+
+                                PersistOutcome.Already -> {
+                                    alreadyLinked++
+                                    settledRawSmsIds += event.rawSmsId
+                                }
+
                                 PersistOutcome.Failed -> failed++
                             }
                         }
@@ -113,8 +141,19 @@ class TransactionReconciliationService(
                             pendingMatch++
                         }
 
-                        is TransactionAssembler.Outcome.NeedsReview -> needsReview++
-                        TransactionAssembler.Outcome.Ignored -> ignored++
+                        is TransactionAssembler.Outcome.NeedsReview -> {
+                            needsReview++
+                            reviewCandidates += ReconciliationReviewCandidate(
+                                rawSmsId = event.rawSmsId,
+                                kind = ReviewKind.NEEDS_REVIEW,
+                                reasons = single.reasons.ifEmpty { listOf("needs_review") },
+                            )
+                        }
+
+                        TransactionAssembler.Outcome.Ignored -> {
+                            ignored++
+                            settledRawSmsIds += event.rawSmsId
+                        }
                     }
                 }
 
@@ -130,31 +169,54 @@ class TransactionReconciliationService(
                     ) {
                         is TransactionAssembler.Outcome.Assembled -> {
                             when (persist(outcome.transaction, outcome.rawSmsIds)) {
-                                PersistOutcome.Saved -> assembledSingle++
-                                PersistOutcome.Already -> alreadyLinked++
+                                PersistOutcome.Saved -> {
+                                    assembledSingle++
+                                    settledRawSmsIds += event.rawSmsId
+                                }
+
+                                PersistOutcome.Already -> {
+                                    alreadyLinked++
+                                    settledRawSmsIds += event.rawSmsId
+                                }
+
                                 PersistOutcome.Failed -> failed++
                             }
                         }
 
-                        TransactionAssembler.Outcome.PendingMatch -> pendingMatch++
-                        is TransactionAssembler.Outcome.NeedsReview -> needsReview++
-                        TransactionAssembler.Outcome.Ignored -> ignored++
+                        TransactionAssembler.Outcome.PendingMatch -> {
+                            pendingMatch++
+                            reviewCandidates += ReconciliationReviewCandidate(
+                                rawSmsId = event.rawSmsId,
+                                kind = ReviewKind.PENDING_MATCH,
+                                reasons = listOf("transfer_pending_match"),
+                            )
+                        }
+
+                        is TransactionAssembler.Outcome.NeedsReview -> {
+                            needsReview++
+                            reviewCandidates += ReconciliationReviewCandidate(
+                                rawSmsId = event.rawSmsId,
+                                kind = ReviewKind.NEEDS_REVIEW,
+                                reasons = outcome.reasons.ifEmpty { listOf("needs_review") },
+                            )
+                        }
+
+                        TransactionAssembler.Outcome.Ignored -> {
+                            ignored++
+                            settledRawSmsIds += event.rawSmsId
+                        }
                     }
                 }
             }
         }
 
-        // Pair matching among unresolved transfers (exclude those that got assembled).
-        val stillOpen = unresolvedTransfers.filterNot {
-            // Re-check: some may have been linked if we ever assemble within loop (not yet).
-            false
-        }.filter {
+        val stillOpen = unresolvedTransfers.filter {
             !financialTransactionRepository.isRawSmsLinked(it.event.rawSmsId)
         }
 
-        // Adjust pendingMatch: candidates that successfully match shouldn't stay pending.
         val pairs = TransactionMatcher.findMutuallyUniquePairs(stillOpen)
         val matchedEventIds = mutableSetOf<String>()
+        val matchedRawSmsIds = mutableSetOf<String>()
         for (pair in pairs) {
             if (pair.outgoing.event.id in matchedEventIds ||
                 pair.incoming.event.id in matchedEventIds
@@ -182,11 +244,19 @@ class TransactionReconciliationService(
                             matchedPairs++
                             matchedEventIds += pair.outgoing.event.id
                             matchedEventIds += pair.incoming.event.id
-                            // Those two were counted as pending earlier.
+                            matchedRawSmsIds += pair.outgoing.event.rawSmsId
+                            matchedRawSmsIds += pair.incoming.event.rawSmsId
+                            settledRawSmsIds += pair.outgoing.event.rawSmsId
+                            settledRawSmsIds += pair.incoming.event.rawSmsId
                             pendingMatch = (pendingMatch - 2).coerceAtLeast(0)
                         }
 
-                        PersistOutcome.Already -> alreadyLinked += 2
+                        PersistOutcome.Already -> {
+                            alreadyLinked += 2
+                            settledRawSmsIds += pair.outgoing.event.rawSmsId
+                            settledRawSmsIds += pair.incoming.event.rawSmsId
+                        }
+
                         PersistOutcome.Failed -> failed++
                     }
                 }
@@ -195,7 +265,17 @@ class TransactionReconciliationService(
             }
         }
 
-        return ReconciliationSummary(
+        for (candidate in stillOpen) {
+            if (candidate.event.rawSmsId in matchedRawSmsIds) continue
+            if (financialTransactionRepository.isRawSmsLinked(candidate.event.rawSmsId)) continue
+            reviewCandidates += ReconciliationReviewCandidate(
+                rawSmsId = candidate.event.rawSmsId,
+                kind = ReviewKind.PENDING_MATCH,
+                reasons = listOf("transfer_pending_match"),
+            )
+        }
+
+        val summary = ReconciliationSummary(
             assembledSingle = assembledSingle,
             matchedPairs = matchedPairs,
             pendingMatch = pendingMatch,
@@ -204,14 +284,26 @@ class TransactionReconciliationService(
             alreadyLinked = alreadyLinked,
             failed = failed,
         )
+        return ReconciliationReport(
+            summary = summary,
+            reviewCandidates = reviewCandidates
+                .groupBy { it.rawSmsId }
+                .map { (_, group) ->
+                    val first = group.first()
+                    ReconciliationReviewCandidate(
+                        rawSmsId = first.rawSmsId,
+                        kind = first.kind,
+                        reasons = group.flatMap { it.reasons }.distinct().sorted(),
+                    )
+                },
+            settledRawSmsIds = settledRawSmsIds,
+        )
     }
 
     private suspend fun persist(
         transaction: com.baraa.masroof.domain.model.FinancialTransaction,
         rawSmsIds: List<String>,
     ): PersistOutcome =
-        // Let unexpected repository failures and CancellationException propagate so
-        // SmsIngestionService can treat derived P8 errors without marking evidence Failed.
         when (financialTransactionRepository.save(transaction, rawSmsIds)) {
             FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
             FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already

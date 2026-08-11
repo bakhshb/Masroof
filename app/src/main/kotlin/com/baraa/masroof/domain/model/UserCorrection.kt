@@ -4,17 +4,20 @@ import com.baraa.masroof.core.money.Money
 import java.time.Instant
 
 /**
- * User-supplied correction for a parsed event.
+ * User-supplied correction overlay for stable RawSms evidence.
  *
- * Stored separately from [RawSms]; never mutates original SMS evidence.
+ * Stored separately from [RawSms] and [ParsedEvent]; never mutates either.
+ * Targets [targetRawSmsId] so corrections survive ParsedEvent reprocessing.
+ *
+ * Ownership changes are not represented here — use
+ * [com.baraa.masroof.domain.ownership.OwnershipConfirmationService].
  */
 data class UserCorrection(
     val id: String,
-    val targetEventId: String,
+    val targetRawSmsId: String,
     val correctedType: MessageFamily?,
     val correctedAmount: Money?,
     val correctedMerchant: String?,
-    val correctedOwnership: OwnershipStatus?,
     val correctedCounterparty: String?,
     val createdAt: Instant,
 )

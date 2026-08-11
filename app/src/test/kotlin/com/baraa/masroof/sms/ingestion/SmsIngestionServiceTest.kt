@@ -3,6 +3,7 @@ package com.baraa.masroof.sms.ingestion
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
@@ -10,6 +11,7 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -18,9 +20,13 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.model.ReviewItem
+import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -323,6 +329,123 @@ class SmsIngestionServiceTest {
     }
 
     @Test
+    fun p9ReviewQueueException_keepsEvidenceAndDoesNotFailIngest() = runBlocking {
+        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
+        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val ftRepo = RoomFinancialTransactionRepository(
+            db.financialTransactionDao(),
+            db.parsedEventDao(),
+        )
+        val reconciliation = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards),
+        )
+        val throwingReviews = object : ReviewRepository {
+            override suspend fun getById(id: String): ReviewItem? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
+            override suspend fun listRequired(): List<ReviewItem> = emptyList()
+            override suspend fun listAll(): List<ReviewItem> = emptyList()
+            override suspend fun upsertRequired(
+                rawSmsId: String,
+                kind: ReviewKind,
+                reasons: List<String>,
+                now: Instant,
+            ): ReviewItem {
+                throw IllegalStateException("p9-review-boom")
+            }
+
+            override suspend fun markResolved(
+                id: String,
+                resolutionKind: ReviewResolutionKind,
+                resolvedAt: Instant,
+                resolvedTransactionId: String?,
+            ): ReviewItem? = null
+        }
+        val updater = ReviewQueueUpdater(
+            reviewRepository = throwingReviews,
+            financialTransactionRepository = ftRepo,
+            clock = InstantClock.System,
+        )
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+            reconciliation = reconciliation,
+            reviewQueueUpdater = updater,
+        )
+        val raw = aljaziraBillPayment(id = "android-sms:p9-fail", deviceId = "p9-fail")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertNotNull(rawRepo.getById(raw.id))
+        assertNotNull(parsedRepo.findByRawSmsId(raw.id))
+        assertEquals(MessageFamily.BILL_PAYMENT, parsedRepo.findByRawSmsId(raw.id)!!.event.messageFamily)
+        // Bill payment stays NeedsReview — no FT required for this boundary.
+        assertTrue(ftRepo.listAll().isEmpty() || ftRepo.findByRawSmsId(raw.id) != null)
+    }
+
+    @Test
+    fun p9ReviewCancellation_propagatesOutOfIngestion() = runBlocking {
+        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
+        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val ftRepo = RoomFinancialTransactionRepository(
+            db.financialTransactionDao(),
+            db.parsedEventDao(),
+        )
+        val reconciliation = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards),
+        )
+        val cancellingReviews = object : ReviewRepository {
+            override suspend fun getById(id: String): ReviewItem? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
+            override suspend fun listRequired(): List<ReviewItem> = emptyList()
+            override suspend fun listAll(): List<ReviewItem> = emptyList()
+            override suspend fun upsertRequired(
+                rawSmsId: String,
+                kind: ReviewKind,
+                reasons: List<String>,
+                now: Instant,
+            ): ReviewItem {
+                throw CancellationException("p9-cancel")
+            }
+
+            override suspend fun markResolved(
+                id: String,
+                resolutionKind: ReviewResolutionKind,
+                resolvedAt: Instant,
+                resolvedTransactionId: String?,
+            ): ReviewItem? = null
+        }
+        val updater = ReviewQueueUpdater(
+            reviewRepository = cancellingReviews,
+            financialTransactionRepository = ftRepo,
+            clock = InstantClock.System,
+        )
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+            reconciliation = reconciliation,
+            reviewQueueUpdater = updater,
+        )
+        val raw = aljaziraBillPayment(id = "android-sms:p9-cancel", deviceId = "p9-cancel")
+        try {
+            svc.ingest(raw)
+            fail("expected CancellationException")
+        } catch (_: CancellationException) {
+            // expected
+        }
+        assertNotNull(rawRepo.getById(raw.id))
+        assertNotNull(parsedRepo.findByRawSmsId(raw.id))
+    }
+
+    @Test
     fun p8DerivedCancellation_propagatesOutOfIngestion() = runBlocking {
         val cancellingFtRepo = object : FinancialTransactionRepository {
             override suspend fun save(
@@ -398,6 +521,24 @@ class SmsIngestionServiceTest {
             sender = "AlJazira",
             body = body,
             receivedAt = Instant.parse("2026-08-03T14:32:00Z"),
+            deviceMessageId = deviceId,
+            bodyHash = SmsBodyHasher.sha256Hex(body),
+        )
+    }
+
+    private fun aljaziraBillPayment(id: String, deviceId: String): RawSms {
+        val body = """
+            سداد فاتورة
+            المفوتر: TEST_BILLER
+            بمبلغ: 210.00 SAR
+            من حساب: 3001
+            في: 2026-08-03 16:40
+        """.trimIndent()
+        return RawSms(
+            id = id,
+            sender = "AlJazira",
+            body = body,
+            receivedAt = Instant.parse("2026-08-03T16:40:00Z"),
             deviceMessageId = deviceId,
             bodyHash = SmsBodyHasher.sha256Hex(body),
         )

@@ -120,3 +120,20 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `account:`/`card:` bank-scoped.
 - P8 derived-processing failures must not destroy RawSms/ParsedEvent evidence.
 
+## 11. P9 — Persistent review workflow and user resolutions
+
+- Schema **version = 4** with Migration(3, 4) creating `review_item` and
+  `user_correction` only (no destructive changes to prior tables).
+- One ReviewItem per RawSms (`review:<rawSmsId>`); identity never uses
+  replaceable ParsedEvent ids.
+- ReviewKind: `NEEDS_REVIEW` / `PENDING_MATCH`; resolutions via
+  `ReviewResolutionKind` (auto + user).
+- `UserCorrection` targets `targetRawSmsId` (not ParsedEvent id); ownership
+  changes stay on P7 `OwnershipConfirmationService`.
+- EffectiveParsedEvent = stored ParsedEvent + latest correction overlay;
+  RawSms and ParsedEvent rows remain immutable under user edits.
+- P8 emits `ReconciliationReport`; `ReviewQueueUpdater` upserts REQUIRED rows
+  and auto-resolves settled evidence with `AUTO_NO_LONGER_REQUIRED`.
+- Manual APIs: correction, external transfer, self-transfer pair, financial type.
+- No review UI / onboarding / dashboard / parsers in P9.
+

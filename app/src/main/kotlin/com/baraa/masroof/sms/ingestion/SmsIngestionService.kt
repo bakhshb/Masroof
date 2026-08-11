@@ -1,8 +1,9 @@
 package com.baraa.masroof.sms.ingestion
 
+import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
-import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
@@ -22,8 +23,9 @@ import java.time.Duration
  * Shared RawSms → persist → parse → store pipeline used by historical scan
  * and live BroadcastReceiver. Idempotent: duplicates do not re-parse.
  *
- * Optional [ownershipDiscovery] and [reconciliation] run after a ParsedEvent
- * is saved. Failures in those derived steps do not roll back RawSms/ParsedEvent.
+ * Optional [ownershipDiscovery], [reconciliation], and [reviewQueueUpdater] run
+ * after a ParsedEvent is saved. Failures in those derived steps do not roll back
+ * RawSms/ParsedEvent (or already-persisted FinancialTransactions).
  */
 class SmsIngestionService(
     private val rawSmsRepository: RawSmsRepository,
@@ -32,6 +34,7 @@ class SmsIngestionService(
     private val parseGateway: SmsParseGateway = AlJaziraParsingPipeline(),
     private val ownershipDiscovery: OwnershipDiscoveryService? = null,
     private val reconciliation: TransactionReconciliationService? = null,
+    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
 ) {
     private val insertMutex = Mutex()
 
@@ -73,8 +76,6 @@ class SmsIngestionService(
         val receivedAt = rawSms.receivedAt
         val from = receivedAt.minus(CROSS_SOURCE_RECEIVED_AT_TOLERANCE)
         val to = receivedAt.plus(CROSS_SOURCE_RECEIVED_AT_TOLERANCE)
-        // Incoming live (null device id) looks for historical (non-null) peers.
-        // Incoming historical looks for live peers.
         val lookingForLiveRow = rawSms.deviceMessageId != null
         return rawSmsRepository.findCrossSourceNearDuplicate(
             sender = rawSms.sender,
@@ -188,7 +189,8 @@ class SmsIngestionService(
 
     private suspend fun afterParsedEvent(event: ParsedEvent) {
         discoverOwnership(event)
-        reconcileDerived(event)
+        val report = reconcileDerived(event) ?: return
+        refreshReviewQueue(report)
     }
 
     private suspend fun discoverOwnership(event: ParsedEvent) {
@@ -202,14 +204,30 @@ class SmsIngestionService(
         }
     }
 
-    private suspend fun reconcileDerived(event: ParsedEvent) {
-        val svc = reconciliation ?: return
-        try {
-            svc.reconcileAfterParsedEvent(event)
+    private suspend fun reconcileDerived(
+        event: ParsedEvent,
+    ): com.baraa.masroof.application.transaction.ReconciliationReport? {
+        val svc = reconciliation ?: return null
+        return try {
+            svc.reconcileAfterParsedEventDetailed(event)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             // P8 derived processing must not destroy RawSms/ParsedEvent evidence.
+            null
+        }
+    }
+
+    private suspend fun refreshReviewQueue(
+        report: com.baraa.masroof.application.transaction.ReconciliationReport,
+    ) {
+        val updater = reviewQueueUpdater ?: return
+        try {
+            updater.applyReport(report)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // P9 review persistence must not fail successful evidence ingestion.
         }
     }
 
