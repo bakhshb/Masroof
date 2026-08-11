@@ -166,6 +166,9 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   Currency enum is SAR-only).
 - Period navigation cancels in-flight loads and never shows a stale summary under a
   different period label.
+- DashboardViewModel does not preload in `init`; first load is triggered when the
+  dashboard becomes visible after onboarding HOME (plus resume refresh when already
+  completed).
 - No account balance, net worth, budgets, categories, review UI, or full transaction
   list in P11. Room remains version 4 (DAO range query only).
 

@@ -3,12 +3,13 @@ package com.baraa.masroof.presentation.dashboard
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.core.money.Money
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,10 +51,23 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun constructingViewModel_doesNotLoadUntilExplicitRefresh() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+
+        assertTrue(loader.calls.isEmpty())
+        assertNull(vm.uiState.value.summary)
+        assertNull(vm.uiState.value.period)
+    }
+
+    @Test
     fun successfulCurrentPeriodLoad() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -67,10 +81,31 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun firstVisibleRefresh_loadsPostOnboardingDataNotStaleEmpty() = runTest {
+        val loader = FakeLoader()
+        // Simulated pre-onboarding empty overview available if eagerly queried.
+        loader.put(currentPeriod, overview(currentPeriod, spending = "0.00", transactionCount = 0))
+        val vm = DashboardViewModel(loader, zone, clock)
+        advanceUntilIdle()
+        assertTrue(loader.calls.isEmpty())
+        assertNull(vm.uiState.value.summary)
+
+        // After import/finalization, overview changes before dashboard visibility.
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        vm.refresh() // first dashboard-visible refresh
+        advanceUntilIdle()
+
+        assertEquals(1, loader.calls.size)
+        assertEquals(Money.of("100.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
+        assertPeriodSummaryInvariant(vm.uiState.value)
+    }
+
+    @Test
     fun navigatingToAnotherPeriod_clearsOldSummaryUnderNewLabel() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         val gate = loader.enqueueGate(previousPeriod)
@@ -96,6 +131,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         loader.failNextPeriod = previousPeriod
@@ -115,6 +151,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         loader.failNextPeriod = previousPeriod
@@ -141,6 +178,7 @@ class DashboardViewModelTest {
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         val gateP1 = loader.enqueueGate(previousPeriod)
@@ -166,6 +204,7 @@ class DashboardViewModelTest {
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "20.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         val gatePrevious = loader.enqueueGate(previousPeriod)
@@ -191,6 +230,7 @@ class DashboardViewModelTest {
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
         loader.put(previous2Period, overview(previous2Period, spending = "30.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
 
         loader.failNextPeriod = previousPeriod
@@ -217,6 +257,7 @@ class DashboardViewModelTest {
         loader.put(currentPeriod, overview(currentPeriod, spending = "12.00"))
         loader.put(previousPeriod, overview(previousPeriod, spending = "8.00"))
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
         assertPeriodSummaryInvariant(vm.uiState.value)
 
@@ -254,6 +295,7 @@ class DashboardViewModelTest {
             ),
         )
         val vm = DashboardViewModel(loader, zone, clock)
+        vm.refresh()
         advanceUntilIdle()
         val preview = vm.uiState.value.recentTransactions.single()
         assertNull(preview.title)
@@ -268,15 +310,19 @@ class DashboardViewModelTest {
         }
     }
 
-    private fun overview(period: FinancialPeriod, spending: String): DashboardOverview {
+    private fun overview(
+        period: FinancialPeriod,
+        spending: String,
+        transactionCount: Int = 1,
+    ): DashboardOverview {
         val base = MonthlyFinancialSummary.empty(period, Currency.SAR)
         val amount = Money.of(spending, Currency.SAR)
         return DashboardOverview(
             period = period,
             summary = base.copy(
                 spendingGross = amount,
-                spendingNet = com.baraa.masroof.application.dashboard.SignedMoneyAmount.of(amount),
-                transactionCount = 1,
+                spendingNet = SignedMoneyAmount.of(amount),
+                transactionCount = transactionCount,
             ),
             recentTransactions = emptyList(),
             isCurrentPeriod = period == currentPeriod,

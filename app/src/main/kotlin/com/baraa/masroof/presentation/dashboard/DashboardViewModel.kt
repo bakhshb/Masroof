@@ -36,10 +36,6 @@ class DashboardViewModel(
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
 
-    init {
-        refresh()
-    }
-
     fun refresh() {
         load(activePeriod)
     }
