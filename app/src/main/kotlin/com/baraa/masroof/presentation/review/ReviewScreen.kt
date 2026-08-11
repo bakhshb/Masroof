@@ -9,18 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +34,11 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.presentation.common.BackNavigationIcon
+import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.IconTextButton
+import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.SectionHeader
 
 @Composable
 fun ReviewRoute(
@@ -82,9 +87,10 @@ private fun ReviewListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.review_title)) },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.review_back))
-                    }
+                    BackNavigationIcon(
+                        onClick = onBack,
+                        contentDescription = stringResource(R.string.review_back),
+                    )
                 },
             )
         },
@@ -104,27 +110,47 @@ private fun ReviewListScreen(
                     modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(stringResource(R.string.review_load_error))
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = onRefresh) {
-                        Text(stringResource(R.string.dashboard_retry))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = MasroofIcons.error,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.review_load_error))
                     }
+                    Spacer(Modifier.height(12.dp))
+                    IconTextButton(
+                        onClick = onRefresh,
+                        icon = MasroofIcons.retry,
+                        text = stringResource(R.string.dashboard_retry),
+                    )
                 }
             }
             state.items.isEmpty() -> {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
                     verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Icon(
+                        imageVector = MasroofIcons.success,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         stringResource(R.string.review_empty),
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Start,
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = onBack) {
-                        Text(stringResource(R.string.review_back))
-                    }
+                    IconTextButton(
+                        onClick = onBack,
+                        icon = MasroofIcons.backToCurrent,
+                        text = stringResource(R.string.review_back),
+                    )
                 }
             }
             else -> {
@@ -133,26 +159,24 @@ private fun ReviewListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
-                        Text(
-                            stringResource(R.string.review_count, state.items.size),
-                            style = MaterialTheme.typography.titleMedium,
+                        SectionHeader(
+                            title = stringResource(R.string.review_count, state.items.size),
+                            icon = MasroofIcons.reviewQueue,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     if (state.informationalDismissCount > 0) {
                         item {
-                            Button(
+                            IconTextButton(
                                 onClick = onDismissAllInformational,
                                 enabled = !state.resolving,
+                                icon = MasroofIcons.warning,
+                                text = stringResource(
+                                    R.string.review_dismiss_all_informational,
+                                    state.informationalDismissCount,
+                                ),
                                 modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    stringResource(
-                                        R.string.review_dismiss_all_informational,
-                                        state.informationalDismissCount,
-                                    ),
-                                )
-                            }
+                            )
                         }
                     }
                     items(state.items, key = { it.id }) { item ->
@@ -172,22 +196,43 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(item.title, style = MaterialTheme.typography.titleSmall)
-                item.amountLabel?.let { Text(it) }
-            }
-            Text(stringResource(item.kindLabelRes), style = MaterialTheme.typography.bodySmall)
-            Text(item.dateLabel, style = MaterialTheme.typography.bodySmall)
-            val reasonRes = ReviewReasonLabels.labelRes(item.reasonLabel)
-            Text(
-                reasonRes?.let { stringResource(it) } ?: item.reasonLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = MasroofIcons.reviewKind(item.kind),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
             )
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(item.title, style = MaterialTheme.typography.titleSmall)
+                    item.amountLabel?.let { Text(it) }
+                }
+                Text(stringResource(item.kindLabelRes), style = MaterialTheme.typography.bodySmall)
+                Text(item.dateLabel, style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.error,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    val reasonRes = ReviewReasonLabels.labelRes(item.reasonLabel)
+                    Text(
+                        reasonRes?.let { stringResource(it) } ?: item.reasonLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         }
     }
 }
@@ -211,9 +256,10 @@ private fun ReviewDetailScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.review_detail_title)) },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.review_back))
-                    }
+                    BackNavigationIcon(
+                        onClick = onBack,
+                        contentDescription = stringResource(R.string.review_back),
+                    )
                 },
             )
         },
@@ -226,24 +272,46 @@ private fun ReviewDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(detail.kindLabelRes), style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.messageFamily(detail.messageFamily),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(detail.kindLabelRes), style = MaterialTheme.typography.titleMedium)
+            }
             detail.amountLabel?.let {
                 Text(it, style = MaterialTheme.typography.headlineSmall)
             }
             detail.sender?.let {
-                Text(stringResource(R.string.review_sender, it))
+                IconLabelRow(icon = MasroofIcons.sender, label = stringResource(R.string.review_sender, it))
             }
-            Text(stringResource(R.string.review_date, detail.dateLabel))
-            detail.merchant?.let { Text(stringResource(R.string.review_merchant, it)) }
-            detail.counterparty?.let { Text(stringResource(R.string.review_counterparty, it)) }
+            IconLabelRow(
+                icon = MasroofIcons.calendar,
+                label = stringResource(R.string.review_date, detail.dateLabel),
+            )
+            detail.merchant?.let {
+                IconLabelRow(icon = MasroofIcons.merchant, label = stringResource(R.string.review_merchant, it))
+            }
+            detail.counterparty?.let {
+                IconLabelRow(icon = MasroofIcons.counterparty, label = stringResource(R.string.review_counterparty, it))
+            }
 
-            Text(stringResource(R.string.review_reasons_title), style = MaterialTheme.typography.titleSmall)
+            SectionHeader(
+                title = stringResource(R.string.review_reasons_title),
+                icon = MasroofIcons.warning,
+            )
             detail.reasonLabels.forEach { reason ->
                 val reasonRes = ReviewReasonLabels.labelRes(reason)
                 Text("• ${reasonRes?.let { stringResource(it) } ?: reason}")
             }
 
-            Text(stringResource(R.string.review_sms_body), style = MaterialTheme.typography.titleSmall)
+            SectionHeader(
+                title = stringResource(R.string.review_sms_body),
+                icon = MasroofIcons.sms,
+            )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     detail.body,
@@ -253,85 +321,115 @@ private fun ReviewDetailScreen(
             }
 
             if (detail.showDismissNonFinancialAction) {
-                Button(
+                IconTextButton(
                     onClick = onDismissNonFinancial,
                     enabled = !resolving,
+                    icon = MasroofIcons.warning,
+                    text = stringResource(R.string.review_action_ignore),
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.review_action_ignore))
-                }
+                )
             }
 
             if (detail.showFinancialTypeActions) {
-                Text(stringResource(R.string.review_actions_title), style = MaterialTheme.typography.titleSmall)
+                SectionHeader(
+                    title = stringResource(R.string.review_actions_title),
+                    icon = MasroofIcons.reviewQueue,
+                )
                 REVIEW_FINANCIAL_TYPE_ACTIONS.forEach { type ->
-                    Button(
+                    IconTextButton(
                         onClick = { onResolveType(type) },
                         enabled = !resolving,
+                        icon = MasroofIcons.transactionType(type),
+                        text = stringResource(type.toUiLabelRes()),
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(type.toUiLabelRes()))
-                    }
-                }
-            }
-
-            if (detail.showExternalTransferAction) {
-                Button(
-                    onClick = onResolveExternal,
-                    enabled = !resolving,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        stringResource(
-                            when (detail.messageFamily) {
-                                MessageFamily.TRANSFER_IN -> R.string.review_action_external_transfer_in
-                                MessageFamily.TRANSFER_OUT -> R.string.review_action_external_transfer_out
-                                else -> R.string.review_action_external_transfer
-                            },
-                        ),
                     )
                 }
             }
 
+            if (detail.showExternalTransferAction) {
+                val externalIcon = when (detail.messageFamily) {
+                    MessageFamily.TRANSFER_IN -> MasroofIcons.externalIn
+                    MessageFamily.TRANSFER_OUT -> MasroofIcons.externalOut
+                    else -> MasroofIcons.selfTransfer
+                }
+                IconTextButton(
+                    onClick = onResolveExternal,
+                    enabled = !resolving,
+                    icon = externalIcon,
+                    text = stringResource(
+                        when (detail.messageFamily) {
+                            MessageFamily.TRANSFER_IN -> R.string.review_action_external_transfer_in
+                            MessageFamily.TRANSFER_OUT -> R.string.review_action_external_transfer_out
+                            else -> R.string.review_action_external_transfer
+                        },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             if (detail.showIncomingIncomeAction) {
-                Button(
+                IconTextButton(
                     onClick = { onResolveType(FinancialTransactionType.INCOME) },
                     enabled = !resolving,
+                    icon = MasroofIcons.income,
+                    text = stringResource(R.string.review_action_incoming_income),
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.review_action_incoming_income))
-                }
+                )
             }
 
             if (detail.pairCandidates.isNotEmpty()) {
-                Text(stringResource(R.string.review_pair_candidates), style = MaterialTheme.typography.titleSmall)
+                SectionHeader(
+                    title = stringResource(R.string.review_pair_candidates),
+                    icon = MasroofIcons.pairMatch,
+                )
                 detail.pairCandidates.forEach { candidate ->
-                    Button(
+                    IconTextButton(
                         onClick = { onResolvePair(candidate.id) },
                         enabled = !resolving,
+                        icon = MasroofIcons.pairMatch,
+                        text = stringResource(R.string.review_pair_with, candidate.title),
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column {
-                            Text(stringResource(R.string.review_pair_with, candidate.title))
-                            candidate.amountLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        }
-                    }
+                    )
                 }
             }
 
             when (message) {
-                ReviewMessage.RESOLVED -> Text(
-                    stringResource(R.string.review_resolved),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                ReviewMessage.STILL_NEEDS_REVIEW -> Text(
-                    stringResource(R.string.review_still_pending),
-                    color = MaterialTheme.colorScheme.error,
-                )
+                ReviewMessage.RESOLVED -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.success,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.review_resolved),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                ReviewMessage.STILL_NEEDS_REVIEW -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.review_still_pending),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 null -> Unit
             }
             if (error == ReviewError.ACTION_FAILED) {
-                Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.error,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
+                }
                 actionErrorDetail?.let { reason ->
                     val detailRes = ReviewReasonLabels.labelRes(reason)
                     Text(

@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,13 +29,19 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.IconTextButton
+import com.baraa.masroof.presentation.common.IconTextButtonOutlined
+import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MetricHighlightCard
+import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.SummaryMiniCard
 
 @Composable
 fun DashboardRoute(
     viewModel: DashboardViewModel,
     onOpenReview: () -> Unit = {},
 ) {
-    // Load only when dashboard becomes visible (e.g. after onboarding HOME).
     LaunchedEffect(Unit) {
         viewModel.refresh()
     }
@@ -66,12 +74,30 @@ private fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-        Text(
-            stringResource(R.string.dashboard_period_summary_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = MasroofIcons.appLogo,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp),
+            )
+            Spacer(Modifier.size(10.dp))
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+        }
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = MasroofIcons.periodHint,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp).padding(top = 2.dp),
+            )
+            Spacer(Modifier.size(6.dp))
+            Text(
+                stringResource(R.string.dashboard_period_summary_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         PeriodSelector(
             label = state.periodLabel,
@@ -92,82 +118,89 @@ private fun DashboardScreen(
             }
 
             state.error != null && state.summary == null -> {
-                Text(stringResource(R.string.dashboard_load_error))
-                Button(onClick = onRetry) {
-                    Text(stringResource(R.string.dashboard_retry))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.error,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.dashboard_load_error))
                 }
+                IconTextButton(
+                    onClick = onRetry,
+                    icon = MasroofIcons.retry,
+                    text = stringResource(R.string.dashboard_retry),
+                )
             }
 
             else -> {
                 val summary = state.summary
                 if (summary == null) return@Column
 
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.dashboard_net_spending), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            MoneyUiFormatter.format(summary.spendingNet),
-                            style = MaterialTheme.typography.headlineSmall,
+                MetricHighlightCard(
+                    title = stringResource(R.string.dashboard_net_spending),
+                    value = MoneyUiFormatter.format(summary.spendingNet),
+                    icon = MasroofIcons.netSpending,
+                    subtitle = if (summary.refunds.amount.signum() > 0) {
+                        stringResource(
+                            R.string.dashboard_gross_before_refunds,
+                            MoneyUiFormatter.format(summary.spendingGross),
                         )
-                        if (summary.refunds.amount.signum() > 0) {
-                            Text(
-                                stringResource(
-                                    R.string.dashboard_gross_before_refunds,
-                                    MoneyUiFormatter.format(summary.spendingGross),
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
+                    } else {
+                        null
+                    },
+                )
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SummaryMiniCard(
                         modifier = Modifier.weight(1f),
                         title = stringResource(R.string.dashboard_income),
-                        value = summary.income,
+                        value = MoneyUiFormatter.format(summary.income),
+                        icon = MasroofIcons.income,
                     )
                     SummaryMiniCard(
                         modifier = Modifier.weight(1f),
                         title = stringResource(R.string.dashboard_refunds),
-                        value = summary.refunds,
+                        value = MoneyUiFormatter.format(summary.refunds),
+                        icon = MasroofIcons.refunds,
                     )
                 }
 
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.dashboard_net_cash_flow), style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            MoneyUiFormatter.format(summary.netCashFlow),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
+                MetricHighlightCard(
+                    title = stringResource(R.string.dashboard_net_cash_flow),
+                    value = MoneyUiFormatter.format(summary.netCashFlow),
+                    icon = MasroofIcons.netCashFlow,
+                )
 
-                Text(stringResource(R.string.dashboard_money_movement), style = MaterialTheme.typography.titleMedium)
-                MovementRow(stringResource(R.string.dashboard_external_in), summary.externalTransfersIn)
-                MovementRow(stringResource(R.string.dashboard_external_out), summary.externalTransfersOut)
-                MovementRow(stringResource(R.string.dashboard_card_payments), summary.creditCardPayments)
-                MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals)
-                MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers)
+                SectionHeader(
+                    title = stringResource(R.string.dashboard_money_movement),
+                    icon = MasroofIcons.moneyMovement,
+                )
+                MovementRow(stringResource(R.string.dashboard_external_in), summary.externalTransfersIn, MasroofIcons.externalIn)
+                MovementRow(stringResource(R.string.dashboard_external_out), summary.externalTransfersOut, MasroofIcons.externalOut)
+                MovementRow(stringResource(R.string.dashboard_card_payments), summary.creditCardPayments, MasroofIcons.cardPayment)
+                MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)
+                MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
 
-                Text(stringResource(R.string.dashboard_recent_title), style = MaterialTheme.typography.titleMedium)
+                SectionHeader(
+                    title = stringResource(R.string.dashboard_recent_title),
+                    icon = MasroofIcons.recentTransactions,
+                )
                 if (summary.transactionCount == 0) {
                     Text(stringResource(R.string.dashboard_empty_period))
                     Spacer(Modifier.height(8.dp))
-                    Button(
+                    IconTextButton(
                         onClick = onRescan,
                         enabled = !state.rescanning,
+                        icon = MasroofIcons.rescan,
+                        text = if (state.rescanning) {
+                            stringResource(R.string.dashboard_rescanning)
+                        } else {
+                            stringResource(R.string.dashboard_rescan_sms)
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (state.rescanning) {
-                                stringResource(R.string.dashboard_rescanning)
-                            } else {
-                                stringResource(R.string.dashboard_rescan_sms)
-                            },
-                        )
-                    }
+                    )
                     state.rescanStatus?.let { status ->
                         Text(
                             rescanStatusMessage(status),
@@ -181,34 +214,62 @@ private fun DashboardScreen(
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
-                    Text(
-                        stringResource(
-                            R.string.dashboard_excluded_other_currency,
-                            summary.excludedOtherCurrencyCount,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = MasroofIcons.warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Text(
+                            stringResource(
+                                R.string.dashboard_excluded_other_currency,
+                                summary.excludedOtherCurrencyCount,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
 
                 if (summary.reviewRequiredCount > 0) {
-                    Button(
+                    IconTextButton(
                         onClick = onOpenReview,
+                        icon = MasroofIcons.reviewQueue,
+                        text = stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount))
-                    }
-                } else {
-                    Text(
-                        stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                        style = MaterialTheme.typography.titleSmall,
                     )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = MasroofIcons.success,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Text(
+                            stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
                 }
 
                 if (state.error != null) {
-                    Text(stringResource(R.string.dashboard_load_error))
-                    TextButton(onClick = onRetry) {
-                        Text(stringResource(R.string.dashboard_retry))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = MasroofIcons.error,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.dashboard_load_error))
                     }
+                    IconTextButtonOutlined(
+                        onClick = onRetry,
+                        icon = MasroofIcons.retry,
+                        text = stringResource(R.string.dashboard_retry),
+                    )
                 }
             }
         }
@@ -229,59 +290,95 @@ private fun PeriodSelector(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            TextButton(onClick = onPrevious) { Text("‹") }
-            Text(label, style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onNext) { Text("›") }
-        }
-        if (!isCurrentPeriod) {
-            TextButton(onClick = onCurrent, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.dashboard_back_to_current))
+            IconButton(onClick = onPrevious) {
+                Icon(
+                    imageVector = MasroofIcons.periodPrevious,
+                    contentDescription = null,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.calendar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(label, style = MaterialTheme.typography.titleMedium)
+            }
+            IconButton(onClick = onNext) {
+                Icon(
+                    imageVector = MasroofIcons.periodNext,
+                    contentDescription = null,
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun SummaryMiniCard(modifier: Modifier, title: String, value: Money) {
-    Card(modifier = modifier) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            Text(MoneyUiFormatter.format(value), style = MaterialTheme.typography.titleMedium)
+        if (!isCurrentPeriod) {
+            IconTextButtonOutlined(
+                onClick = onCurrent,
+                icon = MasroofIcons.backToCurrent,
+                text = stringResource(R.string.dashboard_back_to_current),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
 
 @Composable
-private fun MovementRow(title: String, value: Money) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(title)
-        Text(MoneyUiFormatter.format(value))
-    }
+private fun MovementRow(title: String, value: Money, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    IconLabelRow(
+        icon = icon,
+        label = title,
+        trailing = MoneyUiFormatter.format(value),
+    )
 }
 
 @Composable
 private fun RecentRow(row: TransactionPreviewUi) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(row.title ?: typeLabel(row.type), style = MaterialTheme.typography.titleSmall)
-                Text(row.amountLabel)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(typeLabel(row.type), style = MaterialTheme.typography.bodySmall)
-                Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
-            }
-            Text(
-                when (row.direction) {
-                    TransactionDirectionUi.OUTWARD -> stringResource(R.string.dashboard_direction_out)
-                    TransactionDirectionUi.INWARD -> stringResource(R.string.dashboard_direction_in)
-                    TransactionDirectionUi.NEUTRAL -> stringResource(R.string.dashboard_direction_neutral)
-                },
-                style = MaterialTheme.typography.labelSmall,
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = MasroofIcons.transactionType(row.type),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp).padding(top = 2.dp),
             )
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(row.title ?: typeLabel(row.type), style = MaterialTheme.typography.titleSmall)
+                    Text(row.amountLabel)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(typeLabel(row.type), style = MaterialTheme.typography.bodySmall)
+                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val directionIcon = when (row.direction) {
+                        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
+                        TransactionDirectionUi.INWARD -> MasroofIcons.externalIn
+                        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
+                    }
+                    Icon(
+                        imageVector = directionIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        when (row.direction) {
+                            TransactionDirectionUi.OUTWARD -> stringResource(R.string.dashboard_direction_out)
+                            TransactionDirectionUi.INWARD -> stringResource(R.string.dashboard_direction_in)
+                            TransactionDirectionUi.NEUTRAL -> stringResource(R.string.dashboard_direction_neutral)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
         }
     }
     Spacer(Modifier.height(4.dp))
