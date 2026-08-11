@@ -172,17 +172,17 @@ class DomainModelInvariantTest {
         )
         val correction = UserCorrection(
             id = "corr-1",
-            targetEventId = "evt-1",
+            targetRawSmsId = "sms-1",
             correctedType = MessageFamily.REFUND,
             correctedAmount = Money.of("10.00", Currency.SAR),
             correctedMerchant = "Store",
-            correctedOwnership = null,
             correctedCounterparty = null,
             createdAt = Instant.parse("2026-08-04T10:00:00Z"),
         )
 
         assertEquals("original body", raw.body)
         assertEquals(MessageFamily.REFUND, correction.correctedType)
+        assertEquals("sms-1", correction.targetRawSmsId)
         assertEquals("sms-1", raw.id)
     }
 }
