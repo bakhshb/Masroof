@@ -37,28 +37,28 @@ object MonthlyFinancialSummaryCalculator {
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
                 FinancialTransactionType.FEE,
-                -> spendingGross = spendingGross + tx.amount
+                -> spendingGross = spendingGross + amount
 
                 FinancialTransactionType.REFUND ->
-                    refunds = refunds + tx.amount
+                    refunds = refunds + amount
 
                 FinancialTransactionType.INCOME ->
-                    income = income + tx.amount
+                    income = income + amount
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN ->
-                    externalTransfersIn = externalTransfersIn + tx.amount
+                    externalTransfersIn = externalTransfersIn + amount
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
-                    externalTransfersOut = externalTransfersOut + tx.amount
+                    externalTransfersOut = externalTransfersOut + amount
 
                 FinancialTransactionType.CREDIT_CARD_PAYMENT ->
-                    creditCardPayments = creditCardPayments + tx.amount
+                    creditCardPayments = creditCardPayments + amount
 
                 FinancialTransactionType.CASH_WITHDRAWAL ->
-                    cashWithdrawals = cashWithdrawals + tx.amount
+                    cashWithdrawals = cashWithdrawals + amount
 
                 FinancialTransactionType.SELF_TRANSFER ->
-                    selfTransfers = selfTransfers + tx.amount
+                    selfTransfers = selfTransfers + amount
 
                 FinancialTransactionType.ADJUSTMENT,
                 FinancialTransactionType.UNKNOWN,

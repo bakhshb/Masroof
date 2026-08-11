@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -31,6 +29,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
+import com.baraa.masroof.presentation.common.LongPullToRefreshBox
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MetricHighlightCard
 import com.baraa.masroof.presentation.common.SectionHeader
@@ -74,13 +73,18 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    val isPullRefreshing = state.loading && state.summary != null
+    LongPullToRefreshBox(
+        isRefreshing = isPullRefreshing,
+        onRefresh = onRetry,
+        modifier = Modifier.fillMaxSize(),
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = MasroofIcons.appLogo,
@@ -332,6 +336,7 @@ private fun DashboardScreen(
                 }
             }
         }
+    }
     }
 }
 
