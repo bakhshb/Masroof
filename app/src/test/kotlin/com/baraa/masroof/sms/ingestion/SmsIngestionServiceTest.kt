@@ -3,17 +3,24 @@ package com.baraa.masroof.sms.ingestion
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
+import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -26,8 +33,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -273,6 +282,86 @@ class SmsIngestionServiceTest {
             ProviderSmsRecord(null, assembled.sender, assembled.body, clock.now()),
         )
         assertEquals(fixed, raw.receivedAt)
+    }
+
+    @Test
+    fun p8DerivedSaveException_keepsSuccessfulEvidenceAndDoesNotFailIngest() = runBlocking {
+        val throwingFtRepo = object : FinancialTransactionRepository {
+            override suspend fun save(
+                transaction: FinancialTransaction,
+                rawSmsIds: Collection<String>,
+            ): FinancialTransactionSaveResult {
+                throw IllegalStateException("p8-save-boom")
+            }
+
+            override suspend fun getById(id: String): FinancialTransaction? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
+            override suspend fun listAll(): List<FinancialTransaction> = emptyList()
+            override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+        }
+        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
+        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val reconciliation = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = throwingFtRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards),
+        )
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+            reconciliation = reconciliation,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:p8-fail", deviceId = "p8-fail")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertNotNull(rawRepo.getById(raw.id))
+        assertNotNull(parsedRepo.findByRawSmsId(raw.id))
+        assertEquals(MessageFamily.PURCHASE, parsedRepo.findByRawSmsId(raw.id)!!.event.messageFamily)
+    }
+
+    @Test
+    fun p8DerivedCancellation_propagatesOutOfIngestion() = runBlocking {
+        val cancellingFtRepo = object : FinancialTransactionRepository {
+            override suspend fun save(
+                transaction: FinancialTransaction,
+                rawSmsIds: Collection<String>,
+            ): FinancialTransactionSaveResult {
+                throw CancellationException("p8-cancel")
+            }
+
+            override suspend fun getById(id: String): FinancialTransaction? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
+            override suspend fun listAll(): List<FinancialTransaction> = emptyList()
+            override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+        }
+        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
+        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val reconciliation = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = cancellingFtRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards),
+        )
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankDetector = AlJaziraBankDetector(),
+            parseGateway = AlJaziraParsingPipeline(),
+            reconciliation = reconciliation,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:p8-cancel", deviceId = "p8-cancel")
+        try {
+            svc.ingest(raw)
+            fail("expected CancellationException")
+        } catch (_: CancellationException) {
+            // expected — must not become SmsIngestionResult.Failed
+        }
+        // Evidence persisted before cancellation remains.
+        assertNotNull(rawRepo.getById(raw.id))
+        assertNotNull(parsedRepo.findByRawSmsId(raw.id))
     }
 
     @Test

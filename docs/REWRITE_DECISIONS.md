@@ -105,3 +105,18 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - `BankNetworkType` is never used to infer ownership.
 - No FinancialTransaction persistence, matching, or UI in P7.
 
+## 10. P8 — Transaction matching and financial assembly
+
+- Schema **version = 3** with Migration(2, 3) creating `financial_transaction`
+  and `financial_transaction_raw_sms_link` (links by stable `rawSmsId`).
+- Conservative TRANSFER_OUT↔TRANSFER_IN matching: exact Money, 10-minute window,
+  OWNED local sides, mutually unique candidates, and a strong bridge
+  (exact transactionReference or UNKNOWN-suffix ↔ known-bank destination).
+- Matching never mutates P7 ownership registries or Bank.UNKNOWN identities.
+- Single-event assembly reuses P2 `TransactionClassifier` /
+  `TransferOwnershipResolver`.
+- UNKNOWN-bank transfer sides without a counterpart stay PendingMatch.
+- Deterministic transaction ids from sorted RawSms ids; container ids
+  `account:`/`card:` bank-scoped.
+- P8 derived-processing failures must not destroy RawSms/ParsedEvent evidence.
+

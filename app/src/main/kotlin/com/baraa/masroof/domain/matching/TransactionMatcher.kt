@@ -1,0 +1,148 @@
+package com.baraa.masroof.domain.matching
+
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ParsedEvent
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+
+/**
+ * Facts required for conservative TRANSFER_OUT ↔ TRANSFER_IN matching.
+ * Does not import parsing-layer types.
+ */
+data class TransferMatchCandidate(
+    val event: ParsedEvent,
+    val transactionReference: String?,
+    val occurredAtLocal: LocalDateTime?,
+    val receivedAt: Instant,
+    val sourceOwnership: OwnershipStatus,
+    val destinationOwnership: OwnershipStatus,
+) {
+    val amount: Money? get() = event.amount
+}
+
+data class TransferMatchPair(
+    val outgoing: TransferMatchCandidate,
+    val incoming: TransferMatchCandidate,
+)
+
+/**
+ * Pure conservative transfer-pair matcher. No Room / Android.
+ *
+ * Requires exact Money equality, documented time window, OWNED local sides,
+ * mutually unique relationship, and at least one strong identity bridge.
+ */
+object TransactionMatcher {
+    /** Maximum |t1 − t2| for automatic transfer pairing. */
+    val TRANSFER_MATCH_WINDOW: Duration = Duration.ofMinutes(10)
+
+    fun findMutuallyUniquePairs(
+        candidates: List<TransferMatchCandidate>,
+    ): List<TransferMatchPair> {
+        val outgoing = candidates.filter {
+            it.event.messageFamily == MessageFamily.TRANSFER_OUT &&
+                it.event.amount != null &&
+                it.sourceOwnership == OwnershipStatus.OWNED
+        }
+        val incoming = candidates.filter {
+            it.event.messageFamily == MessageFamily.TRANSFER_IN &&
+                it.event.amount != null &&
+                it.destinationOwnership == OwnershipStatus.OWNED
+        }
+
+        val byAmount = (outgoing + incoming).groupBy { moneyKey(it.event.amount!!) }
+
+        val pairs = mutableListOf<TransferMatchPair>()
+        for ((_, group) in byAmount) {
+            val outs = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_OUT }
+            val inns = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_IN }
+            if (outs.isEmpty() || inns.isEmpty()) continue
+
+            val eligibleOutToIn = mutableMapOf<String, MutableList<String>>()
+            val eligibleInToOut = mutableMapOf<String, MutableList<String>>()
+
+            for (o in outs) {
+                for (i in inns) {
+                    if (!compatiblePair(o, i)) continue
+                    eligibleOutToIn.getOrPut(o.event.id) { mutableListOf() }.add(i.event.id)
+                    eligibleInToOut.getOrPut(i.event.id) { mutableListOf() }.add(o.event.id)
+                }
+            }
+
+            for (o in outs) {
+                val inIds = eligibleOutToIn[o.event.id].orEmpty()
+                if (inIds.size != 1) continue
+                val inId = inIds.single()
+                val outIds = eligibleInToOut[inId].orEmpty()
+                if (outIds.size != 1 || outIds.single() != o.event.id) continue
+                val incomingCandidate = inns.first { it.event.id == inId }
+                pairs += TransferMatchPair(o, incomingCandidate)
+            }
+        }
+        return pairs
+    }
+
+    fun compatiblePair(
+        outgoing: TransferMatchCandidate,
+        incoming: TransferMatchCandidate,
+    ): Boolean {
+        if (outgoing.event.id == incoming.event.id) return false
+        if (outgoing.event.rawSmsId == incoming.event.rawSmsId) return false
+        if (outgoing.event.messageFamily != MessageFamily.TRANSFER_OUT) return false
+        if (incoming.event.messageFamily != MessageFamily.TRANSFER_IN) return false
+
+        val outAmount = outgoing.event.amount ?: return false
+        val inAmount = incoming.event.amount ?: return false
+        if (outAmount != inAmount) return false
+
+        if (outgoing.sourceOwnership != OwnershipStatus.OWNED) return false
+        if (incoming.destinationOwnership != OwnershipStatus.OWNED) return false
+
+        if (!withinWindow(outgoing, incoming)) return false
+        if (!hasStrongBridge(outgoing, incoming)) return false
+        return true
+    }
+
+    private fun withinWindow(
+        a: TransferMatchCandidate,
+        b: TransferMatchCandidate,
+    ): Boolean {
+        val aLocal = a.occurredAtLocal
+        val bLocal = b.occurredAtLocal
+        if (aLocal != null && bLocal != null) {
+            val seconds = kotlin.math.abs(java.time.Duration.between(aLocal, bLocal).seconds)
+            return seconds <= TRANSFER_MATCH_WINDOW.seconds
+        }
+        // Do not mix LocalDateTime with receivedAt.
+        if (aLocal != null || bLocal != null) return false
+        val delta = kotlin.math.abs(
+            java.time.Duration.between(a.receivedAt, b.receivedAt).seconds,
+        )
+        return delta <= TRANSFER_MATCH_WINDOW.seconds
+    }
+
+    private fun hasStrongBridge(
+        outgoing: TransferMatchCandidate,
+        incoming: TransferMatchCandidate,
+    ): Boolean {
+        val outRef = outgoing.transactionReference?.trim().orEmpty()
+        val inRef = incoming.transactionReference?.trim().orEmpty()
+        if (outRef.isNotEmpty() && outRef == inRef) return true
+
+        // UNKNOWN-side suffix bridge: outgoing UNKNOWN dest masked ↔ incoming known dest masked
+        val outDest = outgoing.event.destinationAccountRef ?: return false
+        val inDest = incoming.event.destinationAccountRef ?: return false
+        if (outDest.bank != Bank.UNKNOWN) return false
+        if (inDest.bank == Bank.UNKNOWN) return false
+        val outSuffix = outDest.maskedNumber?.trim().orEmpty()
+        val inSuffix = inDest.maskedNumber?.trim().orEmpty()
+        if (outSuffix.isEmpty() || inSuffix.isEmpty()) return false
+        return outSuffix == inSuffix
+    }
+
+    private fun moneyKey(money: Money): String =
+        "${money.currency.name}|${money.amount.stripTrailingZeros().toPlainString()}"
+}

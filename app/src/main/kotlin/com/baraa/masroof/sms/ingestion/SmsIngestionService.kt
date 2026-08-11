@@ -2,6 +2,7 @@ package com.baraa.masroof.sms.ingestion
 
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
@@ -21,15 +22,8 @@ import java.time.Duration
  * Shared RawSms → persist → parse → store pipeline used by historical scan
  * and live BroadcastReceiver. Idempotent: duplicates do not re-parse.
  *
- * Bank scope is decided with the existing P4 [AlJaziraBankDetector] before
- * persistence so unrelated personal SMS are not stored.
- *
- * Cross-source live↔historical reconciliation uses exact sender + bodyHash and
- * a [CROSS_SOURCE_RECEIVED_AT_TOLERANCE] window. Same-source nearby rows are
- * never merged by that rule.
- *
- * Optional [ownershipDiscovery] runs after a ParsedEvent is saved; discovery
- * failure does not roll back RawSms/ParsedEvent evidence.
+ * Optional [ownershipDiscovery] and [reconciliation] run after a ParsedEvent
+ * is saved. Failures in those derived steps do not roll back RawSms/ParsedEvent.
  */
 class SmsIngestionService(
     private val rawSmsRepository: RawSmsRepository,
@@ -37,6 +31,7 @@ class SmsIngestionService(
     private val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector(),
     private val parseGateway: SmsParseGateway = AlJaziraParsingPipeline(),
     private val ownershipDiscovery: OwnershipDiscoveryService? = null,
+    private val reconciliation: TransactionReconciliationService? = null,
 ) {
     private val insertMutex = Mutex()
 
@@ -127,7 +122,7 @@ class SmsIngestionService(
         when (parseResult) {
             is ParseResult.Success -> {
                 parsedEventRepository.save(parseResult.event, parseResult.details)
-                discoverOwnership(parseResult.event)
+                afterParsedEvent(parseResult.event)
                 SmsIngestionResult.Parsed(
                     rawSmsId = rawSms.id,
                     event = parseResult.event,
@@ -138,7 +133,7 @@ class SmsIngestionService(
             is ParseResult.Partial -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    discoverOwnership(parseResult.event)
+                    afterParsedEvent(parseResult.event)
                     SmsIngestionResult.Parsed(
                         rawSmsId = rawSms.id,
                         event = parseResult.event,
@@ -155,7 +150,7 @@ class SmsIngestionService(
             is ParseResult.ReviewRequired -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    discoverOwnership(parseResult.event)
+                    afterParsedEvent(parseResult.event)
                 }
                 SmsIngestionResult.ReviewRequired(
                     rawSmsId = rawSms.id,
@@ -168,7 +163,7 @@ class SmsIngestionService(
             is ParseResult.NonFinancial -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    discoverOwnership(parseResult.event)
+                    afterParsedEvent(parseResult.event)
                 }
                 SmsIngestionResult.NonFinancial(
                     rawSmsId = rawSms.id,
@@ -191,6 +186,11 @@ class SmsIngestionService(
                 )
         }
 
+    private suspend fun afterParsedEvent(event: ParsedEvent) {
+        discoverOwnership(event)
+        reconcileDerived(event)
+    }
+
     private suspend fun discoverOwnership(event: ParsedEvent) {
         val discovery = ownershipDiscovery ?: return
         try {
@@ -199,6 +199,17 @@ class SmsIngestionService(
             throw e
         } catch (_: Exception) {
             // Discovery is best-effort; RawSms/ParsedEvent evidence stays.
+        }
+    }
+
+    private suspend fun reconcileDerived(event: ParsedEvent) {
+        val svc = reconciliation ?: return
+        try {
+            svc.reconcileAfterParsedEvent(event)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // P8 derived processing must not destroy RawSms/ParsedEvent evidence.
         }
     }
 
