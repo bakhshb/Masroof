@@ -3,27 +3,28 @@ package com.baraa.masroof.domain.assembly
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.matching.TransferMatchPair
-import com.baraa.masroof.domain.model.Account
 import com.baraa.masroof.domain.model.AccountReference
-import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.Card
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.domain.model.FinancialContainer
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.rules.ClassificationContext
+import com.baraa.masroof.domain.rules.ClassificationEvidence
 import com.baraa.masroof.domain.rules.ClassificationResult
+import com.baraa.masroof.domain.rules.ContainerKind
+import com.baraa.masroof.domain.rules.ResolvedContainerFacts
 import com.baraa.masroof.domain.rules.TransactionClassifier
 import java.time.Instant
 
 /**
  * Pure assembly of [FinancialTransaction] from validated evidence + ownership.
  * No Room / Android.
+ *
+ * Passes only facts P8 genuinely knows into P2 classification — never fabricates
+ * [com.baraa.masroof.domain.model.AccountType] / [com.baraa.masroof.domain.model.CardType].
+ * Container ids come from [FinancialContainerIdFactory] on durable known-bank refs.
  */
 object TransactionAssembler {
     sealed interface Outcome {
@@ -81,28 +82,28 @@ object TransactionAssembler {
             }
         }
 
-        val source = accountContainer(event.sourceAccountRef, sourceOwnership)
-        val destination = when (event.messageFamily) {
+        val sourceFacts = accountFacts(event.sourceAccountRef, sourceOwnership)
+        val destinationFacts = when (event.messageFamily) {
             MessageFamily.CARD_PAYMENT ->
-                cardContainer(event.cardRef, cardOwnership, preferCredit = true)
-                    ?: accountContainer(event.destinationAccountRef, destinationOwnership)
+                cardFacts(event.cardRef, cardOwnership)
+                    ?: accountFacts(event.destinationAccountRef, destinationOwnership)
 
-            else -> accountContainer(event.destinationAccountRef, destinationOwnership)
+            else -> accountFacts(event.destinationAccountRef, destinationOwnership)
         }
-        val instrument = when (event.messageFamily) {
+        val instrumentFacts = when (event.messageFamily) {
             MessageFamily.PURCHASE ->
-                cardContainer(event.cardRef, cardOwnership, preferCredit = false)
-                    ?: accountContainer(event.sourceAccountRef, sourceOwnership)
+                cardFacts(event.cardRef, cardOwnership)
+                    ?: accountFacts(event.sourceAccountRef, sourceOwnership)
 
             else -> null
         }
 
         val classification = TransactionClassifier.classify(
-            ClassificationContext(
+            ClassificationEvidence(
                 messageFamily = event.messageFamily,
-                source = source,
-                destination = destination,
-                instrument = instrument,
+                source = sourceFacts,
+                destination = destinationFacts,
+                instrument = instrumentFacts,
                 purchaseChannel = event.purchaseChannel,
                 bankNetworkType = event.bankNetworkType,
             ),
@@ -115,9 +116,6 @@ object TransactionAssembler {
                     amount = amount,
                     occurredAt = event.occurredAt ?: receivedAt,
                     event = event,
-                    source = source,
-                    destination = destination,
-                    instrument = instrument,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
                 )
@@ -134,9 +132,6 @@ object TransactionAssembler {
                         amount = amount,
                         occurredAt = event.occurredAt ?: receivedAt,
                         event = event,
-                        source = source,
-                        destination = destination,
-                        instrument = instrument,
                         linkedEventIds = listOf(event.id),
                         rawSmsIds = listOf(event.rawSmsId),
                     )
@@ -184,14 +179,22 @@ object TransactionAssembler {
             return Outcome.NeedsReview(listOf("matched_pair_requires_known_bank_endpoints"))
         }
 
-        val source = accountContainer(sourceRef, OwnershipStatus.OWNED)!!
-        val destination = accountContainer(destRef, OwnershipStatus.OWNED)!!
+        val sourceId = FinancialContainerIdFactory.accountId(sourceRef)
+            ?: return Outcome.NeedsReview(listOf("matched_pair_source_not_durable"))
+        val destId = FinancialContainerIdFactory.accountId(destRef)
+            ?: return Outcome.NeedsReview(listOf("matched_pair_destination_not_durable"))
 
         val classification = TransactionClassifier.classify(
-            ClassificationContext(
+            ClassificationEvidence(
                 messageFamily = MessageFamily.TRANSFER_OUT,
-                source = source,
-                destination = destination,
+                source = ResolvedContainerFacts(
+                    kind = ContainerKind.ACCOUNT,
+                    ownership = OwnershipStatus.OWNED,
+                ),
+                destination = ResolvedContainerFacts(
+                    kind = ContainerKind.ACCOUNT,
+                    ownership = OwnershipStatus.OWNED,
+                ),
                 bankNetworkType = out.bankNetworkType,
             ),
         )
@@ -214,8 +217,8 @@ object TransactionAssembler {
             type = FinancialTransactionType.SELF_TRANSFER,
             amount = amount,
             occurredAt = occurredAt,
-            sourceContainerId = source.id,
-            destinationContainerId = destination.id,
+            sourceContainerId = sourceId,
+            destinationContainerId = destId,
             merchant = null,
             counterparty = out.counterparty ?: inn.counterparty,
             categoryId = null,
@@ -228,41 +231,32 @@ object TransactionAssembler {
         event.sourceAccountRef?.bank == Bank.UNKNOWN ||
             event.destinationAccountRef?.bank == Bank.UNKNOWN
 
-    private fun accountContainer(
+    private fun accountFacts(
         ref: AccountReference?,
         ownership: OwnershipStatus,
-    ): Account? {
+    ): ResolvedContainerFacts? {
         if (ref == null) return null
         val masked = ref.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return null
-        val id = FinancialContainerIdFactory.accountId(ref.bank, masked)
-        return Account(
-            id = id,
-            bank = ref.bank,
-            maskedNumber = masked,
-            displayName = null,
+        return ResolvedContainerFacts(
+            kind = ContainerKind.ACCOUNT,
             ownership = ownership,
-            type = AccountType.CURRENT,
+            knownCardType = null,
         )
     }
 
-    private fun cardContainer(
+    private fun cardFacts(
         ref: CardReference?,
         ownership: OwnershipStatus,
-        preferCredit: Boolean,
-    ): Card? {
+    ): ResolvedContainerFacts? {
         if (ref == null) return null
         val last4 = ref.last4?.trim().orEmpty()
         if (last4.isEmpty()) return null
-        val id = FinancialContainerIdFactory.cardId(ref.bank, last4)
-        return Card(
-            id = id,
-            bank = ref.bank,
-            last4 = last4,
-            displayName = null,
+        // P7 registry does not know CardType — leave knownCardType null.
+        return ResolvedContainerFacts(
+            kind = ContainerKind.CARD,
             ownership = ownership,
-            type = if (preferCredit) CardType.CREDIT else CardType.DEBIT,
-            linkedAccountId = null,
+            knownCardType = null,
         )
     }
 
@@ -276,32 +270,34 @@ object TransactionAssembler {
         amount: com.baraa.masroof.core.money.Money,
         occurredAt: Instant,
         event: ParsedEvent,
-        source: FinancialContainer?,
-        destination: FinancialContainer?,
-        instrument: FinancialContainer?,
         linkedEventIds: List<String>,
         rawSmsIds: List<String>,
     ): Built {
-        val sourceId = when (event.messageFamily) {
-            MessageFamily.PURCHASE -> instrument?.id ?: source?.id
-            MessageFamily.CARD_PAYMENT -> source?.id
+        // Resolve durable ids from references only (null for Bank.UNKNOWN / incomplete).
+        val durableSourceAccountId = event.sourceAccountRef?.let(FinancialContainerIdFactory::accountId)
+        val durableDestAccountId = event.destinationAccountRef?.let(FinancialContainerIdFactory::accountId)
+        val durableCardId = event.cardRef?.let(FinancialContainerIdFactory::cardId)
+
+        val (sourceId, destId) = when (event.messageFamily) {
+            MessageFamily.PURCHASE ->
+                (durableCardId ?: durableSourceAccountId) to null
+
+            MessageFamily.CARD_PAYMENT ->
+                durableSourceAccountId to durableCardId
+
+            MessageFamily.REFUND ->
+                // Incoming value to the user's container — never put the receiver in source.
+                null to (durableDestAccountId ?: durableCardId)
+
             MessageFamily.WITHDRAWAL,
             MessageFamily.FEE,
             MessageFamily.TRANSFER_OUT,
             MessageFamily.TRANSFER_IN,
-            -> source?.id
+            ->
+                durableSourceAccountId to durableDestAccountId
 
-            MessageFamily.REFUND -> destination?.id ?: instrument?.id
-            else -> source?.id
-        }
-        val destId = when (event.messageFamily) {
-            MessageFamily.CARD_PAYMENT -> destination?.id
-            MessageFamily.TRANSFER_OUT,
-            MessageFamily.TRANSFER_IN,
-            -> destination?.id
-
-            MessageFamily.REFUND -> null
-            else -> destination?.id
+            else ->
+                durableSourceAccountId to durableDestAccountId
         }
 
         return Built(

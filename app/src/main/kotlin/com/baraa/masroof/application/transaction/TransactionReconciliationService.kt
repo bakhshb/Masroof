@@ -12,7 +12,6 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
-import kotlinx.coroutines.CancellationException
 
 /**
  * Operational summary of a reconciliation pass.
@@ -211,16 +210,12 @@ class TransactionReconciliationService(
         transaction: com.baraa.masroof.domain.model.FinancialTransaction,
         rawSmsIds: List<String>,
     ): PersistOutcome =
-        try {
-            when (financialTransactionRepository.save(transaction, rawSmsIds)) {
-                FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
-                FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
-                is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            PersistOutcome.Failed
+        // Let unexpected repository failures and CancellationException propagate so
+        // SmsIngestionService can treat derived P8 errors without marking evidence Failed.
+        when (financialTransactionRepository.save(transaction, rawSmsIds)) {
+            FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
+            FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
+            is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
 
     private enum class PersistOutcome { Saved, Already, Failed }

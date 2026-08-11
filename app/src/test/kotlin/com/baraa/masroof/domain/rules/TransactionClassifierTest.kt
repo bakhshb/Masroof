@@ -340,6 +340,64 @@ class TransactionClassifierTest {
     }
 
     @Test
+    fun cardPaymentEvidence_ownedAccountToOwnedCard_withoutInventedCardType() {
+        val result = TransactionClassifier.classify(
+            ClassificationEvidence(
+                messageFamily = MessageFamily.CARD_PAYMENT,
+                source = ResolvedContainerFacts(
+                    kind = ContainerKind.ACCOUNT,
+                    ownership = OwnershipStatus.OWNED,
+                ),
+                destination = ResolvedContainerFacts(
+                    kind = ContainerKind.CARD,
+                    ownership = OwnershipStatus.OWNED,
+                    knownCardType = null,
+                ),
+            ),
+        )
+
+        val classified = result as ClassificationResult.Classified
+        assertEquals(FinancialTransactionType.CREDIT_CARD_PAYMENT, classified.transactionType)
+        assertFalse(classified.impact.countsAsExpense)
+    }
+
+    @Test
+    fun transferFamily_requiresKnownCreditTypeForCardPaymentShape() {
+        val withoutType = TransactionClassifier.classify(
+            ClassificationEvidence(
+                messageFamily = MessageFamily.TRANSFER_OUT,
+                source = ResolvedContainerFacts(
+                    kind = ContainerKind.ACCOUNT,
+                    ownership = OwnershipStatus.OWNED,
+                ),
+                destination = ResolvedContainerFacts(
+                    kind = ContainerKind.CARD,
+                    ownership = OwnershipStatus.OWNED,
+                    knownCardType = null,
+                ),
+            ),
+        ) as ClassificationResult.Classified
+        // Without a genuine CardType.CREDIT, do not invent credit-card payment.
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, withoutType.transactionType)
+
+        val withCredit = TransactionClassifier.classify(
+            ClassificationEvidence(
+                messageFamily = MessageFamily.TRANSFER_OUT,
+                source = ResolvedContainerFacts(
+                    kind = ContainerKind.ACCOUNT,
+                    ownership = OwnershipStatus.OWNED,
+                ),
+                destination = ResolvedContainerFacts(
+                    kind = ContainerKind.CARD,
+                    ownership = OwnershipStatus.OWNED,
+                    knownCardType = CardType.CREDIT,
+                ),
+            ),
+        ) as ClassificationResult.Classified
+        assertEquals(FinancialTransactionType.CREDIT_CARD_PAYMENT, withCredit.transactionType)
+    }
+
+    @Test
     fun networkIndependence_sameOwnership_sameClassification() {
         val networks = listOf(
             BankNetworkType.INTRA_BANK,

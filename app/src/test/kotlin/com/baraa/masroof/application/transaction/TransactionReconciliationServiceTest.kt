@@ -132,6 +132,10 @@ class TransactionReconciliationServiceTest {
         val tx = ftRepo.listAll().single()
         assertEquals(FinancialTransactionType.CREDIT_CARD_PAYMENT, tx.type)
         assertNotEquals(FinancialTransactionType.EXPENSE, tx.type)
+        assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.sourceContainerId)
+        assertEquals(FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "7271"), tx.destinationContainerId)
+        // Registry entry exists; classification did not require inventing CardType.
+        assertNotNull(cards.get(CardReference(Bank.BANK_ALJAZIRA, "7271")))
     }
 
     @Test
@@ -169,7 +173,7 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun refund_notIncome() = runBlocking {
+    fun refund_notIncome_usesDestinationContainerId() = runBlocking {
         persistEvent(
             smsId = "sms-rf",
             event = event(
@@ -182,7 +186,30 @@ class TransactionReconciliationServiceTest {
             ),
         )
         reconciliation.reconcileStoredEvents()
-        assertEquals(FinancialTransactionType.REFUND, ftRepo.listAll().single().type)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.REFUND, tx.type)
+        assertNotEquals(FinancialTransactionType.INCOME, tx.type)
+        assertNull(tx.sourceContainerId)
+        assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.destinationContainerId)
+    }
+
+    @Test
+    fun cardOnlyRefund_usesCardDestinationContainerId() = runBlocking {
+        persistEvent(
+            smsId = "sms-rf-card",
+            event = event(
+                id = "pe-rf-card",
+                rawSmsId = "sms-rf-card",
+                family = MessageFamily.REFUND,
+                amount = money("12.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.REFUND, tx.type)
+        assertNull(tx.sourceContainerId)
+        assertEquals(FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "7271"), tx.destinationContainerId)
     }
 
     @Test
@@ -325,9 +352,12 @@ class TransactionReconciliationServiceTest {
         assertEquals(2, tx.linkedParsedEventIds.size)
         assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.sourceContainerId)
         assertEquals(FinancialContainerIdFactory.accountId(Bank("D360"), "6810"), tx.destinationContainerId)
+        assertFalse(tx.sourceContainerId!!.contains("UNKNOWN"))
+        assertFalse(tx.destinationContainerId!!.contains("UNKNOWN"))
         assertNull(accounts.get(AccountReference(Bank.UNKNOWN, "6810")))
         assertEquals(OwnershipStatus.UNKNOWN, OwnershipResolver(accounts, cards).resolveAccount(AccountReference(Bank.UNKNOWN, "6810")))
         assertEquals(2, accounts.listAll().size)
+        assertNull(FinancialContainerIdFactory.accountId(AccountReference(Bank.UNKNOWN, "6810")))
     }
 
     @Test
@@ -608,6 +638,13 @@ class TransactionReconciliationServiceTest {
         assertNotEquals(a1, a2)
         assertNotEquals(a1, c1)
         assertEquals(a1, FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"))
+        assertNull(FinancialContainerIdFactory.accountId(AccountReference(Bank.UNKNOWN, "6810")))
+        try {
+            FinancialContainerIdFactory.accountId(Bank.UNKNOWN, "6810")
+            fail("expected IllegalArgumentException for Bank.UNKNOWN")
+        } catch (_: IllegalArgumentException) {
+            // expected
+        }
     }
 
     @Test
@@ -628,23 +665,44 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun p8Failure_doesNotDestroyEvidence() = runBlocking {
+    fun matchedUnknownBridge_doesNotPersistUnknownContainerId() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
+        val t = LocalDateTime.parse("2026-08-10T12:00:00")
         persistEvent(
-            smsId = "sms-ok",
+            smsId = "sms-out-u",
             event = event(
-                id = "pe-ok",
-                rawSmsId = "sms-ok",
-                family = MessageFamily.FEE,
-                amount = money("1.00"),
+                id = "pe-out-u",
+                rawSmsId = "sms-out-u",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
             ),
+            details = ParsedEventDetails(occurredAtLocal = t),
+            at = Instant.parse("2026-08-10T09:00:00Z"),
         )
-        assertNotNull(rawRepo.getById("sms-ok"))
-        assertNotNull(parsedRepo.findByRawSmsId("sms-ok"))
-        // Even if reconciliation has nothing conflicting, evidence remains after run.
+        persistEvent(
+            smsId = "sms-in-u",
+            event = event(
+                id = "pe-in-u",
+                rawSmsId = "sms-in-u",
+                bank = Bank("D360"),
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("500.00"),
+                destination = AccountReference(Bank("D360"), "6810"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+            details = ParsedEventDetails(occurredAtLocal = t.plusMinutes(1)),
+            at = Instant.parse("2026-08-10T09:01:00Z"),
+        )
         reconciliation.reconcileStoredEvents()
-        assertNotNull(rawRepo.getById("sms-ok"))
-        assertNotNull(parsedRepo.findByRawSmsId("sms-ok"))
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals("account:D360:6810", tx.destinationContainerId)
+        assertNotEquals("account:UNKNOWN:6810", tx.destinationContainerId)
+        assertNotEquals("account:UNKNOWN:6810", tx.sourceContainerId)
     }
 
     private suspend fun persistEvent(

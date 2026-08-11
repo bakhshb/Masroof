@@ -1,9 +1,6 @@
 package com.baraa.masroof.domain.rules
 
-import com.baraa.masroof.domain.model.Account
-import com.baraa.masroof.domain.model.Card
 import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.domain.model.FinancialContainer
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -13,12 +10,25 @@ import com.baraa.masroof.domain.model.TransferOwnershipType
  * Pure domain classifier: structured facts + resolved ownership → financial meaning.
  *
  * Does not parse SMS, match related events, or consult bank-specific wording.
- * [ClassificationContext.bankNetworkType] is ignored for ownership decisions.
+ * [ClassificationEvidence.bankNetworkType] / [ClassificationContext.bankNetworkType]
+ * are ignored for ownership decisions.
  */
 object TransactionClassifier {
 
-    fun classify(context: ClassificationContext): ClassificationResult {
-        return when (context.messageFamily) {
+    fun classify(context: ClassificationContext): ClassificationResult =
+        classify(
+            ClassificationEvidence(
+                messageFamily = context.messageFamily,
+                source = context.source?.let(ResolvedContainerFacts::from),
+                destination = context.destination?.let(ResolvedContainerFacts::from),
+                instrument = context.instrument?.let(ResolvedContainerFacts::from),
+                purchaseChannel = context.purchaseChannel,
+                bankNetworkType = context.bankNetworkType,
+            ),
+        )
+
+    fun classify(evidence: ClassificationEvidence): ClassificationResult {
+        return when (evidence.messageFamily) {
             MessageFamily.OTP,
             MessageFamily.BALANCE_NOTICE,
             MessageFamily.NON_FINANCIAL,
@@ -70,20 +80,20 @@ object TransactionClassifier {
                 )
 
             MessageFamily.PURCHASE ->
-                classifyPurchase(context)
+                classifyPurchase(evidence)
 
             MessageFamily.CARD_PAYMENT ->
-                classifyCardPayment(context)
+                classifyCardPayment(evidence)
 
             MessageFamily.TRANSFER_IN,
             MessageFamily.TRANSFER_OUT,
             ->
-                classifyTransfer(context)
+                classifyTransfer(evidence)
         }
     }
 
-    private fun classifyPurchase(context: ClassificationContext): ClassificationResult {
-        val instrument = context.instrument
+    private fun classifyPurchase(evidence: ClassificationEvidence): ClassificationResult {
+        val instrument = evidence.instrument
         if (instrument != null && instrument.ownership == OwnershipStatus.UNKNOWN) {
             return needsReview(
                 tentativeType = FinancialTransactionType.EXPENSE,
@@ -99,9 +109,11 @@ object TransactionClassifier {
             )
         }
 
-        // Owned credit card purchase is an expense at purchase time (D-006).
-        if (instrument is Card &&
-            instrument.type == CardType.CREDIT &&
+        // Owned credit card purchase is an expense at purchase time (D-006)
+        // when CardType.CREDIT is a genuine known fact.
+        if (instrument != null &&
+            instrument.kind == ContainerKind.CARD &&
+            instrument.knownCardType == CardType.CREDIT &&
             instrument.ownership == OwnershipStatus.OWNED
         ) {
             return classified(
@@ -109,19 +121,20 @@ object TransactionClassifier {
                 transferOwnership = null,
                 reasons = listOf(
                     "owned_credit_card_purchase",
-                    context.purchaseChannel?.let { "channel_$it" } ?: "channel_unspecified",
+                    evidence.purchaseChannel?.let { "channel_$it" } ?: "channel_unspecified",
                 ),
             )
         }
 
-        // Owned debit/current/wallet-funded purchase is an expense (§11 grocery example).
+        // Owned account/card funding reference is sufficient for expense
+        // without inventing debit/credit type.
         if (instrument != null && instrument.ownership == OwnershipStatus.OWNED) {
             return classified(
                 type = FinancialTransactionType.EXPENSE,
                 transferOwnership = null,
                 reasons = listOf(
                     "owned_instrument_purchase",
-                    context.purchaseChannel?.let { "channel_$it" } ?: "channel_unspecified",
+                    evidence.purchaseChannel?.let { "channel_$it" } ?: "channel_unspecified",
                 ),
             )
         }
@@ -135,9 +148,9 @@ object TransactionClassifier {
         )
     }
 
-    private fun classifyCardPayment(context: ClassificationContext): ClassificationResult {
-        val source = context.source
-        val destination = context.destination
+    private fun classifyCardPayment(evidence: ClassificationEvidence): ClassificationResult {
+        val source = evidence.source
+        val destination = evidence.destination
 
         if (source == null || destination == null) {
             return needsReview(
@@ -156,7 +169,9 @@ object TransactionClassifier {
             )
         }
 
-        if (isOwnedAccountToOwnedCreditCard(source, destination)) {
+        // MessageFamily.CARD_PAYMENT already established card-payment evidence.
+        // Owned account → owned referenced card is enough; do not require invented CardType.
+        if (isOwnedAccountToOwnedCardPaymentShape(source, destination)) {
             return classified(
                 type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
                 transferOwnership = ownership,
@@ -174,9 +189,9 @@ object TransactionClassifier {
         )
     }
 
-    private fun classifyTransfer(context: ClassificationContext): ClassificationResult {
-        val source = context.source
-        val destination = context.destination
+    private fun classifyTransfer(evidence: ClassificationEvidence): ClassificationResult {
+        val source = evidence.source
+        val destination = evidence.destination
 
         if (source == null || destination == null) {
             return needsReview(
@@ -191,7 +206,8 @@ object TransactionClassifier {
 
         // Owned account → owned credit card is liability settlement, not a self-transfer
         // between equivalent cash containers (D-007), even if SMS looks like a transfer.
-        if (isOwnedAccountToOwnedCreditCard(source, destination)) {
+        // Requires a genuinely known CardType.CREDIT on the destination.
+        if (isOwnedCashLikeToOwnedCreditCard(source, destination)) {
             return classified(
                 type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
                 transferOwnership = TransferOwnershipType.SELF_TRANSFER,
@@ -246,16 +262,42 @@ object TransactionClassifier {
         }
     }
 
-    private fun isOwnedAccountToOwnedCreditCard(
-        source: FinancialContainer,
-        destination: FinancialContainer,
+    /**
+     * CARD_PAYMENT family: owned account (or known debit card) → owned card.
+     * Card type need not be known; the message family already classified the event.
+     */
+    private fun isOwnedAccountToOwnedCardPaymentShape(
+        source: ResolvedContainerFacts,
+        destination: ResolvedContainerFacts,
     ): Boolean {
         val sourceIsOwnedCashLike =
             source.ownership == OwnershipStatus.OWNED &&
-                (source is Account || (source is Card && source.type == CardType.DEBIT))
+                (
+                    source.kind == ContainerKind.ACCOUNT ||
+                        (source.kind == ContainerKind.CARD && source.knownCardType == CardType.DEBIT)
+                    )
+        val destinationIsOwnedCard =
+            destination.kind == ContainerKind.CARD &&
+                destination.ownership == OwnershipStatus.OWNED
+        return sourceIsOwnedCashLike && destinationIsOwnedCard
+    }
+
+    /**
+     * Transfer-family special case: only when credit-card type is genuinely known.
+     */
+    private fun isOwnedCashLikeToOwnedCreditCard(
+        source: ResolvedContainerFacts,
+        destination: ResolvedContainerFacts,
+    ): Boolean {
+        val sourceIsOwnedCashLike =
+            source.ownership == OwnershipStatus.OWNED &&
+                (
+                    source.kind == ContainerKind.ACCOUNT ||
+                        (source.kind == ContainerKind.CARD && source.knownCardType == CardType.DEBIT)
+                    )
         val destinationIsOwnedCredit =
-            destination is Card &&
-                destination.type == CardType.CREDIT &&
+            destination.kind == ContainerKind.CARD &&
+                destination.knownCardType == CardType.CREDIT &&
                 destination.ownership == OwnershipStatus.OWNED
         return sourceIsOwnedCashLike && destinationIsOwnedCredit
     }
