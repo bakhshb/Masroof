@@ -814,6 +814,27 @@ class ReviewWorkflowServiceTest {
         assertFalse(results.any { it is ReviewWorkflowResult.Success && it.transaction?.id != review.resolvedTransactionId })
     }
 
+    @Test
+    fun resolveAsNonFinancial_dismissesWithoutTransaction() = runBlocking {
+        persistEvent(
+            smsId = "sms-otp",
+            event = event(
+                id = "pe-otp",
+                rawSmsId = "sms-otp",
+                family = MessageFamily.UNKNOWN,
+                amount = null,
+            ),
+        )
+        workflow.refreshReviewQueue()
+        val result = workflow.resolveAsNonFinancial(
+            ReviewIdFactory.fromRawSmsId("sms-otp"),
+        ) as ReviewWorkflowResult.Success
+        assertEquals(ReviewStatus.RESOLVED, result.review.status)
+        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, result.review.resolutionKind)
+        assertNull(result.transaction)
+        assertEquals(0, ftRepo.listAll().size)
+    }
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,

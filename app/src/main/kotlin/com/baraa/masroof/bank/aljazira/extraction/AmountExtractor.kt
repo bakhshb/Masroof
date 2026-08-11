@@ -32,6 +32,7 @@ class AmountExtractor {
         private val LABEL_PATTERNS: List<Pair<String, Regex>> = listOf(
             "بمبلغ" to Regex("""بمبلغ""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             "مبلغ العملية" to Regex("""مبلغ\s*العملية""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "القيمة" to Regex("""القيمة""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             "القسط" to Regex("""القسط""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             // "مبلغ" after more-specific labels; avoid matching داخل "مبلغ العملية" / balances via word boundary-ish
             "مبلغ" to Regex("""(?<![\p{L}])مبلغ(?!\s*العملية)(?!\s*المتبقي)""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),

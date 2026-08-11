@@ -107,6 +107,8 @@
     <string name="review_sms_body">نص الرسالة</string>
     <string name="review_actions_title">اختر نوع العملية</string>
     <string name="review_action_external_transfer">تحويل خارجي (ليس بين حساباتي)</string>
+    <string name="review_action_incoming_income">دخل وارد (من خارج حساباتي)</string>
+    <string name="review_action_dismiss_non_financial">تجاهل (رسالة معلوماتية)</string>
     <string name="review_pair_candidates">مطابقة مع حوالة مقابلة</string>
     <string name="review_pair_with">مطابقة مع: %1$s</string>
     <string name="review_kind_needs_review">يحتاج تصنيف</string>
@@ -132,4 +134,9 @@
     <string name="review_reason_transfer_ownership">تحويل — ملكية غير محددة</string>
     <string name="review_reason_transfer_missing_side">تحويل — طرف مفقود</string>
     <string name="review_reason_non_financial">رسالة غير مالية</string>
+    <string name="review_error_not_found">المراجعة غير موجودة</string>
+    <string name="review_error_not_required">المراجعة مغلقة مسبقاً</string>
+    <string name="review_error_already_finalized">تمت معالجة الرسالة مسبقاً</string>
+    <string name="review_error_parsed_missing">بيانات التحليل غير متوفرة — جرّب إعادة الاستيراد</string>
+    <string name="review_error_not_transfer">هذه العملية ليست حوالة</string>
 </resources>

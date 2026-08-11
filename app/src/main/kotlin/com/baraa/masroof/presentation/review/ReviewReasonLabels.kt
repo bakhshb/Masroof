@@ -20,6 +20,15 @@ object ReviewReasonLabels {
             "transfer_ownership_unknown_no_guess" -> R.string.review_reason_transfer_ownership
             "transfer_missing_source_or_destination" -> R.string.review_reason_transfer_missing_side
             "non_financial_or_informational_message" -> R.string.review_reason_non_financial
+            "review_not_found" -> R.string.review_error_not_found
+            "review_not_required" -> R.string.review_error_not_required
+            "raw_sms_already_finalized" -> R.string.review_error_already_finalized
+            "parsed_event_missing" -> R.string.review_error_parsed_missing
+            "missing_destination" -> R.string.review_reason_transfer_missing_side
+            "missing_source" -> R.string.review_reason_transfer_missing_side
+            "destination_not_owned" -> R.string.review_reason_transfer_ownership
+            "source_not_owned" -> R.string.review_reason_transfer_ownership
+            "not_a_transfer" -> R.string.review_error_not_transfer
             else -> null
         }
 }

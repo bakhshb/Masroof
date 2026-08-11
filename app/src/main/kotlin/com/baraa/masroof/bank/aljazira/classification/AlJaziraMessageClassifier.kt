@@ -23,10 +23,19 @@ class AlJaziraMessageClassifier {
         val text = sms.comparisonBody
 
         when {
-            text.contains("رمز التحقق") || text.contains("otp") ->
+            text.contains("رمز التحقق") ||
+                text.contains("otp") ||
+                text.contains("رمز التفعيل") ||
+                text.contains("لإضافة المستفيد") ->
                 return AlJaziraClassification(
-                    family = MessageFamily.OTP,
-                    evidence = listOf("otp_indicator"),
+                    family = if (text.contains("رمز التفعيل") || text.contains("لإضافة المستفيد")) {
+                        MessageFamily.NON_FINANCIAL
+                    } else {
+                        MessageFamily.OTP
+                    },
+                    evidence = listOf(
+                        if (text.contains("رمز التفعيل")) "activation_code" else "otp_indicator",
+                    ),
                     confidence = 1.0,
                 )
 
@@ -92,7 +101,9 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("حوالة واردة") || text.contains("incoming transfer") ->
+            text.contains("حوالة واردة") ||
+                text.contains("حوالة مالية واردة") ||
+                text.contains("incoming transfer") ->
                 return AlJaziraClassification(
                     family = MessageFamily.TRANSFER_IN,
                     direction = MoneyDirection.INCOMING,

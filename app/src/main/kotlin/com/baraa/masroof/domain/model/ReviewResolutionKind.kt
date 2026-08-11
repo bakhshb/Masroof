@@ -9,4 +9,5 @@ enum class ReviewResolutionKind {
     USER_EXTERNAL_TRANSFER,
     USER_SELF_TRANSFER_PAIR,
     USER_FINANCIAL_TYPE,
+    USER_NON_FINANCIAL,
 }

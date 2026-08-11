@@ -49,10 +49,12 @@ fun ReviewRoute(
             resolving = state.resolving,
             message = state.message,
             error = state.error,
+            actionErrorDetail = state.actionErrorDetail,
             onBack = viewModel::closeDetail,
             onResolveType = viewModel::resolveAsFinancialType,
             onResolveExternal = viewModel::resolveAsExternalTransfer,
             onResolvePair = viewModel::resolveSelfTransferPair,
+            onDismissNonFinancial = viewModel::resolveAsNonFinancial,
         )
     } else {
         ReviewListScreen(
@@ -178,10 +180,12 @@ private fun ReviewDetailScreen(
     resolving: Boolean,
     message: ReviewMessage?,
     error: ReviewError?,
+    actionErrorDetail: String?,
     onBack: () -> Unit,
     onResolveType: (FinancialTransactionType) -> Unit,
     onResolveExternal: () -> Unit,
     onResolvePair: (String) -> Unit,
+    onDismissNonFinancial: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -242,6 +246,24 @@ private fun ReviewDetailScreen(
             }
             if (error == ReviewError.ACTION_FAILED) {
                 Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
+                actionErrorDetail?.let { reason ->
+                    val detailRes = ReviewReasonLabels.labelRes(reason)
+                    Text(
+                        detailRes?.let { stringResource(it) } ?: reason,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+
+            if (detail.showDismissNonFinancialAction) {
+                Button(
+                    onClick = onDismissNonFinancial,
+                    enabled = !resolving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.review_action_dismiss_non_financial))
+                }
             }
 
             if (detail.showFinancialTypeActions) {
@@ -264,6 +286,16 @@ private fun ReviewDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.review_action_external_transfer))
+                }
+            }
+
+            if (detail.showIncomingIncomeAction) {
+                Button(
+                    onClick = { onResolveType(FinancialTransactionType.INCOME) },
+                    enabled = !resolving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.review_action_incoming_income))
                 }
             }
 

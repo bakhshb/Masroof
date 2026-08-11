@@ -22,13 +22,16 @@ data class ReviewDetailUi(
     val body: String,
     val dateLabel: String,
     val messageFamilyLabel: String?,
+    val messageFamily: MessageFamily?,
     val amountLabel: String?,
     val merchant: String?,
     val counterparty: String?,
     val reasonLabels: List<String>,
     val pairCandidates: List<ReviewListItemUi>,
     val showExternalTransferAction: Boolean,
+    val showIncomingIncomeAction: Boolean,
     val showFinancialTypeActions: Boolean,
+    val showDismissNonFinancialAction: Boolean,
 )
 
 data class ReviewUiState(
@@ -37,6 +40,7 @@ data class ReviewUiState(
     val selectedDetail: ReviewDetailUi? = null,
     val resolving: Boolean = false,
     val error: ReviewError? = null,
+    val actionErrorDetail: String? = null,
     val message: ReviewMessage? = null,
 )
 
@@ -93,3 +97,27 @@ fun ReviewKind.toUiLabelRes(): Int =
         ReviewKind.NEEDS_REVIEW -> com.baraa.masroof.R.string.review_kind_needs_review
         ReviewKind.PENDING_MATCH -> com.baraa.masroof.R.string.review_kind_pending_match
     }
+
+private val NON_FINANCIAL_BODY_MARKERS = listOf(
+    "رمز التفعيل",
+    "لإضافة المستفيد",
+    "رمز التحقق",
+    "تم تسجيل الدخول",
+)
+
+fun looksLikeNonFinancialSms(body: String): Boolean =
+    NON_FINANCIAL_BODY_MARKERS.any { body.contains(it) }
+
+fun shouldOfferNonFinancialDismiss(
+    messageFamily: MessageFamily?,
+    reasons: List<String>,
+    body: String,
+): Boolean {
+    if (messageFamily == MessageFamily.OTP || messageFamily == MessageFamily.NON_FINANCIAL) {
+        return true
+    }
+    if (reasons.any { it == "non_financial_or_informational_message" }) {
+        return true
+    }
+    return looksLikeNonFinancialSms(body)
+}

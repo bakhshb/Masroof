@@ -351,6 +351,42 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun transferInInter_newAcceptedFormat_depositedToAccountAndValueLabel() {
+        val result = parse(
+            """
+            عملية حوالة مالية واردة
+            أودعت إلى حساب: 3001
+            القيمة: 1,000.00 SAR
+            من: نجاه ط. بنتن
+            [بنك الرياض]
+            خصمت من حساب : 9941
+            في: 21:21 30-07-2026
+            رقم المعاملة: 2BTMS12121410751
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.TRANSFER_IN, result.event.messageFamily)
+        assertEquals(Money.of("1000.00", Currency.SAR), result.event.amount)
+        assertEquals("3001", result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
+        assertNull(result.event.sourceAccountRef)
+        assertEquals("نجاه ط. بنتن", result.event.counterparty)
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+        assertEquals(ParseStatus.SUCCESS, result.event.parseStatus)
+    }
+
+    @Test
+    fun activationCode_isNonFinancialWithoutAmount() {
+        val result = parse(
+            "رمز التفعيل : 3083 لإضافة المستفيد (عبر التطبيق) : (براء فائز بن صالح بخش)",
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun nearMissSenders_areNotAlJazira() {
         listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")

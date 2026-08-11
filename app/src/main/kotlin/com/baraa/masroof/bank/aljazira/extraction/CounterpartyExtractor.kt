@@ -27,6 +27,7 @@ class CounterpartyExtractor {
 
         private val PATTERNS: List<Pair<Regex, Int>> = listOf(
             Regex("""اسم\s*المرسل\s*:\s*$NAME""") to 1,
+            Regex("""(?<![\p{L}])من\s*:\s*$NAME""") to 1,
             // Non-digit destination party (account last4 uses digit-only patterns).
             Regex("""الى\s*:\s*(?!\d)([^\n\[]+?)(?=\s*(?:\n|$|مبلغ|بمبلغ|البنك|في\s*:|رقم|المعرف|\[))""") to 1,
         )

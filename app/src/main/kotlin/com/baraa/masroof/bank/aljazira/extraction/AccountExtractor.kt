@@ -24,12 +24,19 @@ data class AccountExtraction(
  * unidentified external bank references for INTER_BANK transfers.
  */
 class AccountExtractor {
-    fun extractSuffixes(sms: NormalizedSms): AccountSuffixEvidence {
+    fun extractSuffixes(sms: NormalizedSms, family: MessageFamily? = null): AccountSuffixEvidence {
         val text = sms.comparisonBody
         var sourceLast4: String? = null
         var destinationLast4: String? = null
 
-        for (pattern in SOURCE_PATTERNS) {
+        val sourcePatterns = when (family) {
+            // Incoming inter-bank SMS may mention the sender's deducted account — not our source.
+            // Generic "حساب:" also appears on the destination line ("أودعت إلى حساب:").
+            MessageFamily.TRANSFER_IN -> TRANSFER_IN_SOURCE_PATTERNS
+            else -> SOURCE_PATTERNS
+        }
+
+        for (pattern in sourcePatterns) {
             val match = pattern.find(text) ?: continue
             sourceLast4 = match.groupValues[1]
             break
@@ -70,7 +77,7 @@ class AccountExtractor {
         family: MessageFamily,
         networkType: BankNetworkType?,
     ): AccountExtraction =
-        toReferences(extractSuffixes(sms), localBank, family, networkType)
+        toReferences(extractSuffixes(sms, family), localBank, family, networkType)
 
     private fun bankForSource(
         localBank: Bank,
@@ -95,15 +102,24 @@ class AccountExtractor {
         }
 
     companion object {
+        private val DEDUCTED_FROM_ACCOUNT_PATTERN =
+            Regex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})""")
+
         private val SOURCE_PATTERNS = listOf(
-            Regex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})"""),
+            DEDUCTED_FROM_ACCOUNT_PATTERN,
             Regex("""من\s*حساب\s*:\s*(\d{4})"""),
             Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
             Regex("""(?<![\p{L}])حساب\s*:\s*(\d{4})"""),
             Regex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
         )
 
+        private val TRANSFER_IN_SOURCE_PATTERNS = listOf(
+            Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
+            Regex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
+        )
+
         private val DESTINATION_PATTERNS = listOf(
+            Regex("""أودعت\s*(?:إلى|الى)\s*حساب\s*:\s*(\d{4})"""),
             Regex("""المعرف\s*البديل\s*\\?\s*الايبان\s*:\s*(\d{4})"""),
             Regex("""الى\s*حساب(?:ك)?(?:\s*الجاري)?\s*:\s*(\d{4})"""),
             Regex("""إلى\s*:\s*(\d{4})"""),

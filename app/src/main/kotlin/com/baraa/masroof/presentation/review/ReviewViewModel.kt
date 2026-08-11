@@ -81,7 +81,7 @@ class ReviewViewModel(
     }
 
     fun closeDetail() {
-        _uiState.update { it.copy(selectedDetail = null, message = null, error = null) }
+        _uiState.update { it.copy(selectedDetail = null, message = null, error = null, actionErrorDetail = null) }
     }
 
     fun resolveAsFinancialType(type: FinancialTransactionType) {
@@ -95,6 +95,13 @@ class ReviewViewModel(
         val reviewId = _uiState.value.selectedDetail?.id ?: return
         runAction {
             reviewWorkflowService.resolveTransferAsExternal(reviewId)
+        }
+    }
+
+    fun resolveAsNonFinancial() {
+        val reviewId = _uiState.value.selectedDetail?.id ?: return
+        runAction {
+            reviewWorkflowService.resolveAsNonFinancial(reviewId)
         }
     }
 
@@ -115,7 +122,7 @@ class ReviewViewModel(
 
     private fun runAction(action: suspend () -> ReviewWorkflowResult) {
         viewModelScope.launch {
-            _uiState.update { it.copy(resolving = true, error = null, message = null) }
+            _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             try {
                 when (val result = action()) {
                     is ReviewWorkflowResult.Success -> {
@@ -127,7 +134,11 @@ class ReviewViewModel(
                     }
                     is ReviewWorkflowResult.Rejected -> {
                         _uiState.update {
-                            it.copy(resolving = false, error = ReviewError.ACTION_FAILED)
+                            it.copy(
+                                resolving = false,
+                                error = ReviewError.ACTION_FAILED,
+                                actionErrorDetail = result.reason,
+                            )
                         }
                     }
                 }
@@ -135,7 +146,7 @@ class ReviewViewModel(
                 throw ce
             } catch (_: Exception) {
                 _uiState.update {
-                    it.copy(resolving = false, error = ReviewError.ACTION_FAILED)
+                    it.copy(resolving = false, error = ReviewError.ACTION_FAILED, actionErrorDetail = null)
                 }
             }
         }
@@ -175,8 +186,15 @@ class ReviewViewModel(
         pairCandidates: List<ReviewListItemUi>,
     ): ReviewDetailUi {
         val review = detail.review
-        val isTransfer = detail.messageFamily == MessageFamily.TRANSFER_IN ||
-            detail.messageFamily == MessageFamily.TRANSFER_OUT
+        val family = detail.messageFamily
+        val isTransferOut = family == MessageFamily.TRANSFER_OUT
+        val isTransferIn = family == MessageFamily.TRANSFER_IN
+        val pendingMatch = review.kind == ReviewKind.PENDING_MATCH
+        val dismissNonFinancial = shouldOfferNonFinancialDismiss(
+            messageFamily = family,
+            reasons = review.reasons,
+            body = detail.body.orEmpty(),
+        )
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"
         return ReviewDetailUi(
@@ -186,14 +204,17 @@ class ReviewViewModel(
             sender = detail.sender,
             body = detail.body.orEmpty(),
             dateLabel = dateLabel,
-            messageFamilyLabel = detail.messageFamily?.name,
+            messageFamilyLabel = family?.name,
+            messageFamily = family,
             amountLabel = detail.amount?.let(MoneyUiFormatter::format),
             merchant = detail.merchant,
             counterparty = detail.counterparty,
             reasonLabels = review.reasons,
             pairCandidates = pairCandidates,
-            showExternalTransferAction = review.kind == ReviewKind.PENDING_MATCH && isTransfer,
-            showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW,
+            showExternalTransferAction = pendingMatch && isTransferOut,
+            showIncomingIncomeAction = pendingMatch && isTransferIn,
+            showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW && !dismissNonFinancial,
+            showDismissNonFinancialAction = dismissNonFinancial,
         )
     }
 }
