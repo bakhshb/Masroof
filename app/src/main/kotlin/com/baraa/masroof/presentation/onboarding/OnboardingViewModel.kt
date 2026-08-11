@@ -12,6 +12,8 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.sms.scanner.SmsScanFailure
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,7 +179,9 @@ class OnboardingViewModel(
                             onboardingPrefs.setHistoricalImportCompleted(false)
                             _uiState.update {
                                 it.copy(
-                                    importState = ImportState.ProviderError("post_scan_setup_failed"),
+                                    importState = ImportState.ProviderError(
+                                        SmsScanResult(failure = SmsScanFailure.ProviderError("post_scan_setup_failed")),
+                                    ),
                                     error = OnboardingError.IMPORT_FAILED,
                                 )
                             }
@@ -203,7 +207,9 @@ class OnboardingViewModel(
             } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
-                        importState = ImportState.ProviderError("scan_failed"),
+                                importState = ImportState.ProviderError(
+                                    SmsScanResult(failure = SmsScanFailure.ProviderError("scan_failed")),
+                                ),
                         error = OnboardingError.IMPORT_FAILED,
                     )
                 }
