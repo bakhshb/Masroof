@@ -137,3 +137,17 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Manual APIs: correction, external transfer, self-transfer pair, financial type.
 - No review UI / onboarding / dashboard / parsers in P9.
 
+## 12. P10 — Onboarding + SMS setup + ownership confirmation UI
+
+- Onboarding state is persisted outside Room using SharedPreferences
+  (`onboardingCompleted`, historical import start epoch millis, import-completed).
+- Android runtime permission checks remain source-of-truth; onboarding never treats
+  a stored flag as permission truth.
+- Historical import boundary uses selected local date at start-of-day in
+  `ZoneId.systemDefault()` and passes the resulting `Instant` to P6 scanner.
+- Ownership confirmation UI reads/writes only via P7 registry/services
+  (`OwnershipConfirmationService`), showing discovered registry candidates only.
+- Onboarding finalization triggers P9 refresh (`refreshReviewQueue`) so P8/P9
+  reconciliation state is up-to-date before marking setup complete.
+- P10 intentionally ships no dashboard and no review list/detail UI.
+

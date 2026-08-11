@@ -6,8 +6,10 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
@@ -86,6 +88,14 @@ class AppContainer(
 
     val userCorrectionRepository: UserCorrectionRepository =
         RoomUserCorrectionRepository(database.userCorrectionDao())
+
+    val onboardingPreferencesRepository: OnboardingPreferencesRepository =
+        SharedPrefsOnboardingPreferencesRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsOnboardingPreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
 
     val ownershipDiscoveryService: OwnershipDiscoveryService =
         OwnershipDiscoveryService(
