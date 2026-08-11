@@ -45,4 +45,36 @@
     <string name="home_setup_complete">اكتمل الإعداد</string>
     <string name="bank_aljazira">بنك الجزيرة</string>
     <string name="bank_unknown">بنك غير معروف</string>
+
+    <string name="dashboard_net_spending">صافي المصروفات</string>
+    <string name="dashboard_gross_before_refunds">قبل الاستردادات: %1$s</string>
+    <string name="dashboard_income">الدخل</string>
+    <string name="dashboard_refunds">الاستردادات</string>
+    <string name="dashboard_money_movement">حركة الأموال</string>
+    <string name="dashboard_external_in">تحويلات واردة</string>
+    <string name="dashboard_external_out">تحويلات صادرة</string>
+    <string name="dashboard_card_payments">سداد البطاقات</string>
+    <string name="dashboard_cash_withdrawals">سحب نقدي</string>
+    <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
+    <string name="dashboard_recent_title">العمليات الأخيرة</string>
+    <string name="dashboard_empty_period">لا توجد عمليات في هذه الفترة</string>
+    <string name="dashboard_review_required">تحتاج مراجعة: %1$d</string>
+    <string name="dashboard_back_to_current">العودة للشهر الحالي</string>
+    <string name="dashboard_load_error">تعذر تحميل الملخص المالي</string>
+    <string name="dashboard_retry">إعادة المحاولة</string>
+    <string name="dashboard_direction_out">صادر</string>
+    <string name="dashboard_direction_in">وارد</string>
+    <string name="dashboard_direction_neutral">تحويل</string>
+
+    <string name="txn_type_expense">مصروف</string>
+    <string name="txn_type_income">دخل</string>
+    <string name="txn_type_self_transfer">تحويل بين حساباتي</string>
+    <string name="txn_type_external_in">تحويل وارد</string>
+    <string name="txn_type_external_out">تحويل صادر</string>
+    <string name="txn_type_card_payment">سداد بطاقة</string>
+    <string name="txn_type_refund">استرداد</string>
+    <string name="txn_type_cash_withdrawal">سحب نقدي</string>
+    <string name="txn_type_fee">رسوم</string>
+    <string name="txn_type_adjustment">تسوية</string>
+    <string name="txn_type_unknown">غير محدد</string>
 </resources>

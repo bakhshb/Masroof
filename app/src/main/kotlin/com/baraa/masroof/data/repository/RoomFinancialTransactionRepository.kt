@@ -7,6 +7,7 @@ import com.baraa.masroof.data.room.mapper.FinancialTransactionMapper
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import java.time.Instant
 
 class RoomFinancialTransactionRepository(
     private val dao: FinancialTransactionDao,
@@ -49,6 +50,15 @@ class RoomFinancialTransactionRepository(
 
     override suspend fun listAll(): List<FinancialTransaction> =
         dao.listAll().map { reconstruct(it) }
+
+    override suspend fun listOccurredBetween(
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<FinancialTransaction> =
+        dao.listOccurredBetween(
+            startInclusiveEpochMillis = startInclusive.toEpochMilli(),
+            endExclusiveEpochMillis = endExclusive.toEpochMilli(),
+        ).map { reconstruct(it) }
 
     override suspend fun isRawSmsLinked(rawSmsId: String): Boolean =
         dao.findLinkByRawSmsId(rawSmsId) != null

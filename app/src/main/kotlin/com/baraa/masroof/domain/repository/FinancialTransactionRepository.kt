@@ -1,6 +1,7 @@
 package com.baraa.masroof.domain.repository
 
 import com.baraa.masroof.domain.model.FinancialTransaction
+import java.time.Instant
 
 /**
  * Persistence for reconciled [FinancialTransaction]s linked by stable RawSms ids.
@@ -22,6 +23,14 @@ interface FinancialTransactionRepository {
     suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction?
 
     suspend fun listAll(): List<FinancialTransaction>
+
+    /**
+     * Transactions with occurredAt in `[startInclusive, endExclusive)`, newest first.
+     */
+    suspend fun listOccurredBetween(
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<FinancialTransaction>
 
     suspend fun isRawSmsLinked(rawSmsId: String): Boolean
 }

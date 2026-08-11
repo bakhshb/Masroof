@@ -52,6 +52,19 @@ interface FinancialTransactionDao {
 
     @Query(
         """
+        SELECT * FROM financial_transaction
+        WHERE occurredAtEpochMillis >= :startInclusiveEpochMillis
+          AND occurredAtEpochMillis < :endExclusiveEpochMillis
+        ORDER BY occurredAtEpochMillis DESC, id DESC
+        """,
+    )
+    suspend fun listOccurredBetween(
+        startInclusiveEpochMillis: Long,
+        endExclusiveEpochMillis: Long,
+    ): List<FinancialTransactionEntity>
+
+    @Query(
+        """
         SELECT * FROM financial_transaction_raw_sms_link
         WHERE rawSmsId = :rawSmsId
         LIMIT 1

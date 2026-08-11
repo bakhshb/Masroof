@@ -2,6 +2,7 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
@@ -155,6 +156,12 @@ class AppContainer(
             reviewQueueUpdater = reviewQueueUpdater,
             manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
+        )
+
+    val dashboardService: DashboardService =
+        DashboardService(
+            financialTransactionRepository = financialTransactionRepository,
+            reviewRepository = reviewRepository,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()

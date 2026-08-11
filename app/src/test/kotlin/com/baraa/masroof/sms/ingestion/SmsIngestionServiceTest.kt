@@ -303,6 +303,10 @@ class SmsIngestionServiceTest {
             override suspend fun getById(id: String): FinancialTransaction? = null
             override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
             override suspend fun listAll(): List<FinancialTransaction> = emptyList()
+            override suspend fun listOccurredBetween(
+                startInclusive: java.time.Instant,
+                endExclusive: java.time.Instant,
+            ): List<FinancialTransaction> = emptyList()
             override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
@@ -458,6 +462,10 @@ class SmsIngestionServiceTest {
             override suspend fun getById(id: String): FinancialTransaction? = null
             override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
             override suspend fun listAll(): List<FinancialTransaction> = emptyList()
+            override suspend fun listOccurredBetween(
+                startInclusive: java.time.Instant,
+                endExclusive: java.time.Instant,
+            ): List<FinancialTransaction> = emptyList()
             override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())

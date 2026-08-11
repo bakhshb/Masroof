@@ -151,3 +151,17 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   reconciliation state is up-to-date before marking setup complete.
 - P10 intentionally ships no dashboard and no review list/detail UI.
 
+## 13. P11 — Monthly financial dashboard
+
+- Financial month is day 27 → next day 27 exclusive (local dates), converted to
+  Instant boundaries via `ZoneId.systemDefault()` start-of-day.
+- Dashboard source of truth is persisted `FinancialTransaction` (+ REQUIRED review
+  count). Never aggregates from RawSms/ParsedEvent text.
+- Aggregation: EXPENSE+FEE → spendingGross; REFUND → refunds and reduces spendingNet;
+  INCOME separate; EXTERNAL_TRANSFER_IN/OUT, SELF_TRANSFER, CREDIT_CARD_PAYMENT,
+  CASH_WITHDRAWAL are separate movement buckets (not spending/income).
+- ADJUSTMENT/UNKNOWN excluded from primary totals; no FX conversion; primary currency
+  is SAR-scoped.
+- No account balance, net worth, budgets, categories, review UI, or full transaction
+  list in P11. Room remains version 4 (DAO range query only).
+
