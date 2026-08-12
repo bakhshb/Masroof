@@ -370,6 +370,7 @@ class DashboardViewModelTest {
                     override suspend fun isRawSmsLinked(rawSmsId: String) = false
                     override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
                     override suspend fun update(transaction: FinancialTransaction) = false
+                    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
                 },
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     object : com.baraa.masroof.parsing.repository.ParsedEventRepository {

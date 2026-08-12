@@ -85,9 +85,17 @@ class TransactionReconciliationService(
         for (record in records) {
             val event = record.event
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
-                alreadyLinked++
-                settledRawSmsIds += event.rawSmsId
-                continue
+                val body = rawSmsRepository.getById(event.rawSmsId)?.body.orEmpty()
+                if (
+                    eventShouldNotProduceTransaction(event, body) &&
+                    financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
+                ) {
+                    // Stale transaction from a prior misclassification (e.g. OTP matched as purchase).
+                } else {
+                    alreadyLinked++
+                    settledRawSmsIds += event.rawSmsId
+                    continue
+                }
             }
 
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt
@@ -316,6 +324,17 @@ class TransactionReconciliationService(
             FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
+
+    private fun eventShouldNotProduceTransaction(event: ParsedEvent, smsBody: String): Boolean {
+        when (event.messageFamily) {
+            MessageFamily.OTP,
+            MessageFamily.BALANCE_NOTICE,
+            MessageFamily.NON_FINANCIAL,
+            -> return true
+
+            else -> return InformationalMessagePolicy.shouldAutoIgnore(event, smsBody)
+        }
+    }
 
     private suspend fun finalizeAssemblyOutcome(
         event: ParsedEvent,

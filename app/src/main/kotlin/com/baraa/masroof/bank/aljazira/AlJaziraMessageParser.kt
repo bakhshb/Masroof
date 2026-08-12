@@ -61,6 +61,7 @@ class AlJaziraMessageParser(
         val txnAmounts = amountCandidates.filter { it.sourceKind == AmountSourceKind.TRANSACTION_AMOUNT }
         val distinctTxnValues = txnAmounts.map { it.value }.distinct()
         val selectedAmount = when {
+            classification.family.isNonFinancialFamily() -> null
             distinctTxnValues.isEmpty() -> null
             distinctTxnValues.size == 1 -> txnAmounts.first { it.value == distinctTxnValues.single() }
             else -> null // multiple distinct Money values → finalize as review via V-007
@@ -134,5 +135,14 @@ class AlJaziraMessageParser(
             ParseStatus.NON_FINANCIAL
         MessageFamily.UNKNOWN -> ParseStatus.REVIEW_REQUIRED
         else -> ParseStatus.SUCCESS
+    }
+
+    private fun MessageFamily.isNonFinancialFamily(): Boolean = when (this) {
+        MessageFamily.OTP,
+        MessageFamily.NON_FINANCIAL,
+        MessageFamily.BALANCE_NOTICE,
+        -> true
+
+        else -> false
     }
 }

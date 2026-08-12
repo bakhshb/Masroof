@@ -1,5 +1,6 @@
 package com.baraa.masroof.domain.rules
 
+import com.baraa.masroof.domain.rules.OtpMessageHeuristics
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -10,6 +11,9 @@ import java.math.BigDecimal
  */
 object InformationalMessagePolicy {
     private val INFORMATIONAL_BODY_MARKERS = listOf(
+        "one time password",
+        "one-time password",
+        "كلمة مرور",
         "رمز التفعيل",
         "لإضافة المستفيد",
         "رمز التحقق",
@@ -65,8 +69,11 @@ object InformationalMessagePolicy {
         return false
     }
 
-    private fun looksLikeInformationalBody(smsBody: String): Boolean =
-        INFORMATIONAL_BODY_MARKERS.any { smsBody.contains(it) }
+    private fun looksLikeInformationalBody(smsBody: String): Boolean {
+        val comparison = smsBody.lowercase()
+        if (OtpMessageHeuristics.isOtpMessage(comparison)) return true
+        return INFORMATIONAL_BODY_MARKERS.any { smsBody.contains(it, ignoreCase = true) }
+    }
 
     private fun Money?.isSignificantTransactionAmount(): Boolean =
         this != null && amount.compareTo(BigDecimal.ZERO) > 0

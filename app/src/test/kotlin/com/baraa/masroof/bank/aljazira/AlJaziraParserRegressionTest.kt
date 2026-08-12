@@ -471,6 +471,43 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun englishOnlinePurchaseOtp_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            One Time Password for Online Purchase
+            Code: 8811
+            For: SAUDI ELECTRICITY COMPANY
+            Amount: SAR 438.5
+            Date: 2026-08-12 07:49
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun saudiElectricityOnlinePurchase_stillParsesAsPurchase() {
+        val result = parse(
+            """
+            شراء عبر الانترنت
+            بطاقة ائتمانية: 7271
+            بمبلغ :438.50 SAR
+            لدى :SAUDI ELECTRICITY COMP
+            في :07:49 12-08-2026
+            الرصيد المتاح :SAR 13954.24
+            إجمالي المبلغ المستحق:3921.11 SAR
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("438.50", Currency.SAR), result.event.amount)
+        assertEquals("7271", result.event.cardRef?.last4)
+        assertEquals("SAUDI ELECTRICITY COMP", result.event.merchant)
+    }
+
+    @Test
     fun nearMissSenders_areNotAlJazira() {
         listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")

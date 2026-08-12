@@ -90,6 +90,49 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun staleOtpLinkedTransaction_isRemovedOnReconcile() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val otpBody =
+            """
+            One Time Password for Online Purchase
+            Code: 8811
+            For: SAUDI ELECTRICITY COMPANY
+            Amount: SAR 438.5
+            Date: 2026-08-12 07:49
+            """.trimIndent()
+        persistEvent(
+            smsId = "sms-otp-dup",
+            body = otpBody,
+            event = event(
+                id = "pe-otp-dup",
+                rawSmsId = "sms-otp-dup",
+                family = MessageFamily.OTP,
+                amount = null,
+            ),
+        )
+        val staleTx = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf("sms-otp-dup")),
+            type = FinancialTransactionType.EXPENSE,
+            amount = money("438.50"),
+            occurredAt = Instant.parse("2026-08-12T04:49:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "7271"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-otp-dup"),
+        )
+        ftRepo.save(staleTx, listOf("sms-otp-dup"))
+        assertEquals(1, ftRepo.listAll().size)
+
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, summary.assembledSingle)
+        assertEquals(1, summary.ignored)
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertFalse(ftRepo.isRawSmsLinked("sms-otp-dup"))
+    }
+
+    @Test
     fun purchase_assemblesExpense() = runBlocking {
         persistEvent(
             smsId = "sms-buy",

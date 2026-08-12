@@ -84,6 +84,12 @@ interface FinancialTransactionDao {
     @Query("SELECT COUNT(*) FROM financial_transaction")
     suspend fun count(): Int
 
+    @Query("DELETE FROM financial_transaction_raw_sms_link WHERE rawSmsId = :rawSmsId")
+    suspend fun deleteLinkByRawSmsId(rawSmsId: String): Int
+
+    @Query("DELETE FROM financial_transaction WHERE id = :id")
+    suspend fun deleteTransactionById(id: String): Int
+
     @Transaction
     suspend fun saveAtomic(
         entity: FinancialTransactionEntity,
