@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
 fun TransactionRow(
@@ -49,9 +50,22 @@ fun TransactionRow(
                     Text(row.title ?: transactionTypeLabel(row.type), style = MaterialTheme.typography.titleSmall)
                     Text(row.amountLabel)
                 }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(transactionTypeLabel(row.type), style = MaterialTheme.typography.bodySmall)
-                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
+                    row.cardLast4?.let { last4 ->
+                        Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val (directionIcon, directionLabelRes) = when (row.direction) {
