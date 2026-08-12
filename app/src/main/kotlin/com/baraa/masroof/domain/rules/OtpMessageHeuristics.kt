@@ -12,6 +12,8 @@ object OtpMessageHeuristics {
             text.contains("one time password") ||
             text.contains("one-time password") ||
             text.contains("كلمة مرور") ||
+            text.contains("كلمة المرور") ||
+            text.contains("صالحة لمرة واحدة") ||
             text.contains("verification code") ||
             text.contains("do not share") ||
             text.contains("لا تشاركه") ||

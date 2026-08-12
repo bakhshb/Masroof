@@ -489,6 +489,41 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun arabicOneTimePassword_cardReveal_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            كلمة مرور صالحة لمرة واحدة
+            رمز التفعيل: 7559
+            السبب: إظهار بيانات البطاقة
+            التاريخ: 09:55 09-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun arabicOneTimePassword_onlinePurchaseZeroAmount_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            كلمة مرور صالحة لمرة واحدة للشراء عبر الإنترنت
+            كلمة المرور: 4607
+            لدى: Hungerstation
+            مبلغ: SAR 0.0
+            في: 10:01 09-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun saudiElectricityOnlinePurchase_stillParsesAsPurchase() {
         val result = parse(
             """

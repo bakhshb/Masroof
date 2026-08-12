@@ -36,7 +36,8 @@ class AlJaziraMessageClassifier {
                             text.contains("رمز التفعيل") -> "activation_code"
                             text.contains("one time password") || text.contains("one-time password") ->
                                 "english_otp"
-                            text.contains("كلمة مرور") -> "password_ar"
+                            text.contains("كلمة مرور") || text.contains("كلمة المرور") ||
+                                text.contains("صالحة لمرة واحدة") -> "password_ar"
                             else -> "otp_indicator"
                         },
                     ),

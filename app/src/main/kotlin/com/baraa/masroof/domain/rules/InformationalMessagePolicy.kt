@@ -14,6 +14,8 @@ object InformationalMessagePolicy {
         "one time password",
         "one-time password",
         "كلمة مرور",
+        "كلمة المرور",
+        "صالحة لمرة واحدة",
         "رمز التفعيل",
         "لإضافة المستفيد",
         "رمز التحقق",
