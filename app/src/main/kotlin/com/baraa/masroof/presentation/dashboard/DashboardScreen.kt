@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
 import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
@@ -55,7 +56,6 @@ fun DashboardRoute(
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refresh,
         onRescan = viewModel::rescanSms,
-        onReparseStored = viewModel::reparseStoredEvents,
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
@@ -71,7 +71,6 @@ private fun DashboardScreen(
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
     onRescan: () -> Unit,
-    onReparseStored: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
@@ -104,11 +103,17 @@ private fun DashboardScreen(
                 Spacer(Modifier.size(10.dp))
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
             }
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = MasroofIcons.settings,
-                    contentDescription = stringResource(R.string.dashboard_open_settings),
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ReviewNotificationIconButton(
+                    reviewCount = state.summary?.reviewRequiredCount ?: 0,
+                    onClick = onOpenReview,
                 )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = MasroofIcons.settings,
+                        contentDescription = stringResource(R.string.dashboard_open_settings),
+                    )
+                }
             }
         }
         Row(verticalAlignment = Alignment.Top) {
@@ -304,45 +309,6 @@ private fun DashboardScreen(
                             stringResource(R.string.dashboard_excluded_other_currency_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                IconTextButtonOutlined(
-                    onClick = onReparseStored,
-                    icon = MasroofIcons.rescan,
-                    text = if (state.reparsingStored) {
-                        stringResource(R.string.dashboard_reparse_stored_running)
-                    } else {
-                        stringResource(R.string.dashboard_reparse_stored)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(R.string.dashboard_reparse_stored_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                if (summary.reviewRequiredCount > 0) {
-                    IconTextButton(
-                        onClick = onOpenReview,
-                        icon = MasroofIcons.reviewQueue,
-                        text = stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = MasroofIcons.success,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        Text(
-                            stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                            style = MaterialTheme.typography.titleSmall,
                         )
                     }
                 }

@@ -56,6 +56,7 @@ fun SettingsRoute(
         onResumeTracking = viewModel::resumeTracking,
         onDismissStopConfirm = viewModel::dismissStopConfirm,
         onConfirmStopTracking = viewModel::confirmStopTracking,
+        onReparseStored = viewModel::reparseStoredMessages,
     )
 }
 
@@ -70,6 +71,7 @@ private fun SettingsScreen(
     onResumeTracking: (ManagedCardUi) -> Unit,
     onDismissStopConfirm: () -> Unit,
     onConfirmStopTracking: () -> Unit,
+    onReparseStored: () -> Unit,
 ) {
     state.stopConfirmTarget?.let { target ->
         AlertDialog(
@@ -208,6 +210,26 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+
+            SectionHeader(
+                title = stringResource(R.string.settings_data_section),
+                icon = MasroofIcons.rescan,
+            )
+            IconTextButtonOutlined(
+                onClick = onReparseStored,
+                icon = MasroofIcons.rescan,
+                text = if (state.reparsingStored) {
+                    stringResource(R.string.dashboard_reparse_stored_running)
+                } else {
+                    stringResource(R.string.dashboard_reparse_stored)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                stringResource(R.string.settings_reparse_stored_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             SectionHeader(
                 title = stringResource(R.string.settings_about_section),

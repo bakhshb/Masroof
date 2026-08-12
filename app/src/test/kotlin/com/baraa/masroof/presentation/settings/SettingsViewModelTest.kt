@@ -115,6 +115,7 @@ class SettingsViewModelTest {
                 cardRegistry = registry,
             ),
             refreshReviewQueue = { onRefreshReviewQueue() },
+            reparseStoredEvents = { 0 },
             appVersion = "1.0-test",
         )
 

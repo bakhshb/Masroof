@@ -49,6 +49,7 @@ object MasroofIcons {
     val moneyMovement: ImageVector = Icons.Filled.AccountBalance
     val recentTransactions: ImageVector = Icons.Filled.Receipt
     val reviewQueue: ImageVector = Icons.Filled.RateReview
+    val notifications: ImageVector = Icons.Filled.Notifications
     val rescan: ImageVector = Icons.Filled.Sync
     val retry: ImageVector = Icons.Filled.Refresh
     val periodPrevious: ImageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft

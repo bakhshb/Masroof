@@ -17,6 +17,7 @@ data class SettingsUiState(
     val appVersion: String = "",
     val updating: Boolean = false,
     val stopConfirmTarget: ManagedCardUi? = null,
+    val reparsingStored: Boolean = false,
     val error: SettingsError? = null,
 )
 

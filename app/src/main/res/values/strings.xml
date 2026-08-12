@@ -69,7 +69,11 @@
     <string name="settings_about_section">عن التطبيق</string>
     <string name="settings_app_version_label">نسخة التطبيق</string>
     <string name="settings_update_failed">تعذّر تحديث إعدادات البطاقة</string>
+    <string name="settings_data_section">البيانات والرسائل</string>
+    <string name="settings_reparse_stored_hint">يُحدّث المبالغ (مثل USD 23) دون إعادة استيراد من الجهاز.</string>
     <string name="dashboard_open_settings">الإعدادات</string>
+    <string name="dashboard_review_notifications">عمليات المراجعة</string>
+    <string name="dashboard_review_notifications_count">%1$d عملية تحتاج مراجعة</string>
     <string name="dashboard_unregistered_cards_body">بطاقة غير مسجّلة — أكّدها من الإعدادات.</string>
     <string name="dashboard_unregistered_cards_more">وب %1$d بطاقة غير مسجّلة أخرى — أكّدها من الإعدادات.</string>
     <string name="dashboard_manage_cards_in_settings">إدارة البطاقات</string>

@@ -18,6 +18,7 @@ class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val refreshReviewQueue: suspend () -> Unit,
+    private val reparseStoredEvents: suspend () -> Int,
     private val appVersion: String,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState(appVersion = appVersion))
@@ -60,6 +61,23 @@ class SettingsViewModel(
 
     fun resumeTracking(card: ManagedCardUi) {
         updateOwnership(card, owned = true)
+    }
+
+    fun reparseStoredMessages() {
+        if (_uiState.value.reparsingStored || _uiState.value.updating) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(reparsingStored = true, error = null) }
+            try {
+                reparseStoredEvents()
+                refreshReviewQueue()
+                applyRegistry(cardRegistryRepository.listAll())
+                _uiState.update { it.copy(reparsingStored = false) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(reparsingStored = false, error = SettingsError.UPDATE_FAILED) }
+            }
+        }
     }
 
     private fun updateOwnership(card: ManagedCardUi, owned: Boolean) {
