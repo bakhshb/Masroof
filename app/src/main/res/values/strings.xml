@@ -43,6 +43,13 @@
     <string name="onboarding_status_unknown">الملكية: غير محددة</string>
     <string name="onboarding_finalize">إنهاء الإعداد</string>
 
+    <string name="ownership_prompt_banner_title">بطاقة جديدة ···%1$s — هل هي بطاقتك؟</string>
+    <string name="ownership_prompt_banner_body">حتى تُحسب مشترياتها تلقائياً، أكّد أنها بطاقتك أو ليست لك.</string>
+    <string name="ownership_prompt_banner_body_more">وب %1$d بطاقة أخرى تحتاج تأكيداً — أكّدها من قسم البطاقات أدناه.</string>
+    <string name="ownership_prompt_needs_confirm">تحتاج تأكيد</string>
+    <string name="review_ownership_prompt_title">تأكيد ملكية البطاقة</string>
+    <string name="review_ownership_prompt_body">هذه العملية مرتبطة ببطاقة ···%1$s لم تُؤكَّد ملكيتها بعد.</string>
+
     <string name="onboarding_done_title">تم إعداد مصروف</string>
     <string name="onboarding_done_counts">حسابات مملوكة: %1$d • بطاقات مملوكة: %2$d • عمليات تحتاج مراجعة: %3$d</string>
     <string name="onboarding_enter_app">الدخول إلى مصروف</string>

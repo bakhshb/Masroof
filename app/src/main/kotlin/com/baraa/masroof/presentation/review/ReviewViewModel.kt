@@ -5,10 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.review.ReviewDetailLoader
 import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.presentation.dashboard.MoneyUiFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +27,9 @@ import java.util.Locale
 class ReviewViewModel(
     private val reviewWorkflowService: ReviewWorkflowService,
     private val detailLoader: ReviewDetailLoader,
+    private val cardRegistryRepository: CardRegistryRepository,
+    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
@@ -145,6 +152,63 @@ class ReviewViewModel(
         }
     }
 
+    fun confirmOwnershipCardOwned() {
+        val cardRef = currentOwnershipCardRef() ?: return
+        runOwnershipAction(owned = true, cardRef = cardRef)
+    }
+
+    fun markOwnershipCardExternal() {
+        val cardRef = currentOwnershipCardRef() ?: return
+        runOwnershipAction(owned = false, cardRef = cardRef)
+    }
+
+    private fun currentOwnershipCardRef(): CardReference? =
+        _uiState.value.selectedDetail?.ownershipCard
+
+    private fun runOwnershipAction(owned: Boolean, cardRef: CardReference) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
+            try {
+                if (owned) {
+                    ownershipConfirmationService.confirmCardOwned(cardRef)
+                } else {
+                    ownershipConfirmationService.markCardExternal(cardRef)
+                }
+                refreshReviewQueue()
+                val reviewId = _uiState.value.selectedDetail?.id
+                if (reviewId != null) {
+                    val detail = detailLoader.loadDetail(reviewId)
+                    if (detail == null) {
+                        refreshAfterAction(message = ReviewMessage.RESOLVED, closeDetail = true)
+                        return@launch
+                    }
+                    val pairCandidates = if (detail.review.kind == ReviewKind.PENDING_MATCH) {
+                        detailLoader.loadPairCandidates(reviewId).map(::toListItem)
+                    } else {
+                        emptyList()
+                    }
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            resolving = false,
+                            selectedDetail = toDetailUi(detail, pairCandidates),
+                            message = ReviewMessage.RESOLVED,
+                            error = null,
+                        )
+                    }
+                    applySummaries(detailLoader.loadSummaries())
+                } else {
+                    applySummaries(detailLoader.loadSummaries())
+                    _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+            }
+        }
+    }
+
     fun resolveSelfTransferPair(partnerReviewId: String) {
         val currentId = _uiState.value.selectedDetail?.id ?: return
         viewModelScope.launch {
@@ -242,7 +306,7 @@ class ReviewViewModel(
         )
     }
 
-    private fun toDetailUi(
+    private suspend fun toDetailUi(
         detail: ReviewDetailLoader.ReviewDetail,
         pairCandidates: List<ReviewListItemUi>,
     ): ReviewDetailUi {
@@ -259,6 +323,14 @@ class ReviewViewModel(
         )
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"
+        val ownershipCard = if (review.reasons.any { it in OWNERSHIP_CARD_REASONS }) {
+            detail.cardRef?.takeIf { cardRef ->
+                cardRef.last4 != null &&
+                    cardRegistryRepository.resolve(cardRef) == OwnershipStatus.UNKNOWN
+            }
+        } else {
+            null
+        }
         return ReviewDetailUi(
             id = review.id,
             kind = review.kind,
@@ -278,8 +350,18 @@ class ReviewViewModel(
             showIncomingIncomeAction = pendingMatch && isTransferIn,
             showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW &&
                 !dismissNonFinancial &&
-                family !in TRANSFER_MESSAGE_FAMILIES,
+                family !in TRANSFER_MESSAGE_FAMILIES &&
+                ownershipCard == null,
             showDismissNonFinancialAction = review.kind == ReviewKind.NEEDS_REVIEW,
+            ownershipCard = ownershipCard,
+            showOwnershipActions = ownershipCard != null,
+        )
+    }
+
+    private companion object {
+        val OWNERSHIP_CARD_REASONS = setOf(
+            "purchase_instrument_ownership_unknown",
+            "card_payment_ownership_unresolved",
         )
     }
 }

@@ -9,7 +9,9 @@ import com.baraa.masroof.application.transaction.TransactionReclassificationServ
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -310,6 +312,75 @@ class DashboardViewModelTest {
         assertFalse(preview.amountLabel.contains("CREDIT_CARD_PAYMENT"))
     }
 
+    @Test
+    fun refresh_loadsUnknownCardsFromRegistry() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val registry = FakeCardRegistry(
+            CardRegistryEntry(
+                bank = Bank.BANK_ALJAZIRA,
+                last4 = "5123",
+                ownership = OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = "sms-1",
+                lastSeenRawSmsId = "sms-1",
+            ),
+        )
+        val vm = viewModel(loader, registry)
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals(listOf(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123")), vm.uiState.value.unknownCards)
+    }
+
+    @Test
+    fun confirmCardOwned_refreshesUnknownCards() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val registry = FakeCardRegistry(
+            CardRegistryEntry(
+                bank = Bank.BANK_ALJAZIRA,
+                last4 = "5123",
+                ownership = OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = "sms-1",
+                lastSeenRawSmsId = "sms-1",
+            ),
+        )
+        var refreshQueueCalls = 0
+        val vm = viewModel(loader, registry) { refreshQueueCalls++ }
+        vm.refresh()
+        advanceUntilIdle()
+        vm.confirmCardOwned(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123"))
+        advanceUntilIdle()
+
+        assertEquals(OwnershipStatus.OWNED, registry.entries.single().ownership)
+        assertEquals(1, refreshQueueCalls)
+        assertTrue(vm.uiState.value.unknownCards.isEmpty())
+    }
+
+    private class FakeCardRegistry(
+        vararg initial: CardRegistryEntry,
+    ) : com.baraa.masroof.domain.repository.CardRegistryRepository {
+        val entries = initial.toMutableList()
+
+        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
+
+        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
+            val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
+            if (index >= 0) {
+                entries[index] = entries[index].copy(ownership = status)
+            }
+        }
+
+        override suspend fun resolve(reference: CardReference): OwnershipStatus =
+            entries.find { it.bank == reference.bank && it.last4 == reference.last4 }?.ownership
+                ?: OwnershipStatus.UNKNOWN
+
+        override suspend fun get(reference: CardReference) =
+            entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
+
+        override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+    }
+
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
         val summary = state.summary
         if (summary != null) {
@@ -347,9 +418,25 @@ class DashboardViewModelTest {
             currency = Currency.SAR,
         )
 
-    private fun viewModel(loader: FakeLoader): DashboardViewModel =
+    private fun viewModel(
+        loader: FakeLoader,
+        cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
+        onRefreshReviewQueue: () -> Unit = {},
+    ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
+            cardRegistryRepository = cardRegistry,
+            ownershipConfirmationService = com.baraa.masroof.domain.ownership.OwnershipConfirmationService(
+                accountRegistry = object : com.baraa.masroof.domain.repository.AccountRegistryRepository {
+                    override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
+                    override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
+                    override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
+                    override suspend fun get(ref: AccountReference) = null
+                    override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
+                },
+                cardRegistry = cardRegistry,
+            ),
+            refreshReviewQueue = { onRefreshReviewQueue() },
             rescanService = { SmsScanResult() },
             reparseStoredEventsService = { 0 },
             reclassificationService = TransactionReclassificationService(

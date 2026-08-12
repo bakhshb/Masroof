@@ -6,10 +6,15 @@ import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -26,6 +31,9 @@ import java.util.Locale
 
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
+    private val cardRegistryRepository: CardRegistryRepository,
+    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val refreshReviewQueue: suspend () -> Unit,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
     private val reparseStoredEventsService: suspend () -> Int,
     private val reclassificationService: TransactionReclassificationService,
@@ -128,6 +136,35 @@ class DashboardViewModel(
         }
     }
 
+    fun confirmCardOwned(candidate: UnknownCardCandidateUi) {
+        updateCardOwnership(candidate, owned = true)
+    }
+
+    fun markCardExternal(candidate: UnknownCardCandidateUi) {
+        updateCardOwnership(candidate, owned = false)
+    }
+
+    private fun updateCardOwnership(candidate: UnknownCardCandidateUi, owned: Boolean) {
+        if (_uiState.value.ownershipUpdating) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(ownershipUpdating = true) }
+            try {
+                val ref = CardReference(candidate.bank, candidate.last4)
+                if (owned) {
+                    ownershipConfirmationService.confirmCardOwned(ref)
+                } else {
+                    ownershipConfirmationService.markCardExternal(ref)
+                }
+                refreshReviewQueue()
+                refresh()
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(ownershipUpdating = false) }
+            }
+        }
+    }
+
     fun reclassifySelectedTransaction(newType: FinancialTransactionType) {
         val transactionId = _uiState.value.selectedTransactionId ?: return
         viewModelScope.launch {
@@ -199,6 +236,7 @@ class DashboardViewModel(
 
             try {
                 val overview = overviewLoader.loadOverview(period)
+                val unknownCards = loadUnknownCards()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -218,6 +256,8 @@ class DashboardViewModel(
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,
+                        unknownCards = unknownCards,
+                        ownershipUpdating = false,
                     )
                 }
             } catch (ce: CancellationException) {
@@ -277,4 +317,10 @@ class DashboardViewModel(
             searchText = searchText,
         )
     }
+
+    private suspend fun loadUnknownCards(): List<UnknownCardCandidateUi> =
+        cardRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN }
+            .map { UnknownCardCandidateUi(bank = it.bank, last4 = it.last4) }
+            .sortedBy { it.last4 }
 }

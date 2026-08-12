@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import java.time.Instant
@@ -31,6 +32,10 @@ fun CreditCardsSection(
     overview: CreditCardsOverview,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
+    unknownCardLast4s: Set<String> = emptySet(),
+    ownershipUpdating: Boolean = false,
+    onConfirmCardOwned: (String) -> Unit = {},
+    onMarkCardExternal: (String) -> Unit = {},
 ) {
     if (!overview.hasContent) return
 
@@ -90,6 +95,10 @@ fun CreditCardsSection(
                 salaryPeriodLabel = overview.salaryPeriodLabel,
                 zoneId = zoneId,
                 dateFormatter = dateTimeFormatter,
+                needsOwnershipConfirm = row.last4 in unknownCardLast4s,
+                ownershipUpdating = ownershipUpdating,
+                onConfirmOwned = { onConfirmCardOwned(row.last4) },
+                onMarkExternal = { onMarkCardExternal(row.last4) },
             )
         }
     }
@@ -101,6 +110,10 @@ private fun CreditCardRowCard(
     salaryPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
+    needsOwnershipConfirm: Boolean,
+    ownershipUpdating: Boolean,
+    onConfirmOwned: () -> Unit,
+    onMarkExternal: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -164,6 +177,14 @@ private fun CreditCardRowCard(
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (needsOwnershipConfirm) {
+                CardOwnershipInlinePrompt(
+                    enabled = !ownershipUpdating,
+                    onConfirmOwned = onConfirmOwned,
+                    onMarkExternal = onMarkExternal,
                 )
             }
         }

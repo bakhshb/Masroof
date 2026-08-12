@@ -3,8 +3,14 @@ package com.baraa.masroof.presentation.dashboard
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+
+data class UnknownCardCandidateUi(
+    val bank: Bank,
+    val last4: String,
+)
 
 enum class TransactionDirectionUi {
     OUTWARD,
@@ -47,6 +53,8 @@ data class DashboardUiState(
     val reclassifying: Boolean = false,
     val reclassifyError: String? = null,
     val reclassifySuccess: Boolean = false,
+    val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
+    val ownershipUpdating: Boolean = false,
 )
 
 enum class DashboardError {

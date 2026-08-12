@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.common.CardOwnershipPromptBanner
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
@@ -57,6 +58,8 @@ fun DashboardRoute(
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
+        onConfirmCardOwned = viewModel::confirmCardOwned,
+        onMarkCardExternal = viewModel::markCardExternal,
     )
 }
 
@@ -72,6 +75,8 @@ private fun DashboardScreen(
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onConfirmCardOwned: (UnknownCardCandidateUi) -> Unit,
+    onMarkCardExternal: (UnknownCardCandidateUi) -> Unit,
 ) {
     val isPullRefreshing = state.loading && state.summary != null
     LongPullToRefreshBox(
@@ -207,10 +212,29 @@ private fun DashboardScreen(
                 MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)
                 MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
 
+                state.unknownCards.firstOrNull()?.let { firstUnknown ->
+                    CardOwnershipPromptBanner(
+                        last4 = firstUnknown.last4,
+                        extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
+                        enabled = !state.ownershipUpdating,
+                        onConfirmOwned = { onConfirmCardOwned(firstUnknown) },
+                        onMarkExternal = { onMarkCardExternal(firstUnknown) },
+                    )
+                }
+
                 state.creditCards?.let { creditCards ->
+                    val unknownLast4s = state.unknownCards.map { it.last4 }.toSet()
                     CreditCardsSection(
                         overview = creditCards,
                         zoneId = java.time.ZoneId.systemDefault(),
+                        unknownCardLast4s = unknownLast4s,
+                        ownershipUpdating = state.ownershipUpdating,
+                        onConfirmCardOwned = { last4 ->
+                            state.unknownCards.find { it.last4 == last4 }?.let(onConfirmCardOwned)
+                        },
+                        onMarkCardExternal = { last4 ->
+                            state.unknownCards.find { it.last4 == last4 }?.let(onMarkCardExternal)
+                        },
                     )
                 }
 
