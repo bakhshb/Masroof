@@ -61,7 +61,6 @@ data class DashboardUiState(
     val reclassifySuccess: Boolean = false,
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
-    val ownershipUpdating: Boolean = false,
 )
 
 enum class DashboardError {

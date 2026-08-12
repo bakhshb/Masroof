@@ -16,11 +16,14 @@ import com.baraa.masroof.presentation.onboarding.OnboardingStep
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.review.ReviewRoute
 import com.baraa.masroof.presentation.review.ReviewViewModel
+import com.baraa.masroof.presentation.settings.SettingsRoute
+import com.baraa.masroof.presentation.settings.SettingsViewModel
 
 private enum class HomeDestination {
     Dashboard,
     Review,
     AllTransactions,
+    Settings,
 }
 
 /**
@@ -31,6 +34,7 @@ fun MasroofRoot(
     onboardingViewModel: OnboardingViewModel,
     dashboardViewModel: DashboardViewModel,
     reviewViewModel: ReviewViewModel,
+    settingsViewModel: SettingsViewModel,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
 ) {
@@ -47,6 +51,11 @@ fun MasroofRoot(
 
                 homeDestination == HomeDestination.AllTransactions ->
                     homeDestination = HomeDestination.Dashboard
+
+                homeDestination == HomeDestination.Settings -> {
+                    homeDestination = HomeDestination.Dashboard
+                    dashboardViewModel.refresh()
+                }
 
                 homeDestination == HomeDestination.Review ->
                     if (reviewState.selectedDetail != null) {
@@ -84,6 +93,7 @@ fun MasroofRoot(
                 onOpenReview = { homeDestination = HomeDestination.Review },
                 onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                onOpenSettings = { homeDestination = HomeDestination.Settings },
             )
             HomeDestination.Review -> ReviewRoute(
                 viewModel = reviewViewModel,
@@ -100,6 +110,13 @@ fun MasroofRoot(
                     onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 )
             }
+            HomeDestination.Settings -> SettingsRoute(
+                viewModel = settingsViewModel,
+                onBack = {
+                    homeDestination = HomeDestination.Dashboard
+                    dashboardViewModel.refresh()
+                },
+            )
         }
     } else {
         homeDestination = HomeDestination.Dashboard

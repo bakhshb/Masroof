@@ -53,6 +53,27 @@
     <string name="review_ownership_prompt_title">بطاقة غير مسجلة</string>
     <string name="review_ownership_prompt_body">هذه العملية مرتبطة ببطاقة جديدة ···%1$s. أكّد أنها بطاقتك أو اختر «لا أتابعها».</string>
 
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_back">رجوع</string>
+    <string name="settings_cards_section">بطاقاتي</string>
+    <string name="settings_cards_hint">البطاقات المتابَعة تظهر في لوحة التحكم. المتوقفة تختفي منها.</string>
+    <string name="settings_cards_empty">لا توجد بطاقات مسجّلة بعد.</string>
+    <string name="settings_cards_followed">بطاقاتي</string>
+    <string name="settings_cards_unregistered">غير مسجّلة</string>
+    <string name="settings_cards_stopped">متوقفة</string>
+    <string name="settings_resume_tracking">متابعة البطاقة</string>
+    <string name="settings_stop_confirm_title">إيقاف متابعة البطاقة؟</string>
+    <string name="settings_stop_confirm_body">لن تظهر بطاقة ···%1$s في لوحة التحكم ولن تُحسب مشترياتها ضمن مصروفاتك.</string>
+    <string name="settings_stop_confirm_action">إيقاف المتابعة</string>
+    <string name="settings_cancel">إلغاء</string>
+    <string name="settings_about_section">عن التطبيق</string>
+    <string name="settings_app_version_label">نسخة التطبيق</string>
+    <string name="settings_update_failed">تعذّر تحديث إعدادات البطاقة</string>
+    <string name="dashboard_open_settings">الإعدادات</string>
+    <string name="dashboard_unregistered_cards_body">بطاقة غير مسجّلة — أكّدها من الإعدادات.</string>
+    <string name="dashboard_unregistered_cards_more">وب %1$d بطاقة غير مسجّلة أخرى — أكّدها من الإعدادات.</string>
+    <string name="dashboard_manage_cards_in_settings">إدارة البطاقات</string>
+
     <string name="onboarding_done_title">تم إعداد مصروف</string>
     <string name="onboarding_done_counts">حسابات مملوكة: %1$d • بطاقات مملوكة: %2$d • عمليات تحتاج مراجعة: %3$d</string>
     <string name="onboarding_enter_app">الدخول إلى مصروف</string>

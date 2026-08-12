@@ -26,7 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.presentation.common.CardOwnershipPromptBanner
+import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
@@ -42,6 +42,7 @@ fun DashboardRoute(
     onOpenReview: () -> Unit = {},
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -58,9 +59,7 @@ fun DashboardRoute(
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
-        onConfirmCardOwned = viewModel::confirmCardOwned,
-        onMarkCardExternal = viewModel::markCardExternal,
-        onStopTrackingOwnedCard = viewModel::stopTrackingOwnedCard,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -76,9 +75,7 @@ private fun DashboardScreen(
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
-    onConfirmCardOwned: (UnknownCardCandidateUi) -> Unit,
-    onMarkCardExternal: (UnknownCardCandidateUi) -> Unit,
-    onStopTrackingOwnedCard: (OwnedCardUi) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val isPullRefreshing = state.loading && state.summary != null
     LongPullToRefreshBox(
@@ -92,15 +89,27 @@ private fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = MasroofIcons.appLogo,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp),
-            )
-            Spacer(Modifier.size(10.dp))
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.appLogo,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = MasroofIcons.settings,
+                    contentDescription = stringResource(R.string.dashboard_open_settings),
+                )
+            }
         }
         Row(verticalAlignment = Alignment.Top) {
             Icon(
@@ -215,34 +224,22 @@ private fun DashboardScreen(
                 MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
 
                 state.unknownCards.firstOrNull()?.let { firstUnknown ->
-                    CardOwnershipPromptBanner(
-                        last4 = firstUnknown.last4,
+                    UnregisteredCardsNotice(
+                        firstLast4 = firstUnknown.last4,
                         extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
-                        enabled = !state.ownershipUpdating,
-                        onConfirmOwned = { onConfirmCardOwned(firstUnknown) },
-                        onMarkExternal = { onMarkCardExternal(firstUnknown) },
+                        onOpenSettings = onOpenSettings,
                     )
                 }
 
                 state.creditCards?.let { creditCards ->
-                    val unknownLast4s = state.unknownCards.map { it.last4 }.toSet()
                     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-                    CreditCardsSection(
-                        overview = creditCards,
-                        zoneId = java.time.ZoneId.systemDefault(),
-                        unknownCardLast4s = unknownLast4s,
-                        ownedCardLast4s = ownedLast4s,
-                        ownershipUpdating = state.ownershipUpdating,
-                        onConfirmCardOwned = { last4 ->
-                            state.unknownCards.find { it.last4 == last4 }?.let(onConfirmCardOwned)
-                        },
-                        onMarkCardExternal = { last4 ->
-                            state.unknownCards.find { it.last4 == last4 }?.let(onMarkCardExternal)
-                        },
-                        onStopTrackingOwnedCard = { last4 ->
-                            state.ownedCards.find { it.last4 == last4 }?.let(onStopTrackingOwnedCard)
-                        },
-                    )
+                    val followedOverview = creditCards.followedOnly(ownedLast4s)
+                    if (followedOverview.hasContent) {
+                        CreditCardsSection(
+                            overview = followedOverview,
+                            zoneId = java.time.ZoneId.systemDefault(),
+                        )
+                    }
                 }
 
                 SectionHeader(

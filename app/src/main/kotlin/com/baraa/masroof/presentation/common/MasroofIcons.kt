@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Store
@@ -70,6 +71,7 @@ object MasroofIcons {
     val error: ImageVector = Icons.Filled.ErrorOutline
     val warning: ImageVector = Icons.Filled.WarningAmber
     val ownership: ImageVector = Icons.Filled.VerifiedUser
+    val settings: ImageVector = Icons.Filled.Settings
     val shopping: ImageVector = Icons.Filled.ShoppingCart
 
     fun transactionType(type: FinancialTransactionType): ImageVector =

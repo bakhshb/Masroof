@@ -19,11 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
-import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.StopTrackingCardButton
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.formatCardLast4
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -34,12 +32,6 @@ fun CreditCardsSection(
     overview: CreditCardsOverview,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
-    unknownCardLast4s: Set<String> = emptySet(),
-    ownedCardLast4s: Set<String> = emptySet(),
-    ownershipUpdating: Boolean = false,
-    onConfirmCardOwned: (String) -> Unit = {},
-    onMarkCardExternal: (String) -> Unit = {},
-    onStopTrackingOwnedCard: (String) -> Unit = {},
 ) {
     if (!overview.hasContent) return
 
@@ -99,12 +91,6 @@ fun CreditCardsSection(
                 salaryPeriodLabel = overview.salaryPeriodLabel,
                 zoneId = zoneId,
                 dateFormatter = dateTimeFormatter,
-                needsOwnershipConfirm = row.last4 in unknownCardLast4s,
-                canStopTracking = row.last4 in ownedCardLast4s,
-                ownershipUpdating = ownershipUpdating,
-                onConfirmOwned = { onConfirmCardOwned(row.last4) },
-                onMarkExternal = { onMarkCardExternal(row.last4) },
-                onStopTracking = { onStopTrackingOwnedCard(row.last4) },
             )
         }
     }
@@ -116,12 +102,6 @@ private fun CreditCardRowCard(
     salaryPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
-    needsOwnershipConfirm: Boolean,
-    canStopTracking: Boolean,
-    ownershipUpdating: Boolean,
-    onConfirmOwned: () -> Unit,
-    onMarkExternal: () -> Unit,
-    onStopTracking: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -190,19 +170,6 @@ private fun CreditCardRowCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            if (needsOwnershipConfirm) {
-                CardOwnershipInlinePrompt(
-                    enabled = !ownershipUpdating,
-                    onConfirmOwned = onConfirmOwned,
-                    onMarkExternal = onMarkExternal,
-                )
-            } else if (canStopTracking) {
-                StopTrackingCardButton(
-                    enabled = !ownershipUpdating,
-                    onClick = onStopTracking,
-                )
-            }
         }
     }
 }
@@ -224,3 +191,6 @@ private fun formatSnapshotTime(
     zoneId: ZoneId,
     formatter: DateTimeFormatter,
 ): String = formatter.format(instant.atZone(zoneId))
+
+fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview =
+    copy(cards = cards.filter { it.last4 in ownedLast4s })

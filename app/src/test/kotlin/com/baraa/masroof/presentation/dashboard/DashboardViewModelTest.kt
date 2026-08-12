@@ -332,31 +332,6 @@ class DashboardViewModelTest {
         assertEquals(listOf(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123")), vm.uiState.value.unknownCards)
     }
 
-    @Test
-    fun confirmCardOwned_refreshesUnknownCards() = runTest {
-        val loader = FakeLoader()
-        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
-        val registry = FakeCardRegistry(
-            CardRegistryEntry(
-                bank = Bank.BANK_ALJAZIRA,
-                last4 = "5123",
-                ownership = OwnershipStatus.UNKNOWN,
-                firstSeenRawSmsId = "sms-1",
-                lastSeenRawSmsId = "sms-1",
-            ),
-        )
-        var refreshQueueCalls = 0
-        val vm = viewModel(loader, registry) { refreshQueueCalls++ }
-        vm.refresh()
-        advanceUntilIdle()
-        vm.confirmCardOwned(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123"))
-        advanceUntilIdle()
-
-        assertEquals(OwnershipStatus.OWNED, registry.entries.single().ownership)
-        assertEquals(1, refreshQueueCalls)
-        assertTrue(vm.uiState.value.unknownCards.isEmpty())
-    }
-
     private class FakeCardRegistry(
         vararg initial: CardRegistryEntry,
     ) : com.baraa.masroof.domain.repository.CardRegistryRepository {
@@ -421,22 +396,10 @@ class DashboardViewModelTest {
     private fun viewModel(
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
-        onRefreshReviewQueue: () -> Unit = {},
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
             cardRegistryRepository = cardRegistry,
-            ownershipConfirmationService = com.baraa.masroof.domain.ownership.OwnershipConfirmationService(
-                accountRegistry = object : com.baraa.masroof.domain.repository.AccountRegistryRepository {
-                    override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
-                    override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
-                    override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
-                    override suspend fun get(ref: AccountReference) = null
-                    override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
-                },
-                cardRegistry = cardRegistry,
-            ),
-            refreshReviewQueue = { onRefreshReviewQueue() },
             rescanService = { SmsScanResult() },
             reparseStoredEventsService = { 0 },
             reclassificationService = TransactionReclassificationService(
