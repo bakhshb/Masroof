@@ -1,7 +1,9 @@
 package com.baraa.masroof
 
 import android.app.Application
+import android.content.Context
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.presentation.locale.AppLocaleContext
 
 /**
  * Application entry and composition root holder for Masroof.
@@ -9,6 +11,12 @@ import com.baraa.masroof.application.AppContainer
 class MasroofApplication : Application() {
     lateinit var container: AppContainer
         private set
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(
+            AppLocaleContext.wrap(base, AppLocaleContext.readStoredLanguageTag(base)),
+        )
+    }
 
     override fun onCreate() {
         super.onCreate()

@@ -37,6 +37,7 @@ fun MasroofRoot(
     settingsViewModel: SettingsViewModel,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onLocaleChanged: () -> Unit,
 ) {
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val reviewState by reviewViewModel.uiState.collectAsState()
@@ -118,6 +119,7 @@ fun MasroofRoot(
                     dashboardViewModel.refresh()
                 },
                 onOpenReview = { homeDestination = HomeDestination.Review },
+                onLocaleChanged = onLocaleChanged,
             )
         }
     } else {

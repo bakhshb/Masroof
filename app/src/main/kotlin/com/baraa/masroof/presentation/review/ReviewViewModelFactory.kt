@@ -29,6 +29,7 @@ class ReviewViewModelFactory(
                     container.refreshReviewQueue()
                 }
             },
+            appContext = container.applicationContext,
         ) as T
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
@@ -25,7 +26,6 @@ import com.baraa.masroof.presentation.common.formatCardLast4
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun CreditCardsSection(
@@ -35,8 +35,9 @@ fun CreditCardsSection(
 ) {
     if (!overview.hasContent) return
 
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
-    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", locale)
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(

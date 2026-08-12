@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import android.content.Context
+import com.baraa.masroof.R
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.SalaryCycleStartAdjustment
 import java.time.LocalDate
@@ -7,24 +9,33 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object FinancialPeriodUiFormatter {
-    private val dayMonth: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
-
-    fun formatRange(period: FinancialPeriod): String {
-        val start = formatDayMonth(period.startDate)
-        val end = formatDayMonth(period.displayEndDateInclusive)
+    fun formatRange(context: Context, period: FinancialPeriod): String {
+        val dayMonth = dayMonthFormatter(context)
+        val start = dayMonth.format(period.startDate)
+        val end = dayMonth.format(period.displayEndDateInclusive)
         return "$start - $end"
     }
 
-    fun formatSalaryPeriodTitle(period: FinancialPeriod): String =
-        "فترة الراتب: ${formatRange(period)}"
+    fun formatSalaryPeriodTitle(context: Context, period: FinancialPeriod): String =
+        context.getString(R.string.dashboard_salary_period_label, formatRange(context, period))
 
-    fun formatAdjustmentHint(adjustment: SalaryCycleStartAdjustment?): String? =
+    fun formatAdjustmentHint(
+        context: Context,
+        adjustment: SalaryCycleStartAdjustment?,
+    ): String? =
         when (adjustment) {
-            SalaryCycleStartAdjustment.EARLY_FOR_FRIDAY -> "بدأت 26 لأن 27 جمعة"
-            SalaryCycleStartAdjustment.LATE_FOR_SATURDAY -> "بدأت 28 لأن 27 سبت"
+            SalaryCycleStartAdjustment.EARLY_FOR_FRIDAY ->
+                context.getString(R.string.dashboard_period_adjustment_early_friday)
+            SalaryCycleStartAdjustment.LATE_FOR_SATURDAY ->
+                context.getString(R.string.dashboard_period_adjustment_late_saturday)
             null -> null
         }
 
-    fun formatDayMonth(date: LocalDate): String = dayMonth.format(date)
+    fun formatDayMonth(context: Context, date: LocalDate): String =
+        dayMonthFormatter(context).format(date)
+
+    private fun dayMonthFormatter(context: Context): DateTimeFormatter {
+        val locale: Locale = context.resources.configuration.locales[0]
+        return DateTimeFormatter.ofPattern("d MMMM", locale)
+    }
 }

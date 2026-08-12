@@ -14,6 +14,7 @@ class SettingsViewModelFactory(
         return SettingsViewModel(
             cardRegistryRepository = container.cardRegistryRepository,
             ownershipConfirmationService = container.ownershipConfirmationService,
+            appLocaleRepository = container.appLocaleRepository,
             refreshReviewQueue = { container.refreshReviewQueue() },
             reparseStoredEvents = { container.reparseAllStoredEvents() },
             appVersion = appVersion,

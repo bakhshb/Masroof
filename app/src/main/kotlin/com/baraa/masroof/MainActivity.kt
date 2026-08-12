@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },
                         onOpenAppSettings = openSettings,
+                        onLocaleChanged = { recreate() },
                     )
                 }
             }

@@ -20,6 +20,7 @@ class DashboardViewModelFactory(
             cardRegistryRepository = container.cardRegistryRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
+            appContext = container.applicationContext,
             zoneId = zoneId,
             clock = clock,
         ) as T

@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,7 +75,7 @@ fun SettingsNavRow(
                 Spacer(Modifier.width(8.dp))
             }
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),

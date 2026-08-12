@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -34,6 +37,7 @@ fun SettingsRoute(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
+    onLocaleChanged: () -> Unit,
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -54,6 +58,9 @@ fun SettingsRoute(
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
             onReparseStored = viewModel::reparseStoredMessages,
+            onSelectLanguage = { tag ->
+                viewModel.setLanguageTag(tag, onLocaleChanged)
+            },
         )
 
         SettingsDestination.MyCards -> SettingsMyCardsScreen(
@@ -84,7 +91,20 @@ private fun SettingsHubScreen(
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
+    onSelectLanguage: (String) -> Unit,
 ) {
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+
+    if (showLanguageDialog) {
+        SettingsLanguageDialog(
+            selectedLanguageTag = state.languageTag,
+            onDismiss = { showLanguageDialog = false },
+            onSelectLanguage = { tag ->
+                showLanguageDialog = false
+                onSelectLanguage(tag)
+            },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -146,6 +166,13 @@ private fun SettingsHubScreen(
             )
 
             SettingsNavRow(
+                icon = Icons.Filled.Language,
+                title = stringResource(R.string.settings_language_title),
+                subtitle = languageSubtitle(state.languageTag),
+                onClick = { showLanguageDialog = true },
+            )
+
+            SettingsNavRow(
                 icon = MasroofIcons.periodHint,
                 title = stringResource(R.string.settings_about_section),
                 subtitle = stringResource(R.string.settings_about_subtitle, state.appVersion),
@@ -162,6 +189,13 @@ private fun SettingsHubScreen(
         }
     }
 }
+
+@Composable
+private fun languageSubtitle(languageTag: String): String =
+    when (languageTag) {
+        AppLocale.TAG_EN -> stringResource(R.string.settings_language_english)
+        else -> stringResource(R.string.settings_language_arabic)
+    }
 
 @Composable
 private fun cardsHubSubtitle(state: SettingsUiState): String {

@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.review
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.review.ReviewDetailLoader
@@ -31,13 +32,17 @@ class ReviewViewModel(
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
+    private val appContext: Context,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReviewUiState())
     val uiState: StateFlow<ReviewUiState> = _uiState.asStateFlow()
 
-    private val dateFormatter: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMM yyyy", Locale("ar"))
+    private val dateFormatter: DateTimeFormatter
+        get() = DateTimeFormatter.ofPattern(
+            "d MMM yyyy",
+            appContext.resources.configuration.locales[0],
+        )
 
     fun refresh() {
         viewModelScope.launch {

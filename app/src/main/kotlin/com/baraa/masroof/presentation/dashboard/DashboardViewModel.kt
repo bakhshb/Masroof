@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -32,6 +33,7 @@ class DashboardViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
+    private val appContext: Context,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -44,8 +46,11 @@ class DashboardViewModel(
     private var loadJob: Job? = null
     private var rescanJob: Job? = null
 
-    private val dateFormatter: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
+    private val dateFormatter: DateTimeFormatter
+        get() = DateTimeFormatter.ofPattern(
+            "d MMM",
+            appContext.resources.configuration.locales[0],
+        )
 
     companion object {
         const val RECENT_TRANSACTION_LIMIT: Int = 5
@@ -148,8 +153,8 @@ class DashboardViewModel(
 
     private fun periodPresentation(period: FinancialPeriod): Pair<String, String?> {
         val adjustment = FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate)
-        return FinancialPeriodUiFormatter.formatSalaryPeriodTitle(period) to
-            FinancialPeriodUiFormatter.formatAdjustmentHint(adjustment)
+        return FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, period) to
+            FinancialPeriodUiFormatter.formatAdjustmentHint(appContext, adjustment)
     }
 
     private fun load(period: FinancialPeriod, preserveSelectionId: String? = null) {

@@ -66,6 +66,9 @@
     <string name="settings_stop_confirm_body">لن تظهر بطاقة ···%1$s في لوحة التحكم ولن تُحسب مشترياتها ضمن مصروفاتك.</string>
     <string name="settings_stop_confirm_action">إيقاف المتابعة</string>
     <string name="settings_cancel">إلغاء</string>
+    <string name="settings_language_title">اللغة</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_language_english">English</string>
     <string name="settings_about_section">عن التطبيق</string>
     <string name="settings_app_version_label">نسخة التطبيق</string>
     <string name="settings_about_subtitle">نسخة %1$s</string>
@@ -101,6 +104,9 @@
 
     <string name="dashboard_net_spending">صافي المصروفات</string>
     <string name="dashboard_period_summary_hint">ملخص فترة الراتب — لا يعرض رصيد الحساب البنكي</string>
+    <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
+    <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>
+    <string name="dashboard_period_adjustment_late_saturday">بدأت 28 لأن 27 سبت</string>
     <string name="dashboard_net_cash_flow">صافي التغير النقدي</string>
     <string name="dashboard_gross_before_refunds">قبل الاستردادات: %1$s</string>
     <string name="dashboard_income">الدخل</string>
