@@ -1,14 +1,21 @@
 package com.baraa.masroof.presentation.common
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 
 @Composable
@@ -17,28 +24,32 @@ fun ReviewNotificationIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BadgedBox(
-        modifier = modifier,
-        badge = {
+    // Badge anchor must stay on the bell's visual top-right corner in both RTL and LTR.
+    // Material BadgedBox flips with layout direction and can overlap the adjacent settings icon.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(modifier = modifier.size(48.dp)) {
+            IconButton(onClick = onClick, modifier = Modifier.matchParentSize()) {
+                Icon(
+                    imageVector = MasroofIcons.notifications,
+                    contentDescription = if (reviewCount > 0) {
+                        stringResource(R.string.dashboard_review_notifications_count, reviewCount)
+                    } else {
+                        stringResource(R.string.dashboard_review_notifications)
+                    },
+                )
+            }
             if (reviewCount > 0) {
-                Badge {
+                Badge(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-2).dp, y = 6.dp),
+                ) {
                     Text(
                         if (reviewCount > 99) "99+" else reviewCount.toString(),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
             }
-        },
-    ) {
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = MasroofIcons.notifications,
-                contentDescription = if (reviewCount > 0) {
-                    stringResource(R.string.dashboard_review_notifications_count, reviewCount)
-                } else {
-                    stringResource(R.string.dashboard_review_notifications)
-                },
-            )
         }
     }
 }
