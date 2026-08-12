@@ -2,6 +2,8 @@ package com.baraa.masroof.presentation.dashboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -469,9 +471,15 @@ class DashboardViewModelTest {
                 ),
             ),
             appContext = appContext,
+            appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeAppLocaleRepository : AppLocaleRepository {
+        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
+        override fun setLanguageTag(languageTag: String) = Unit
+    }
 
     private class FakeLoader : DashboardOverviewLoader {
         private val overviews = mutableMapOf<FinancialPeriod, DashboardOverview>()

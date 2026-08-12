@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -147,9 +149,15 @@ class DashboardServiceTest {
             reviewRepository = reviewRepo,
             parsedEventRepository = FakeParsedRepo(),
             rawSmsRepository = FakeRawRepo(),
+            appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeAppLocaleRepository : AppLocaleRepository {
+        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
+        override fun setLanguageTag(languageTag: String) = Unit
+    }
 
     private class FakeParsedRepo(
         private val records: List<ParsedEventRecord> = emptyList(),

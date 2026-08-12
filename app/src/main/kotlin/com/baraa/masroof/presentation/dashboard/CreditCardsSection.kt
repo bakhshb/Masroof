@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -59,7 +60,7 @@ fun CreditCardsSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        MoneyUiFormatter.format(due),
+                        formatLocalizedMoney(due),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     overview.aggregateDueDate?.let { dueDate ->
@@ -132,7 +133,7 @@ private fun CreditCardRowCard(
                 } else {
                     stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
                 },
-                value = MoneyUiFormatter.format(row.statementSpendingNet),
+                value = formatLocalizedMoney(row.statementSpendingNet),
             )
 
             SnapshotMetricRow(
@@ -144,20 +145,20 @@ private fun CreditCardRowCard(
                 } else {
                     stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
                 },
-                value = MoneyUiFormatter.format(row.salaryPeriodSpendingNet),
+                value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
             )
 
             row.snapshot?.availableBalance?.let { available ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_available),
-                    value = MoneyUiFormatter.format(available),
+                    value = formatLocalizedMoney(available),
                 )
             }
 
             row.snapshot?.dueAmount?.let { due ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_card_due),
-                    value = MoneyUiFormatter.format(due),
+                    value = formatLocalizedMoney(due),
                 )
             }
 

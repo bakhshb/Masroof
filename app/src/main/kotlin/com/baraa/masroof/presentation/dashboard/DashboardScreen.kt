@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
 import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.IconLabelRow
@@ -155,12 +156,12 @@ private fun DashboardScreen(
                 if (summary != null) {
                 MetricHighlightCard(
                     title = stringResource(R.string.dashboard_net_spending),
-                    value = MoneyUiFormatter.format(summary.spendingNet),
+                    value = formatLocalizedMoney(summary.spendingNet),
                     icon = MasroofIcons.netSpending,
                     subtitle = if (summary.refunds.amount.signum() > 0) {
                         stringResource(
                             R.string.dashboard_gross_before_refunds,
-                            MoneyUiFormatter.format(summary.spendingGross),
+                            formatLocalizedMoney(summary.spendingGross),
                         )
                     } else {
                         null
@@ -171,20 +172,20 @@ private fun DashboardScreen(
                     SummaryMiniCard(
                         modifier = Modifier.weight(1f),
                         title = stringResource(R.string.dashboard_income),
-                        value = MoneyUiFormatter.format(summary.income),
+                        value = formatLocalizedMoney(summary.income),
                         icon = MasroofIcons.income,
                     )
                     SummaryMiniCard(
                         modifier = Modifier.weight(1f),
                         title = stringResource(R.string.dashboard_refunds),
-                        value = MoneyUiFormatter.format(summary.refunds),
+                        value = formatLocalizedMoney(summary.refunds),
                         icon = MasroofIcons.refunds,
                     )
                 }
 
                 MetricHighlightCard(
                     title = stringResource(R.string.dashboard_net_cash_flow),
-                    value = MoneyUiFormatter.format(summary.netCashFlow),
+                    value = formatLocalizedMoney(summary.netCashFlow),
                     icon = MasroofIcons.netCashFlow,
                 )
 
@@ -403,7 +404,7 @@ private fun MovementRow(title: String, value: Money, icon: androidx.compose.ui.g
     IconLabelRow(
         icon = icon,
         label = title,
-        trailing = MoneyUiFormatter.format(value),
+        trailing = formatLocalizedMoney(value),
     )
 }
 

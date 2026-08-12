@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import java.math.BigDecimal
@@ -9,25 +10,35 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 object MoneyUiFormatter {
-    fun format(money: Money): String = format(money.amount, money.currency)
+    fun format(money: Money): String = format(money, AppLocale.DEFAULT_TAG)
 
-    fun format(signed: SignedMoneyAmount): String = format(signed.amount, signed.currency)
+    fun format(money: Money, languageTag: String): String =
+        format(money.amount, money.currency, languageTag)
 
-    fun format(amount: BigDecimal, currency: Currency): String {
-        val symbols = DecimalFormatSymbols(Locale.US).apply {
-            groupingSeparator = ','
-            decimalSeparator = '.'
+    fun format(signed: SignedMoneyAmount): String = format(signed, AppLocale.DEFAULT_TAG)
+
+    fun format(signed: SignedMoneyAmount, languageTag: String): String =
+        format(signed.amount, signed.currency, languageTag)
+
+    fun format(amount: BigDecimal, currency: Currency): String =
+        format(amount, currency, AppLocale.DEFAULT_TAG)
+
+    fun format(amount: BigDecimal, currency: Currency, languageTag: String): String {
+        val locale = AppLocale.displayLocale(languageTag)
+        val symbols = DecimalFormatSymbols(locale).apply {
+            groupingSeparator = if (languageTag == AppLocale.TAG_EN) ',' else ','
+            decimalSeparator = if (languageTag == AppLocale.TAG_EN) '.' else '.'
         }
         val formatter = DecimalFormat("#,##0.00", symbols)
         formatter.minimumFractionDigits = Money.SCALE
         formatter.maximumFractionDigits = Money.SCALE
         val number = formatter.format(amount)
-        return "$number ${currencyLabel(currency)}"
+        return "$number ${currencyLabel(currency, languageTag)}"
     }
 
-    fun currencyLabel(currency: Currency): String =
+    fun currencyLabel(currency: Currency, languageTag: String): String =
         when (currency) {
-            Currency.SAR -> "ر.س"
+            Currency.SAR -> if (languageTag == AppLocale.TAG_EN) "SAR" else "ر.س"
             Currency.USD -> "USD"
         }
 }

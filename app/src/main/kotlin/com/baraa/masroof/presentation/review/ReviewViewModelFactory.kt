@@ -29,7 +29,7 @@ class ReviewViewModelFactory(
                     container.refreshReviewQueue()
                 }
             },
-            appContext = container.applicationContext,
+            appLocaleRepository = container.appLocaleRepository,
         ) as T
     }
 }

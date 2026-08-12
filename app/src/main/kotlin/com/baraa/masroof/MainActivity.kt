@@ -1,6 +1,7 @@
 package com.baraa.masroof
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -26,12 +27,19 @@ import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 import com.baraa.masroof.presentation.settings.SettingsViewModelFactory
 import com.baraa.masroof.presentation.theme.MasroofTheme
+import com.baraa.masroof.presentation.locale.AppLocaleContext
 
 /**
  * Launcher: P10 onboarding until complete, then P11 monthly dashboard.
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(
+            AppLocaleContext.wrap(newBase, AppLocaleContext.readStoredLanguageTag(newBase)),
+        )
+    }
 
     private val onboardingViewModel: OnboardingViewModel by viewModels {
         OnboardingViewModelFactory(
@@ -85,7 +93,12 @@ class MainActivity : ComponentActivity() {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },
                         onOpenAppSettings = openSettings,
-                        onLocaleChanged = { recreate() },
+                        onLocaleChanged = {
+                            dashboardViewModel.refresh()
+                            reviewViewModel.refresh()
+                            settingsViewModel.refresh()
+                            recreate()
+                        },
                     )
                 }
             }
@@ -97,6 +110,7 @@ class MainActivity : ComponentActivity() {
         onboardingViewModel.reloadFromCurrentState()
         if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
             dashboardViewModel.refresh()
+            reviewViewModel.refresh()
         }
     }
 

@@ -6,6 +6,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+import java.time.LocalDate
 
 data class UnknownCardCandidateUi(
     val bank: Bank,
@@ -31,6 +32,7 @@ data class TransactionPreviewUi(
     /** Merchant/counterparty when present; Compose falls back to Arabic type label when null. */
     val title: String?,
     val amount: Money,
+    val localDate: LocalDate,
     val amountLabel: String,
     val dateLabel: String,
     val type: FinancialTransactionType,

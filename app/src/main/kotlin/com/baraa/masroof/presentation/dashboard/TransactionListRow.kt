@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.common.MasroofIcons
 
 @Composable
@@ -100,7 +102,7 @@ fun TransactionListRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = row.dateLabel,
+                        text = formatLocalizedTransactionDate(row.localDate),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -109,7 +111,7 @@ fun TransactionListRow(
             }
 
             Text(
-                text = row.amountLabel,
+                text = formatLocalizedMoney(row.amount),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )

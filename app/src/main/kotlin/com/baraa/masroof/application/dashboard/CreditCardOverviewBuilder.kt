@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.bank.aljazira.CreditCardStatementHeuristics
 import com.baraa.masroof.bank.aljazira.extraction.DueDateExtractor
@@ -28,8 +29,9 @@ import java.util.Locale
  */
 object CreditCardOverviewBuilder {
     private val dueDateExtractor = DueDateExtractor()
-    private val dayMonth: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
+
+    private fun dayMonthFormatter(locale: Locale): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("d MMMM", locale)
 
     fun resolveStatementSpendingStart(
         parsedRecords: List<ParsedEventRecord>,
@@ -47,7 +49,9 @@ object CreditCardOverviewBuilder {
         clock: Clock,
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
+        displayLocale: Locale = Locale.forLanguageTag(AppLocale.TAG_AR),
     ): CreditCardsOverview {
+        val dayMonth = dayMonthFormatter(displayLocale)
         val creditCardMeta = mutableMapOf<String, CardReference>()
         val snapshotCandidates = mutableListOf<SnapshotCandidate>()
 

@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 
 @Composable
 fun TransactionRow(
@@ -47,11 +49,14 @@ fun TransactionRow(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(row.title ?: transactionTypeLabel(row.type), style = MaterialTheme.typography.titleSmall)
-                    Text(row.amountLabel)
+                    Text(formatLocalizedMoney(row.amount))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(transactionTypeLabel(row.type), style = MaterialTheme.typography.bodySmall)
-                    Text(row.dateLabel, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        formatLocalizedTransactionDate(row.localDate),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val (directionIcon, directionLabelRes) = when (row.direction) {

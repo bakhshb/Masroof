@@ -1,7 +1,8 @@
 package com.baraa.masroof.presentation.review
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.review.ReviewDetailLoader
 import com.baraa.masroof.application.review.ReviewWorkflowResult
@@ -32,16 +33,19 @@ class ReviewViewModel(
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
-    private val appContext: Context,
+    private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReviewUiState())
     val uiState: StateFlow<ReviewUiState> = _uiState.asStateFlow()
 
+    private val languageTag: String
+        get() = appLocaleRepository.getLanguageTag()
+
     private val dateFormatter: DateTimeFormatter
         get() = DateTimeFormatter.ofPattern(
             "d MMM yyyy",
-            appContext.resources.configuration.locales[0],
+            AppLocale.displayLocale(languageTag),
         )
 
     fun refresh() {
@@ -304,7 +308,7 @@ class ReviewViewModel(
             kind = review.kind,
             kindLabelRes = review.kind.toUiLabelRes(),
             title = summary.title ?: "—",
-            amountLabel = summary.amount?.let(MoneyUiFormatter::format),
+            amountLabel = summary.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
             dismissibleAsNonFinancial = dismissible,
@@ -345,7 +349,7 @@ class ReviewViewModel(
             dateLabel = dateLabel,
             messageFamilyLabel = family?.name,
             messageFamily = family,
-            amountLabel = detail.amount?.let(MoneyUiFormatter::format),
+            amountLabel = detail.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             merchant = detail.merchant,
             counterparty = detail.counterparty,
             reasonLabels = review.reasons,

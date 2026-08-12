@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -310,7 +311,7 @@ private fun TransactionListResultsBanner(
                 Text(
                     text = stringResource(
                         R.string.transaction_list_filtered_total,
-                        MoneyUiFormatter.format(totalAmount),
+                        formatLocalizedMoney(totalAmount),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
