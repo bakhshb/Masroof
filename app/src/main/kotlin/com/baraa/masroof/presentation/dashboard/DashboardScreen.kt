@@ -30,6 +30,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
 import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.ForeignCurrencyNotice
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.LongPullToRefreshBox
@@ -269,29 +270,7 @@ private fun DashboardScreen(
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = MasroofIcons.warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.size(6.dp))
-                            Text(
-                                stringResource(
-                                    R.string.dashboard_excluded_other_currency,
-                                    summary.excludedOtherCurrencyCount,
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.dashboard_excluded_other_currency_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    ForeignCurrencyNotice(excludedCount = summary.excludedOtherCurrencyCount)
                 }
 
                 if (state.error != null) {

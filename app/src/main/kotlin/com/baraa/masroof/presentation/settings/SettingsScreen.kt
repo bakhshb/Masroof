@@ -1,110 +1,90 @@
 package com.baraa.masroof.presentation.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.BackNavigationIcon
-import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
-import com.baraa.masroof.presentation.common.IconTextButton
-import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.SectionHeader
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
 fun SettingsRoute(
     viewModel: SettingsViewModel,
+    reviewRequiredCount: Int,
     onBack: () -> Unit,
+    onOpenReview: () -> Unit,
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
     }
     val state by viewModel.uiState.collectAsState()
-    SettingsScreen(
-        state = state,
-        onBack = onBack,
-        onConfirmOwned = viewModel::confirmCardOwned,
-        onMarkExternal = viewModel::markCardExternal,
-        onRequestStopTracking = viewModel::requestStopTracking,
-        onResumeTracking = viewModel::resumeTracking,
-        onDismissStopConfirm = viewModel::dismissStopConfirm,
-        onConfirmStopTracking = viewModel::confirmStopTracking,
-        onReparseStored = viewModel::reparseStoredMessages,
-    )
+    var destination by rememberSaveable { mutableStateOf(SettingsDestination.Hub) }
+
+    BackHandler(enabled = destination != SettingsDestination.Hub) {
+        destination = SettingsDestination.Hub
+    }
+
+    when (destination) {
+        SettingsDestination.Hub -> SettingsHubScreen(
+            state = state,
+            reviewRequiredCount = reviewRequiredCount,
+            onBack = onBack,
+            onOpenMyCards = { destination = SettingsDestination.MyCards },
+            onOpenReview = onOpenReview,
+            onOpenAbout = { destination = SettingsDestination.About },
+            onReparseStored = viewModel::reparseStoredMessages,
+        )
+
+        SettingsDestination.MyCards -> SettingsMyCardsScreen(
+            state = state,
+            onBack = { destination = SettingsDestination.Hub },
+            onConfirmOwned = viewModel::confirmCardOwned,
+            onMarkExternal = viewModel::markCardExternal,
+            onRequestStopTracking = viewModel::requestStopTracking,
+            onResumeTracking = viewModel::resumeTracking,
+            onDismissStopConfirm = viewModel::dismissStopConfirm,
+            onConfirmStopTracking = viewModel::confirmStopTracking,
+        )
+
+        SettingsDestination.About -> SettingsAboutScreen(
+            appVersion = state.appVersion,
+            onBack = { destination = SettingsDestination.Hub },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(
+private fun SettingsHubScreen(
     state: SettingsUiState,
+    reviewRequiredCount: Int,
     onBack: () -> Unit,
-    onConfirmOwned: (ManagedCardUi) -> Unit,
-    onMarkExternal: (ManagedCardUi) -> Unit,
-    onRequestStopTracking: (ManagedCardUi) -> Unit,
-    onResumeTracking: (ManagedCardUi) -> Unit,
-    onDismissStopConfirm: () -> Unit,
-    onConfirmStopTracking: () -> Unit,
+    onOpenMyCards: () -> Unit,
+    onOpenReview: () -> Unit,
+    onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
 ) {
-    state.stopConfirmTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = onDismissStopConfirm,
-            icon = {
-                Icon(
-                    imageVector = MasroofIcons.warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                )
-            },
-            title = { Text(stringResource(R.string.settings_stop_confirm_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        R.string.settings_stop_confirm_body,
-                        formatCardLast4(target.last4),
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onConfirmStopTracking, enabled = !state.updating) {
-                    Text(stringResource(R.string.settings_stop_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissStopConfirm) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -137,71 +117,39 @@ private fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionHeader(
-                title = stringResource(R.string.settings_cards_section),
+            SettingsNavRow(
                 icon = MasroofIcons.cardPayment,
-            )
-            Text(
-                stringResource(R.string.settings_cards_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                title = stringResource(R.string.settings_cards_section),
+                subtitle = cardsHubSubtitle(state),
+                onClick = onOpenMyCards,
             )
 
-            if (
-                state.followedCards.isEmpty() &&
-                state.unregisteredCards.isEmpty() &&
-                state.stoppedCards.isEmpty()
-            ) {
-                Text(
-                    stringResource(R.string.settings_cards_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            SettingsNavRow(
+                icon = MasroofIcons.notifications,
+                title = stringResource(R.string.settings_hub_review_title),
+                subtitle = reviewHubSubtitle(reviewRequiredCount),
+                badgeCount = reviewRequiredCount.takeIf { it > 0 },
+                onClick = onOpenReview,
+            )
 
-            if (state.unregisteredCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_unregistered))
-                state.unregisteredCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
-                        CardOwnershipInlinePrompt(
-                            enabled = !state.updating,
-                            onConfirmOwned = { onConfirmOwned(card) },
-                            onMarkExternal = { onMarkExternal(card) },
-                        )
-                    }
-                }
-            }
+            SettingsReparseRow(
+                title = stringResource(R.string.settings_reparse_title),
+                subtitle = stringResource(R.string.settings_reparse_stored_hint),
+                icon = MasroofIcons.rescan,
+                actionIcon = MasroofIcons.retry,
+                running = state.reparsingStored,
+                enabled = !state.reparsingStored && !state.updating,
+                onRefresh = onReparseStored,
+            )
 
-            if (state.followedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_followed))
-                state.followedCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
-                        IconTextButtonOutlined(
-                            onClick = { onRequestStopTracking(card) },
-                            icon = MasroofIcons.warning,
-                            text = stringResource(R.string.ownership_action_stop_tracking),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-
-            if (state.stoppedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_stopped))
-                state.stoppedCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
-                        IconTextButton(
-                            onClick = { onResumeTracking(card) },
-                            enabled = !state.updating,
-                            icon = MasroofIcons.success,
-                            text = stringResource(R.string.settings_resume_tracking),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
+            SettingsNavRow(
+                icon = MasroofIcons.periodHint,
+                title = stringResource(R.string.settings_about_section),
+                subtitle = stringResource(R.string.settings_about_subtitle, state.appVersion),
+                onClick = onOpenAbout,
+            )
 
             state.error?.let {
                 Text(
@@ -210,101 +158,31 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-
-            SectionHeader(
-                title = stringResource(R.string.settings_data_section),
-                icon = MasroofIcons.rescan,
-            )
-            IconTextButtonOutlined(
-                onClick = onReparseStored,
-                icon = MasroofIcons.rescan,
-                text = if (state.reparsingStored) {
-                    stringResource(R.string.dashboard_reparse_stored_running)
-                } else {
-                    stringResource(R.string.dashboard_reparse_stored)
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                stringResource(R.string.settings_reparse_stored_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            SectionHeader(
-                title = stringResource(R.string.settings_about_section),
-                icon = MasroofIcons.periodHint,
-            )
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.settings_app_version_label),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        state.appVersion,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun SettingsCardGroupTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
-}
+private fun cardsHubSubtitle(state: SettingsUiState): String {
+    val followed = state.followedCards.size
+    val unregistered = state.unregisteredCards.size
+    val stopped = state.stoppedCards.size
+    return when {
+        followed == 0 && unregistered == 0 && stopped == 0 ->
+            stringResource(R.string.settings_hub_cards_subtitle_none)
 
-@Composable
-private fun ManagedCardPanel(
-    card: ManagedCardUi,
-    actions: @Composable () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.cardPayment,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.size(8.dp))
-                Column {
-                    Text(
-                        bankLabel(card.bank),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(card.last4),
-                        ),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                }
-            }
-            actions()
-        }
+        unregistered > 0 ->
+            stringResource(R.string.settings_hub_cards_subtitle, followed, unregistered)
+
+        else ->
+            stringResource(R.string.settings_hub_cards_subtitle_followed_only, followed)
     }
 }
 
 @Composable
-private fun bankLabel(bank: Bank): String =
-    if (bank == Bank.BANK_ALJAZIRA) {
-        stringResource(R.string.bank_aljazira)
+private fun reviewHubSubtitle(reviewRequiredCount: Int): String =
+    if (reviewRequiredCount > 0) {
+        stringResource(R.string.settings_hub_review_subtitle_count, reviewRequiredCount)
     } else {
-        stringResource(R.string.bank_unknown)
+        stringResource(R.string.settings_hub_review_subtitle_none)
     }

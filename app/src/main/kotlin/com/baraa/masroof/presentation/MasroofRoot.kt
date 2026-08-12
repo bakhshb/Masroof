@@ -112,10 +112,12 @@ fun MasroofRoot(
             }
             HomeDestination.Settings -> SettingsRoute(
                 viewModel = settingsViewModel,
+                reviewRequiredCount = dashboardState.summary?.reviewRequiredCount ?: 0,
                 onBack = {
                     homeDestination = HomeDestination.Dashboard
                     dashboardViewModel.refresh()
                 },
+                onOpenReview = { homeDestination = HomeDestination.Review },
             )
         }
     } else {

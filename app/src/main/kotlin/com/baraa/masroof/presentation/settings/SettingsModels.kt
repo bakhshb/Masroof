@@ -24,3 +24,9 @@ data class SettingsUiState(
 enum class SettingsError {
     UPDATE_FAILED,
 }
+
+enum class SettingsDestination {
+    Hub,
+    MyCards,
+    About,
+}
