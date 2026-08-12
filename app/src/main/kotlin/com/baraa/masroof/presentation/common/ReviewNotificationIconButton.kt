@@ -9,7 +9,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -24,31 +23,31 @@ fun ReviewNotificationIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Badge anchor must stay on the bell's visual top-right corner in both RTL and LTR.
-    // Material BadgedBox flips with layout direction and can overlap the adjacent settings icon.
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Box(modifier = modifier.size(48.dp)) {
-            IconButton(onClick = onClick, modifier = Modifier.matchParentSize()) {
-                Icon(
-                    imageVector = MasroofIcons.notifications,
-                    contentDescription = if (reviewCount > 0) {
-                        stringResource(R.string.dashboard_review_notifications_count, reviewCount)
-                    } else {
-                        stringResource(R.string.dashboard_review_notifications)
-                    },
+    val layoutDirection = LocalLayoutDirection.current
+    // TopStart flips with locale: top-left in English (LTR), top-right in Arabic (RTL).
+    val badgeOffsetX = if (layoutDirection == LayoutDirection.Rtl) (-4).dp else 4.dp
+
+    Box(modifier = modifier.size(48.dp)) {
+        IconButton(onClick = onClick, modifier = Modifier.matchParentSize()) {
+            Icon(
+                imageVector = MasroofIcons.notifications,
+                contentDescription = if (reviewCount > 0) {
+                    stringResource(R.string.dashboard_review_notifications_count, reviewCount)
+                } else {
+                    stringResource(R.string.dashboard_review_notifications)
+                },
+            )
+        }
+        if (reviewCount > 0) {
+            Badge(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = badgeOffsetX, y = 6.dp),
+            ) {
+                Text(
+                    if (reviewCount > 99) "99+" else reviewCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
                 )
-            }
-            if (reviewCount > 0) {
-                Badge(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-2).dp, y = 6.dp),
-                ) {
-                    Text(
-                        if (reviewCount > 99) "99+" else reviewCount.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
             }
         }
     }
