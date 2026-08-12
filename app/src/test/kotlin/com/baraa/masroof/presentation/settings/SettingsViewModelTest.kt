@@ -1,10 +1,13 @@
 package com.baraa.masroof.presentation.settings
 
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,12 +39,12 @@ class SettingsViewModelTest {
 
     @Test
     fun refresh_groupsCardsByOwnership() = runTest {
-        val registry = FakeCardRegistry(
+        val cards = FakeCardRegistry(
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.OWNED, "1", "1"),
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "5123", OwnershipStatus.UNKNOWN, "2", "2"),
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL, "3", "3"),
         )
-        val vm = viewModel(registry)
+        val vm = viewModel(cards = cards)
         vm.refresh()
         advanceUntilIdle()
 
@@ -52,28 +55,59 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun refresh_groupsAccountsByOwnership() = runTest {
+        val accounts = FakeAccountRegistry(
+            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.OWNED, "1", "1"),
+            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3002", OwnershipStatus.UNKNOWN, "2", "2"),
+            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL, "3", "3"),
+        )
+        val vm = viewModel(accounts = accounts)
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals("3001", vm.uiState.value.followedAccounts.single().maskedNumber)
+        assertEquals("3002", vm.uiState.value.unregisteredAccounts.single().maskedNumber)
+        assertEquals("3003", vm.uiState.value.stoppedAccounts.single().maskedNumber)
+    }
+
+    @Test
     fun resumeTracking_marksCardOwned() = runTest {
-        val registry = FakeCardRegistry(
+        val cards = FakeCardRegistry(
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL, "3", "3"),
         )
         var refreshCalls = 0
-        val vm = viewModel(registry) { refreshCalls++ }
+        val vm = viewModel(cards = cards) { refreshCalls++ }
         vm.refresh()
         advanceUntilIdle()
         vm.resumeTracking(ManagedCardUi(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL))
         advanceUntilIdle()
 
-        assertEquals(OwnershipStatus.OWNED, registry.entries.single().ownership)
+        assertEquals(OwnershipStatus.OWNED, cards.entries.single().ownership)
         assertEquals(1, refreshCalls)
         assertTrue(vm.uiState.value.followedCards.any { it.last4 == "9999" })
     }
 
     @Test
+    fun resumeAccountTracking_marksAccountOwned() = runTest {
+        val accounts = FakeAccountRegistry(
+            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL, "3", "3"),
+        )
+        val vm = viewModel(accounts = accounts)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.resumeAccountTracking(ManagedAccountUi(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL))
+        advanceUntilIdle()
+
+        assertEquals(OwnershipStatus.OWNED, accounts.entries.single().ownership)
+        assertTrue(vm.uiState.value.followedAccounts.any { it.maskedNumber == "3003" })
+    }
+
+    @Test
     fun confirmStopTracking_marksCardExternal() = runTest {
-        val registry = FakeCardRegistry(
+        val cards = FakeCardRegistry(
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.OWNED, "1", "1"),
         )
-        val vm = viewModel(registry)
+        val vm = viewModel(cards = cards)
         vm.refresh()
         advanceUntilIdle()
         val card = vm.uiState.value.followedCards.single()
@@ -81,38 +115,40 @@ class SettingsViewModelTest {
         vm.confirmStopTracking()
         advanceUntilIdle()
 
-        assertEquals(OwnershipStatus.EXTERNAL, registry.entries.single().ownership)
-        assertNull(vm.uiState.value.stopConfirmTarget)
+        assertEquals(OwnershipStatus.EXTERNAL, cards.entries.single().ownership)
+        assertNull(vm.uiState.value.stopConfirmCardTarget)
         assertTrue(vm.uiState.value.stoppedCards.any { it.last4 == "7271" })
     }
 
+    @Test
+    fun confirmStopAccountTracking_marksAccountExternal() = runTest {
+        val accounts = FakeAccountRegistry(
+            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.OWNED, "1", "1"),
+        )
+        val vm = viewModel(accounts = accounts)
+        vm.refresh()
+        advanceUntilIdle()
+        val account = vm.uiState.value.followedAccounts.single()
+        vm.requestStopAccountTracking(account)
+        vm.confirmStopAccountTracking()
+        advanceUntilIdle()
+
+        assertEquals(OwnershipStatus.EXTERNAL, accounts.entries.single().ownership)
+        assertNull(vm.uiState.value.stopConfirmAccountTarget)
+        assertTrue(vm.uiState.value.stoppedAccounts.any { it.maskedNumber == "3001" })
+    }
+
     private fun viewModel(
-        registry: CardRegistryRepository,
+        cards: CardRegistryRepository = FakeCardRegistry(),
+        accounts: AccountRegistryRepository = FakeAccountRegistry(),
         onRefreshReviewQueue: () -> Unit = {},
     ): SettingsViewModel =
         SettingsViewModel(
-            cardRegistryRepository = registry,
+            cardRegistryRepository = cards,
+            accountRegistryRepository = accounts,
             ownershipConfirmationService = OwnershipConfirmationService(
-                accountRegistry = object : com.baraa.masroof.domain.repository.AccountRegistryRepository {
-                    override suspend fun observe(
-                        reference: com.baraa.masroof.domain.model.AccountReference,
-                        rawSmsId: String,
-                    ) = Unit
-
-                    override suspend fun setOwnership(
-                        reference: com.baraa.masroof.domain.model.AccountReference,
-                        status: OwnershipStatus,
-                    ) = Unit
-
-                    override suspend fun resolve(
-                        reference: com.baraa.masroof.domain.model.AccountReference,
-                    ) = OwnershipStatus.UNKNOWN
-
-                    override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
-                    override suspend fun listAll() =
-                        emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
-                },
-                cardRegistry = registry,
+                accountRegistry = accounts,
+                cardRegistry = cards,
             ),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
@@ -141,5 +177,30 @@ class SettingsViewModelTest {
             entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
 
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+    }
+
+    private class FakeAccountRegistry(
+        vararg initial: AccountRegistryEntry,
+    ) : AccountRegistryRepository {
+        val entries = initial.toMutableList()
+
+        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
+
+        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
+            val masked = reference.maskedNumber ?: return
+            val index = entries.indexOfFirst { it.bank == reference.bank && it.maskedNumber == masked }
+            if (index >= 0) {
+                entries[index] = entries[index].copy(ownership = status)
+            }
+        }
+
+        override suspend fun resolve(reference: AccountReference): OwnershipStatus =
+            entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }?.ownership
+                ?: OwnershipStatus.UNKNOWN
+
+        override suspend fun get(reference: AccountReference) =
+            entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
+
+        override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
     }
 }

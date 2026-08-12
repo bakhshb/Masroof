@@ -51,6 +51,7 @@ fun SettingsRoute(
             reviewRequiredCount = reviewRequiredCount,
             onBack = onBack,
             onOpenMyCards = { destination = SettingsDestination.MyCards },
+            onOpenMyAccounts = { destination = SettingsDestination.MyAccounts },
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
             onReparseStored = viewModel::reparseStoredMessages,
@@ -67,6 +68,17 @@ fun SettingsRoute(
             onConfirmStopTracking = viewModel::confirmStopTracking,
         )
 
+        SettingsDestination.MyAccounts -> SettingsMyAccountsScreen(
+            state = state,
+            onBack = { destination = SettingsDestination.Hub },
+            onConfirmOwned = viewModel::confirmAccountOwned,
+            onMarkExternal = viewModel::markAccountExternal,
+            onRequestStopTracking = viewModel::requestStopAccountTracking,
+            onResumeTracking = viewModel::resumeAccountTracking,
+            onDismissStopConfirm = viewModel::dismissStopConfirm,
+            onConfirmStopTracking = viewModel::confirmStopAccountTracking,
+        )
+
         SettingsDestination.About -> SettingsAboutScreen(
             appVersion = state.appVersion,
             onBack = { destination = SettingsDestination.Hub },
@@ -81,6 +93,7 @@ private fun SettingsHubScreen(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenMyCards: () -> Unit,
+    onOpenMyAccounts: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
@@ -124,6 +137,13 @@ private fun SettingsHubScreen(
                 title = stringResource(R.string.settings_cards_section),
                 subtitle = cardsHubSubtitle(state),
                 onClick = onOpenMyCards,
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.externalIn,
+                title = stringResource(R.string.settings_accounts_section),
+                subtitle = accountsHubSubtitle(state),
+                onClick = onOpenMyAccounts,
             )
 
             SettingsNavRow(
@@ -177,6 +197,23 @@ private fun cardsHubSubtitle(state: SettingsUiState): String {
 
         else ->
             stringResource(R.string.settings_hub_cards_subtitle_followed_only, followed)
+    }
+}
+
+@Composable
+private fun accountsHubSubtitle(state: SettingsUiState): String {
+    val followed = state.followedAccounts.size
+    val unregistered = state.unregisteredAccounts.size
+    val stopped = state.stoppedAccounts.size
+    return when {
+        followed == 0 && unregistered == 0 && stopped == 0 ->
+            stringResource(R.string.settings_hub_accounts_subtitle_none)
+
+        unregistered > 0 ->
+            stringResource(R.string.settings_hub_accounts_subtitle, followed, unregistered)
+
+        else ->
+            stringResource(R.string.settings_hub_accounts_subtitle_followed_only, followed)
     }
 }
 

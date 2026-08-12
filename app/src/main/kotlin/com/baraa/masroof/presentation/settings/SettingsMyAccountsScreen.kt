@@ -26,27 +26,26 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.presentation.common.AccountOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.BackNavigationIcon
-import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsMyCardsScreen(
+fun SettingsMyAccountsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
-    onConfirmOwned: (ManagedCardUi) -> Unit,
-    onMarkExternal: (ManagedCardUi) -> Unit,
-    onRequestStopTracking: (ManagedCardUi) -> Unit,
-    onResumeTracking: (ManagedCardUi) -> Unit,
+    onConfirmOwned: (ManagedAccountUi) -> Unit,
+    onMarkExternal: (ManagedAccountUi) -> Unit,
+    onRequestStopTracking: (ManagedAccountUi) -> Unit,
+    onResumeTracking: (ManagedAccountUi) -> Unit,
     onDismissStopConfirm: () -> Unit,
     onConfirmStopTracking: () -> Unit,
 ) {
-    SettingsStopConfirmDialog(
-        target = state.stopConfirmCardTarget,
+    SettingsAccountStopConfirmDialog(
+        target = state.stopConfirmAccountTarget,
         updating = state.updating,
         onDismiss = onDismissStopConfirm,
         onConfirm = onConfirmStopTracking,
@@ -55,7 +54,7 @@ fun SettingsMyCardsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_cards_section)) },
+                title = { Text(stringResource(R.string.settings_accounts_section)) },
                 navigationIcon = {
                     BackNavigationIcon(
                         onClick = onBack,
@@ -74,59 +73,59 @@ fun SettingsMyCardsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                stringResource(R.string.settings_cards_hint),
+                stringResource(R.string.settings_accounts_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             if (
-                state.followedCards.isEmpty() &&
-                state.unregisteredCards.isEmpty() &&
-                state.stoppedCards.isEmpty()
+                state.followedAccounts.isEmpty() &&
+                state.unregisteredAccounts.isEmpty() &&
+                state.stoppedAccounts.isEmpty()
             ) {
                 Text(
-                    stringResource(R.string.settings_cards_empty),
+                    stringResource(R.string.settings_accounts_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            if (state.unregisteredCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_unregistered))
-                state.unregisteredCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
-                        CardOwnershipInlinePrompt(
+            if (state.unregisteredAccounts.isNotEmpty()) {
+                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_unregistered))
+                state.unregisteredAccounts.forEach { account ->
+                    ManagedAccountPanel(account = account) {
+                        AccountOwnershipInlinePrompt(
                             enabled = !state.updating,
-                            onConfirmOwned = { onConfirmOwned(card) },
-                            onMarkExternal = { onMarkExternal(card) },
+                            onConfirmOwned = { onConfirmOwned(account) },
+                            onMarkExternal = { onMarkExternal(account) },
                         )
                     }
                 }
             }
 
-            if (state.followedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_followed))
-                state.followedCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
+            if (state.followedAccounts.isNotEmpty()) {
+                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_followed))
+                state.followedAccounts.forEach { account ->
+                    ManagedAccountPanel(account = account) {
                         IconTextButtonOutlined(
-                            onClick = { onRequestStopTracking(card) },
+                            onClick = { onRequestStopTracking(account) },
                             icon = MasroofIcons.warning,
-                            text = stringResource(R.string.ownership_action_stop_tracking),
+                            text = stringResource(R.string.settings_stop_account_tracking),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
             }
 
-            if (state.stoppedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_stopped))
-                state.stoppedCards.forEach { card ->
-                    ManagedCardPanel(card = card) {
+            if (state.stoppedAccounts.isNotEmpty()) {
+                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_stopped))
+                state.stoppedAccounts.forEach { account ->
+                    ManagedAccountPanel(account = account) {
                         IconTextButton(
-                            onClick = { onResumeTracking(card) },
+                            onClick = { onResumeTracking(account) },
                             enabled = !state.updating,
                             icon = MasroofIcons.success,
-                            text = stringResource(R.string.settings_resume_tracking),
+                            text = stringResource(R.string.settings_resume_account_tracking),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -145,52 +144,13 @@ fun SettingsMyCardsScreen(
 }
 
 @Composable
-fun SettingsStopConfirmDialog(
-    target: ManagedCardUi?,
-    updating: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    target ?: return
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = MasroofIcons.warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-            )
-        },
-        title = { Text(stringResource(R.string.settings_stop_confirm_title)) },
-        text = {
-            Text(
-                stringResource(
-                    R.string.settings_stop_confirm_body,
-                    formatCardLast4(target.last4),
-                ),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !updating) {
-                Text(stringResource(R.string.settings_stop_confirm_action))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.settings_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun SettingsCardGroupTitle(title: String) {
+private fun SettingsAccountGroupTitle(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall)
 }
 
 @Composable
-private fun ManagedCardPanel(
-    card: ManagedCardUi,
+private fun ManagedAccountPanel(
+    account: ManagedAccountUi,
     actions: @Composable () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -200,7 +160,7 @@ private fun ManagedCardPanel(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = MasroofIcons.cardPayment,
+                    imageVector = MasroofIcons.externalIn,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
@@ -208,14 +168,14 @@ private fun ManagedCardPanel(
                 Spacer(Modifier.size(8.dp))
                 Column {
                     Text(
-                        bankLabel(card.bank),
+                        bankLabel(account.bank),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(card.last4),
+                            R.string.onboarding_account_suffix,
+                            account.maskedNumber,
                         ),
                         style = MaterialTheme.typography.titleSmall,
                     )
@@ -233,3 +193,42 @@ private fun bankLabel(bank: Bank): String =
     } else {
         stringResource(R.string.bank_unknown)
     }
+
+@Composable
+fun SettingsAccountStopConfirmDialog(
+    target: ManagedAccountUi?,
+    updating: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    target ?: return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = MasroofIcons.warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(stringResource(R.string.settings_stop_account_confirm_title)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.settings_stop_account_confirm_body,
+                    target.maskedNumber,
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !updating) {
+                Text(stringResource(R.string.settings_stop_confirm_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_cancel))
+            }
+        },
+    )
+}

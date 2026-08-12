@@ -13,6 +13,7 @@ class SettingsViewModelFactory(
         require(modelClass.isAssignableFrom(SettingsViewModel::class.java))
         return SettingsViewModel(
             cardRegistryRepository = container.cardRegistryRepository,
+            accountRegistryRepository = container.accountRegistryRepository,
             ownershipConfirmationService = container.ownershipConfirmationService,
             refreshReviewQueue = { container.refreshReviewQueue() },
             reparseStoredEvents = { container.reparseAllStoredEvents() },
