@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -77,45 +78,26 @@ private fun DashboardScreen(
     onOpenSettings: () -> Unit,
 ) {
     val isPullRefreshing = state.loading && state.summary != null
-    LongPullToRefreshBox(
-        isRefreshing = isPullRefreshing,
-        onRefresh = onRetry,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Column(
+    Column(modifier = Modifier.fillMaxSize()) {
+        DashboardAppBar(
+            reviewCount = state.summary?.reviewRequiredCount ?: 0,
+            onOpenReview = onOpenReview,
+            onOpenSettings = onOpenSettings,
+        )
+        LongPullToRefreshBox(
+            isRefreshing = isPullRefreshing,
+            onRefresh = onRetry,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.appLogo,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ReviewNotificationIconButton(
-                    reviewCount = state.summary?.reviewRequiredCount ?: 0,
-                    onClick = onOpenReview,
-                )
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = MasroofIcons.settings,
-                        contentDescription = stringResource(R.string.dashboard_open_settings),
-                    )
-                }
-            }
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = MasroofIcons.periodHint,
@@ -169,8 +151,7 @@ private fun DashboardScreen(
 
             else -> {
                 val summary = state.summary
-                if (summary == null) return@Column
-
+                if (summary != null) {
                 MetricHighlightCard(
                     title = stringResource(R.string.dashboard_net_spending),
                     value = MoneyUiFormatter.format(summary.spendingNet),
@@ -329,9 +310,55 @@ private fun DashboardScreen(
                         text = stringResource(R.string.dashboard_retry),
                     )
                 }
+                }
+            }
+        }
             }
         }
     }
+}
+
+@Composable
+private fun DashboardAppBar(
+    reviewCount: Int,
+    onOpenReview: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.appLogo,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ReviewNotificationIconButton(
+                    reviewCount = reviewCount,
+                    onClick = onOpenReview,
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = MasroofIcons.settings,
+                        contentDescription = stringResource(R.string.dashboard_open_settings),
+                    )
+                }
+            }
+        }
     }
 }
 
