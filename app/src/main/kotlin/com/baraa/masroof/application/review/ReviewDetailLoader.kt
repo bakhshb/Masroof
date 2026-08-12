@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.review
 
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
@@ -33,6 +34,7 @@ class ReviewDetailLoader(
         val amount: Money?,
         val merchant: String?,
         val counterparty: String?,
+        val cardRef: CardReference?,
     )
 
     suspend fun loadSummaries(): List<ReviewSummary> {
@@ -98,6 +100,7 @@ class ReviewDetailLoader(
             amount = event?.amount,
             merchant = event?.merchant,
             counterparty = event?.counterparty,
+            cardRef = event?.cardRef,
         )
     }
 }

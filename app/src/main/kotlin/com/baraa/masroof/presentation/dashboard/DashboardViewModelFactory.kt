@@ -17,8 +17,8 @@ class DashboardViewModelFactory(
         require(modelClass.isAssignableFrom(DashboardViewModel::class.java))
         return DashboardViewModel(
             overviewLoader = container.dashboardService,
+            cardRegistryRepository = container.cardRegistryRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
-            reparseStoredEventsService = { container.reparseAllStoredEvents() },
             reclassificationService = container.transactionReclassificationService,
             zoneId = zoneId,
             clock = clock,

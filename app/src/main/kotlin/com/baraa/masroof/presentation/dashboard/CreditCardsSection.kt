@@ -21,6 +21,7 @@ import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.formatCardLast4
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -113,7 +114,10 @@ private fun CreditCardRowCard(
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    stringResource(R.string.dashboard_credit_card_last4, row.last4),
+                    stringResource(
+                        R.string.dashboard_credit_card_last4,
+                        formatCardLast4(row.last4),
+                    ),
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
@@ -187,3 +191,6 @@ private fun formatSnapshotTime(
     zoneId: ZoneId,
     formatter: DateTimeFormatter,
 ): String = formatter.format(instant.atZone(zoneId))
+
+fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview =
+    copy(cards = cards.filter { it.last4 in ownedLast4s })

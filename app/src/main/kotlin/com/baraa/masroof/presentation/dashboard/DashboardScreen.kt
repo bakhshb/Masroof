@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,7 +27,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
+import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.ForeignCurrencyNotice
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.LongPullToRefreshBox
@@ -41,6 +45,7 @@ fun DashboardRoute(
     onOpenReview: () -> Unit = {},
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -53,10 +58,10 @@ fun DashboardRoute(
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refresh,
         onRescan = viewModel::rescanSms,
-        onReparseStored = viewModel::reparseStoredEvents,
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -68,33 +73,32 @@ private fun DashboardScreen(
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
     onRescan: () -> Unit,
-    onReparseStored: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val isPullRefreshing = state.loading && state.summary != null
-    LongPullToRefreshBox(
-        isRefreshing = isPullRefreshing,
-        onRefresh = onRetry,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Column(
+    Column(modifier = Modifier.fillMaxSize()) {
+        DashboardAppBar(
+            reviewCount = state.summary?.reviewRequiredCount ?: 0,
+            onOpenReview = onOpenReview,
+            onOpenSettings = onOpenSettings,
+        )
+        LongPullToRefreshBox(
+            isRefreshing = isPullRefreshing,
+            onRefresh = onRetry,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = MasroofIcons.appLogo,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp),
-            )
-            Spacer(Modifier.size(10.dp))
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = MasroofIcons.periodHint,
@@ -148,8 +152,7 @@ private fun DashboardScreen(
 
             else -> {
                 val summary = state.summary
-                if (summary == null) return@Column
-
+                if (summary != null) {
                 MetricHighlightCard(
                     title = stringResource(R.string.dashboard_net_spending),
                     value = MoneyUiFormatter.format(summary.spendingNet),
@@ -207,11 +210,23 @@ private fun DashboardScreen(
                 MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)
                 MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
 
-                state.creditCards?.let { creditCards ->
-                    CreditCardsSection(
-                        overview = creditCards,
-                        zoneId = java.time.ZoneId.systemDefault(),
+                state.unknownCards.firstOrNull()?.let { firstUnknown ->
+                    UnregisteredCardsNotice(
+                        firstLast4 = firstUnknown.last4,
+                        extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
+                        onOpenSettings = onOpenSettings,
                     )
+                }
+
+                state.creditCards?.let { creditCards ->
+                    val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
+                    val followedOverview = creditCards.followedOnly(ownedLast4s)
+                    if (followedOverview.hasContent) {
+                        CreditCardsSection(
+                            overview = followedOverview,
+                            zoneId = java.time.ZoneId.systemDefault(),
+                        )
+                    }
                 }
 
                 SectionHeader(
@@ -255,68 +270,7 @@ private fun DashboardScreen(
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = MasroofIcons.warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.size(6.dp))
-                            Text(
-                                stringResource(
-                                    R.string.dashboard_excluded_other_currency,
-                                    summary.excludedOtherCurrencyCount,
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.dashboard_excluded_other_currency_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                IconTextButtonOutlined(
-                    onClick = onReparseStored,
-                    icon = MasroofIcons.rescan,
-                    text = if (state.reparsingStored) {
-                        stringResource(R.string.dashboard_reparse_stored_running)
-                    } else {
-                        stringResource(R.string.dashboard_reparse_stored)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(R.string.dashboard_reparse_stored_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                if (summary.reviewRequiredCount > 0) {
-                    IconTextButton(
-                        onClick = onOpenReview,
-                        icon = MasroofIcons.reviewQueue,
-                        text = stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = MasroofIcons.success,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        Text(
-                            stringResource(R.string.dashboard_review_required, summary.reviewRequiredCount),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                    }
+                    ForeignCurrencyNotice(excludedCount = summary.excludedOtherCurrencyCount)
                 }
 
                 if (state.error != null) {
@@ -335,9 +289,55 @@ private fun DashboardScreen(
                         text = stringResource(R.string.dashboard_retry),
                     )
                 }
+                }
+            }
+        }
             }
         }
     }
+}
+
+@Composable
+private fun DashboardAppBar(
+    reviewCount: Int,
+    onOpenReview: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = MasroofIcons.appLogo,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ReviewNotificationIconButton(
+                    reviewCount = reviewCount,
+                    onClick = onOpenReview,
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = MasroofIcons.settings,
+                        contentDescription = stringResource(R.string.dashboard_open_settings),
+                    )
+                }
+            }
+        }
     }
 }
 

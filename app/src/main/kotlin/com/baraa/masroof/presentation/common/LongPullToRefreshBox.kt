@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.common
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -23,8 +26,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -35,12 +36,15 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Default pull distance before refresh can trigger on release (~2× a typical short pull). */
-val LongPullToRefreshThreshold: Dp = 160.dp
+/** Pull distance before refresh can arm (~ deliberate long pull). */
+val LongPullToRefreshThreshold: Dp = 180.dp
+
+/** Must stay at/above [LongPullToRefreshThreshold] this long before release triggers refresh. */
+const val LongPullToRefreshHoldMs: Long = 400L
 
 /**
- * Pull-to-refresh wrapper with a high threshold and release-to-confirm behavior:
- * drag down, optionally hold, then lift to refresh. Pulling back up before release cancels.
+ * Pull-to-refresh: drag down past [threshold], **hold** for [holdDurationMs], then release.
+ * Normal scrolling does not refresh — only overscroll at the top (not consumed by the list) counts.
  */
 @Composable
 fun LongPullToRefreshBox(
@@ -48,16 +52,43 @@ fun LongPullToRefreshBox(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     threshold: Dp = LongPullToRefreshThreshold,
+    holdDurationMs: Long = LongPullToRefreshHoldMs,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val scrollState = rememberScrollState()
     var pullDistance by remember { mutableFloatStateOf(0f) }
+    var thresholdHeldSince by remember { mutableStateOf<Long?>(null) }
     val thresholdPx = with(LocalDensity.current) { threshold.toPx() }
     val maxPullPx = thresholdPx * 1.25f
     val isRefreshingState = rememberUpdatedState(isRefreshing)
     val onRefreshState = rememberUpdatedState(onRefresh)
+    val scrollOffsetState = rememberUpdatedState(scrollState.value)
 
-    val nestedScrollConnection = remember(scrollState, thresholdPx) {
+    LaunchedEffect(pullDistance, thresholdPx) {
+        if (pullDistance >= thresholdPx) {
+            if (thresholdHeldSince == null) {
+                thresholdHeldSince = System.currentTimeMillis()
+            }
+        } else {
+            thresholdHeldSince = null
+        }
+    }
+
+    LaunchedEffect(scrollState.value) {
+        if (scrollState.value > 0) {
+            pullDistance = 0f
+            thresholdHeldSince = null
+        }
+    }
+
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) {
+            pullDistance = 0f
+            thresholdHeldSince = null
+        }
+    }
+
+    val nestedScrollConnection = remember(thresholdPx, maxPullPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (pullDistance > 0f && available.y < 0f) {
@@ -73,7 +104,13 @@ fun LongPullToRefreshBox(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                if (!isRefreshingState.value && scrollState.value == 0 && available.y > 0f) {
+                if (
+                    !isRefreshingState.value &&
+                    scrollOffsetState.value == 0 &&
+                    consumed.y == 0f &&
+                    available.y > 0f &&
+                    source == NestedScrollSource.Drag
+                ) {
                     pullDistance = min(pullDistance + available.y, maxPullPx)
                     return Offset(0f, available.y)
                 }
@@ -83,34 +120,43 @@ fun LongPullToRefreshBox(
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (!isRefreshingState.value && pullDistance > 0f && pullDistance < thresholdPx) {
                     pullDistance = 0f
+                    thresholdHeldSince = null
                 }
                 return Velocity.Zero
             }
         }
     }
 
-    LaunchedEffect(isRefreshing) {
-        if (!isRefreshing) {
-            pullDistance = 0f
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(thresholdPx) {
+            .pointerInput(thresholdPx, holdDurationMs) {
                 awaitEachGesture {
+                    var cancelledByScroll = false
                     awaitFirstDown(requireUnconsumed = false)
                     do {
+                        if (scrollOffsetState.value > 0) {
+                            cancelledByScroll = true
+                            pullDistance = 0f
+                            thresholdHeldSince = null
+                        }
                         val event = awaitPointerEvent(PointerEventPass.Final)
                     } while (event.changes.any { it.pressed })
 
-                    if (!isRefreshingState.value) {
-                        if (pullDistance >= thresholdPx) {
+                    if (
+                        !isRefreshingState.value &&
+                        !cancelledByScroll &&
+                        scrollOffsetState.value == 0
+                    ) {
+                        val heldMs = thresholdHeldSince?.let { System.currentTimeMillis() - it } ?: 0L
+                        val shouldRefresh =
+                            pullDistance >= thresholdPx && heldMs >= holdDurationMs
+                        if (shouldRefresh) {
                             onRefreshState.value()
                         }
-                        pullDistance = 0f
                     }
+                    pullDistance = 0f
+                    thresholdHeldSince = null
                 }
             }
             .nestedScroll(nestedScrollConnection),
@@ -130,7 +176,9 @@ fun LongPullToRefreshBox(
         )
 
         if (pullDistance > 0f || isRefreshing) {
-            val isReady = pullDistance >= thresholdPx
+            val atThreshold = pullDistance >= thresholdPx
+            val heldMs = thresholdHeldSince?.let { System.currentTimeMillis() - it } ?: 0L
+            val holdComplete = atThreshold && heldMs >= holdDurationMs
             CircularProgressIndicator(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -138,14 +186,16 @@ fun LongPullToRefreshBox(
                     .alpha(
                         when {
                             isRefreshing -> 1f
-                            isReady -> 1f
+                            holdComplete -> 1f
+                            atThreshold -> 0.85f
                             else -> min(1f, pullDistance / thresholdPx)
                         },
                     ),
-                color = if (isReady && !isRefreshing) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.colorScheme.primary
+                color = when {
+                    isRefreshing -> MaterialTheme.colorScheme.primary
+                    holdComplete -> MaterialTheme.colorScheme.secondary
+                    atThreshold -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.primary
                 },
             )
         }

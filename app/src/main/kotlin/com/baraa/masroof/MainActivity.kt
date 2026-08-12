@@ -23,6 +23,8 @@ import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModelFactory
 import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.ReviewViewModelFactory
+import com.baraa.masroof.presentation.settings.SettingsViewModel
+import com.baraa.masroof.presentation.settings.SettingsViewModelFactory
 import com.baraa.masroof.presentation.theme.MasroofTheme
 
 /**
@@ -45,6 +47,13 @@ class MainActivity : ComponentActivity() {
 
     private val reviewViewModel: ReviewViewModel by viewModels {
         ReviewViewModelFactory(container = container)
+    }
+
+    private val settingsViewModel: SettingsViewModel by viewModels {
+        SettingsViewModelFactory(
+            container = container,
+            appVersion = BuildConfig.VERSION_NAME,
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,6 +80,7 @@ class MainActivity : ComponentActivity() {
                         onboardingViewModel = onboardingViewModel,
                         dashboardViewModel = dashboardViewModel,
                         reviewViewModel = reviewViewModel,
+                        settingsViewModel = settingsViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },

@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.presentation.common.formatCardLast4
+import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
@@ -61,6 +63,8 @@ fun ReviewRoute(
             onResolveExternal = viewModel::resolveAsExternalTransfer,
             onResolvePair = viewModel::resolveSelfTransferPair,
             onDismissNonFinancial = viewModel::resolveAsIgnored,
+            onConfirmOwnershipCardOwned = viewModel::confirmOwnershipCardOwned,
+            onMarkOwnershipCardExternal = viewModel::markOwnershipCardExternal,
         )
     } else {
         ReviewListScreen(
@@ -250,6 +254,8 @@ private fun ReviewDetailScreen(
     onResolveExternal: () -> Unit,
     onResolvePair: (String) -> Unit,
     onDismissNonFinancial: () -> Unit,
+    onConfirmOwnershipCardOwned: () -> Unit,
+    onMarkOwnershipCardExternal: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -306,6 +312,25 @@ private fun ReviewDetailScreen(
             detail.reasonLabels.forEach { reason ->
                 val reasonRes = ReviewReasonLabels.labelRes(reason)
                 Text("• ${reasonRes?.let { stringResource(it) } ?: reason}")
+            }
+
+            if (detail.showOwnershipActions && detail.ownershipCard?.last4 != null) {
+                SectionHeader(
+                    title = stringResource(R.string.review_ownership_prompt_title),
+                    icon = MasroofIcons.ownership,
+                )
+                Text(
+                    stringResource(
+                        R.string.review_ownership_prompt_body,
+                        formatCardLast4(detail.ownershipCard.last4),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                CardOwnershipInlinePrompt(
+                    enabled = !resolving,
+                    onConfirmOwned = onConfirmOwnershipCardOwned,
+                    onMarkExternal = onMarkOwnershipCardExternal,
+                )
             }
 
             SectionHeader(

@@ -6,10 +6,13 @@ import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -26,8 +29,8 @@ import java.util.Locale
 
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
+    private val cardRegistryRepository: CardRegistryRepository,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
-    private val reparseStoredEventsService: suspend () -> Int,
     private val reclassificationService: TransactionReclassificationService,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -65,23 +68,6 @@ class DashboardViewModel(
     fun goToCurrentPeriod() {
         activePeriod = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         load(activePeriod)
-    }
-
-    fun reparseStoredEvents() {
-        if (rescanJob?.isActive == true) return
-        rescanJob = viewModelScope.launch {
-            _uiState.update { it.copy(reparsingStored = true) }
-            try {
-                reparseStoredEventsService()
-                refresh()
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (_: Exception) {
-                // Best-effort; dashboard refresh still runs on success path only.
-            } finally {
-                _uiState.update { it.copy(reparsingStored = false) }
-            }
-        }
     }
 
     fun rescanSms() {
@@ -199,6 +185,8 @@ class DashboardViewModel(
 
             try {
                 val overview = overviewLoader.loadOverview(period)
+                val unknownCards = loadUnknownCards()
+                val ownedCards = loadOwnedCards()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -218,6 +206,8 @@ class DashboardViewModel(
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,
+                        unknownCards = unknownCards,
+                        ownedCards = ownedCards,
                     )
                 }
             } catch (ce: CancellationException) {
@@ -277,4 +267,16 @@ class DashboardViewModel(
             searchText = searchText,
         )
     }
+
+    private suspend fun loadUnknownCards(): List<UnknownCardCandidateUi> =
+        cardRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN }
+            .map { UnknownCardCandidateUi(bank = it.bank, last4 = it.last4) }
+            .sortedBy { it.last4 }
+
+    private suspend fun loadOwnedCards(): List<OwnedCardUi> =
+        cardRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
+            .map { OwnedCardUi(bank = it.bank, last4 = it.last4) }
+            .sortedBy { it.last4 }
 }

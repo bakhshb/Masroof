@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.review
 
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
@@ -35,6 +36,8 @@ data class ReviewDetailUi(
     val showIncomingIncomeAction: Boolean,
     val showFinancialTypeActions: Boolean,
     val showDismissNonFinancialAction: Boolean,
+    val ownershipCard: CardReference? = null,
+    val showOwnershipActions: Boolean = false,
 )
 
 data class ReviewUiState(
