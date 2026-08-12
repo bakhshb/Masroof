@@ -38,6 +38,8 @@ import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -158,7 +160,7 @@ fun TransactionDetailScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                transaction.amountLabel,
+                formatLocalizedMoney(transaction.amount),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -180,7 +182,7 @@ fun TransactionDetailScreen(
                     IconLabelRow(
                         icon = MasroofIcons.calendar,
                         label = stringResource(R.string.transaction_detail_date),
-                        trailing = transaction.dateLabel,
+                        trailing = formatLocalizedTransactionDate(transaction.localDate),
                     )
                     IconLabelRow(
                         icon = directionIcon(transaction.direction),
