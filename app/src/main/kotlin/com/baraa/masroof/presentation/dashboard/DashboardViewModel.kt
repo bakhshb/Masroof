@@ -159,9 +159,16 @@ class DashboardViewModel(
         load(activePeriod, preserveSelectionId = selectedId)
     }
 
+    private fun periodPresentation(period: FinancialPeriod): Pair<String, String?> {
+        val adjustment = FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate)
+        return FinancialPeriodUiFormatter.formatSalaryPeriodTitle(period) to
+            FinancialPeriodUiFormatter.formatAdjustmentHint(adjustment)
+    }
+
     private fun load(period: FinancialPeriod, preserveSelectionId: String? = null) {
         val samePeriodRefresh =
             _uiState.value.period == period && _uiState.value.summary?.period == period
+        val (periodLabel, periodAdjustmentHint) = periodPresentation(period)
 
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -171,14 +178,16 @@ class DashboardViewModel(
                         loading = true,
                         error = null,
                         period = period,
-                        periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                        periodLabel = periodLabel,
+                        periodAdjustmentHint = periodAdjustmentHint,
                     )
                 } else {
                     current.copy(
                         loading = true,
                         error = null,
                         period = period,
-                        periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                        periodLabel = periodLabel,
+                        periodAdjustmentHint = periodAdjustmentHint,
                         summary = null,
                         creditCards = null,
                         recentTransactions = emptyList(),
@@ -194,11 +203,13 @@ class DashboardViewModel(
                     return@launch
                 }
                 val previews = overview.transactions.map(::toPreview)
+                val (loadedLabel, loadedHint) = periodPresentation(overview.period)
                 _uiState.update {
                     it.copy(
                         loading = false,
                         period = overview.period,
-                        periodLabel = FinancialPeriodUiFormatter.formatRange(overview.period),
+                        periodLabel = loadedLabel,
+                        periodAdjustmentHint = loadedHint,
                         summary = overview.summary,
                         creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
@@ -220,14 +231,16 @@ class DashboardViewModel(
                             loading = false,
                             error = DashboardError.LOAD_FAILED,
                             period = period,
-                            periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                            periodLabel = periodLabel,
+                            periodAdjustmentHint = periodAdjustmentHint,
                         )
                     } else {
                         current.copy(
                             loading = false,
                             error = DashboardError.LOAD_FAILED,
                             period = period,
-                            periodLabel = FinancialPeriodUiFormatter.formatRange(period),
+                            periodLabel = periodLabel,
+                            periodAdjustmentHint = periodAdjustmentHint,
                             summary = null,
                             creditCards = null,
                             recentTransactions = emptyList(),

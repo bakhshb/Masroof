@@ -34,7 +34,8 @@ fun CreditCardsSection(
 ) {
     if (!overview.hasContent) return
 
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -51,7 +52,7 @@ fun CreditCardsSection(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        stringResource(R.string.dashboard_credit_card_aggregate_due),
+                        stringResource(R.string.dashboard_credit_card_statement_due),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -59,11 +60,30 @@ fun CreditCardsSection(
                         MoneyUiFormatter.format(due),
                         style = MaterialTheme.typography.titleMedium,
                     )
+                    overview.aggregateDueDate?.let { dueDate ->
+                        Text(
+                            stringResource(
+                                R.string.dashboard_credit_card_due_date,
+                                dateFormatter.format(dueDate),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    overview.statementPeriodLabel?.let { statementLabel ->
+                        Text(
+                            stringResource(
+                                R.string.dashboard_credit_card_statement_issued,
+                                statementLabel,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     overview.aggregateDueUpdatedAt?.let { at ->
                         Text(
                             stringResource(
                                 R.string.dashboard_credit_card_updated,
-                                formatSnapshotTime(at, zoneId, dateFormatter),
+                                formatSnapshotTime(at, zoneId, dateTimeFormatter),
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -74,7 +94,18 @@ fun CreditCardsSection(
         }
 
         overview.cards.forEach { row ->
-            CreditCardRowCard(row, zoneId, dateFormatter)
+            CreditCardRowCard(row, overview.statementPeriodLabel, zoneId, dateTimeFormatter)
+        }
+
+        if (overview.supplementaryCardCount > 0) {
+            Text(
+                stringResource(
+                    R.string.dashboard_credit_card_supplementary_count,
+                    overview.supplementaryCardCount,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -82,6 +113,7 @@ fun CreditCardsSection(
 @Composable
 private fun CreditCardRowCard(
     row: CreditCardDashboardRow,
+    statementPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
@@ -96,14 +128,25 @@ private fun CreditCardRowCard(
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    stringResource(R.string.dashboard_credit_card_last4, row.last4),
+                    if (row.isPrimary) {
+                        stringResource(R.string.dashboard_credit_card_primary_last4, row.last4)
+                    } else {
+                        stringResource(R.string.dashboard_credit_card_last4, row.last4)
+                    },
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
 
             SnapshotMetricRow(
-                label = stringResource(R.string.dashboard_credit_card_period_spending),
-                value = MoneyUiFormatter.format(row.periodSpendingNet),
+                label = if (statementPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_statement_spending,
+                        statementPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
+                },
+                value = MoneyUiFormatter.format(row.statementSpendingNet),
             )
 
             row.snapshot?.availableBalance?.let { available ->

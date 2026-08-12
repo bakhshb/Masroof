@@ -18,68 +18,87 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class CreditCardOverviewBuilderTest {
+    private val zone = ZoneId.of("Asia/Riyadh")
+    private val clock = Clock.fixed(Instant.parse("2026-08-11T17:05:00Z"), zone)
     private val card7271 = CardReference(Bank.BANK_ALJAZIRA, "7271")
     private val cardId7271 = FinancialContainerIdFactory.cardId(card7271)!!
 
     @Test
-    fun buildsSnapshotAndPeriodSpending() {
-        val at = Instant.parse("2026-08-11T17:05:00Z")
-        val body = """
+    fun buildsSnapshotAndStatementSpending() {
+        val purchaseAt = Instant.parse("2026-08-11T17:05:00Z")
+        val statementAt = Instant.parse("2026-08-10T09:00:00Z")
+        val beforeStatementAt = Instant.parse("2026-08-09T12:00:00Z")
+
+        val purchaseBody = """
             شراء عبر الانترنت
             بطاقة ائتمانية: 7271
-            بمبلغ: 75.00 SAR
+            بمblغ: 75.00 SAR
             الرصيد المتاح: 14569.09 SAR
             إجمالي المبلغ المستحق:3921.11 SAR
+        """.trimIndent().replace("بمblغ", "بمبلغ")
+
+        val statementBody = """
+            بطاقة إئتمانية: إصدار كشف حساب
+            بطاقة: 7271 بطاقة إئتمانية
+            إجمالي المبلغ المستحق: 3921.11 SAR
+            تاريخ الاستحقاق: 07/09/2026
         """.trimIndent()
-        val raw = RawSms(
-            id = "sms-cc-1",
-            sender = "AlJazira",
-            body = body,
-            receivedAt = at,
-            deviceMessageId = "1",
-            bodyHash = "hash",
-        )
-        val event = parsedEvent(
-            id = "pe-1",
-            rawSmsId = raw.id,
+
+        val purchaseRaw = rawSms("sms-cc-1", purchaseBody, purchaseAt)
+        val statementRaw = rawSms("sms-stmt", statementBody, statementAt)
+        val purchaseEvent = parsedEvent("pe-1", purchaseRaw.id, card7271, "75.00", purchaseAt)
+        val statementEvent = parsedEvent(
+            id = "pe-stmt",
+            rawSmsId = statementRaw.id,
             cardRef = card7271,
-            amount = "75.00",
-            at = at,
+            amount = null,
+            at = statementAt,
+            family = MessageFamily.NON_FINANCIAL,
         )
-        val details = ParsedEventDetails(
-            availableBalance = Money.of("14569.09", Currency.SAR),
-            outstandingBalance = Money.of("3921.11", Currency.SAR),
-        )
-        val tx = FinancialTransaction(
-            id = TransactionIdFactory.fromRawSmsIds(listOf(raw.id)),
-            type = FinancialTransactionType.EXPENSE,
-            amount = Money.of("75.00", Currency.SAR),
-            occurredAt = at,
-            sourceContainerId = cardId7271,
-            destinationContainerId = null,
-            merchant = "ananinja.com",
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = listOf(event.id),
+
+        val txs = listOf(
+            cardExpense("tx-after", "75.00", purchaseAt),
+            cardExpense("tx-before", "50.00", beforeStatementAt),
         )
 
         val overview = CreditCardOverviewBuilder.build(
-            periodTransactions = listOf(tx),
-            parsedRecords = listOf(ParsedEventRecord(event, details)),
-            rawSmsById = mapOf(raw.id to raw),
+            statementTransactions = txs,
+            parsedRecords = listOf(
+                ParsedEventRecord(
+                    purchaseEvent,
+                    ParsedEventDetails(
+                        availableBalance = Money.of("14569.09", Currency.SAR),
+                        outstandingBalance = Money.of("999.00", Currency.SAR),
+                    ),
+                ),
+                ParsedEventRecord(
+                    statementEvent,
+                    ParsedEventDetails(outstandingBalance = Money.of("3921.11", Currency.SAR)),
+                ),
+            ),
+            rawSmsById = mapOf(purchaseRaw.id to purchaseRaw, statementRaw.id to statementRaw),
+            zoneId = zone,
+            clock = clock,
         )
 
         assertEquals(Money.of("3921.11", Currency.SAR), overview.aggregateDueAmount)
+        assertEquals(LocalDate.parse("2026-09-07"), overview.aggregateDueDate)
         assertEquals(1, overview.cards.size)
         val row = overview.cards.single()
         assertEquals("7271", row.last4)
-        assertEquals(SignedMoneyAmount.of(Money.of("75.00", Currency.SAR)), row.periodSpendingNet)
+        assertTrue(row.isPrimary)
+        assertEquals(SignedMoneyAmount.of(Money.of("75.00", Currency.SAR)), row.statementSpendingNet)
         assertEquals(Money.of("14569.09", Currency.SAR), row.snapshot?.availableBalance)
+        assertEquals(Money.of("3921.11", Currency.SAR), row.snapshot?.dueAmount)
         assertTrue(overview.hasContent)
     }
 
@@ -92,43 +111,56 @@ class CreditCardOverviewBuilderTest {
             بمبلغ: 120.00 SAR
             خصمت من حساب: 3001
         """.trimIndent()
-        val raw = RawSms(
-            id = "sms-mada",
-            sender = "AlJazira",
-            body = body,
-            receivedAt = at,
-            deviceMessageId = "2",
-            bodyHash = "hash2",
-        )
+        val raw = rawSms("sms-mada", body, at)
         val card = CardReference(Bank.BANK_ALJAZIRA, "2210")
-        val event = parsedEvent(
-            id = "pe-mada",
-            rawSmsId = raw.id,
-            cardRef = card,
-            amount = "120.00",
-            at = at,
-        )
+        val event = parsedEvent("pe-mada", raw.id, card, "120.00", at)
         val overview = CreditCardOverviewBuilder.build(
-            periodTransactions = emptyList(),
+            statementTransactions = emptyList(),
             parsedRecords = listOf(ParsedEventRecord(event, ParsedEventDetails())),
             rawSmsById = mapOf(raw.id to raw),
+            zoneId = zone,
+            clock = clock,
         )
         assertEquals(0, overview.cards.size)
+        assertNull(overview.aggregateDueAmount)
     }
+
+    private fun rawSms(id: String, body: String, at: Instant) = RawSms(
+        id = id,
+        sender = "AlJazira",
+        body = body,
+        receivedAt = at,
+        deviceMessageId = id,
+        bodyHash = id,
+    )
+
+    private fun cardExpense(id: String, amount: String, at: Instant) = FinancialTransaction(
+        id = id,
+        type = FinancialTransactionType.EXPENSE,
+        amount = Money.of(amount, Currency.SAR),
+        occurredAt = at,
+        sourceContainerId = cardId7271,
+        destinationContainerId = null,
+        merchant = "shop",
+        counterparty = null,
+        categoryId = null,
+        linkedParsedEventIds = emptyList(),
+    )
 
     private fun parsedEvent(
         id: String,
         rawSmsId: String,
         cardRef: CardReference,
-        amount: String,
+        amount: String?,
         at: Instant,
+        family: MessageFamily = MessageFamily.PURCHASE,
     ) = ParsedEvent(
         id = id,
         rawSmsId = rawSmsId,
         bank = Bank.BANK_ALJAZIRA,
-        messageFamily = MessageFamily.PURCHASE,
+        messageFamily = family,
         direction = MoneyDirection.OUTGOING,
-        amount = Money.of(amount, Currency.SAR),
+        amount = amount?.let { Money.of(it, Currency.SAR) },
         purchaseChannel = null,
         sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
         destinationAccountRef = null,
@@ -138,6 +170,10 @@ class CreditCardOverviewBuilderTest {
         occurredAt = at,
         bankNetworkType = null,
         confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
+        parseStatus = if (family == MessageFamily.NON_FINANCIAL) {
+            ParseStatus.NON_FINANCIAL
+        } else {
+            ParseStatus.SUCCESS
+        },
     )
 }

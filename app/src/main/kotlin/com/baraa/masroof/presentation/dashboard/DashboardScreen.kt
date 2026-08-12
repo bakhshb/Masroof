@@ -112,6 +112,7 @@ private fun DashboardScreen(
 
         PeriodSelector(
             label = state.periodLabel,
+            adjustmentHint = state.periodAdjustmentHint,
             isCurrentPeriod = state.isCurrentPeriod,
             onPrevious = onPrevious,
             onNext = onNext,
@@ -343,6 +344,7 @@ private fun DashboardScreen(
 @Composable
 private fun PeriodSelector(
     label: String,
+    adjustmentHint: String?,
     isCurrentPeriod: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -376,6 +378,14 @@ private fun PeriodSelector(
                     contentDescription = null,
                 )
             }
+        }
+        adjustmentHint?.let { hint ->
+            Text(
+                hint,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (!isCurrentPeriod) {
             IconTextButtonOutlined(

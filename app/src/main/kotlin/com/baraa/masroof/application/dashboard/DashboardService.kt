@@ -60,12 +60,34 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
-        val creditCards = CreditCardOverviewBuilder.build(
-            periodTransactions = transactions,
+        val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            zoneId = zoneId,
+            clock = clock,
+        )
+        val statementEndExclusive = LocalDate.now(clock)
+            .plusDays(1)
+            .atStartOfDay(zoneId)
+            .toInstant()
+        val statementTransactions = financialTransactionRepository.listOccurredBetween(
+            startInclusive = statementStart,
+            endExclusive = statementEndExclusive,
+        )
+        val statementSarEquivalents = TransactionSarEquivalentResolver.resolve(
+            transactions = statementTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
+        )
+        val creditCards = CreditCardOverviewBuilder.build(
+            statementTransactions = statementTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            zoneId = zoneId,
+            clock = clock,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = statementSarEquivalents,
         )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(
