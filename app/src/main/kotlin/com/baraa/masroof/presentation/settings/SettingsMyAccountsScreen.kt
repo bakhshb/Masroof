@@ -113,7 +113,7 @@ fun SettingsMyAccountsScreen(
                             R.string.onboarding_account_suffix,
                             account.maskedNumber,
                         ),
-                        trailingAction = {
+                        endAction = {
                             SettingsStopTrackingButton(
                                 onClick = { onRequestStopTracking(account) },
                                 enabled = !state.updating,
@@ -134,7 +134,7 @@ fun SettingsMyAccountsScreen(
                             R.string.onboarding_account_suffix,
                             account.maskedNumber,
                         ),
-                        trailingAction = {
+                        endAction = {
                             SettingsResumeTrackingButton(
                                 onClick = { onResumeTracking(account) },
                                 enabled = !state.updating,

@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,13 +28,16 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofIcons
 
+/**
+ * Registry row for Arabic RTL: identity on the right (start), action on the left (end).
+ */
 @Composable
 fun SettingsRegistryItemCard(
     icon: ImageVector,
     bank: Bank,
     title: String,
     modifier: Modifier = Modifier,
-    trailingAction: (@Composable () -> Unit)? = null,
+    endAction: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
 ) {
     Card(modifier = modifier.fillMaxWidth()) {
@@ -41,13 +45,11 @@ fun SettingsRegistryItemCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = if (endAction != null) 92.dp else 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -66,9 +68,10 @@ fun SettingsRegistryItemCard(
                         Text(title, style = MaterialTheme.typography.titleSmall)
                     }
                 }
-                trailingAction?.let { action ->
-                    Spacer(Modifier.width(8.dp))
-                    action()
+                endAction?.let { action ->
+                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                        action()
+                    }
                 }
             }
             footer?.invoke()
@@ -87,7 +90,7 @@ fun SettingsStopTrackingButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
+        modifier = modifier.semantics { this.contentDescription = contentDescription },
         contentPadding = ButtonDefaults.ContentPadding,
         border = BorderStroke(1.dp, error.copy(alpha = 0.55f)),
         colors = ButtonDefaults.outlinedButtonColors(

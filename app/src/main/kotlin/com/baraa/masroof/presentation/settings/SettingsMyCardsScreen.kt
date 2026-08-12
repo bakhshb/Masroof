@@ -113,7 +113,7 @@ fun SettingsMyCardsScreen(
                             R.string.dashboard_credit_card_last4,
                             formatCardLast4(card.last4),
                         ),
-                        trailingAction = {
+                        endAction = {
                             SettingsStopTrackingButton(
                                 onClick = { onRequestStopTracking(card) },
                                 enabled = !state.updating,
@@ -134,7 +134,7 @@ fun SettingsMyCardsScreen(
                             R.string.dashboard_credit_card_last4,
                             formatCardLast4(card.last4),
                         ),
-                        trailingAction = {
+                        endAction = {
                             SettingsResumeTrackingButton(
                                 onClick = { onResumeTracking(card) },
                                 enabled = !state.updating,
