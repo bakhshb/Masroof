@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 
@@ -17,11 +18,15 @@ data class TransactionPreviewUi(
     val id: String,
     /** Merchant/counterparty when present; Compose falls back to Arabic type label when null. */
     val title: String?,
+    val amount: Money,
     val amountLabel: String,
     val dateLabel: String,
     val type: FinancialTransactionType,
     val typeLabelResHint: FinancialTransactionType,
     val direction: TransactionDirectionUi,
+    val cardLast4: String?,
+    /** Lowercase merchant/counterparty text for in-memory search. */
+    val searchText: String,
 )
 
 data class DashboardUiState(
