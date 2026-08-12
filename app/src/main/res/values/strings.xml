@@ -81,6 +81,13 @@
     <string name="transaction_list_title">عمليات الفترة</string>
     <string name="transaction_list_period">الفترة: %1$s</string>
     <string name="transaction_list_count">%1$d عملية في هذه الفترة</string>
+    <string name="transaction_list_search_hint">ابحث بالاسم أو المبلغ</string>
+    <string name="transaction_list_filter_all_types">الكل</string>
+    <string name="transaction_list_filter_all_cards">كل البطاقات</string>
+    <string name="transaction_list_filtered_count">%1$d من %2$d عملية</string>
+    <string name="transaction_list_filtered_total">مجموع المبالغ المعروضة: %1$s</string>
+    <string name="transaction_list_no_filter_results">لا توجد عمليات مطابقة للفلتر</string>
+    <string name="transaction_list_clear_filters">مسح الفلاتر</string>
     <string name="transaction_detail_title">تفاصيل العملية</string>
     <string name="transaction_detail_current_type">التصنيف الحالي: %1$s</string>
     <string name="transaction_detail_reclassify_title">إعادة التصنيف</string>

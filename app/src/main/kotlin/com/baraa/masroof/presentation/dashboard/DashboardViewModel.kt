@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -256,14 +257,24 @@ class DashboardViewModel(
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
         val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
+        val searchText = listOfNotNull(
+            tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
+            tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
+        ).joinToString(" ").lowercase(Locale.getDefault())
         return TransactionPreviewUi(
             id = tx.id,
             title = title,
+            amount = tx.amount,
             amountLabel = MoneyUiFormatter.format(tx.amount),
             dateLabel = dateFormatter.format(localDate),
             type = tx.type,
             typeLabelResHint = tx.type,
             direction = TransactionTypePresentation.direction(tx.type),
+            cardLast4 = FinancialContainerIdParser.cardLast4FromContainers(
+                sourceContainerId = tx.sourceContainerId,
+                destinationContainerId = tx.destinationContainerId,
+            ),
+            searchText = searchText,
         )
     }
 }
