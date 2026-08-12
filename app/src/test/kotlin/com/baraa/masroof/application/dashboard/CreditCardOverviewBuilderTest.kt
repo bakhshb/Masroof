@@ -38,7 +38,7 @@ class CreditCardOverviewBuilderTest {
     private val cardId3478 = FinancialContainerIdFactory.cardId(card3478)!!
 
     @Test
-    fun buildsAllCardsWithDualSpendingAndPerCardDue() {
+    fun aggregateDueFromStatement_purchaseDuePerCard() {
         val purchaseAt = Instant.parse("2026-08-11T17:05:00Z")
         val statementAt = Instant.parse("2026-08-10T09:00:00Z")
         val beforeStatementAt = Instant.parse("2026-08-09T12:00:00Z")
@@ -60,10 +60,10 @@ class CreditCardOverviewBuilderTest {
             body = """
                 شراء عبر الانترنت
                 بطاقة ائتمانية: 3478
-                بمblغ: 50.00 SAR
+                بمبلغ: 50.00 SAR
                 الرصيد المتاح: 14644.09 SAR
                 إجمالي المبلغ المستحق:500.00 SAR
-            """.trimIndent().replace("بمblغ", "بمبلغ"),
+            """.trimIndent(),
             at = Instant.parse("2026-08-11T16:40:00Z"),
         )
         val statement7271 = rawSms(
@@ -71,7 +71,7 @@ class CreditCardOverviewBuilderTest {
             body = """
                 بطاقة إئتمانية: إصدار كشف حساب
                 بطاقة: 7271 بطاقة إئتمانية
-                إجمالي المبلغ المستحق: 3921.11 SAR
+                إجمالي المبلغ المستحق: 0.00 SAR
                 تاريخ الاستحقاق: 07/09/2026
             """.trimIndent(),
             at = statementAt,
@@ -110,7 +110,7 @@ class CreditCardOverviewBuilderTest {
                         at = statementAt,
                         family = MessageFamily.NON_FINANCIAL,
                     ),
-                    ParsedEventDetails(outstandingBalance = Money.of("3921.11", Currency.SAR)),
+                    ParsedEventDetails(outstandingBalance = Money.of("0.00", Currency.SAR)),
                 ),
             ),
             rawSmsById = mapOf(
@@ -122,7 +122,9 @@ class CreditCardOverviewBuilderTest {
             clock = clock,
         )
 
-        assertEquals(Money.of("3921.11", Currency.SAR), overview.aggregateDueAmount)
+        assertEquals(Money.of("0.00", Currency.SAR), overview.aggregateDueAmount)
+        assertEquals(LocalDate.parse("2026-09-07"), overview.aggregateDueDate)
+        assertEquals(statementAt, overview.aggregateDueUpdatedAt)
         assertEquals(2, overview.cards.size)
 
         val row7271 = overview.cards.first { it.last4 == "7271" }

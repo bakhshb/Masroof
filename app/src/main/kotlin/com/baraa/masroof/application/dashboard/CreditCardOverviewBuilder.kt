@@ -82,9 +82,12 @@ object CreditCardOverviewBuilder {
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = dayMonth.format(salaryPeriod.startDate)
 
-        val latestSnapshotByCard = snapshotCandidates
+        val latestPurchaseDueByCard = snapshotCandidates
+            .filter { !it.isStatement && it.details.outstandingBalance != null }
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
+
+        val cardIds = creditCardMeta.keys.toSet()
 
         val latestStatementByCard = snapshotCandidates
             .filter { it.isStatement }
@@ -96,11 +99,10 @@ object CreditCardOverviewBuilder {
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
 
-        val cardIds = creditCardMeta.keys.toSet()
-
         val rows = cardIds.map { cardId ->
             val ref = creditCardMeta[cardId]
-                ?: latestSnapshotByCard[cardId]?.cardRef
+                ?: latestPurchaseDueByCard[cardId]?.cardRef
+                ?: latestAvailableByCard[cardId]?.cardRef
                 ?: parseCardId(cardId)
             val cardStatementStart = latestStatementByCard[cardId]?.updatedAt ?: globalStatementStart
             val statementLabel = dayMonth.format(cardStatementStart.atZone(zoneId).toLocalDate())
@@ -127,30 +129,21 @@ object CreditCardOverviewBuilder {
                 salaryPeriodSpendingNet = salaryNet,
                 statementPeriodLabel = statementLabel,
                 snapshot = buildCardSnapshot(
-                    latestStatement = latestStatementByCard[cardId],
+                    latestPurchaseDue = latestPurchaseDueByCard[cardId],
                     latestAvailable = latestAvailableByCard[cardId],
-                    fallbackDue = latestSnapshotByCard[cardId],
                 ),
             )
         }.sortedBy { it.last4 }
 
-        val aggregateDue = snapshotCandidates
-            .mapNotNull { candidate ->
-                candidate.details.outstandingBalance?.let { due ->
-                    candidate.updatedAt to due
-                }
-            }
-            .maxByOrNull { it.first }
-
-        val aggregateStatement = snapshotCandidates
+        val latestStatement = snapshotCandidates
             .filter { it.isStatement }
             .maxByOrNull { it.updatedAt }
 
         return CreditCardsOverview(
             cards = rows,
-            aggregateDueAmount = aggregateDue?.second,
-            aggregateDueUpdatedAt = aggregateDue?.first,
-            aggregateDueDate = aggregateStatement?.dueDate,
+            aggregateDueAmount = latestStatement?.details?.outstandingBalance,
+            aggregateDueUpdatedAt = latestStatement?.updatedAt,
+            aggregateDueDate = latestStatement?.dueDate,
             salaryPeriodLabel = salaryPeriodLabel,
             currency = primaryCurrency,
         )
@@ -209,25 +202,21 @@ object CreditCardOverviewBuilder {
     }
 
     private fun buildCardSnapshot(
-        latestStatement: SnapshotCandidate?,
+        latestPurchaseDue: SnapshotCandidate?,
         latestAvailable: SnapshotCandidate?,
-        fallbackDue: SnapshotCandidate?,
     ): CreditCardBalanceSnapshot? {
-        val dueCandidate = latestStatement ?: fallbackDue?.takeIf {
-            it.details.outstandingBalance != null
-        }
-        if (latestAvailable == null && dueCandidate == null) return null
+        if (latestAvailable == null && latestPurchaseDue == null) return null
 
         val updatedAt = listOfNotNull(
             latestAvailable?.updatedAt,
-            dueCandidate?.updatedAt,
+            latestPurchaseDue?.updatedAt,
         ).maxOrNull() ?: return null
 
         return CreditCardBalanceSnapshot(
             availableBalance = latestAvailable?.details?.availableBalance,
-            dueAmount = dueCandidate?.details?.outstandingBalance,
-            dueDate = latestStatement?.dueDate,
-            statementIssuedAt = latestStatement?.updatedAt,
+            dueAmount = latestPurchaseDue?.details?.outstandingBalance,
+            dueDate = null,
+            statementIssuedAt = null,
             updatedAt = updatedAt,
         )
     }

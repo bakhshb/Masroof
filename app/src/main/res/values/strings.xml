@@ -72,7 +72,7 @@
     <string name="dashboard_credit_card_available">الرصيد المتاح للبطاقة</string>
     <string name="dashboard_credit_card_card_due">المبلغ المستحق</string>
     <string name="dashboard_credit_card_due_date">تاريخ الاستحقاق: %1$s</string>
-    <string name="dashboard_credit_card_aggregate_due">إجمالي المستحق (آخر رسالة)</string>
+    <string name="dashboard_credit_card_aggregate_due">إجمالي المستحق (كشف الحساب)</string>
     <string name="dashboard_credit_card_updated">محدّث: %1$s</string>
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
