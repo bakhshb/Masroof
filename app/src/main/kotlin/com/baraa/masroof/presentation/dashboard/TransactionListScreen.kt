@@ -36,15 +36,17 @@ fun TransactionListScreen(
     onOpenTransaction: (String) -> Unit,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedCardLast4 by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var selectedCardLast4s by rememberSaveable { mutableStateOf(listOf<String>()) }
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
 
-    val filterState = remember(searchQuery, selectedTypeName, selectedCardLast4) {
+    val filterState = remember(searchQuery, selectedTypeNames, selectedCardLast4s) {
         TransactionListFilterState(
             searchQuery = searchQuery,
-            type = selectedTypeName?.let { runCatching { FinancialTransactionType.valueOf(it) }.getOrNull() },
-            cardLast4 = selectedCardLast4,
+            types = selectedTypeNames.mapNotNull { name ->
+                runCatching { FinancialTransactionType.valueOf(name) }.getOrNull()
+            }.toSet(),
+            cardLast4s = selectedCardLast4s.toSet(),
         )
     }
 
@@ -107,16 +109,26 @@ fun TransactionListScreen(
                     filterState = filterState,
                     availableTypes = availableTypes,
                     availableCards = availableCards,
-                    onTypeSelected = { type ->
-                        selectedTypeName = type?.name
+                    onTypeToggle = { type ->
+                        selectedTypeNames = if (type.name in selectedTypeNames) {
+                            selectedTypeNames - type.name
+                        } else {
+                            selectedTypeNames + type.name
+                        }
                     },
-                    onCardSelected = { card ->
-                        selectedCardLast4 = card
+                    onClearTypes = { selectedTypeNames = emptyList() },
+                    onCardToggle = { last4 ->
+                        selectedCardLast4s = if (last4 in selectedCardLast4s) {
+                            selectedCardLast4s - last4
+                        } else {
+                            selectedCardLast4s + last4
+                        }
                     },
+                    onClearCards = { selectedCardLast4s = emptyList() },
                     onClearFilters = {
                         searchQuery = ""
-                        selectedTypeName = null
-                        selectedCardLast4 = null
+                        selectedTypeNames = emptyList()
+                        selectedCardLast4s = emptyList()
                         filtersExpanded = false
                     },
                     filteredCount = filterResult.transactions.size,

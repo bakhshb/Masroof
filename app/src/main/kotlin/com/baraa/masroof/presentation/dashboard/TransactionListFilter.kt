@@ -3,16 +3,15 @@ package com.baraa.masroof.presentation.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import java.math.BigDecimal
 import java.util.Locale
 
 data class TransactionListFilterState(
     val searchQuery: String = "",
-    val type: FinancialTransactionType? = null,
-    val cardLast4: String? = null,
+    val types: Set<FinancialTransactionType> = emptySet(),
+    val cardLast4s: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
-        get() = searchQuery.isNotBlank() || type != null || cardLast4 != null
+        get() = searchQuery.isNotBlank() || types.isNotEmpty() || cardLast4s.isNotEmpty()
 }
 
 data class TransactionListFilterResult(
@@ -41,8 +40,8 @@ object TransactionListFilterEngine {
         primaryCurrency: Currency = Currency.SAR,
     ): TransactionListFilterResult {
         val filtered = transactions.filter { tx ->
-            matchesType(tx, filter.type) &&
-                matchesCard(tx, filter.cardLast4) &&
+            matchesTypes(tx, filter.types) &&
+                matchesCards(tx, filter.cardLast4s) &&
                 matchesSearch(tx, filter.searchQuery)
         }
         return TransactionListFilterResult(
@@ -59,11 +58,13 @@ object TransactionListFilterEngine {
     fun availableCardLast4s(transactions: List<TransactionPreviewUi>): List<String> =
         transactions.mapNotNull { it.cardLast4 }.distinct().sorted()
 
-    private fun matchesType(tx: TransactionPreviewUi, type: FinancialTransactionType?): Boolean =
-        type == null || tx.type == type
+    private fun matchesTypes(
+        tx: TransactionPreviewUi,
+        types: Set<FinancialTransactionType>,
+    ): Boolean = types.isEmpty() || tx.type in types
 
-    private fun matchesCard(tx: TransactionPreviewUi, cardLast4: String?): Boolean =
-        cardLast4 == null || tx.cardLast4 == cardLast4
+    private fun matchesCards(tx: TransactionPreviewUi, cardLast4s: Set<String>): Boolean =
+        cardLast4s.isEmpty() || tx.cardLast4 in cardLast4s
 
     private fun matchesSearch(tx: TransactionPreviewUi, rawQuery: String): Boolean {
         val query = rawQuery.trim()

@@ -85,6 +85,7 @@
     <string name="transaction_list_filters_toggle">تصفية</string>
     <string name="transaction_list_filter_type_section">نوع العملية</string>
     <string name="transaction_list_filter_card_section">البطاقة</string>
+    <string name="transaction_list_multi_filter_hint">يمكنك اختيار أكثر من نوع أو بطاقة — تُطبَّق كل الفلاتر معاً</string>
     <string name="transaction_list_clear_search">مسح البحث</string>
     <string name="transaction_list_filter_all_types">الكل</string>
     <string name="transaction_list_filter_all_cards">كل البطاقات</string>

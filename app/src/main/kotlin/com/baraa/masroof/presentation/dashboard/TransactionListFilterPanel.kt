@@ -56,8 +56,10 @@ fun TransactionListToolbar(
     filterState: TransactionListFilterState,
     availableTypes: List<FinancialTransactionType>,
     availableCards: List<String>,
-    onTypeSelected: (FinancialTransactionType?) -> Unit,
-    onCardSelected: (String?) -> Unit,
+    onTypeToggle: (FinancialTransactionType) -> Unit,
+    onClearTypes: () -> Unit,
+    onCardToggle: (String) -> Unit,
+    onClearCards: () -> Unit,
     onClearFilters: () -> Unit,
     filteredCount: Int,
     totalCount: Int,
@@ -162,8 +164,10 @@ fun TransactionListToolbar(
                 filterState = filterState,
                 availableTypes = availableTypes,
                 availableCards = availableCards,
-                onTypeSelected = onTypeSelected,
-                onCardSelected = onCardSelected,
+                onTypeToggle = onTypeToggle,
+                onClearTypes = onClearTypes,
+                onCardToggle = onCardToggle,
+                onClearCards = onClearCards,
             )
         }
 
@@ -182,8 +186,10 @@ private fun TransactionListFilterSheet(
     filterState: TransactionListFilterState,
     availableTypes: List<FinancialTransactionType>,
     availableCards: List<String>,
-    onTypeSelected: (FinancialTransactionType?) -> Unit,
-    onCardSelected: (String?) -> Unit,
+    onTypeToggle: (FinancialTransactionType) -> Unit,
+    onClearTypes: () -> Unit,
+    onCardToggle: (String) -> Unit,
+    onClearCards: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -194,22 +200,26 @@ private fun TransactionListFilterSheet(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Text(
+                text = stringResource(R.string.transaction_list_multi_filter_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (availableTypes.isNotEmpty()) {
                 FilterChipSection(
                     title = stringResource(R.string.transaction_list_filter_type_section),
                 ) {
                     FilterChip(
-                        selected = filterState.type == null,
-                        onClick = { onTypeSelected(null) },
+                        selected = filterState.types.isEmpty(),
+                        onClick = onClearTypes,
                         label = { Text(stringResource(R.string.transaction_list_filter_all_types)) },
                         colors = filterChipColors(),
                     )
                     availableTypes.forEach { type ->
                         FilterChip(
-                            selected = filterState.type == type,
-                            onClick = {
-                                onTypeSelected(if (filterState.type == type) null else type)
-                            },
+                            selected = type in filterState.types,
+                            onClick = { onTypeToggle(type) },
                             label = { Text(transactionTypeLabel(type)) },
                             colors = filterChipColors(),
                         )
@@ -222,17 +232,15 @@ private fun TransactionListFilterSheet(
                     title = stringResource(R.string.transaction_list_filter_card_section),
                 ) {
                     FilterChip(
-                        selected = filterState.cardLast4 == null,
-                        onClick = { onCardSelected(null) },
+                        selected = filterState.cardLast4s.isEmpty(),
+                        onClick = onClearCards,
                         label = { Text(stringResource(R.string.transaction_list_filter_all_cards)) },
                         colors = filterChipColors(),
                     )
                     availableCards.forEach { last4 ->
                         FilterChip(
-                            selected = filterState.cardLast4 == last4,
-                            onClick = {
-                                onCardSelected(if (filterState.cardLast4 == last4) null else last4)
-                            },
+                            selected = last4 in filterState.cardLast4s,
+                            onClick = { onCardToggle(last4) },
                             label = {
                                 Text(stringResource(R.string.dashboard_credit_card_last4, last4))
                             },
@@ -320,9 +328,7 @@ private fun filterChipColors() = FilterChipDefaults.filterChipColors(
 )
 
 fun TransactionListFilterState.activeFilterCount(): Int {
-    var count = 0
-    if (type != null) count++
-    if (cardLast4 != null) count++
+    var count = types.size + cardLast4s.size
     if (searchQuery.isNotBlank()) count++
     return count
 }

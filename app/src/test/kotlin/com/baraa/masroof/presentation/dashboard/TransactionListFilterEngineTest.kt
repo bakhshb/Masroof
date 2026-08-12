@@ -4,7 +4,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class TransactionListFilterEngineTest {
@@ -27,11 +26,31 @@ class TransactionListFilterEngineTest {
         )
         val result = TransactionListFilterEngine.apply(
             txs,
-            TransactionListFilterState(type = FinancialTransactionType.EXPENSE),
+            TransactionListFilterState(types = setOf(FinancialTransactionType.EXPENSE)),
         )
         assertEquals(1, result.transactions.size)
         assertEquals(FinancialTransactionType.EXPENSE, result.transactions.single().type)
         assertEquals(Money.of("100.00", Currency.SAR), result.totalAmount)
+    }
+
+    @Test
+    fun multipleTypes_useOrWithinTypes() {
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "100"),
+            preview(type = FinancialTransactionType.REFUND, amount = "20"),
+            preview(type = FinancialTransactionType.INCOME, amount = "5000"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(
+                types = setOf(
+                    FinancialTransactionType.EXPENSE,
+                    FinancialTransactionType.REFUND,
+                ),
+            ),
+        )
+        assertEquals(2, result.transactions.size)
+        assertEquals(Money.of("120.00", Currency.SAR), result.totalAmount)
     }
 
     @Test
@@ -42,10 +61,25 @@ class TransactionListFilterEngineTest {
         )
         val result = TransactionListFilterEngine.apply(
             txs,
-            TransactionListFilterState(cardLast4 = "7271"),
+            TransactionListFilterState(cardLast4s = setOf("7271")),
         )
         assertEquals(1, result.transactions.size)
         assertEquals("7271", result.transactions.single().cardLast4)
+    }
+
+    @Test
+    fun multipleCards_useOrWithinCards() {
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "50", card = "3478"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "30", card = "8332"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(cardLast4s = setOf("7271", "3478")),
+        )
+        assertEquals(2, result.transactions.size)
+        assertEquals(Money.of("150.00", Currency.SAR), result.totalAmount)
     }
 
     @Test
@@ -58,12 +92,32 @@ class TransactionListFilterEngineTest {
         val result = TransactionListFilterEngine.apply(
             txs,
             TransactionListFilterState(
-                type = FinancialTransactionType.EXPENSE,
-                cardLast4 = "7271",
+                types = setOf(FinancialTransactionType.EXPENSE),
+                cardLast4s = setOf("7271"),
             ),
         )
         assertEquals(1, result.transactions.size)
         assertEquals(Money.of("100.00", Currency.SAR), result.totalAmount)
+    }
+
+    @Test
+    fun multipleTypesCardsAndSearch_combineWithAnd() {
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "100", merchant = "Tamara", card = "7271"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "50", merchant = "TABBY", card = "7271"),
+            preview(type = FinancialTransactionType.REFUND, amount = "20", merchant = "Tamara", card = "7271"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "100", merchant = "Tamara", card = "3478"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(
+                searchQuery = "tamara",
+                types = setOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.REFUND),
+                cardLast4s = setOf("7271"),
+            ),
+        )
+        assertEquals(2, result.transactions.size)
+        assertEquals(Money.of("120.00", Currency.SAR), result.totalAmount)
     }
 
     @Test
