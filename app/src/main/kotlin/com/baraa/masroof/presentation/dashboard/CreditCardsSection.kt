@@ -21,6 +21,8 @@ import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.StopTrackingCardButton
+import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.common.SectionHeader
 import java.time.Instant
 import java.time.ZoneId
@@ -33,9 +35,11 @@ fun CreditCardsSection(
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
     unknownCardLast4s: Set<String> = emptySet(),
+    ownedCardLast4s: Set<String> = emptySet(),
     ownershipUpdating: Boolean = false,
     onConfirmCardOwned: (String) -> Unit = {},
     onMarkCardExternal: (String) -> Unit = {},
+    onStopTrackingOwnedCard: (String) -> Unit = {},
 ) {
     if (!overview.hasContent) return
 
@@ -96,9 +100,11 @@ fun CreditCardsSection(
                 zoneId = zoneId,
                 dateFormatter = dateTimeFormatter,
                 needsOwnershipConfirm = row.last4 in unknownCardLast4s,
+                canStopTracking = row.last4 in ownedCardLast4s,
                 ownershipUpdating = ownershipUpdating,
                 onConfirmOwned = { onConfirmCardOwned(row.last4) },
                 onMarkExternal = { onMarkCardExternal(row.last4) },
+                onStopTracking = { onStopTrackingOwnedCard(row.last4) },
             )
         }
     }
@@ -111,9 +117,11 @@ private fun CreditCardRowCard(
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
     needsOwnershipConfirm: Boolean,
+    canStopTracking: Boolean,
     ownershipUpdating: Boolean,
     onConfirmOwned: () -> Unit,
     onMarkExternal: () -> Unit,
+    onStopTracking: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,7 +134,10 @@ private fun CreditCardRowCard(
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    stringResource(R.string.dashboard_credit_card_last4, row.last4),
+                    stringResource(
+                        R.string.dashboard_credit_card_last4,
+                        formatCardLast4(row.last4),
+                    ),
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
@@ -185,6 +196,11 @@ private fun CreditCardRowCard(
                     enabled = !ownershipUpdating,
                     onConfirmOwned = onConfirmOwned,
                     onMarkExternal = onMarkExternal,
+                )
+            } else if (canStopTracking) {
+                StopTrackingCardButton(
+                    enabled = !ownershipUpdating,
+                    onClick = onStopTracking,
                 )
             }
         }

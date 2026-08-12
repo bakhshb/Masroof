@@ -28,6 +28,7 @@ fun CardOwnershipPromptBanner(
     onMarkExternal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val displayLast4 = formatCardLast4(last4)
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -47,10 +48,14 @@ fun CardOwnershipPromptBanner(
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    stringResource(R.string.ownership_prompt_banner_title, last4),
+                    stringResource(R.string.ownership_prompt_banner_title, displayLast4),
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
+            Text(
+                stringResource(R.string.ownership_prompt_banner_question),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Text(
                 if (extraCount > 0) {
                     stringResource(R.string.ownership_prompt_banner_body_more, extraCount)
@@ -119,7 +124,7 @@ private fun CardOwnershipActionRow(
             onClick = onMarkExternal,
             enabled = enabled,
             icon = MasroofIcons.warning,
-            text = stringResource(R.string.onboarding_not_mine),
+            text = stringResource(R.string.ownership_action_not_mine),
         )
     }
 }

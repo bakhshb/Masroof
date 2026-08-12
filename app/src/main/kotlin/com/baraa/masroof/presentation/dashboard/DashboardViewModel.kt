@@ -137,19 +137,23 @@ class DashboardViewModel(
     }
 
     fun confirmCardOwned(candidate: UnknownCardCandidateUi) {
-        updateCardOwnership(candidate, owned = true)
+        updateCardOwnership(candidate.bank, candidate.last4, owned = true)
     }
 
     fun markCardExternal(candidate: UnknownCardCandidateUi) {
-        updateCardOwnership(candidate, owned = false)
+        updateCardOwnership(candidate.bank, candidate.last4, owned = false)
     }
 
-    private fun updateCardOwnership(candidate: UnknownCardCandidateUi, owned: Boolean) {
+    fun stopTrackingOwnedCard(card: OwnedCardUi) {
+        updateCardOwnership(card.bank, card.last4, owned = false)
+    }
+
+    private fun updateCardOwnership(bank: Bank, last4: String, owned: Boolean) {
         if (_uiState.value.ownershipUpdating) return
         viewModelScope.launch {
             _uiState.update { it.copy(ownershipUpdating = true) }
             try {
-                val ref = CardReference(candidate.bank, candidate.last4)
+                val ref = CardReference(bank, last4)
                 if (owned) {
                     ownershipConfirmationService.confirmCardOwned(ref)
                 } else {
@@ -237,6 +241,7 @@ class DashboardViewModel(
             try {
                 val overview = overviewLoader.loadOverview(period)
                 val unknownCards = loadUnknownCards()
+                val ownedCards = loadOwnedCards()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -257,6 +262,7 @@ class DashboardViewModel(
                         error = null,
                         selectedTransactionId = preserveSelectionId,
                         unknownCards = unknownCards,
+                        ownedCards = ownedCards,
                         ownershipUpdating = false,
                     )
                 }
@@ -322,5 +328,11 @@ class DashboardViewModel(
         cardRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN }
             .map { UnknownCardCandidateUi(bank = it.bank, last4 = it.last4) }
+            .sortedBy { it.last4 }
+
+    private suspend fun loadOwnedCards(): List<OwnedCardUi> =
+        cardRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
+            .map { OwnedCardUi(bank = it.bank, last4 = it.last4) }
             .sortedBy { it.last4 }
 }

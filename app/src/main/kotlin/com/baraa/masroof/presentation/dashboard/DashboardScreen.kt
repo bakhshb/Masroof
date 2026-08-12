@@ -60,6 +60,7 @@ fun DashboardRoute(
         onOpenTransaction = onOpenTransaction,
         onConfirmCardOwned = viewModel::confirmCardOwned,
         onMarkCardExternal = viewModel::markCardExternal,
+        onStopTrackingOwnedCard = viewModel::stopTrackingOwnedCard,
     )
 }
 
@@ -77,6 +78,7 @@ private fun DashboardScreen(
     onOpenTransaction: (String) -> Unit,
     onConfirmCardOwned: (UnknownCardCandidateUi) -> Unit,
     onMarkCardExternal: (UnknownCardCandidateUi) -> Unit,
+    onStopTrackingOwnedCard: (OwnedCardUi) -> Unit,
 ) {
     val isPullRefreshing = state.loading && state.summary != null
     LongPullToRefreshBox(
@@ -224,16 +226,21 @@ private fun DashboardScreen(
 
                 state.creditCards?.let { creditCards ->
                     val unknownLast4s = state.unknownCards.map { it.last4 }.toSet()
+                    val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
                     CreditCardsSection(
                         overview = creditCards,
                         zoneId = java.time.ZoneId.systemDefault(),
                         unknownCardLast4s = unknownLast4s,
+                        ownedCardLast4s = ownedLast4s,
                         ownershipUpdating = state.ownershipUpdating,
                         onConfirmCardOwned = { last4 ->
                             state.unknownCards.find { it.last4 == last4 }?.let(onConfirmCardOwned)
                         },
                         onMarkCardExternal = { last4 ->
                             state.unknownCards.find { it.last4 == last4 }?.let(onMarkCardExternal)
+                        },
+                        onStopTrackingOwnedCard = { last4 ->
+                            state.ownedCards.find { it.last4 == last4 }?.let(onStopTrackingOwnedCard)
                         },
                     )
                 }

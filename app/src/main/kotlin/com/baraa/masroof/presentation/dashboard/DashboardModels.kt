@@ -12,6 +12,12 @@ data class UnknownCardCandidateUi(
     val last4: String,
 )
 
+/** Confirmed owned card — can offer «stop tracking». */
+data class OwnedCardUi(
+    val bank: Bank,
+    val last4: String,
+)
+
 enum class TransactionDirectionUi {
     OUTWARD,
     INWARD,
@@ -54,6 +60,7 @@ data class DashboardUiState(
     val reclassifyError: String? = null,
     val reclassifySuccess: Boolean = false,
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
+    val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownershipUpdating: Boolean = false,
 )
 

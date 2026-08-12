@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
@@ -321,7 +322,7 @@ private fun ReviewDetailScreen(
                 Text(
                     stringResource(
                         R.string.review_ownership_prompt_body,
-                        detail.ownershipCard.last4,
+                        formatCardLast4(detail.ownershipCard.last4),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
