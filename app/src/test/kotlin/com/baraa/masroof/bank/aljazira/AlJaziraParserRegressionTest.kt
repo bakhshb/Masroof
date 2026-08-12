@@ -220,6 +220,23 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun localTransferVerificationCode_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            رمز التحقق: 3108
+            السبب: تحويل محلي - تطبيق الجوال
+            المبلغ: 513
+            التاريخ: 14:31 08-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun balanceNotice_extractsBalanceWithoutTransactionAmount() {
         val result = parse(
             """
