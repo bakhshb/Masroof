@@ -88,6 +88,7 @@ fun SettingsNavRow(
 fun SettingsReparseRow(
     title: String,
     subtitle: String,
+    detail: String? = null,
     icon: ImageVector,
     actionIcon: ImageVector,
     running: Boolean,
@@ -116,6 +117,13 @@ fun SettingsReparseRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                detail?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (running) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)

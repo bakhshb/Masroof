@@ -137,6 +137,7 @@ private fun SettingsHubScreen(
             SettingsReparseRow(
                 title = stringResource(R.string.settings_reparse_title),
                 subtitle = stringResource(R.string.settings_reparse_stored_hint),
+                detail = stringResource(R.string.settings_reparse_stored_example),
                 icon = MasroofIcons.rescan,
                 actionIcon = MasroofIcons.retry,
                 running = state.reparsingStored,
