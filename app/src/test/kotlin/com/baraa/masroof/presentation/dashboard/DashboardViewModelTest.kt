@@ -121,7 +121,7 @@ class DashboardViewModelTest {
 
         val loadingState = vm.uiState.value
         assertEquals(previousPeriod, loadingState.period)
-        assertEquals(FinancialPeriodUiFormatter.formatRange(previousPeriod), loadingState.periodLabel)
+        assertEquals(FinancialPeriodUiFormatter.formatSalaryPeriodTitle(previousPeriod), loadingState.periodLabel)
         assertTrue(loadingState.loading)
         assertNull(loadingState.summary)
         assertTrue(loadingState.recentTransactions.isEmpty())
@@ -146,7 +146,7 @@ class DashboardViewModelTest {
 
         val state = vm.uiState.value
         assertEquals(previousPeriod, state.period)
-        assertEquals(FinancialPeriodUiFormatter.formatRange(previousPeriod), state.periodLabel)
+        assertEquals(FinancialPeriodUiFormatter.formatSalaryPeriodTitle(previousPeriod), state.periodLabel)
         assertNull(state.summary)
         assertEquals(DashboardError.LOAD_FAILED, state.error)
         assertFalse(state.loading)
@@ -342,6 +342,8 @@ class DashboardViewModelTest {
             cards = emptyList(),
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
 
@@ -368,6 +370,7 @@ class DashboardViewModelTest {
                     override suspend fun isRawSmsLinked(rawSmsId: String) = false
                     override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
                     override suspend fun update(transaction: FinancialTransaction) = false
+                    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
                 },
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
@@ -440,6 +443,8 @@ class DashboardViewModelTest {
                         cards = emptyList(),
                         aggregateDueAmount = null,
                         aggregateDueUpdatedAt = null,
+                        aggregateDueDate = null,
+                        salaryPeriodLabel = null,
                         currency = Currency.SAR,
                     ),
                     isCurrentPeriod = false,

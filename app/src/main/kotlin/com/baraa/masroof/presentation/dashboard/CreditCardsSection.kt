@@ -34,7 +34,8 @@ fun CreditCardsSection(
 ) {
     if (!overview.hasContent) return
 
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -59,11 +60,21 @@ fun CreditCardsSection(
                         MoneyUiFormatter.format(due),
                         style = MaterialTheme.typography.titleMedium,
                     )
+                    overview.aggregateDueDate?.let { dueDate ->
+                        Text(
+                            stringResource(
+                                R.string.dashboard_credit_card_due_date,
+                                dateFormatter.format(dueDate),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     overview.aggregateDueUpdatedAt?.let { at ->
                         Text(
                             stringResource(
                                 R.string.dashboard_credit_card_updated,
-                                formatSnapshotTime(at, zoneId, dateFormatter),
+                                formatSnapshotTime(at, zoneId, dateTimeFormatter),
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -74,7 +85,12 @@ fun CreditCardsSection(
         }
 
         overview.cards.forEach { row ->
-            CreditCardRowCard(row, zoneId, dateFormatter)
+            CreditCardRowCard(
+                row = row,
+                salaryPeriodLabel = overview.salaryPeriodLabel,
+                zoneId = zoneId,
+                dateFormatter = dateTimeFormatter,
+            )
         }
     }
 }
@@ -82,6 +98,7 @@ fun CreditCardsSection(
 @Composable
 private fun CreditCardRowCard(
     row: CreditCardDashboardRow,
+    salaryPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
@@ -102,14 +119,40 @@ private fun CreditCardRowCard(
             }
 
             SnapshotMetricRow(
-                label = stringResource(R.string.dashboard_credit_card_period_spending),
-                value = MoneyUiFormatter.format(row.periodSpendingNet),
+                label = if (row.statementPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_statement_spending,
+                        row.statementPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
+                },
+                value = MoneyUiFormatter.format(row.statementSpendingNet),
+            )
+
+            SnapshotMetricRow(
+                label = if (salaryPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_salary_spending,
+                        salaryPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
+                },
+                value = MoneyUiFormatter.format(row.salaryPeriodSpendingNet),
             )
 
             row.snapshot?.availableBalance?.let { available ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_available),
                     value = MoneyUiFormatter.format(available),
+                )
+            }
+
+            row.snapshot?.dueAmount?.let { due ->
+                SnapshotMetricRow(
+                    label = stringResource(R.string.dashboard_credit_card_card_due),
+                    value = MoneyUiFormatter.format(due),
                 )
             }
 

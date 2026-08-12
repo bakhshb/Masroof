@@ -51,7 +51,7 @@
     <string name="bank_unknown">بنك غير معروف</string>
 
     <string name="dashboard_net_spending">صافي المصروفات</string>
-    <string name="dashboard_period_summary_hint">ملخص حركة الفترة — لا يعرض رصيد الحساب البنكي</string>
+    <string name="dashboard_period_summary_hint">ملخص فترة الراتب — لا يعرض رصيد الحساب البنكي</string>
     <string name="dashboard_net_cash_flow">صافي التغير النقدي</string>
     <string name="dashboard_gross_before_refunds">قبل الاستردادات: %1$s</string>
     <string name="dashboard_income">الدخل</string>
@@ -65,9 +65,14 @@
     <string name="dashboard_credit_cards_title">البطاقات الائتمانية</string>
     <string name="dashboard_credit_cards_snapshot_hint">من رسائل البنك — لقطة من آخر رسالة بطاقة، وليس رصيداً لحظياً</string>
     <string name="dashboard_credit_card_last4">بطاقة ···%1$s</string>
-    <string name="dashboard_credit_card_period_spending">منصرف الفترة</string>
+    <string name="dashboard_credit_card_statement_spending">منصرف منذ كشف %1$s</string>
+    <string name="dashboard_credit_card_statement_spending_fallback">منصرف منذ آخر كشف</string>
+    <string name="dashboard_credit_card_salary_spending">منصرف فترة الراتب (من %1$s)</string>
+    <string name="dashboard_credit_card_salary_spending_fallback">منصرف فترة الراتب</string>
     <string name="dashboard_credit_card_available">الرصيد المتاح للبطاقة</string>
-    <string name="dashboard_credit_card_aggregate_due">إجمالي المستحق (آخر رسالة)</string>
+    <string name="dashboard_credit_card_card_due">المبلغ المستحق</string>
+    <string name="dashboard_credit_card_due_date">تاريخ الاستحقاق: %1$s</string>
+    <string name="dashboard_credit_card_aggregate_due">إجمالي المستحق (كشف الحساب)</string>
     <string name="dashboard_credit_card_updated">محدّث: %1$s</string>
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
@@ -91,7 +96,7 @@
     <string name="dashboard_reparse_stored_running">جاري إعادة التحليل…</string>
     <string name="dashboard_reparse_stored_hint">يُحدّث المبالغ (مثل USD 23) دون إعادة استيراد من الجهاز.</string>
     <string name="dashboard_review_required">تحتاج مراجعة: %1$d</string>
-    <string name="dashboard_back_to_current">العودة للشهر الحالي</string>
+    <string name="dashboard_back_to_current">العودة لفترة الراتب الحالية</string>
     <string name="dashboard_load_error">تعذر تحميل الملخص المالي</string>
     <string name="dashboard_retry">إعادة المحاولة</string>
     <string name="dashboard_rescan_sms">إعادة استيراد الرسائل</string>

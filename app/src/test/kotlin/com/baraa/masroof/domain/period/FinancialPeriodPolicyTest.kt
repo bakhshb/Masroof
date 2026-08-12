@@ -37,8 +37,28 @@ class FinancialPeriodPolicyTest {
 
         assertEquals(current.startDate, previous.endDateExclusive)
         assertEquals(current.endDateExclusive, next.startDate)
-        assertEquals(LocalDate.parse("2026-06-27"), previous.startDate)
+        assertEquals(LocalDate.parse("2026-06-28"), previous.startDate)
         assertEquals(LocalDate.parse("2026-09-27"), next.endDateExclusive)
+    }
+
+    @Test
+    fun salaryStart_whenNominal27IsFriday_startsOn26() {
+        val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-03-15"))
+        assertEquals(LocalDate.parse("2026-02-26"), period.startDate)
+        assertEquals(
+            SalaryCycleStartAdjustment.EARLY_FOR_FRIDAY,
+            FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate),
+        )
+    }
+
+    @Test
+    fun salaryStart_whenNominal27IsSaturday_startsOn28() {
+        val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-07-15"))
+        assertEquals(LocalDate.parse("2026-06-28"), period.startDate)
+        assertEquals(
+            SalaryCycleStartAdjustment.LATE_FOR_SATURDAY,
+            FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate),
+        )
     }
 
     @Test

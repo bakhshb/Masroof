@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.classification
 
+import com.baraa.masroof.domain.rules.OtpMessageHeuristics
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
@@ -23,10 +24,7 @@ class AlJaziraMessageClassifier {
         val text = sms.comparisonBody
 
         when {
-            text.contains("رمز التحقق") ||
-                text.contains("otp") ||
-                text.contains("رمز التفعيل") ||
-                text.contains("لإضافة المستفيد") ->
+            OtpMessageHeuristics.isOtpMessage(text) ->
                 return AlJaziraClassification(
                     family = if (text.contains("رمز التفعيل") || text.contains("لإضافة المستفيد")) {
                         MessageFamily.NON_FINANCIAL
@@ -34,7 +32,14 @@ class AlJaziraMessageClassifier {
                         MessageFamily.OTP
                     },
                     evidence = listOf(
-                        if (text.contains("رمز التفعيل")) "activation_code" else "otp_indicator",
+                        when {
+                            text.contains("رمز التفعيل") -> "activation_code"
+                            text.contains("one time password") || text.contains("one-time password") ->
+                                "english_otp"
+                            text.contains("كلمة مرور") || text.contains("كلمة المرور") ||
+                                text.contains("صالحة لمرة واحدة") -> "password_ar"
+                            else -> "otp_indicator"
+                        },
                     ),
                     confidence = 1.0,
                 )
@@ -188,6 +193,7 @@ class AlJaziraMessageClassifier {
     }
 
     private fun isOnlinePurchase(text: String): Boolean {
+        if (OtpMessageHeuristics.isOtpMessage(text)) return false
         return text.contains("شراء عبر الانترنت") ||
             text.contains("شراء من الانترنت") ||
             text.contains("online purchase") ||

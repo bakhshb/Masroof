@@ -37,6 +37,12 @@ interface FinancialTransactionRepository {
     suspend fun listRawSmsIds(transactionId: String): List<String>
 
     suspend fun update(transaction: FinancialTransaction): Boolean
+
+    /**
+     * Removes a transaction when [rawSmsId] is its only linked SMS evidence.
+     * Used after reparse when a message is reclassified as non-financial (e.g. OTP).
+     */
+    suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean
 }
 
 sealed interface FinancialTransactionSaveResult {

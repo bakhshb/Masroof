@@ -1,16 +1,14 @@
 package com.baraa.masroof.presentation.onboarding
 
+import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 object ImportDatePolicy {
+    /** Start of the salary cycle containing [today], including Fri/Sat adjustments. */
     fun last27th(today: LocalDate): LocalDate =
-        if (today.dayOfMonth >= 27) {
-            today.withDayOfMonth(27)
-        } else {
-            today.minusMonths(1).withDayOfMonth(27)
-        }
+        FinancialPeriodPolicy.periodContaining(today).startDate
 
     fun toStartOfDayInstant(
         date: LocalDate,

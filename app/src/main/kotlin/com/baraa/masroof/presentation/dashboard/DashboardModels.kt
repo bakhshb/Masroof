@@ -28,6 +28,7 @@ data class DashboardUiState(
     val loading: Boolean = true,
     val period: FinancialPeriod? = null,
     val periodLabel: String = "",
+    val periodAdjustmentHint: String? = null,
     val summary: MonthlyFinancialSummary? = null,
     val creditCards: CreditCardsOverview? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),

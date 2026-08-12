@@ -220,6 +220,23 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun localTransferVerificationCode_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            رمز التحقق: 3108
+            السبب: تحويل محلي - تطبيق الجوال
+            المبلغ: 513
+            التاريخ: 14:31 08-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
     fun balanceNotice_extractsBalanceWithoutTransactionAmount() {
         val result = parse(
             """
@@ -468,6 +485,78 @@ class AlJaziraParserRegressionTest {
         assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
         assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
         assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun englishOnlinePurchaseOtp_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            One Time Password for Online Purchase
+            Code: 8811
+            For: SAUDI ELECTRICITY COMPANY
+            Amount: SAR 438.5
+            Date: 2026-08-12 07:49
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun arabicOneTimePassword_cardReveal_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            كلمة مرور صالحة لمرة واحدة
+            رمز التفعيل: 7559
+            السبب: إظهار بيانات البطاقة
+            التاريخ: 09:55 09-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.NON_FINANCIAL, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun arabicOneTimePassword_onlinePurchaseZeroAmount_isNonFinancialWithoutAmount() {
+        val result = parse(
+            """
+            كلمة مرور صالحة لمرة واحدة للشراء عبر الإنترنت
+            كلمة المرور: 4607
+            لدى: Hungerstation
+            مبلغ: SAR 0.0
+            في: 10:01 09-08-2026
+            """.trimIndent(),
+        )
+        assertTrue(result is ParseResult.NonFinancial)
+        val nf = result as ParseResult.NonFinancial
+        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
+        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
+        assertNull(nf.event?.amount)
+    }
+
+    @Test
+    fun saudiElectricityOnlinePurchase_stillParsesAsPurchase() {
+        val result = parse(
+            """
+            شراء عبر الانترنت
+            بطاقة ائتمانية: 7271
+            بمبلغ :438.50 SAR
+            لدى :SAUDI ELECTRICITY COMP
+            في :07:49 12-08-2026
+            الرصيد المتاح :SAR 13954.24
+            إجمالي المبلغ المستحق:3921.11 SAR
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("438.50", Currency.SAR), result.event.amount)
+        assertEquals("7271", result.event.cardRef?.last4)
+        assertEquals("SAUDI ELECTRICITY COMP", result.event.merchant)
     }
 
     @Test
