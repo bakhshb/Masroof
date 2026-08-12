@@ -64,6 +64,8 @@
     <string name="settings_accounts_stopped">متوقفة</string>
     <string name="settings_resume_account_tracking">متابعة الحساب</string>
     <string name="settings_stop_account_tracking">إيقاف متابعة الحساب</string>
+    <string name="settings_action_stop_short">إيقاف</string>
+    <string name="settings_action_resume_short">متابعة</string>
     <string name="settings_stop_account_confirm_title">إيقاف متابعة الحساب؟</string>
     <string name="settings_stop_account_confirm_body">لن يُعدّ حساب ···%1$s من حساباتك — قد تُصنَّف تحويلاته كتحويلات خارجية.</string>
     <string name="settings_hub_accounts_subtitle_none">لا توجد حسابات بعد</string>

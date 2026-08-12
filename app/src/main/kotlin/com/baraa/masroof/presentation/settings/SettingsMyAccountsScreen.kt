@@ -2,16 +2,12 @@ package com.baraa.masroof.presentation.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,16 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.AccountOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.BackNavigationIcon
-import com.baraa.masroof.presentation.common.IconTextButton
-import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,42 +85,62 @@ fun SettingsMyAccountsScreen(
             if (state.unregisteredAccounts.isNotEmpty()) {
                 SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_unregistered))
                 state.unregisteredAccounts.forEach { account ->
-                    ManagedAccountPanel(account = account) {
-                        AccountOwnershipInlinePrompt(
-                            enabled = !state.updating,
-                            onConfirmOwned = { onConfirmOwned(account) },
-                            onMarkExternal = { onMarkExternal(account) },
-                        )
-                    }
+                    SettingsRegistryItemCard(
+                        icon = MasroofIcons.externalIn,
+                        bank = account.bank,
+                        title = stringResource(
+                            R.string.onboarding_account_suffix,
+                            account.maskedNumber,
+                        ),
+                        footer = {
+                            AccountOwnershipInlinePrompt(
+                                enabled = !state.updating,
+                                onConfirmOwned = { onConfirmOwned(account) },
+                                onMarkExternal = { onMarkExternal(account) },
+                            )
+                        },
+                    )
                 }
             }
 
             if (state.followedAccounts.isNotEmpty()) {
                 SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_followed))
                 state.followedAccounts.forEach { account ->
-                    ManagedAccountPanel(account = account) {
-                        IconTextButtonOutlined(
-                            onClick = { onRequestStopTracking(account) },
-                            icon = MasroofIcons.warning,
-                            text = stringResource(R.string.settings_stop_account_tracking),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    SettingsRegistryItemCard(
+                        icon = MasroofIcons.externalIn,
+                        bank = account.bank,
+                        title = stringResource(
+                            R.string.onboarding_account_suffix,
+                            account.maskedNumber,
+                        ),
+                        trailingAction = {
+                            SettingsStopTrackingButton(
+                                onClick = { onRequestStopTracking(account) },
+                                enabled = !state.updating,
+                                contentDescription = stringResource(R.string.settings_stop_account_tracking),
+                            )
+                        },
+                    )
                 }
             }
 
             if (state.stoppedAccounts.isNotEmpty()) {
                 SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_stopped))
                 state.stoppedAccounts.forEach { account ->
-                    ManagedAccountPanel(account = account) {
-                        IconTextButton(
-                            onClick = { onResumeTracking(account) },
-                            enabled = !state.updating,
-                            icon = MasroofIcons.success,
-                            text = stringResource(R.string.settings_resume_account_tracking),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    SettingsRegistryItemCard(
+                        icon = MasroofIcons.externalIn,
+                        bank = account.bank,
+                        title = stringResource(
+                            R.string.onboarding_account_suffix,
+                            account.maskedNumber,
+                        ),
+                        trailingAction = {
+                            SettingsResumeTrackingButton(
+                                onClick = { onResumeTracking(account) },
+                                enabled = !state.updating,
+                            )
+                        },
+                    )
                 }
             }
 
@@ -147,52 +159,6 @@ fun SettingsMyAccountsScreen(
 private fun SettingsAccountGroupTitle(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall)
 }
-
-@Composable
-private fun ManagedAccountPanel(
-    account: ManagedAccountUi,
-    actions: @Composable () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.externalIn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.size(8.dp))
-                Column {
-                    Text(
-                        bankLabel(account.bank),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(
-                            R.string.onboarding_account_suffix,
-                            account.maskedNumber,
-                        ),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                }
-            }
-            actions()
-        }
-    }
-}
-
-@Composable
-private fun bankLabel(bank: Bank): String =
-    if (bank == Bank.BANK_ALJAZIRA) {
-        stringResource(R.string.bank_aljazira)
-    } else {
-        stringResource(R.string.bank_unknown)
-    }
 
 @Composable
 fun SettingsAccountStopConfirmDialog(
