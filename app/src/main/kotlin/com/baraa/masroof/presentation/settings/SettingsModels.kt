@@ -24,6 +24,7 @@ data class SettingsUiState(
     val unregisteredAccounts: List<ManagedAccountUi> = emptyList(),
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
     val appVersion: String = "",
+    val languageTag: String = "",
     val updating: Boolean = false,
     val stopConfirmCardTarget: ManagedCardUi? = null,
     val stopConfirmAccountTarget: ManagedAccountUi? = null,

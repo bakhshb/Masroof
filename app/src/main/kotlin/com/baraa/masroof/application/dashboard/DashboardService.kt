@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -29,11 +31,13 @@ class DashboardService(
     private val reviewRepository: ReviewRepository,
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
+    private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
 ) : DashboardOverviewLoader {
     override suspend fun loadOverview(period: FinancialPeriod): DashboardOverview {
+        val displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag())
         val startInclusive = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId)
         val endExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
         val transactions = financialTransactionRepository.listOccurredBetween(
@@ -90,6 +94,7 @@ class DashboardService(
             clock = clock,
             primaryCurrency = primaryCurrency,
             sarEquivalents = cardSarEquivalents,
+            displayLocale = displayLocale,
         )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(

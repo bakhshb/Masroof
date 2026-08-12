@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.onboarding.HistoricalSmsRescanService
+import android.content.Context
 import com.baraa.masroof.application.AppContainer
 import java.time.Clock
 import java.time.ZoneId
@@ -20,6 +21,8 @@ class DashboardViewModelFactory(
             cardRegistryRepository = container.cardRegistryRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
+            appContext = container.applicationContext,
+            appLocaleRepository = container.appLocaleRepository,
             zoneId = zoneId,
             clock = clock,
         ) as T

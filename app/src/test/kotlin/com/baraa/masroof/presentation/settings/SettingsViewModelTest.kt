@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
@@ -150,10 +152,21 @@ class SettingsViewModelTest {
                 accountRegistry = accounts,
                 cardRegistry = cards,
             ),
+            appLocaleRepository = FakeAppLocaleRepository(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
             appVersion = "1.0-test",
         )
+
+    private class FakeAppLocaleRepository : AppLocaleRepository {
+        private var tag: String = AppLocale.DEFAULT_TAG
+
+        override fun getLanguageTag(): String = tag
+
+        override fun setLanguageTag(languageTag: String) {
+            tag = languageTag
+        }
+    }
 
     private class FakeCardRegistry(
         vararg initial: CardRegistryEntry,

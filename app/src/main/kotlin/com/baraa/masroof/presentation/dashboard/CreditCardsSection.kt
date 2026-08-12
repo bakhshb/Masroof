@@ -14,18 +14,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun CreditCardsSection(
@@ -35,8 +36,9 @@ fun CreditCardsSection(
 ) {
     if (!overview.hasContent) return
 
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale("ar"))
-    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale("ar"))
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", locale)
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -58,7 +60,7 @@ fun CreditCardsSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        MoneyUiFormatter.format(due),
+                        formatLocalizedMoney(due),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     overview.aggregateDueDate?.let { dueDate ->
@@ -131,7 +133,7 @@ private fun CreditCardRowCard(
                 } else {
                     stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
                 },
-                value = MoneyUiFormatter.format(row.statementSpendingNet),
+                value = formatLocalizedMoney(row.statementSpendingNet),
             )
 
             SnapshotMetricRow(
@@ -143,20 +145,20 @@ private fun CreditCardRowCard(
                 } else {
                     stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
                 },
-                value = MoneyUiFormatter.format(row.salaryPeriodSpendingNet),
+                value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
             )
 
             row.snapshot?.availableBalance?.let { available ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_available),
-                    value = MoneyUiFormatter.format(available),
+                    value = formatLocalizedMoney(available),
                 )
             }
 
             row.snapshot?.dueAmount?.let { due ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_card_due),
-                    value = MoneyUiFormatter.format(due),
+                    value = formatLocalizedMoney(due),
                 )
             }
 

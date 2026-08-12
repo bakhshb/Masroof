@@ -8,7 +8,10 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
+import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
@@ -92,10 +95,26 @@ class AppContainer(
     val userCorrectionRepository: UserCorrectionRepository =
         RoomUserCorrectionRepository(database.userCorrectionDao())
 
+    val applicationContext: Context get() = appContext
+
+    val localizedApplicationContext: Context
+        get() = AppLocaleContext.wrap(
+            appContext,
+            AppLocaleContext.readStoredLanguageTag(appContext),
+        )
+
     val onboardingPreferencesRepository: OnboardingPreferencesRepository =
         SharedPrefsOnboardingPreferencesRepository(
             appContext.getSharedPreferences(
                 SharedPrefsOnboardingPreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
+    val appLocaleRepository: AppLocaleRepository =
+        SharedPrefsAppLocaleRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsAppLocaleRepository.PREFS_NAME,
                 Context.MODE_PRIVATE,
             ),
         )
@@ -173,6 +192,7 @@ class AppContainer(
             reviewRepository = reviewRepository,
             parsedEventRepository = parsedEventRepository,
             rawSmsRepository = rawSmsRepository,
+            appLocaleRepository = appLocaleRepository,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()

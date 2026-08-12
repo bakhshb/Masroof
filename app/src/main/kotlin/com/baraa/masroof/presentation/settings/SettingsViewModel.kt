@@ -2,6 +2,8 @@ package com.baraa.masroof.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -20,16 +22,24 @@ class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val appLocaleRepository: AppLocaleRepository,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
     private val appVersion: String,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(SettingsUiState(appVersion = appVersion))
+    private val _uiState = MutableStateFlow(
+        SettingsUiState(
+            appVersion = appVersion,
+            languageTag = appLocaleRepository.getLanguageTag(),
+        ),
+    )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = true, error = null) }
+            _uiState.update {
+                it.copy(loading = true, error = null, languageTag = appLocaleRepository.getLanguageTag())
+            }
             try {
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
@@ -109,6 +119,16 @@ class SettingsViewModel(
                 _uiState.update { it.copy(reparsingStored = false, error = SettingsError.UPDATE_FAILED) }
             }
         }
+    }
+
+    fun setLanguageTag(languageTag: String, onApplied: () -> Unit) {
+        val normalized = when (languageTag) {
+            AppLocale.TAG_EN -> AppLocale.TAG_EN
+            else -> AppLocale.TAG_AR
+        }
+        if (normalized == appLocaleRepository.getLanguageTag()) return
+        appLocaleRepository.setLanguageTag(normalized)
+        onApplied()
     }
 
     private fun updateCardOwnership(card: ManagedCardUi, owned: Boolean) {

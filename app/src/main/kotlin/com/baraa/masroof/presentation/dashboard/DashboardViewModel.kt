@@ -1,6 +1,9 @@
 package com.baraa.masroof.presentation.dashboard
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.baraa.masroof.presentation.locale.AppLocaleContext
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -32,6 +36,8 @@ class DashboardViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
+    private val appContext: Context,
+    private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -44,8 +50,14 @@ class DashboardViewModel(
     private var loadJob: Job? = null
     private var rescanJob: Job? = null
 
-    private val dateFormatter: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMM", Locale("ar"))
+    private val languageTag: String
+        get() = appLocaleRepository.getLanguageTag()
+
+    private val dateFormatter: DateTimeFormatter
+        get() = DateTimeFormatter.ofPattern("d MMM", AppLocale.displayLocale(languageTag))
+
+    private fun localizedContext(): Context =
+        AppLocaleContext.wrap(appContext, languageTag)
 
     companion object {
         const val RECENT_TRANSACTION_LIMIT: Int = 5
@@ -148,8 +160,9 @@ class DashboardViewModel(
 
     private fun periodPresentation(period: FinancialPeriod): Pair<String, String?> {
         val adjustment = FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate)
-        return FinancialPeriodUiFormatter.formatSalaryPeriodTitle(period) to
-            FinancialPeriodUiFormatter.formatAdjustmentHint(adjustment)
+        val context = localizedContext()
+        return FinancialPeriodUiFormatter.formatSalaryPeriodTitle(context, period) to
+            FinancialPeriodUiFormatter.formatAdjustmentHint(context, adjustment)
     }
 
     private fun load(period: FinancialPeriod, preserveSelectionId: String? = null) {
@@ -255,7 +268,8 @@ class DashboardViewModel(
             id = tx.id,
             title = title,
             amount = tx.amount,
-            amountLabel = MoneyUiFormatter.format(tx.amount),
+            localDate = localDate,
+            amountLabel = MoneyUiFormatter.format(tx.amount, languageTag),
             dateLabel = dateFormatter.format(localDate),
             type = tx.type,
             typeLabelResHint = tx.type,

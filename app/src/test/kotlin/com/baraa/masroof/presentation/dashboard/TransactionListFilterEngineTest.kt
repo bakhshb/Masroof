@@ -202,6 +202,7 @@ class TransactionListFilterEngineTest {
             id = "$type-$amount-$merchant-$card",
             title = title,
             amount = money,
+            localDate = java.time.LocalDate.of(2026, 8, 1),
             amountLabel = money.amount.toPlainString(),
             dateLabel = "1 أغسطس",
             type = type,

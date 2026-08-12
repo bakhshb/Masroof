@@ -1,5 +1,9 @@
 package com.baraa.masroof.presentation.dashboard
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -34,14 +38,18 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
 class DashboardViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private val appContext: Context = ApplicationProvider.getApplicationContext()
     private val zone = ZoneId.of("Asia/Riyadh")
     private val clock = Clock.fixed(Instant.parse("2026-08-11T08:00:00Z"), zone)
     private val currentPeriod = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
@@ -123,7 +131,10 @@ class DashboardViewModelTest {
 
         val loadingState = vm.uiState.value
         assertEquals(previousPeriod, loadingState.period)
-        assertEquals(FinancialPeriodUiFormatter.formatSalaryPeriodTitle(previousPeriod), loadingState.periodLabel)
+        assertEquals(
+            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod),
+            loadingState.periodLabel,
+        )
         assertTrue(loadingState.loading)
         assertNull(loadingState.summary)
         assertTrue(loadingState.recentTransactions.isEmpty())
@@ -148,7 +159,10 @@ class DashboardViewModelTest {
 
         val state = vm.uiState.value
         assertEquals(previousPeriod, state.period)
-        assertEquals(FinancialPeriodUiFormatter.formatSalaryPeriodTitle(previousPeriod), state.periodLabel)
+        assertEquals(
+            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod),
+            state.periodLabel,
+        )
         assertNull(state.summary)
         assertEquals(DashboardError.LOAD_FAILED, state.error)
         assertFalse(state.loading)
@@ -456,9 +470,16 @@ class DashboardViewModelTest {
                     },
                 ),
             ),
+            appContext = appContext,
+            appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeAppLocaleRepository : AppLocaleRepository {
+        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
+        override fun setLanguageTag(languageTag: String) = Unit
+    }
 
     private class FakeLoader : DashboardOverviewLoader {
         private val overviews = mutableMapOf<FinancialPeriod, DashboardOverview>()
