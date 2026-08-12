@@ -17,23 +17,21 @@ data class CreditCardBalanceSnapshot(
 data class CreditCardDashboardRow(
     val bank: Bank,
     val last4: String,
-    val isPrimary: Boolean,
     val statementSpendingNet: SignedMoneyAmount,
+    val salaryPeriodSpendingNet: SignedMoneyAmount,
+    val statementPeriodLabel: String?,
     val snapshot: CreditCardBalanceSnapshot?,
 )
 
 /**
- * Primary credit-card snapshot plus statement-cycle spending.
- *
- * [aggregateDueAmount] comes from the latest statement SMS for the primary card.
+ * All credit cards with dual spending windows (statement cycle + salary period).
  */
 data class CreditCardsOverview(
     val cards: List<CreditCardDashboardRow>,
     val aggregateDueAmount: Money?,
     val aggregateDueUpdatedAt: Instant?,
     val aggregateDueDate: LocalDate?,
-    val statementPeriodLabel: String?,
-    val supplementaryCardCount: Int,
+    val salaryPeriodLabel: String?,
     val currency: Currency,
 ) {
     val hasContent: Boolean

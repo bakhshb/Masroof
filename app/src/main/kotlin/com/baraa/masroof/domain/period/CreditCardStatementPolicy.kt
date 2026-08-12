@@ -8,7 +8,6 @@ import java.time.temporal.ChronoUnit
  */
 object CreditCardStatementPolicy {
     const val DEFAULT_STATEMENT_DAY: Int = 10
-    const val PRIMARY_CARD_LAST4: String = "7271"
 
     fun statementCycleStartOnOrBefore(
         anchor: LocalDate,

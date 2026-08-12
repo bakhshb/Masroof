@@ -343,8 +343,7 @@ class DashboardViewModelTest {
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
-            statementPeriodLabel = null,
-            supplementaryCardCount = 0,
+            salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
 
@@ -444,8 +443,7 @@ class DashboardViewModelTest {
                         aggregateDueAmount = null,
                         aggregateDueUpdatedAt = null,
                         aggregateDueDate = null,
-                        statementPeriodLabel = null,
-                        supplementaryCardCount = 0,
+                        salaryPeriodLabel = null,
                         currency = Currency.SAR,
                     ),
                     isCurrentPeriod = false,

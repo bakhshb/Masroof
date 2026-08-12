@@ -52,7 +52,7 @@ fun CreditCardsSection(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        stringResource(R.string.dashboard_credit_card_statement_due),
+                        stringResource(R.string.dashboard_credit_card_aggregate_due),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -65,15 +65,6 @@ fun CreditCardsSection(
                             stringResource(
                                 R.string.dashboard_credit_card_due_date,
                                 dateFormatter.format(dueDate),
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    overview.statementPeriodLabel?.let { statementLabel ->
-                        Text(
-                            stringResource(
-                                R.string.dashboard_credit_card_statement_issued,
-                                statementLabel,
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -94,17 +85,11 @@ fun CreditCardsSection(
         }
 
         overview.cards.forEach { row ->
-            CreditCardRowCard(row, overview.statementPeriodLabel, zoneId, dateTimeFormatter)
-        }
-
-        if (overview.supplementaryCardCount > 0) {
-            Text(
-                stringResource(
-                    R.string.dashboard_credit_card_supplementary_count,
-                    overview.supplementaryCardCount,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            CreditCardRowCard(
+                row = row,
+                salaryPeriodLabel = overview.salaryPeriodLabel,
+                zoneId = zoneId,
+                dateFormatter = dateTimeFormatter,
             )
         }
     }
@@ -113,7 +98,7 @@ fun CreditCardsSection(
 @Composable
 private fun CreditCardRowCard(
     row: CreditCardDashboardRow,
-    statementPeriodLabel: String?,
+    salaryPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
@@ -128,20 +113,16 @@ private fun CreditCardRowCard(
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    if (row.isPrimary) {
-                        stringResource(R.string.dashboard_credit_card_primary_last4, row.last4)
-                    } else {
-                        stringResource(R.string.dashboard_credit_card_last4, row.last4)
-                    },
+                    stringResource(R.string.dashboard_credit_card_last4, row.last4),
                     style = MaterialTheme.typography.titleSmall,
                 )
             }
 
             SnapshotMetricRow(
-                label = if (statementPeriodLabel != null) {
+                label = if (row.statementPeriodLabel != null) {
                     stringResource(
                         R.string.dashboard_credit_card_statement_spending,
-                        statementPeriodLabel,
+                        row.statementPeriodLabel,
                     )
                 } else {
                     stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
@@ -149,10 +130,29 @@ private fun CreditCardRowCard(
                 value = MoneyUiFormatter.format(row.statementSpendingNet),
             )
 
+            SnapshotMetricRow(
+                label = if (salaryPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_salary_spending,
+                        salaryPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
+                },
+                value = MoneyUiFormatter.format(row.salaryPeriodSpendingNet),
+            )
+
             row.snapshot?.availableBalance?.let { available ->
                 SnapshotMetricRow(
                     label = stringResource(R.string.dashboard_credit_card_available),
                     value = MoneyUiFormatter.format(available),
+                )
+            }
+
+            row.snapshot?.dueAmount?.let { due ->
+                SnapshotMetricRow(
+                    label = stringResource(R.string.dashboard_credit_card_card_due),
+                    value = MoneyUiFormatter.format(due),
                 )
             }
 
