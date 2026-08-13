@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.settings
 
+import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.OwnershipStatus
 
@@ -25,12 +26,24 @@ data class SettingsUiState(
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
     val appVersion: String = "",
     val languageTag: String = "",
+    val themeMode: ThemeMode = ThemeMode.DEFAULT,
     val updating: Boolean = false,
     val stopConfirmCardTarget: ManagedCardUi? = null,
     val stopConfirmAccountTarget: ManagedAccountUi? = null,
     val reparsingStored: Boolean = false,
+    val exportingBackup: Boolean = false,
+    val importingBackup: Boolean = false,
+    val awaitingImportConfirm: Boolean = false,
+    val backupMessage: BackupMessage? = null,
     val error: SettingsError? = null,
 )
+
+enum class BackupMessage {
+    EXPORT_SUCCESS,
+    EXPORT_FAILED,
+    IMPORT_FAILED,
+    IMPORT_INVALID,
+}
 
 enum class SettingsError {
     UPDATE_FAILED,

@@ -2,6 +2,10 @@ package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.DatabaseBackupGateway
+import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
@@ -54,6 +58,13 @@ class SettingsViewModelTest {
         assertEquals("5123", vm.uiState.value.unregisteredCards.single().last4)
         assertEquals("9999", vm.uiState.value.stoppedCards.single().last4)
         assertEquals("1.0-test", vm.uiState.value.appVersion)
+    }
+
+    @Test
+    fun setThemeMode_updatesState() = runTest {
+        val vm = viewModel(themeMode = ThemeMode.SYSTEM)
+        vm.setThemeMode(ThemeMode.DARK)
+        assertEquals(ThemeMode.DARK, vm.uiState.value.themeMode)
     }
 
     @Test
@@ -143,6 +154,7 @@ class SettingsViewModelTest {
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
+        themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
     ): SettingsViewModel =
         SettingsViewModel(
@@ -153,6 +165,8 @@ class SettingsViewModelTest {
                 cardRegistry = cards,
             ),
             appLocaleRepository = FakeAppLocaleRepository(),
+            themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
+            databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
             appVersion = "1.0-test",
@@ -166,6 +180,23 @@ class SettingsViewModelTest {
         override fun setLanguageTag(languageTag: String) {
             tag = languageTag
         }
+    }
+
+    private class FakeThemePreferencesRepository(
+        private var mode: ThemeMode = ThemeMode.SYSTEM,
+    ) : ThemePreferencesRepository {
+        override fun getThemeMode(): ThemeMode = mode
+
+        override fun setThemeMode(mode: ThemeMode) {
+            this.mode = mode
+        }
+    }
+
+    private class FakeDatabaseBackupGateway : DatabaseBackupGateway {
+        override suspend fun exportTo(destination: android.net.Uri): Result<Unit> = Result.success(Unit)
+
+        override suspend fun importFrom(source: android.net.Uri): BackupImportOutcome =
+            BackupImportOutcome.Failed
     }
 
     private class FakeCardRegistry(

@@ -12,10 +12,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.baraa.masroof.application.backup.BackupPackageFormat
+import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.presentation.MasroofRoot
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
 import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
@@ -57,22 +62,56 @@ class MainActivity : ComponentActivity() {
         ReviewViewModelFactory(container = container)
     }
 
+    private var themeModeState = mutableStateOf(ThemeMode.DEFAULT)
+
     private val settingsViewModel: SettingsViewModel by viewModels {
         SettingsViewModelFactory(
             container = container,
             appVersion = BuildConfig.VERSION_NAME,
+            onThemeModeChanged = { mode -> themeModeState.value = mode },
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        themeModeState.value = container.themePreferencesRepository.getThemeMode()
         setContent {
-            MasroofTheme {
+            val themeMode by themeModeState
+            val darkTheme = when (themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            MasroofTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestMultiplePermissions(),
                     ) { _ ->
                         onboardingViewModel.onPermissionResult(hasSmsPermissions())
+                    }
+
+                    val exportLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.CreateDocument(BackupPackageFormat.MIME_TYPE),
+                    ) { uri: Uri? ->
+                        if (uri != null) {
+                            settingsViewModel.exportBackup(uri)
+                        }
+                    }
+
+                    val importLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument(),
+                    ) { uri: Uri? ->
+                        if (uri != null) {
+                            settingsViewModel.offerImport(uri)
+                        }
+                    }
+
+                    val onboardingImportLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument(),
+                    ) { uri: Uri? ->
+                        if (uri != null) {
+                            onboardingViewModel.restoreBackup(uri)
+                        }
                     }
 
                     val openSettings = {
@@ -98,6 +137,16 @@ class MainActivity : ComponentActivity() {
                             reviewViewModel.refresh()
                             settingsViewModel.refresh()
                             recreate()
+                        },
+                        onRequestExport = {
+                            val name = BackupPackageFormat.defaultExportFileName(System.currentTimeMillis())
+                            exportLauncher.launch(name)
+                        },
+                        onRequestImport = {
+                            importLauncher.launch(arrayOf("*/*"))
+                        },
+                        onRequestRestoreBackup = {
+                            onboardingImportLauncher.launch(arrayOf("*/*"))
                         },
                     )
                 }

@@ -18,30 +18,36 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.theme.ThemeMode
 
 @Composable
-fun SettingsLanguageDialog(
-    selectedLanguageTag: String,
+fun SettingsThemeDialog(
+    selectedMode: ThemeMode,
     onDismiss: () -> Unit,
-    onSelectLanguage: (String) -> Unit,
+    onSelectMode: (ThemeMode) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_language_title)) },
+        title = { Text(stringResource(R.string.settings_theme_title)) },
         text = {
             Column {
-                languageOption(
-                    tag = AppLocale.TAG_AR,
-                    label = stringResource(R.string.settings_language_arabic),
-                    selectedLanguageTag = selectedLanguageTag,
-                    onSelectLanguage = onSelectLanguage,
+                themeOption(
+                    mode = ThemeMode.LIGHT,
+                    label = stringResource(R.string.settings_theme_light),
+                    selectedMode = selectedMode,
+                    onSelectMode = onSelectMode,
                 )
-                languageOption(
-                    tag = AppLocale.TAG_EN,
-                    label = stringResource(R.string.settings_language_english),
-                    selectedLanguageTag = selectedLanguageTag,
-                    onSelectLanguage = onSelectLanguage,
+                themeOption(
+                    mode = ThemeMode.DARK,
+                    label = stringResource(R.string.settings_theme_dark),
+                    selectedMode = selectedMode,
+                    onSelectMode = onSelectMode,
+                )
+                themeOption(
+                    mode = ThemeMode.SYSTEM,
+                    label = stringResource(R.string.settings_theme_system),
+                    selectedMode = selectedMode,
+                    onSelectMode = onSelectMode,
                 )
             }
         },
@@ -55,26 +61,26 @@ fun SettingsLanguageDialog(
 }
 
 @Composable
-private fun languageOption(
-    tag: String,
+private fun themeOption(
+    mode: ThemeMode,
     label: String,
-    selectedLanguageTag: String,
-    onSelectLanguage: (String) -> Unit,
+    selectedMode: ThemeMode,
+    onSelectMode: (ThemeMode) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .selectable(
-                selected = tag == selectedLanguageTag,
-                onClick = { onSelectLanguage(tag) },
+                selected = mode == selectedMode,
+                onClick = { onSelectMode(mode) },
                 role = Role.RadioButton,
             )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(
-            selected = tag == selectedLanguageTag,
-            onClick = { onSelectLanguage(tag) },
+            selected = mode == selectedMode,
+            onClick = { onSelectMode(mode) },
         )
         Text(
             label,

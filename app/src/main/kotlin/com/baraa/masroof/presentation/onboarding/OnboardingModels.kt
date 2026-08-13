@@ -53,6 +53,7 @@ data class OnboardingUiState(
     val ownedAccountsCount: Int = 0,
     val ownedCardsCount: Int = 0,
     val reviewRequiredCount: Int = 0,
+    val restoringBackup: Boolean = false,
     val error: OnboardingError? = null,
 ) {
     val hasUnknownCandidates: Boolean =
@@ -66,6 +67,8 @@ enum class OnboardingError {
     OWNERSHIP_UPDATE_FAILED,
     FINALIZATION_FAILED,
     INVALID_FUTURE_DATE,
+    BACKUP_RESTORE_FAILED,
+    BACKUP_RESTORE_INVALID,
 }
 
 internal fun SmsScanResult.toImportState(): ImportState =

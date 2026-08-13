@@ -2,6 +2,7 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
@@ -9,12 +10,14 @@ import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
+import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
@@ -115,6 +118,14 @@ class AppContainer(
         SharedPrefsAppLocaleRepository(
             appContext.getSharedPreferences(
                 SharedPrefsAppLocaleRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
+    val themePreferencesRepository: ThemePreferencesRepository =
+        SharedPrefsThemePreferencesRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsThemePreferencesRepository.PREFS_NAME,
                 Context.MODE_PRIVATE,
             ),
         )
@@ -260,5 +271,14 @@ class AppContainer(
     fun close() {
         applicationScope.cancel()
         database.close()
+    }
+
+    val databaseBackupService: DatabaseBackupService by lazy {
+        DatabaseBackupService(
+            appContext = appContext,
+            database = database,
+            closeDatabase = { database.close() },
+            appVersionName = com.baraa.masroof.BuildConfig.VERSION_NAME,
+        )
     }
 }

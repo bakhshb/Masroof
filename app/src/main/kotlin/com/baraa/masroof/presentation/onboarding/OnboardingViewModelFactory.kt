@@ -25,6 +25,7 @@ class OnboardingViewModelFactory(
                 reviewRepository = container.reviewRepository,
                 discoverFromStoredEvents = { container.discoverFromStoredEvents() },
                 refreshReviewQueue = { container.refreshReviewQueue() },
+                databaseBackupService = container.databaseBackupService,
                 permissionStateProvider = permissionStateProvider,
             ) as T
         }

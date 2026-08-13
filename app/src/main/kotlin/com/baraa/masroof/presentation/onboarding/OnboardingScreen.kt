@@ -50,6 +50,7 @@ fun OnboardingRoute(
     viewModel: OnboardingViewModel,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onRequestRestoreBackup: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     OnboardingScreen(
@@ -57,6 +58,8 @@ fun OnboardingRoute(
         onStart = viewModel::onStartClicked,
         onRequestPermissions = onRequestPermissions,
         onOpenAppSettings = onOpenAppSettings,
+        onRequestRestoreBackup = onRequestRestoreBackup,
+        onClearBackupError = viewModel::clearBackupError,
         onSelectDateOption = viewModel::selectDateOption,
         onSelectCustomDate = viewModel::selectCustomDate,
         onStartImport = viewModel::startImport,
@@ -75,6 +78,8 @@ private fun OnboardingScreen(
     onStart: () -> Unit,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onRequestRestoreBackup: () -> Unit,
+    onClearBackupError: () -> Unit,
     onSelectDateOption: (ImportDateOption) -> Unit,
     onSelectCustomDate: (LocalDate) -> Unit,
     onStartImport: () -> Unit,
@@ -87,7 +92,14 @@ private fun OnboardingScreen(
 ) {
     Scaffold { padding ->
         when (state.step) {
-            OnboardingStep.WELCOME -> WelcomeStep(Modifier.padding(padding), onStart)
+            OnboardingStep.WELCOME -> WelcomeStep(
+                modifier = Modifier.padding(padding),
+                restoringBackup = state.restoringBackup,
+                error = state.error,
+                onStart = onStart,
+                onRequestRestoreBackup = onRequestRestoreBackup,
+                onClearBackupError = onClearBackupError,
+            )
             OnboardingStep.PERMISSION -> PermissionStep(
                 modifier = Modifier.padding(padding),
                 denied = state.error == OnboardingError.PERMISSION_DENIED,
@@ -118,7 +130,33 @@ private fun OnboardingScreen(
 }
 
 @Composable
-private fun WelcomeStep(modifier: Modifier, onStart: () -> Unit) {
+private fun WelcomeStep(
+    modifier: Modifier,
+    restoringBackup: Boolean,
+    error: OnboardingError?,
+    onStart: () -> Unit,
+    onRequestRestoreBackup: () -> Unit,
+    onClearBackupError: () -> Unit,
+) {
+    if (error == OnboardingError.BACKUP_RESTORE_FAILED ||
+        error == OnboardingError.BACKUP_RESTORE_INVALID
+    ) {
+        val message = if (error == OnboardingError.BACKUP_RESTORE_INVALID) {
+            stringResource(R.string.onboarding_restore_invalid)
+        } else {
+            stringResource(R.string.onboarding_restore_failed)
+        }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onClearBackupError,
+            title = { Text(stringResource(R.string.onboarding_restore_backup)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = onClearBackupError) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -131,17 +169,51 @@ private fun WelcomeStep(modifier: Modifier, onStart: () -> Unit) {
             modifier = Modifier.size(64.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.onboarding_welcome_title), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            stringResource(R.string.onboarding_welcome_title),
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.onboarding_welcome_body))
+        Text(
+            stringResource(R.string.onboarding_welcome_body),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_welcome_local_only))
+        Text(
+            stringResource(R.string.onboarding_welcome_local_only),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(24.dp))
+        if (restoringBackup) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(16.dp))
+        }
         IconTextButton(
             onClick = onStart,
             icon = MasroofIcons.appLogo,
             text = stringResource(R.string.onboarding_start),
             modifier = Modifier.fillMaxWidth(),
+            enabled = !restoringBackup,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            stringResource(R.string.onboarding_restore_backup_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        IconTextButtonOutlined(
+            onClick = onRequestRestoreBackup,
+            icon = MasroofIcons.importBackup,
+            text = stringResource(R.string.onboarding_restore_backup),
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !restoringBackup,
         )
     }
 }
