@@ -64,7 +64,7 @@ class DashboardViewModel(
     }
 
     fun refresh() {
-        load(activePeriod)
+        load(activePeriod, preserveSelectionId = _uiState.value.selectedTransactionId)
     }
 
     fun goToPreviousPeriod() {
@@ -154,8 +154,7 @@ class DashboardViewModel(
     }
 
     private fun refreshPreservingSelection() {
-        val selectedId = _uiState.value.selectedTransactionId
-        load(activePeriod, preserveSelectionId = selectedId)
+        refresh()
     }
 
     private fun periodPresentation(period: FinancialPeriod): Pair<String, String?> {

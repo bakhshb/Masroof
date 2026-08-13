@@ -89,6 +89,10 @@ fun MasroofRoot(
                 )
                 return
             }
+            // Keep the detail destination while a refresh reloads rows for the same period.
+            if (dashboardState.loading) {
+                return
+            }
         }
 
         when (homeDestination) {
@@ -128,7 +132,6 @@ fun MasroofRoot(
             )
         }
     } else {
-        homeDestination = HomeDestination.Dashboard
         OnboardingRoute(
             viewModel = onboardingViewModel,
             onRequestPermissions = onRequestPermissions,

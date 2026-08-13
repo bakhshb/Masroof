@@ -183,6 +183,15 @@
     <string name="transaction_detail_card">Card</string>
     <string name="transaction_detail_merchant">Merchant / description</string>
     <string name="transaction_detail_edit_category">Edit category</string>
+    <string name="transaction_share">Share</string>
+    <string name="transaction_share_detail_heading">%1$s — Transaction details</string>
+    <string name="transaction_share_list_heading">%1$s — Period transactions %2$s</string>
+    <string name="transaction_share_amount">Amount</string>
+    <string name="transaction_share_search">Search</string>
+    <string name="transaction_share_types">Type</string>
+    <string name="transaction_share_cards">Card</string>
+    <string name="transaction_share_count">Count</string>
+    <string name="transaction_share_total">Total</string>
     <string name="transaction_reclassify_sheet_title">Choose new category</string>
     <string name="transaction_reclassify_sheet_save">Save</string>
     <string name="transaction_reclassify_sheet_cancel">Cancel</string>
