@@ -7,11 +7,17 @@ object AppLocale {
     const val TAG_EN: String = "en"
     const val DEFAULT_TAG: String = TAG_AR
 
+    fun languageCode(languageTag: String): String =
+        languageTag.substringBefore('-').substringBefore('_').lowercase(Locale.ROOT)
+
+    fun isEnglish(languageTag: String): Boolean = languageCode(languageTag) == TAG_EN
+
     fun displayLocale(languageTag: String): Locale =
-        when (languageTag) {
-            TAG_EN -> Locale.ENGLISH
-            else -> Locale.forLanguageTag(TAG_AR)
+        if (isEnglish(languageTag)) {
+            Locale.ENGLISH
+        } else {
+            Locale.forLanguageTag(TAG_AR)
         }
 
-    fun isRtl(languageTag: String): Boolean = languageTag != TAG_EN
+    fun isRtl(languageTag: String): Boolean = !isEnglish(languageTag)
 }

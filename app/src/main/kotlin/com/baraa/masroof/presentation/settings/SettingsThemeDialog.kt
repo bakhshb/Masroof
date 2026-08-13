@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.theme.ThemeMode
@@ -84,7 +85,10 @@ private fun themeOption(
         Text(
             label,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .fillMaxWidth(),
+            textAlign = TextAlign.Start,
         )
     }
 }

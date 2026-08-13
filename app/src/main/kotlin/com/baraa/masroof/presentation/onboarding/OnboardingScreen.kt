@@ -169,11 +169,24 @@ private fun WelcomeStep(
             modifier = Modifier.size(64.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.onboarding_welcome_title), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            stringResource(R.string.onboarding_welcome_title),
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.onboarding_welcome_body), textAlign = TextAlign.Center)
+        Text(
+            stringResource(R.string.onboarding_welcome_body),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_welcome_local_only), textAlign = TextAlign.Center)
+        Text(
+            stringResource(R.string.onboarding_welcome_local_only),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(24.dp))
         if (restoringBackup) {
             CircularProgressIndicator()
@@ -191,6 +204,7 @@ private fun WelcomeStep(
             stringResource(R.string.onboarding_restore_backup_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))

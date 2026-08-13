@@ -316,9 +316,10 @@ private fun SettingsHubScreen(
 
 @Composable
 private fun languageSubtitle(languageTag: String): String =
-    when (languageTag) {
-        AppLocale.TAG_EN -> stringResource(R.string.settings_language_english)
-        else -> stringResource(R.string.settings_language_arabic)
+    if (AppLocale.isEnglish(languageTag)) {
+        stringResource(R.string.settings_language_english)
+    } else {
+        stringResource(R.string.settings_language_arabic)
     }
 
 @Composable

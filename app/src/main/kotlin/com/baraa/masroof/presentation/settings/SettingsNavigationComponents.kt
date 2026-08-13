@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -58,11 +59,18 @@ fun SettingsNavRow(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
+                )
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
                 )
             }
             if (badgeCount != null && badgeCount > 0) {
@@ -111,17 +119,26 @@ fun SettingsReparseRow(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
+                )
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
                 )
                 detail?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Start,
                     )
                 }
             }
