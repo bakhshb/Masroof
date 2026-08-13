@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Store
@@ -80,6 +81,7 @@ object MasroofIcons {
     val export: ImageVector = Icons.Filled.Upload
     val importBackup: ImageVector = Icons.Filled.Download
     val theme: ImageVector = Icons.Filled.DarkMode
+    val share: ImageVector = Icons.Filled.Share
 
     fun transactionType(type: FinancialTransactionType): ImageVector =
         when (type) {

@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
@@ -37,6 +38,7 @@ import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.ShareActionIcon
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
@@ -134,6 +136,11 @@ fun TransactionDetailScreen(
         )
     }
 
+    val context = LocalContext.current
+    val shareChooserTitle = stringResource(R.string.transaction_share)
+    val shareSubject = stringResource(R.string.transaction_detail_title)
+    val shareText = transactionDetailShareText(transaction)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -142,6 +149,19 @@ fun TransactionDetailScreen(
                     BackNavigationIcon(
                         onClick = onBack,
                         contentDescription = stringResource(R.string.review_back),
+                    )
+                },
+                actions = {
+                    ShareActionIcon(
+                        enabled = true,
+                        onClick = {
+                            SharePlainText.share(
+                                context = context,
+                                text = shareText,
+                                chooserTitle = shareChooserTitle,
+                                subject = shareSubject,
+                            )
+                        },
                     )
                 },
             )

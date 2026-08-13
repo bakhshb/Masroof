@@ -196,6 +196,15 @@
     <string name="transaction_detail_reclassify_success">تم تحديث التصنيف</string>
     <string name="transaction_detail_reclassify_failed">تعذر تحديث التصنيف</string>
     <string name="transaction_detail_edit_category">تعديل التصنيف</string>
+    <string name="transaction_share">مشاركة</string>
+    <string name="transaction_share_detail_heading">%1$s — تفاصيل عملية</string>
+    <string name="transaction_share_list_heading">%1$s — عمليات الفترة %2$s</string>
+    <string name="transaction_share_amount">المبلغ</string>
+    <string name="transaction_share_search">البحث</string>
+    <string name="transaction_share_types">النوع</string>
+    <string name="transaction_share_cards">البطاقة</string>
+    <string name="transaction_share_count">العدد</string>
+    <string name="transaction_share_total">المجموع</string>
     <string name="transaction_reclassify_sheet_title">اختر التصنيف الجديد</string>
     <string name="transaction_reclassify_sheet_save">حفظ</string>
     <string name="transaction_reclassify_sheet_cancel">إلغاء</string>
