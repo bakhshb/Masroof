@@ -166,8 +166,9 @@ fun IconTextButtonOutlined(
     icon: ImageVector,
     text: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
-    TextButton(onClick = onClick, modifier = modifier) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = modifier) {
         Icon(
             imageVector = icon,
             contentDescription = null,

@@ -2,6 +2,9 @@ package com.baraa.masroof.presentation.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
+import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
@@ -35,6 +38,7 @@ class OnboardingViewModel(
     private val reviewRepository: ReviewRepository,
     private val discoverFromStoredEvents: suspend () -> Int,
     private val refreshReviewQueue: suspend () -> Unit,
+    private val databaseBackupService: DatabaseBackupGateway,
     private val permissionStateProvider: () -> Boolean,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -92,6 +96,55 @@ class OnboardingViewModel(
                 step = if (permissionGranted) OnboardingStep.IMPORT_DATE else OnboardingStep.PERMISSION,
                 error = if (permissionGranted) null else OnboardingError.PERMISSION_DENIED,
             )
+        }
+    }
+
+    fun clearBackupError() {
+        _uiState.update {
+            if (it.error == OnboardingError.BACKUP_RESTORE_FAILED ||
+                it.error == OnboardingError.BACKUP_RESTORE_INVALID
+            ) {
+                it.copy(error = null)
+            } else {
+                it
+            }
+        }
+    }
+
+    fun restoreBackup(uri: Uri) {
+        if (_uiState.value.restoringBackup) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(restoringBackup = true, error = null)
+            }
+            try {
+                when (databaseBackupService.importFrom(uri)) {
+                    BackupImportOutcome.SuccessNeedsRestart -> Unit
+                    BackupImportOutcome.InvalidPackage ->
+                        _uiState.update {
+                            it.copy(
+                                restoringBackup = false,
+                                error = OnboardingError.BACKUP_RESTORE_INVALID,
+                            )
+                        }
+                    BackupImportOutcome.Failed ->
+                        _uiState.update {
+                            it.copy(
+                                restoringBackup = false,
+                                error = OnboardingError.BACKUP_RESTORE_FAILED,
+                            )
+                        }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        restoringBackup = false,
+                        error = OnboardingError.BACKUP_RESTORE_FAILED,
+                    )
+                }
+            }
         }
     }
 

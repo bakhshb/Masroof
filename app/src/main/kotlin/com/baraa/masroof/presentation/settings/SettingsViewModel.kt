@@ -1,9 +1,14 @@
 package com.baraa.masroof.presentation.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -23,14 +28,18 @@ class SettingsViewModel(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val appLocaleRepository: AppLocaleRepository,
+    private val themePreferencesRepository: ThemePreferencesRepository,
+    private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
     private val appVersion: String,
+    private val onThemeModeChanged: (ThemeMode) -> Unit = {},
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             appVersion = appVersion,
             languageTag = appLocaleRepository.getLanguageTag(),
+            themeMode = themePreferencesRepository.getThemeMode(),
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -38,7 +47,12 @@ class SettingsViewModel(
     fun refresh() {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(loading = true, error = null, languageTag = appLocaleRepository.getLanguageTag())
+                it.copy(
+                    loading = true,
+                    error = null,
+                    languageTag = appLocaleRepository.getLanguageTag(),
+                    themeMode = themePreferencesRepository.getThemeMode(),
+                )
             }
             try {
                 applyRegistries(
@@ -129,6 +143,70 @@ class SettingsViewModel(
         if (normalized == appLocaleRepository.getLanguageTag()) return
         appLocaleRepository.setLanguageTag(normalized)
         onApplied()
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        if (mode == themePreferencesRepository.getThemeMode()) return
+        themePreferencesRepository.setThemeMode(mode)
+        _uiState.update { it.copy(themeMode = mode) }
+        onThemeModeChanged(mode)
+    }
+
+    fun clearBackupMessage() {
+        _uiState.update { it.copy(backupMessage = null) }
+    }
+
+    fun exportBackup(uri: Uri) {
+        if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(exportingBackup = true, backupMessage = null, error = null) }
+            try {
+                databaseBackupService.exportTo(uri).getOrThrow()
+                _uiState.update {
+                    it.copy(exportingBackup = false, backupMessage = BackupMessage.EXPORT_SUCCESS)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(exportingBackup = false, backupMessage = BackupMessage.EXPORT_FAILED)
+                }
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(importingBackup = true, backupMessage = null, error = null) }
+            try {
+                when (databaseBackupService.importFrom(uri)) {
+                    BackupImportOutcome.SuccessNeedsRestart -> {
+                        // Process restarts inside the service after a successful restore.
+                    }
+                    BackupImportOutcome.InvalidPackage ->
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                backupMessage = BackupMessage.IMPORT_INVALID,
+                            )
+                        }
+                    BackupImportOutcome.Failed ->
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                backupMessage = BackupMessage.IMPORT_FAILED,
+                            )
+                        }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(importingBackup = false, backupMessage = BackupMessage.IMPORT_FAILED)
+                }
+            }
+        }
     }
 
     private fun updateCardOwnership(card: ManagedCardUi, owned: Boolean) {

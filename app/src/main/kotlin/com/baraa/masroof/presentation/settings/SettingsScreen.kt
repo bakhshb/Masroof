@@ -4,16 +4,19 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,10 +29,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.R
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.SectionHeader
 
 @Composable
 fun SettingsRoute(
@@ -38,6 +43,8 @@ fun SettingsRoute(
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
     onLocaleChanged: () -> Unit,
+    onRequestExport: () -> Unit,
+    onRequestImport: () -> Unit,
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -62,6 +69,10 @@ fun SettingsRoute(
             onSelectLanguage = { tag ->
                 viewModel.setLanguageTag(tag, onLocaleChanged)
             },
+            onSelectTheme = viewModel::setThemeMode,
+            onRequestExport = onRequestExport,
+            onRequestImport = onRequestImport,
+            onClearBackupMessage = viewModel::clearBackupMessage,
         )
 
         SettingsDestination.MyCards -> SettingsMyCardsScreen(
@@ -105,8 +116,14 @@ private fun SettingsHubScreen(
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
     onSelectLanguage: (String) -> Unit,
+    onSelectTheme: (ThemeMode) -> Unit,
+    onRequestExport: () -> Unit,
+    onRequestImport: () -> Unit,
+    onClearBackupMessage: () -> Unit,
 ) {
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+    var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showImportConfirm by rememberSaveable { mutableStateOf(false) }
 
     if (showLanguageDialog) {
         SettingsLanguageDialog(
@@ -118,6 +135,57 @@ private fun SettingsHubScreen(
             },
         )
     }
+    if (showThemeDialog) {
+        SettingsThemeDialog(
+            selectedMode = state.themeMode,
+            onDismiss = { showThemeDialog = false },
+            onSelectMode = { mode ->
+                showThemeDialog = false
+                onSelectTheme(mode)
+            },
+        )
+    }
+    if (showImportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirm = false },
+            title = { Text(stringResource(R.string.settings_import_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_import_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showImportConfirm = false
+                        onRequestImport()
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_import_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirm = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+    state.backupMessage?.let { message ->
+        val text = when (message) {
+            BackupMessage.EXPORT_SUCCESS -> stringResource(R.string.settings_export_success)
+            BackupMessage.EXPORT_FAILED -> stringResource(R.string.settings_export_failed)
+            BackupMessage.IMPORT_FAILED -> stringResource(R.string.settings_import_failed)
+            BackupMessage.IMPORT_INVALID -> stringResource(R.string.settings_import_invalid)
+        }
+        AlertDialog(
+            onDismissRequest = onClearBackupMessage,
+            title = { Text(stringResource(R.string.settings_data_section)) },
+            text = { Text(text) },
+            confirmButton = {
+                TextButton(onClick = onClearBackupMessage) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -174,6 +242,11 @@ private fun SettingsHubScreen(
                 onClick = onOpenReview,
             )
 
+            SectionHeader(
+                title = stringResource(R.string.settings_data_section),
+                icon = MasroofIcons.rescan,
+            )
+
             SettingsReparseRow(
                 title = stringResource(R.string.settings_reparse_title),
                 subtitle = stringResource(R.string.settings_reparse_stored_hint),
@@ -181,15 +254,48 @@ private fun SettingsHubScreen(
                 icon = MasroofIcons.rescan,
                 actionIcon = MasroofIcons.retry,
                 running = state.reparsingStored,
-                enabled = !state.reparsingStored && !state.updating,
+                enabled = !state.reparsingStored && !state.updating &&
+                    !state.exportingBackup && !state.importingBackup,
                 onRefresh = onReparseStored,
             )
+
+            SettingsNavRow(
+                icon = MasroofIcons.export,
+                title = stringResource(R.string.settings_export_title),
+                subtitle = stringResource(R.string.settings_export_subtitle),
+                onClick = onRequestExport,
+                enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.importBackup,
+                title = stringResource(R.string.settings_import_title),
+                subtitle = stringResource(R.string.settings_import_subtitle),
+                onClick = { showImportConfirm = true },
+                enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
+            )
+
+            if (state.exportingBackup || state.importingBackup) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
 
             SettingsNavRow(
                 icon = Icons.Filled.Language,
                 title = stringResource(R.string.settings_language_title),
                 subtitle = languageSubtitle(state.languageTag),
                 onClick = { showLanguageDialog = true },
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.theme,
+                title = stringResource(R.string.settings_theme_title),
+                subtitle = themeSubtitle(state.themeMode),
+                onClick = { showThemeDialog = true },
             )
 
             SettingsNavRow(
@@ -215,6 +321,14 @@ private fun languageSubtitle(languageTag: String): String =
     when (languageTag) {
         AppLocale.TAG_EN -> stringResource(R.string.settings_language_english)
         else -> stringResource(R.string.settings_language_arabic)
+    }
+
+@Composable
+private fun themeSubtitle(mode: ThemeMode): String =
+    when (mode) {
+        ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
+        ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
+        ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
     }
 
 @Composable

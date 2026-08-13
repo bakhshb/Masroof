@@ -13,7 +13,9 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -74,6 +77,9 @@ object MasroofIcons {
     val ownership: ImageVector = Icons.Filled.VerifiedUser
     val settings: ImageVector = Icons.Filled.Settings
     val shopping: ImageVector = Icons.Filled.ShoppingCart
+    val export: ImageVector = Icons.Filled.Upload
+    val importBackup: ImageVector = Icons.Filled.Download
+    val theme: ImageVector = Icons.Filled.DarkMode
 
     fun transactionType(type: FinancialTransactionType): ImageVector =
         when (type) {

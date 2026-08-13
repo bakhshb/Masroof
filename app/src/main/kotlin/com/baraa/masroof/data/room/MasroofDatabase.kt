@@ -58,6 +58,10 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     companion object {
         const val NAME: String = "masroof.db"
+        const val VERSION: Int = 4
+
+        /** Must match app/schemas/.../4.json identityHash. */
+        const val IDENTITY_HASH: String = "927b7cd577af432ddcea1436a87715d2"
 
         val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }

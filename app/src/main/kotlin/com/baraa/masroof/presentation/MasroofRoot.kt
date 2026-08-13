@@ -38,6 +38,9 @@ fun MasroofRoot(
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onLocaleChanged: () -> Unit,
+    onRequestExport: () -> Unit,
+    onRequestImport: () -> Unit,
+    onRequestRestoreBackup: () -> Unit,
 ) {
     val onboardingState by onboardingViewModel.uiState.collectAsState()
     val reviewState by reviewViewModel.uiState.collectAsState()
@@ -120,6 +123,8 @@ fun MasroofRoot(
                 },
                 onOpenReview = { homeDestination = HomeDestination.Review },
                 onLocaleChanged = onLocaleChanged,
+                onRequestExport = onRequestExport,
+                onRequestImport = onRequestImport,
             )
         }
     } else {
@@ -128,6 +133,7 @@ fun MasroofRoot(
             viewModel = onboardingViewModel,
             onRequestPermissions = onRequestPermissions,
             onOpenAppSettings = onOpenAppSettings,
+            onRequestRestoreBackup = onRequestRestoreBackup,
         )
     }
 }

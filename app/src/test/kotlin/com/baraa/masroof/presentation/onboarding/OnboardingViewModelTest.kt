@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.onboarding
 
+import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
@@ -456,6 +458,7 @@ class OnboardingViewModelTest {
         val cardRepo = FakeCardRepo(cards)
         val reviewRepo = FakeReviewRepo()
         val gateway = gateway
+        val backupGateway = FakeDatabaseBackupGateway()
         var permissionGranted: Boolean = permissionGranted
         var discoverShouldFail: Boolean = discoverShouldFail
         var refreshed: Boolean = false
@@ -475,10 +478,24 @@ class OnboardingViewModelTest {
                     0
                 },
                 refreshReviewQueue = { refreshed = true },
+                databaseBackupService = backupGateway,
                 permissionStateProvider = { permissionGranted },
                 zoneId = zone,
                 clock = Clock.fixed(now, zone),
             )
+        }
+    }
+
+    private class FakeDatabaseBackupGateway(
+        var outcome: BackupImportOutcome = BackupImportOutcome.InvalidPackage,
+    ) : DatabaseBackupGateway {
+        var lastImportUri: android.net.Uri? = null
+
+        override suspend fun exportTo(destination: android.net.Uri): Result<Unit> = Result.success(Unit)
+
+        override suspend fun importFrom(source: android.net.Uri): BackupImportOutcome {
+            lastImportUri = source
+            return outcome
         }
     }
 
