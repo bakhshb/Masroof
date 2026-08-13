@@ -43,6 +43,7 @@ class SettingsViewModel(
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var pendingImportUri: Uri? = null
 
     fun refresh() {
         viewModelScope.launch {
@@ -154,6 +155,24 @@ class SettingsViewModel(
 
     fun clearBackupMessage() {
         _uiState.update { it.copy(backupMessage = null) }
+    }
+
+    fun offerImport(uri: Uri) {
+        if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
+        pendingImportUri = uri
+        _uiState.update { it.copy(awaitingImportConfirm = true, backupMessage = null) }
+    }
+
+    fun cancelPendingImport() {
+        pendingImportUri = null
+        _uiState.update { it.copy(awaitingImportConfirm = false) }
+    }
+
+    fun confirmPendingImport() {
+        val uri = pendingImportUri ?: return
+        pendingImportUri = null
+        _uiState.update { it.copy(awaitingImportConfirm = false) }
+        importBackup(uri)
     }
 
     fun exportBackup(uri: Uri) {

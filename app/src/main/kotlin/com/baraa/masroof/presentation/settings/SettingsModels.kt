@@ -33,6 +33,7 @@ data class SettingsUiState(
     val reparsingStored: Boolean = false,
     val exportingBackup: Boolean = false,
     val importingBackup: Boolean = false,
+    val awaitingImportConfirm: Boolean = false,
     val backupMessage: BackupMessage? = null,
     val error: SettingsError? = null,
 )

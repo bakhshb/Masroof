@@ -72,6 +72,8 @@ fun SettingsRoute(
             onSelectTheme = viewModel::setThemeMode,
             onRequestExport = onRequestExport,
             onRequestImport = onRequestImport,
+            onConfirmPendingImport = viewModel::confirmPendingImport,
+            onCancelPendingImport = viewModel::cancelPendingImport,
             onClearBackupMessage = viewModel::clearBackupMessage,
         )
 
@@ -119,11 +121,12 @@ private fun SettingsHubScreen(
     onSelectTheme: (ThemeMode) -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onConfirmPendingImport: () -> Unit,
+    onCancelPendingImport: () -> Unit,
     onClearBackupMessage: () -> Unit,
 ) {
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
-    var showImportConfirm by rememberSaveable { mutableStateOf(false) }
 
     if (showLanguageDialog) {
         SettingsLanguageDialog(
@@ -145,23 +148,18 @@ private fun SettingsHubScreen(
             },
         )
     }
-    if (showImportConfirm) {
+    if (state.awaitingImportConfirm) {
         AlertDialog(
-            onDismissRequest = { showImportConfirm = false },
+            onDismissRequest = onCancelPendingImport,
             title = { Text(stringResource(R.string.settings_import_confirm_title)) },
             text = { Text(stringResource(R.string.settings_import_confirm_body)) },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showImportConfirm = false
-                        onRequestImport()
-                    },
-                ) {
+                TextButton(onClick = onConfirmPendingImport) {
                     Text(stringResource(R.string.settings_import_confirm_action))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showImportConfirm = false }) {
+                TextButton(onClick = onCancelPendingImport) {
                     Text(stringResource(R.string.settings_cancel))
                 }
             },
@@ -242,6 +240,20 @@ private fun SettingsHubScreen(
                 onClick = onOpenReview,
             )
 
+            SettingsNavRow(
+                icon = Icons.Filled.Language,
+                title = stringResource(R.string.settings_language_title),
+                subtitle = languageSubtitle(state.languageTag),
+                onClick = { showLanguageDialog = true },
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.theme,
+                title = stringResource(R.string.settings_theme_title),
+                subtitle = themeSubtitle(state.themeMode),
+                onClick = { showThemeDialog = true },
+            )
+
             SectionHeader(
                 title = stringResource(R.string.settings_data_section),
                 icon = MasroofIcons.rescan,
@@ -271,7 +283,7 @@ private fun SettingsHubScreen(
                 icon = MasroofIcons.importBackup,
                 title = stringResource(R.string.settings_import_title),
                 subtitle = stringResource(R.string.settings_import_subtitle),
-                onClick = { showImportConfirm = true },
+                onClick = onRequestImport,
                 enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
             )
 
@@ -283,20 +295,6 @@ private fun SettingsHubScreen(
                     CircularProgressIndicator()
                 }
             }
-
-            SettingsNavRow(
-                icon = Icons.Filled.Language,
-                title = stringResource(R.string.settings_language_title),
-                subtitle = languageSubtitle(state.languageTag),
-                onClick = { showLanguageDialog = true },
-            )
-
-            SettingsNavRow(
-                icon = MasroofIcons.theme,
-                title = stringResource(R.string.settings_theme_title),
-                subtitle = themeSubtitle(state.themeMode),
-                onClick = { showThemeDialog = true },
-            )
 
             SettingsNavRow(
                 icon = MasroofIcons.periodHint,

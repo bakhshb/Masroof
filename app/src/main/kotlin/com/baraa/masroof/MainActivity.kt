@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
                         contract = ActivityResultContracts.OpenDocument(),
                     ) { uri: Uri? ->
                         if (uri != null) {
-                            settingsViewModel.importBackup(uri)
+                            settingsViewModel.offerImport(uri)
                         }
                     }
 
