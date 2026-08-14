@@ -34,6 +34,7 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
 
 @Composable
@@ -241,38 +242,26 @@ private fun SettingsHubScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.settings_back),
-                    )
-                },
-            )
-        },
-    ) { padding ->
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.settings_title),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.settings_back),
+    ) { contentModifier ->
         if (state.loading) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = contentModifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CircularProgressIndicator()
             }
-            return@Scaffold
+            return@MasroofSecondaryScaffold
         }
 
         Column(
-            modifier = Modifier
+            modifier = contentModifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SettingsNavRow(

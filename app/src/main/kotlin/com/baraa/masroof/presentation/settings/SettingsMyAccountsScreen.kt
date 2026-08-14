@@ -21,7 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.AccountOwnershipInlinePrompt
-import com.baraa.masroof.presentation.common.BackNavigationIcon
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,25 +43,15 @@ fun SettingsMyAccountsScreen(
         onConfirm = onConfirmStopTracking,
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_accounts_section)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.settings_back),
-                    )
-                },
-            )
-        },
-    ) { padding ->
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.settings_accounts_section),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.settings_back),
+    ) { contentModifier ->
         Column(
-            modifier = Modifier
+            modifier = contentModifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(

@@ -11,10 +11,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,19 +43,7 @@ fun SectionHeader(
     icon: ImageVector,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
-        )
-        Text(title, style = MaterialTheme.typography.titleMedium)
-    }
+    MasroofSectionTitle(title = title, modifier = modifier)
 }
 
 @Composable
@@ -96,20 +85,22 @@ fun SummaryMiniCard(
     value: String,
     icon: ImageVector,
 ) {
-    Card(modifier = modifier) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(title, style = MaterialTheme.typography.bodyMedium)
-            }
-            Text(value, style = MaterialTheme.typography.titleMedium)
+    MasroofCard(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(title, style = MaterialTheme.typography.bodyMedium)
         }
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
@@ -121,22 +112,28 @@ fun MetricHighlightCard(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium)
-            }
-            Text(value, style = MaterialTheme.typography.headlineSmall)
-            subtitle?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall)
-            }
+    MasroofCard(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            value,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        subtitle?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
@@ -149,7 +146,15 @@ fun IconTextButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Button(onClick = onClick, enabled = enabled, modifier = modifier) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+        ),
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
@@ -168,7 +173,13 @@ fun IconTextButtonOutlined(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = null,

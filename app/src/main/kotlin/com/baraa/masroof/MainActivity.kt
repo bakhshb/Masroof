@@ -14,10 +14,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import androidx.core.content.ContextCompat
 import com.baraa.masroof.application.backup.BackupPackageFormat
 import com.baraa.masroof.application.theme.ThemeMode
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
             MasroofTheme(darkTheme = darkTheme) {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                MasroofScreenBackground(modifier = Modifier.fillMaxSize()) {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestMultiplePermissions(),
                     ) { _ ->
@@ -170,6 +170,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
 
     override fun onResume() {
         super.onResume()

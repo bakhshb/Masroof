@@ -35,7 +35,10 @@ import com.baraa.masroof.presentation.common.ForeignCurrencyNotice
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.LongPullToRefreshBox
+import com.baraa.masroof.presentation.common.MasroofAppBar
+import com.baraa.masroof.presentation.common.MasroofHintBox
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofPeriodPill
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.SmsPermissionNotice
 import com.baraa.masroof.presentation.common.SmsRescanStatusNotice
@@ -109,29 +112,31 @@ private fun DashboardScreen(
                     .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                imageVector = MasroofIcons.periodHint,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp).padding(top = 2.dp),
-            )
-            Spacer(Modifier.size(6.dp))
+        MasroofHintBox(
+            text = stringResource(R.string.dashboard_period_summary_hint),
+        )
+
+        MasroofPeriodPill(
+            label = state.periodLabel,
+            onPrevious = onPrevious,
+            onNext = onNext,
+        )
+        state.periodAdjustmentHint?.let { hint ->
             Text(
-                stringResource(R.string.dashboard_period_summary_hint),
+                hint,
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-
-        PeriodSelector(
-            label = state.periodLabel,
-            adjustmentHint = state.periodAdjustmentHint,
-            isCurrentPeriod = state.isCurrentPeriod,
-            onPrevious = onPrevious,
-            onNext = onNext,
-            onCurrent = onCurrent,
-        )
+        if (!state.isCurrentPeriod) {
+            IconTextButtonOutlined(
+                onClick = onCurrent,
+                icon = MasroofIcons.backToCurrent,
+                text = stringResource(R.string.dashboard_back_to_current),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         if (!state.smsPermissionGranted) {
             SmsPermissionNotice(
@@ -307,96 +312,17 @@ private fun DashboardAppBar(
     onOpenReview: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+    MasroofAppBar(
+        title = stringResource(R.string.app_name),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.appLogo,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ReviewNotificationIconButton(
-                    reviewCount = reviewCount,
-                    onClick = onOpenReview,
-                )
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = MasroofIcons.settings,
-                        contentDescription = stringResource(R.string.dashboard_open_settings),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PeriodSelector(
-    label: String,
-    adjustmentHint: String?,
-    isCurrentPeriod: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            IconButton(onClick = onPrevious) {
-                Icon(
-                    imageVector = MasroofIcons.periodPrevious,
-                    contentDescription = null,
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.calendar,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.size(6.dp))
-                Text(label, style = MaterialTheme.typography.titleMedium)
-            }
-            IconButton(onClick = onNext) {
-                Icon(
-                    imageVector = MasroofIcons.periodNext,
-                    contentDescription = null,
-                )
-            }
-        }
-        adjustmentHint?.let { hint ->
-            Text(
-                hint,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (!isCurrentPeriod) {
-            IconTextButtonOutlined(
-                onClick = onCurrent,
-                icon = MasroofIcons.backToCurrent,
-                text = stringResource(R.string.dashboard_back_to_current),
-                modifier = Modifier.fillMaxWidth(),
+        ReviewNotificationIconButton(
+            reviewCount = reviewCount,
+            onClick = onOpenReview,
+        )
+        IconButton(onClick = onOpenSettings) {
+            Icon(
+                imageVector = MasroofIcons.settings,
+                contentDescription = stringResource(R.string.dashboard_open_settings),
             )
         }
     }

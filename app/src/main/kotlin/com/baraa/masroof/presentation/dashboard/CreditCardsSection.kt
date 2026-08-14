@@ -7,12 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,10 +22,16 @@ import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.common.MasroofBadge
+import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCardAccent
+import com.baraa.masroof.presentation.common.MasroofCycleChip
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofMiniCard
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -43,6 +44,7 @@ fun CreditCardsSection(
 ) {
     if (!overview.hasContent) return
 
+    val extended = MasroofThemeExtras.extendedColors
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMMM", locale)
     val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
@@ -57,50 +59,61 @@ fun CreditCardsSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-        ) {
-            Text(
-                stringResource(R.string.dashboard_credit_card_statement_day_hint),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
+        MasroofCycleChip(
+            text = stringResource(R.string.dashboard_credit_card_statement_day_hint),
+        )
 
         overview.aggregateDueAmount?.let { due ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            MasroofCard(accent = MasroofCardAccent.Liability) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.dashboard_credit_card_aggregate_due),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            stringResource(R.string.dashboard_credit_card_liability_subtitle),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        )
+                    }
+                    MasroofBadge(
+                        text = stringResource(R.string.dashboard_credit_card_liability_badge),
+                        accent = MasroofCardAccent.Liability,
+                    )
+                }
+                Text(
+                    formatLocalizedMoney(due),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = extended.liability,
+                    ),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                overview.aggregateDueDate?.let { dueDate ->
                     Text(
-                        stringResource(R.string.dashboard_credit_card_aggregate_due),
-                        style = MaterialTheme.typography.labelMedium,
+                        stringResource(
+                            R.string.dashboard_credit_card_due_date,
+                            dateFormatter.format(dueDate),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                overview.aggregateDueUpdatedAt?.let { at ->
+                    Text(
+                        stringResource(
+                            R.string.dashboard_credit_card_updated,
+                            formatSnapshotTime(at, zoneId, dateTimeFormatter),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        formatLocalizedMoney(due),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    overview.aggregateDueDate?.let { dueDate ->
-                        Text(
-                            stringResource(
-                                R.string.dashboard_credit_card_due_date,
-                                dateFormatter.format(dueDate),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    overview.aggregateDueUpdatedAt?.let { at ->
-                        Text(
-                            stringResource(
-                                R.string.dashboard_credit_card_updated,
-                                formatSnapshotTime(at, zoneId, dateTimeFormatter),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
         }
@@ -115,29 +128,35 @@ fun CreditCardsSection(
         }
 
         if (overview.cards.isNotEmpty()) {
-            AggregateSpendingCard(
-                title = if (overview.salaryPeriodLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_cards_aggregate_period_spending,
-                        overview.salaryPeriodLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
-                },
-                amount = overview.aggregatePeriodSpendingNet,
-            )
-
-            AggregateSpendingCard(
-                title = if (overview.aggregateStatementPeriodLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_cards_aggregate_statement_spending,
-                        overview.aggregateStatementPeriodLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
-                },
-                amount = overview.aggregateStatementSpendingNet,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AggregateSpendingMiniCard(
+                    title = if (overview.aggregateStatementPeriodLabel != null) {
+                        stringResource(
+                            R.string.dashboard_credit_cards_aggregate_statement_spending,
+                            overview.aggregateStatementPeriodLabel,
+                        )
+                    } else {
+                        stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+                    },
+                    amount = overview.aggregateStatementSpendingNet,
+                    modifier = Modifier.weight(1f),
+                )
+                AggregateSpendingMiniCard(
+                    title = if (overview.salaryPeriodLabel != null) {
+                        stringResource(
+                            R.string.dashboard_credit_cards_aggregate_period_spending,
+                            overview.salaryPeriodLabel,
+                        )
+                    } else {
+                        stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
+                    },
+                    amount = overview.aggregatePeriodSpendingNet,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -149,38 +168,40 @@ private fun CreditCardRowCard(
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.cardPayment,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.size(8.dp))
+    val extended = MasroofThemeExtras.extendedColors
+    MasroofCard(accent = MasroofCardAccent.Credit) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(
                         R.string.dashboard_credit_card_last4,
                         formatCardLast4(row.last4),
                     ),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.dashboard_credit_card_spending_subtitle),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 )
             }
-
-            SpendingMetricRow(
-                label = if (calendarMonthLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_card_month_spending,
-                        calendarMonthLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_card_month_spending_fallback)
-                },
-                value = formatLocalizedMoney(row.calendarMonthSpendingNet),
+            MasroofBadge(
+                text = stringResource(R.string.dashboard_credit_card_credit_badge),
+                accent = MasroofCardAccent.Credit,
             )
+        }
 
-            SpendingMetricRow(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MasroofMiniCard(
                 label = if (row.statementPeriodLabel != null) {
                     stringResource(
                         R.string.dashboard_credit_card_statement_spending,
@@ -190,23 +211,47 @@ private fun CreditCardRowCard(
                     stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
                 },
                 value = formatLocalizedMoney(row.statementSpendingNet),
+                valueColor = extended.card,
+                modifier = Modifier.weight(1f),
             )
+            MasroofMiniCard(
+                label = if (calendarMonthLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_month_spending,
+                        calendarMonthLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_month_spending_fallback)
+                },
+                value = formatLocalizedMoney(row.calendarMonthSpendingNet),
+                valueColor = extended.card,
+                modifier = Modifier.weight(1f),
+            )
+        }
 
-            row.snapshot?.availableBalance?.let { available ->
-                SnapshotMetricRow(
-                    label = stringResource(R.string.dashboard_credit_card_available),
-                    value = formatLocalizedMoney(available),
-                )
+        row.snapshot?.let { snapshot ->
+            Spacer(Modifier.size(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                snapshot.dueAmount?.let { due ->
+                    MasroofMiniCard(
+                        label = stringResource(R.string.dashboard_credit_card_card_due),
+                        value = formatLocalizedMoney(due),
+                        valueColor = extended.liability,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                snapshot.availableBalance?.let { available ->
+                    MasroofMiniCard(
+                        label = stringResource(R.string.dashboard_credit_card_available),
+                        value = formatLocalizedMoney(available),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
-
-            row.snapshot?.dueAmount?.let { due ->
-                SnapshotMetricRow(
-                    label = stringResource(R.string.dashboard_credit_card_card_due),
-                    value = formatLocalizedMoney(due),
-                )
-            }
-
-            row.snapshot?.updatedAt?.let { at ->
+            snapshot.updatedAt?.let { at ->
                 Text(
                     stringResource(
                         R.string.dashboard_credit_card_updated,
@@ -214,6 +259,7 @@ private fun CreditCardRowCard(
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
@@ -221,63 +267,18 @@ private fun CreditCardRowCard(
 }
 
 @Composable
-private fun AggregateSpendingCard(
+private fun AggregateSpendingMiniCard(
     title: String,
     amount: SignedMoneyAmount,
+    modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                formatLocalizedMoney(amount),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SpendingMetricRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.error,
-        )
-    }
-}
-
-@Composable
-private fun SnapshotMetricRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
-    }
+    val extended = MasroofThemeExtras.extendedColors
+    MasroofMiniCard(
+        label = title,
+        value = formatLocalizedMoney(amount),
+        valueColor = extended.card,
+        modifier = modifier,
+    )
 }
 
 private fun formatSnapshotTime(

@@ -39,7 +39,9 @@ import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
+import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
 
 @Composable
@@ -86,23 +88,15 @@ private fun ReviewListScreen(
     onOpen: (String) -> Unit,
     onDismissAllInformational: () -> Unit,
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.review_title)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.review_back),
-                    )
-                },
-            )
-        },
-    ) { padding ->
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.review_title),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.review_back),
+    ) { contentModifier ->
         when {
             state.loading && state.items.isEmpty() -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(padding),
+                    modifier = contentModifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -111,7 +105,7 @@ private fun ReviewListScreen(
             }
             state.error == ReviewError.LOAD_FAILED && state.items.isEmpty() -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                    modifier = contentModifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -133,7 +127,7 @@ private fun ReviewListScreen(
             }
             state.items.isEmpty() -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                    modifier = contentModifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -159,7 +153,7 @@ private fun ReviewListScreen(
             }
             else -> {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                    modifier = contentModifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
@@ -195,13 +189,12 @@ private fun ReviewListScreen(
 
 @Composable
 private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
-    Card(
+    MasroofCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
             Icon(
@@ -257,39 +250,35 @@ private fun ReviewDetailScreen(
     onConfirmOwnershipCardOwned: () -> Unit,
     onMarkOwnershipCardExternal: () -> Unit,
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.review_detail_title)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.review_back),
-                    )
-                },
-            )
-        },
-    ) { padding ->
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.review_detail_title),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.review_back),
+    ) { contentModifier ->
         Column(
-            modifier = Modifier
+            modifier = contentModifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MasroofIcons.messageFamily(detail.messageFamily),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp),
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(stringResource(detail.kindLabelRes), style = MaterialTheme.typography.titleMedium)
-            }
-            detail.amountLabel?.let {
-                Text(it, style = MaterialTheme.typography.headlineSmall)
+            MasroofCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.messageFamily(detail.messageFamily),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Text(stringResource(detail.kindLabelRes), style = MaterialTheme.typography.titleMedium)
+                }
+                detail.amountLabel?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
             detail.sender?.let {
                 IconLabelRow(icon = MasroofIcons.sender, label = stringResource(R.string.review_sender, it))
@@ -337,10 +326,9 @@ private fun ReviewDetailScreen(
                 title = stringResource(R.string.review_sms_body),
                 icon = MasroofIcons.sms,
             )
-            Card(modifier = Modifier.fillMaxWidth()) {
+            MasroofCard {
                 Text(
                     detail.body,
-                    modifier = Modifier.padding(12.dp),
                     textAlign = TextAlign.Start,
                 )
             }

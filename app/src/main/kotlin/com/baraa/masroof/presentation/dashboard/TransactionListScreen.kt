@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.BackNavigationIcon
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.ShareActionIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,37 +74,28 @@ fun TransactionListScreen(
     )
     val canShare = filterResult.transactions.isNotEmpty()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.transaction_list_title)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.review_back),
-                    )
-                },
-                actions = {
-                    ShareActionIcon(
-                        enabled = canShare,
-                        onClick = {
-                            SharePlainText.share(
-                                context = context,
-                                text = shareText,
-                                chooserTitle = shareChooserTitle,
-                                subject = shareSubject,
-                            )
-                        },
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.transaction_list_title),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.review_back),
+        actions = {
+            ShareActionIcon(
+                enabled = canShare,
+                onClick = {
+                    SharePlainText.share(
+                        context = context,
+                        text = shareText,
+                        chooserTitle = shareChooserTitle,
+                        subject = shareSubject,
                     )
                 },
             )
         },
-    ) { padding ->
+    ) { contentModifier ->
         if (transactions.isEmpty()) {
             Column(
-                modifier = Modifier
+                modifier = contentModifier
                     .fillMaxSize()
-                    .padding(padding)
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -113,15 +105,10 @@ fun TransactionListScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            return@Scaffold
+            return@MasroofSecondaryScaffold
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-        ) {
+        Column(modifier = contentModifier.fillMaxSize()) {
             TransactionListToolbar(
                 periodLabel = periodLabel,
                 searchQuery = searchQuery,

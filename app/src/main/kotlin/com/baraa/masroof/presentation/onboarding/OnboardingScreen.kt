@@ -90,10 +90,10 @@ private fun OnboardingScreen(
     onFinalize: () -> Unit,
     onEnterApp: () -> Unit,
 ) {
-    Scaffold { padding ->
+    Column(modifier = Modifier.fillMaxSize()) {
         when (state.step) {
             OnboardingStep.WELCOME -> WelcomeStep(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 restoringBackup = state.restoringBackup,
                 error = state.error,
                 onStart = onStart,
@@ -101,21 +101,21 @@ private fun OnboardingScreen(
                 onClearBackupError = onClearBackupError,
             )
             OnboardingStep.PERMISSION -> PermissionStep(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 denied = state.error == OnboardingError.PERMISSION_DENIED,
                 onRequestPermissions = onRequestPermissions,
                 onOpenSettings = onOpenAppSettings,
             )
             OnboardingStep.IMPORT_DATE -> ImportDateStep(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 state = state,
                 onSelectDateOption = onSelectDateOption,
                 onSelectCustomDate = onSelectCustomDate,
                 onContinue = onStartImport,
             )
-            OnboardingStep.IMPORTING -> ImportingStep(Modifier.padding(padding), state, onStartImport)
+            OnboardingStep.IMPORTING -> ImportingStep(Modifier.fillMaxSize().padding(24.dp), state, onStartImport)
             OnboardingStep.OWNERSHIP -> OwnershipStep(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 state = state,
                 onSetAccountOwned = onSetAccountOwned,
                 onSetAccountExternal = onSetAccountExternal,
@@ -123,8 +123,8 @@ private fun OnboardingScreen(
                 onSetCardExternal = onSetCardExternal,
                 onFinalize = onFinalize,
             )
-            OnboardingStep.FINALIZE -> CompletionStep(Modifier.padding(padding), state, onEnterApp)
-            OnboardingStep.HOME -> HomePlaceholder(Modifier.padding(padding), state)
+            OnboardingStep.FINALIZE -> CompletionStep(Modifier.fillMaxSize().padding(24.dp), state, onEnterApp)
+            OnboardingStep.HOME -> HomePlaceholder(Modifier.fillMaxSize(), state)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,8 +40,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.presentation.common.BackNavigationIcon
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,29 +71,19 @@ fun SettingsAboutScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_about_section)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.settings_back),
-                    )
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        MasroofSecondaryScaffold(
+            title = stringResource(R.string.settings_about_section),
+            onBack = onBack,
+            backContentDescription = stringResource(R.string.settings_back),
+        ) { contentModifier ->
+            Column(
+                modifier = contentModifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
             Icon(
                 imageVector = MasroofIcons.appLogo,
                 contentDescription = null,
@@ -139,7 +131,12 @@ fun SettingsAboutScreen(
                 onDownloadUpdate = onDownloadUpdate,
                 onInstallUpdate = onInstallUpdate,
             )
+            }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -155,11 +152,8 @@ private fun UpdateSectionCard(
     onDownloadUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    MasroofCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             IconLabelRow(
                 icon = MasroofIcons.export,
                 label = stringResource(R.string.settings_updates_title),
@@ -342,11 +336,8 @@ private fun AboutInfoCard(
     title: String,
     body: String,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    MasroofCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             IconLabelRow(icon = icon, label = title, iconTint = MaterialTheme.colorScheme.primary)
             Text(
                 body,

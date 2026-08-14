@@ -225,6 +225,10 @@
     <string name="dashboard_credit_card_due_date">Due date: %1$s</string>
     <string name="dashboard_credit_card_aggregate_due">Total due (statement)</string>
     <string name="dashboard_credit_card_updated">Updated: %1$s</string>
+    <string name="dashboard_credit_card_liability_subtitle">From latest bank message</string>
+    <string name="dashboard_credit_card_liability_badge">Liability</string>
+    <string name="dashboard_credit_card_spending_subtitle">Card spending is not current-account outflow</string>
+    <string name="dashboard_credit_card_credit_badge">Credit</string>
     <string name="dashboard_cash_withdrawals">Cash withdrawals</string>
     <string name="dashboard_self_transfers">Transfers between my accounts</string>
     <string name="dashboard_recent_title">Recent transactions</string>
