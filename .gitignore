@@ -18,6 +18,7 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+release-signing.env
 
 # Orchestration runtime state
 .orch/

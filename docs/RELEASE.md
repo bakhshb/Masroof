@@ -15,6 +15,19 @@ Keep `release.keystore` and passwords safe. You need the **same keystore** for e
 
 ### 2. Add GitHub Actions secrets
 
+**Option A — automated (recommended)**
+
+From the repo root, with [GitHub CLI](https://cli.github.com/) logged in as the repo owner:
+
+```bash
+./scripts/generate-release-keystore.sh   # skip if you already have release.keystore
+./scripts/upload-release-secrets.sh
+```
+
+This creates `release.keystore`, `keystore.properties`, and uploads four secrets to GitHub. Those files are gitignored — do not commit them.
+
+**Option B — manual**
+
 In the repository: **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Value |
@@ -23,6 +36,15 @@ In the repository: **Settings → Secrets and variables → Actions**, add:
 | `RELEASE_KEYSTORE_PASSWORD` | Keystore password |
 | `RELEASE_KEY_ALIAS` | `masroof` |
 | `RELEASE_KEY_PASSWORD` | Key password |
+
+Generate a keystore once:
+
+```bash
+keytool -genkey -v -keystore release.keystore -alias masroof \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Or use `./scripts/generate-release-keystore.sh` for a random password and local `keystore.properties`.
 
 ### 3. Create a GitHub read-only token (for your phone)
 
