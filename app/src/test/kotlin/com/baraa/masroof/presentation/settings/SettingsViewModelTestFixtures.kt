@@ -10,7 +10,7 @@ import com.baraa.masroof.application.update.UpdateChecker
 import okhttp3.OkHttpClient
 
 internal object SettingsViewModelTestFixtures {
-    const val APP_VERSION: String = "0.2.0"
+    const val APP_VERSION: String = "0.2.1"
 
     fun appUpdateService(
         tokenConfigured: Boolean = false,
@@ -38,7 +38,7 @@ internal object SettingsViewModelTestFixtures {
             context = context,
             tokenRepository = tokenRepository,
             releaseClient = GitHubReleaseClient(OkHttpClient(), "bakhshb", "Masroof"),
-            updateChecker = UpdateChecker(installedVersionCode = 3),
+            updateChecker = UpdateChecker(installedVersionCode = 4),
         )
     }
 

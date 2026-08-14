@@ -59,6 +59,7 @@ enum class AppUpdateMessage {
     DOWNLOAD_SUCCESS,
     TOKEN_SAVED,
     TOKEN_REQUIRED,
+    AUTH_FAILED,
     CHECK_FAILED,
     DOWNLOAD_FAILED,
     INSTALL_FAILED,

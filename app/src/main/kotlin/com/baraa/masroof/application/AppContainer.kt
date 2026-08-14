@@ -297,9 +297,7 @@ class AppContainer(
             ),
         )
 
-    private val updateHttpClient: OkHttpClient =
-        OkHttpClient.Builder()
-            .build()
+    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
     val appUpdateService: AppUpdateService by lazy {
         AppUpdateService(

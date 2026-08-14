@@ -328,6 +328,7 @@ private fun resolveUpdateMessage(message: AppUpdateMessage): String =
         AppUpdateMessage.DOWNLOAD_SUCCESS -> stringResource(R.string.settings_download_success)
         AppUpdateMessage.TOKEN_SAVED -> stringResource(R.string.settings_github_token_saved)
         AppUpdateMessage.TOKEN_REQUIRED -> stringResource(R.string.settings_github_token_required)
+        AppUpdateMessage.AUTH_FAILED -> stringResource(R.string.settings_github_auth_failed)
         AppUpdateMessage.CHECK_FAILED -> stringResource(R.string.settings_updates_check_failed)
         AppUpdateMessage.DOWNLOAD_FAILED -> stringResource(R.string.settings_download_failed)
         AppUpdateMessage.INSTALL_FAILED -> stringResource(R.string.settings_install_failed)

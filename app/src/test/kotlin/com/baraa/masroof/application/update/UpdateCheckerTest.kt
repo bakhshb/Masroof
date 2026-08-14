@@ -5,14 +5,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateCheckerTest {
-    private val checker = UpdateChecker(installedVersionCode = 3)
+    private val checker = UpdateChecker(installedVersionCode = 4)
 
     @Test
     fun newerVersionCode_isAvailable() {
         val manifest =
             UpdateManifest(
-                versionCode = 4,
-                versionName = "0.3.0",
+                versionCode = 5,
+                versionName = "0.2.1",
                 apkFileName = "masroof-0.3.0.apk",
                 sha256 = "abc",
             )
@@ -25,9 +25,9 @@ class UpdateCheckerTest {
     fun sameVersionCode_isUpToDate() {
         val manifest =
             UpdateManifest(
-                versionCode = 3,
-                versionName = "0.2.0",
-                apkFileName = "masroof-0.2.0.apk",
+                versionCode = 4,
+                versionName = "0.2.1",
+                apkFileName = "masroof-0.2.1.apk",
                 sha256 = "abc",
             )
         assertFalse(checker.isUpdateAvailable(manifest))

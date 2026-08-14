@@ -21,11 +21,13 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
@@ -186,7 +188,11 @@ class SettingsViewModel(
                 )
             }
             try {
-                when (val result = appUpdateService.checkForUpdate().getOrThrow()) {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        appUpdateService.checkForUpdate().getOrThrow()
+                    }
+                when (result) {
                     UpdateCheckResult.UpToDate ->
                         _uiState.update {
                             it.copy(
@@ -203,10 +209,11 @@ class SettingsViewModel(
             } catch (error: Exception) {
                 if (!silent) {
                     val message =
-                        if (error is MissingGitHubTokenException) {
-                            AppUpdateMessage.TOKEN_REQUIRED
-                        } else {
-                            AppUpdateMessage.CHECK_FAILED
+                        when {
+                            error is MissingGitHubTokenException -> AppUpdateMessage.TOKEN_REQUIRED
+                            error.message?.contains("authentication failed", ignoreCase = true) == true ->
+                                AppUpdateMessage.AUTH_FAILED
+                            else -> AppUpdateMessage.CHECK_FAILED
                         }
                     _uiState.update {
                         it.copy(updateState = AppUpdateUiState.Idle, updateMessage = message)
@@ -236,22 +243,24 @@ class SettingsViewModel(
                 )
             }
             try {
-                appUpdateService
-                    .downloadUpdate(
-                        manifest = manifest,
-                        onProgress = { bytesRead, totalBytes ->
-                            _uiState.update {
-                                it.copy(
-                                    updateState = AppUpdateUiState.Downloading(
-                                        manifest = manifest,
-                                        bytesRead = bytesRead,
-                                        totalBytes = totalBytes,
-                                    ),
-                                )
-                            }
-                        },
-                    )
-                    .getOrThrow()
+                withContext(Dispatchers.IO) {
+                    appUpdateService
+                        .downloadUpdate(
+                            manifest = manifest,
+                            onProgress = { bytesRead, totalBytes ->
+                                _uiState.update {
+                                    it.copy(
+                                        updateState = AppUpdateUiState.Downloading(
+                                            manifest = manifest,
+                                            bytesRead = bytesRead,
+                                            totalBytes = totalBytes,
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                        .getOrThrow()
+                }
                 _uiState.update {
                     it.copy(
                         updateState = AppUpdateUiState.ReadyToInstall(manifest),
@@ -284,7 +293,9 @@ class SettingsViewModel(
         val apkFile = appUpdateService.updateApkFile(state.manifest)
         viewModelScope.launch {
             try {
-                apkInstaller.install(apkFile).getOrThrow()
+                withContext(Dispatchers.Main) {
+                    apkInstaller.install(apkFile).getOrThrow()
+                }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
