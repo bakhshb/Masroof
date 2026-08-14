@@ -3,9 +3,13 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -34,6 +38,7 @@ class DashboardService(
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val appLocaleRepository: AppLocaleRepository,
+    private val accountRegistryRepository: AccountRegistryRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
@@ -59,6 +64,12 @@ class DashboardService(
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
+        val ownedAccountContainerIds = accountRegistryRepository.listAll()
+            .asSequence()
+            .filter { it.bank != Bank.UNKNOWN }
+            .filter { it.ownership == OwnershipStatus.OWNED }
+            .mapNotNull { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
+            .toSet()
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
             transactions = transactions,
@@ -71,12 +82,14 @@ class DashboardService(
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
+            ownedAccountContainerIds = ownedAccountContainerIds,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
             transactions = transactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
+            ownedAccountContainerIds = ownedAccountContainerIds,
         )
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,

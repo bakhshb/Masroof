@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -32,6 +34,7 @@ import com.baraa.masroof.presentation.common.SummaryMiniCard
 fun CurrentAccountSection(
     summary: CurrentAccountSummary,
     accountBadge: String?,
+    ownedAccountCount: Int = 1,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -66,7 +69,13 @@ fun CurrentAccountSection(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                stringResource(R.string.dashboard_current_account_net_subtitle),
+                                stringResource(
+                                    if (ownedAccountCount > 1) {
+                                        R.string.dashboard_current_account_net_subtitle_multi
+                                    } else {
+                                        R.string.dashboard_current_account_net_subtitle
+                                    },
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -171,8 +180,10 @@ fun CurrentAccountSection(
 
 @Composable
 fun SpendingSplitSection(
-    fromCurrentAccount: Money,
-    onCreditCard: com.baraa.masroof.application.dashboard.SignedMoneyAmount,
+    spendingSplit: SpendingSplitSummary,
+    currentAccount: CurrentAccountSummary,
+    followedCardsSpending: SignedMoneyAmount? = null,
+    unknownCardCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,21 +198,95 @@ fun SpendingSplitSection(
             SummaryMiniCard(
                 modifier = Modifier.weight(1f),
                 title = stringResource(R.string.dashboard_spending_from_account),
-                value = formatLocalizedMoney(fromCurrentAccount),
+                value = formatLocalizedMoney(spendingSplit.fromCurrentAccount),
                 icon = MasroofIcons.externalOut,
             )
             SummaryMiniCard(
                 modifier = Modifier.weight(1f),
                 title = stringResource(R.string.dashboard_spending_on_card),
-                value = formatLocalizedMoney(onCreditCard),
+                value = formatLocalizedMoney(spendingSplit.onCreditCard),
                 icon = MasroofIcons.cardPayment,
             )
         }
-        Text(
-            stringResource(R.string.dashboard_spending_split_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.dashboard_spending_total),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text(
+                        formatLocalizedMoney(spendingSplit.totalNet),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+                Text(
+                    stringResource(R.string.dashboard_spending_split_account_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val excludedTransfers = currentAccount.externalTransfersOut
+                val excludedCash = currentAccount.cashWithdrawals
+                val excludedCardPay = currentAccount.creditCardPayments
+                if (
+                    excludedTransfers.amount.signum() > 0 ||
+                    excludedCash.amount.signum() > 0 ||
+                    excludedCardPay.amount.signum() > 0
+                ) {
+                    Text(
+                        stringResource(
+                            R.string.dashboard_spending_split_excluded,
+                            formatLocalizedMoney(excludedTransfers),
+                            formatLocalizedMoney(excludedCash),
+                            formatLocalizedMoney(excludedCardPay),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    stringResource(R.string.dashboard_spending_split_card_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                followedCardsSpending?.let { followed ->
+                    val otherCardsDelta = spendingSplit.onCreditCard.amount
+                        .subtract(followed.amount)
+                        .setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN)
+                    if (otherCardsDelta.signum() > 0) {
+                        Text(
+                            stringResource(
+                                R.string.dashboard_spending_split_other_cards,
+                                formatLocalizedMoney(SignedMoneyAmount(otherCardsDelta, spendingSplit.currency)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (unknownCardCount > 0) {
+                    Text(
+                        stringResource(R.string.dashboard_spending_split_unknown_cards, unknownCardCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+        }
     }
 }
 
