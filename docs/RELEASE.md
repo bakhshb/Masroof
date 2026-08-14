@@ -1,6 +1,6 @@
 # Release and in-app updates
 
-Masroof release APKs are built in **GitHub Actions** and published to **private GitHub Releases**. The app checks for updates using your personal GitHub token (read-only) and installs APKs without Google Play.
+Masroof release APKs are built in **GitHub Actions** when you **merge to `main`** (see [CI.md](CI.md)). The app checks for updates using your personal GitHub token and installs APKs without Google Play.
 
 ## One-time setup
 
@@ -37,15 +37,6 @@ In the repository: **Settings → Secrets and variables → Actions**, add:
 | `RELEASE_KEY_ALIAS` | `masroof` |
 | `RELEASE_KEY_PASSWORD` | Key password |
 
-Generate a keystore once:
-
-```bash
-keytool -genkey -v -keystore release.keystore -alias masroof \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
-
-Or use `./scripts/generate-release-keystore.sh` for a random password and local `keystore.properties`.
-
 ### 3. Create a GitHub read-only token (for your phone)
 
 1. GitHub → **Settings → Developer settings → Personal access tokens**
@@ -54,25 +45,19 @@ Or use `./scripts/generate-release-keystore.sh` for a random password and local 
 
 The token is stored in app-private storage on the device and is never committed to the repo.
 
-## Releasing a new version (cloud)
+### 4. Branch protection (recommended)
+
+See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
+
+## Releasing a new version
 
 1. Bump version in `app/build.gradle.kts`:
    - `appVersionCode` (must increase every release)
-   - `appVersionName` (display version, e.g. `0.2.1`)
-2. Commit and push to `main`.
-3. Tag and push:
+   - `appVersionName` (display version, e.g. `0.2.2`)
+2. Open a PR → wait for **CI** to pass → merge to `main`.
+3. **Release** workflow runs automatically and publishes `masroof-<version>.apk` + `version.json`.
 
-```bash
-git tag v0.2.1
-git push origin v0.2.1
-```
-
-4. GitHub Actions workflow **Release** runs on GitHub’s servers:
-   - Builds signed `assembleRelease`
-   - Generates `version.json` (version + SHA-256)
-   - Creates a GitHub Release with `masroof-<version>.apk` and `version.json`
-
-You can also run the workflow manually from **Actions → Release → Run workflow**.
+No manual `git tag` is required. Tagging `v*` still works as an optional trigger.
 
 ## Updating the app on your phone
 
@@ -96,4 +81,4 @@ Output: `app/build/outputs/apk/release/app-release.apk`
 
 - **Debug APK → release APK**: different signing keys; uninstall the debug build first, then install release.
 - **Private repo**: only devices with a valid read token can fetch updates.
-- **versionCode** in Gradle must match what CI publishes; the workflow reads it from `app/build.gradle.kts`.
+- **versionCode** in Gradle must increase for each release; the workflow reads it from `app/build.gradle.kts`.
