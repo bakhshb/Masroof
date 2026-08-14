@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,7 +44,19 @@ fun SectionHeader(
     icon: ImageVector,
     modifier: Modifier = Modifier,
 ) {
-    MasroofSectionTitle(title = title, modifier = modifier)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        MasroofSectionTitle(title = title)
+    }
 }
 
 @Composable
