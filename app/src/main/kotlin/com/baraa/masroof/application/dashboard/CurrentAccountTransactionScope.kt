@@ -44,6 +44,7 @@ internal data class CurrentAccountTransactionScope(
         parsedRecordsById: Map<String, ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
     ): Boolean {
+        if (tx.type == FinancialTransactionType.BILL_PAYMENT) return true
         if (tx.id in billPaymentTxIds) return true
         return linkedRecords(tx, parsedRecordsById).any { record ->
             record.event.messageFamily == MessageFamily.BILL_PAYMENT ||
@@ -177,6 +178,7 @@ internal data class CurrentAccountTransactionScope(
         private val TRUSTED_OWNED_SOURCE_TYPES = setOf(
             FinancialTransactionType.CASH_WITHDRAWAL,
             FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            FinancialTransactionType.BILL_PAYMENT,
             FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
             FinancialTransactionType.EXPENSE,
             FinancialTransactionType.FEE,

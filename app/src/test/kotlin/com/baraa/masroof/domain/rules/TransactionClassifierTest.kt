@@ -178,18 +178,17 @@ class TransactionClassifierTest {
     }
 
     @Test
-    fun billPayment_doesNotSilentlyBecomeExpense() {
+    fun billPayment_classifiesToBillPaymentType() {
         val result = TransactionClassifier.classify(
             ClassificationContext(messageFamily = MessageFamily.BILL_PAYMENT),
         )
 
-        assertTrue(result is ClassificationResult.NeedsReview)
-        val review = result as ClassificationResult.NeedsReview
-        assertTrue(review.tentativeType != FinancialTransactionType.EXPENSE)
-        assertEquals(null, review.tentativeType)
-        assertFalse(review.impact.countsAsExpense)
-        assertFalse(review.impact.countsAsIncome)
-        assertEquals(NetWorthEffect.UNRESOLVED, review.impact.netWorthEffect)
+        assertTrue(result is ClassificationResult.Classified)
+        val classified = result as ClassificationResult.Classified
+        assertEquals(FinancialTransactionType.BILL_PAYMENT, classified.transactionType)
+        assertTrue(classified.impact.countsAsExpense)
+        assertFalse(classified.impact.countsAsIncome)
+        assertEquals(NetWorthEffect.DECREASE, classified.impact.netWorthEffect)
     }
 
     @Test

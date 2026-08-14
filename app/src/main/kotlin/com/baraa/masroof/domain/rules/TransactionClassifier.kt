@@ -70,13 +70,10 @@ object TransactionClassifier {
                 )
 
             MessageFamily.BILL_PAYMENT ->
-                // No dedicated FinancialTransactionType and no explicit DOMAIN rule
-                // mapping bill payment → EXPENSE. Stay conservative.
-                ClassificationResult.NeedsReview(
-                    tentativeType = null,
+                classified(
+                    type = FinancialTransactionType.BILL_PAYMENT,
                     transferOwnership = null,
-                    impact = FinancialImpactCalculator.unresolved(),
-                    reasons = listOf("bill_payment_financial_treatment_unresolved"),
+                    reasons = listOf("message_family_bill_payment"),
                 )
 
             MessageFamily.PURCHASE ->

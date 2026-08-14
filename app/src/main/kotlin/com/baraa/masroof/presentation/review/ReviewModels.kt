@@ -67,6 +67,7 @@ val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(
     FinancialTransactionType.CREDIT_CARD_PAYMENT,
     FinancialTransactionType.REFUND,
     FinancialTransactionType.CASH_WITHDRAWAL,
+    FinancialTransactionType.BILL_PAYMENT,
     FinancialTransactionType.FEE,
 )
 
@@ -97,6 +98,7 @@ fun FinancialTransactionType.toUiLabelRes(): Int =
         FinancialTransactionType.CREDIT_CARD_PAYMENT -> com.baraa.masroof.R.string.txn_type_card_payment
         FinancialTransactionType.REFUND -> com.baraa.masroof.R.string.txn_type_refund
         FinancialTransactionType.CASH_WITHDRAWAL -> com.baraa.masroof.R.string.txn_type_cash_withdrawal
+        FinancialTransactionType.BILL_PAYMENT -> com.baraa.masroof.R.string.txn_type_bill_payment
         FinancialTransactionType.FEE -> com.baraa.masroof.R.string.txn_type_fee
         FinancialTransactionType.ADJUSTMENT -> com.baraa.masroof.R.string.txn_type_adjustment
         FinancialTransactionType.SELF_TRANSFER -> com.baraa.masroof.R.string.txn_type_self_transfer

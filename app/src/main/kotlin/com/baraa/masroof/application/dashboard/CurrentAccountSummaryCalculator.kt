@@ -73,6 +73,11 @@ object CurrentAccountSummaryCalculator {
                     cashWithdrawals += amount
                 }
 
+                FinancialTransactionType.BILL_PAYMENT -> {
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
+                    billPayments += amount
+                }
+
                 FinancialTransactionType.EXPENSE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
@@ -93,7 +98,11 @@ object CurrentAccountSummaryCalculator {
                 FinancialTransactionType.FEE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    fees += amount
+                    if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
+                        billPayments += amount
+                    } else {
+                        fees += amount
+                    }
                 }
 
                 FinancialTransactionType.SELF_TRANSFER -> {
@@ -154,6 +163,7 @@ object CurrentAccountSummaryCalculator {
             val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
+                FinancialTransactionType.BILL_PAYMENT,
                 FinancialTransactionType.FEE,
                 -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) {

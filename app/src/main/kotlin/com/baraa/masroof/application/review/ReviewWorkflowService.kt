@@ -352,6 +352,7 @@ class ReviewWorkflowService(
                 null to (destAccountId ?: cardId)
 
             FinancialTransactionType.CASH_WITHDRAWAL,
+            FinancialTransactionType.BILL_PAYMENT,
             FinancialTransactionType.FEE,
             ->
                 sourceAccountId to null
@@ -414,6 +415,7 @@ class ReviewWorkflowService(
             FinancialTransactionType.CREDIT_CARD_PAYMENT,
             FinancialTransactionType.REFUND,
             FinancialTransactionType.CASH_WITHDRAWAL,
+            FinancialTransactionType.BILL_PAYMENT,
             FinancialTransactionType.FEE,
             FinancialTransactionType.ADJUSTMENT,
         )

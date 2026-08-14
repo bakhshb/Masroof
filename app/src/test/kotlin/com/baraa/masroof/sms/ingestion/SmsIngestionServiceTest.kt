@@ -16,6 +16,7 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -389,8 +390,7 @@ class SmsIngestionServiceTest {
         assertNotNull(rawRepo.getById(raw.id))
         assertNotNull(parsedRepo.findByRawSmsId(raw.id))
         assertEquals(MessageFamily.BILL_PAYMENT, parsedRepo.findByRawSmsId(raw.id)!!.event.messageFamily)
-        // Bill payment stays NeedsReview — no FT required for this boundary.
-        assertTrue(ftRepo.listAll().isEmpty() || ftRepo.findByRawSmsId(raw.id) != null)
+        assertEquals(FinancialTransactionType.BILL_PAYMENT, ftRepo.findByRawSmsId(raw.id)!!.type)
     }
 
     @Test
@@ -441,7 +441,14 @@ class SmsIngestionServiceTest {
             reconciliation = reconciliation,
             reviewQueueUpdater = updater,
         )
-        val raw = aljaziraBillPayment(id = "android-sms:p9-cancel", deviceId = "p9-cancel")
+        val raw = RawSms(
+            id = "android-sms:p9-cancel",
+            sender = "AlJazira",
+            body = transferBody(),
+            receivedAt = Instant.parse("2026-08-01T12:26:00Z"),
+            deviceMessageId = "p9-cancel",
+            bodyHash = SmsBodyHasher.sha256Hex(transferBody()),
+        )
         try {
             svc.ingest(raw)
             fail("expected CancellationException")

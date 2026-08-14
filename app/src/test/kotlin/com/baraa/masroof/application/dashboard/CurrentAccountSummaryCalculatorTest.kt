@@ -79,6 +79,66 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun billPayment_autoAssemblesToBillPaymentType() {
+        val owned = "account:bank_aljazira:3001"
+        val billTx = tx(
+            id = "bill",
+            type = FinancialTransactionType.BILL_PAYMENT,
+            amount = "210",
+            source = owned,
+            linked = listOf("evt-bill"),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(billTx),
+            parsedRecords = listOf(
+                parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT),
+            ),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.of("210.00", Currency.SAR), summary.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.posPurchases)
+        assertEquals(Money.zero(Currency.SAR), summary.fees)
+    }
+
+    @Test
+    fun feeWithBillPaymentWording_countsAsBillPayment() {
+        val owned = "account:bank_aljazira:3001"
+        val feeBill = tx(
+            id = "fee-bill",
+            type = FinancialTransactionType.FEE,
+            amount = "120.00",
+            source = owned,
+            linked = listOf("evt-fee-bill"),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(feeBill),
+            parsedRecords = listOf(
+                parsedRecord(
+                    id = "evt-fee-bill",
+                    family = MessageFamily.BILL_PAYMENT,
+                    sourceLast4 = "3001",
+                    rawBody = "سداد فاتورة\nالمفوتر: STC",
+                ),
+            ),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = mapOf(
+                "sms-evt-fee-bill" to RawSms(
+                    id = "sms-evt-fee-bill",
+                    sender = "AlJazira",
+                    body = "سداد فاتورة\nالمفوتر: STC",
+                    receivedAt = Instant.parse("2026-08-10T12:00:00Z"),
+                    deviceMessageId = "evt-fee-bill",
+                    bodyHash = "evt-fee-bill",
+                ),
+            ),
+        )
+        assertEquals(Money.of("120.00", Currency.SAR), summary.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.fees)
+    }
+
+    @Test
     fun billPaymentDetectedFromLinkedParsedEvent() {
         val accountId = "account:bank_aljazira:3001"
         val billTx = tx("bill", FinancialTransactionType.EXPENSE, "210", source = accountId, linked = listOf("evt-bill"))
