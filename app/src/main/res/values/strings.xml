@@ -107,6 +107,9 @@
     <string name="settings_data_section">البيانات والرسائل</string>
     <string name="settings_reparse_stored_hint">يعيد تحليل رسائل البنك المحفوظة على الجهاز. مفيد بعد تحديث التطبيق أو إذا بدا مبلغ أو تصنيف غير صحيح — دون إعادة استيراد من الهاتف.</string>
     <string name="settings_reparse_stored_example">مثال: مشتريات بالدولار تُحوَّل للريال إذا ورد سعر الصرف في الرسالة.</string>
+    <string name="settings_import_sms_title">استيراد رسائل البنك من الهاتف</string>
+    <string name="settings_import_sms_subtitle">يفحص صندوق الرسائل ويضيف العمليات الجديدة</string>
+    <string name="settings_import_sms_permission_denied">فعّل صلاحية الرسائل أولاً من الإعدادات</string>
     <string name="settings_export_title">تصدير البيانات</string>
     <string name="settings_export_subtitle">حفظ نسخة لنقلها إلى جوال آخر</string>
     <string name="settings_import_title">استيراد البيانات</string>
@@ -161,6 +164,21 @@
     <string name="bank_unknown">بنك غير معروف</string>
 
     <string name="dashboard_net_spending">صافي المصروفات</string>
+    <string name="dashboard_current_account_section">الحساب الجاري — حركة نقدية فعلية</string>
+    <string name="dashboard_current_account_net_title">صافي حركة الجاري</string>
+    <string name="dashboard_current_account_net_subtitle">ما دخل وخرج من حسابك</string>
+    <string name="dashboard_current_account_net_formula">وارد %1$s − صادر %2$s</string>
+    <string name="dashboard_current_account_inflows">وارد إلى الجاري</string>
+    <string name="dashboard_current_account_outflows">صادر من الجاري</string>
+    <string name="dashboard_external_in_short">حوالات واردة</string>
+    <string name="dashboard_external_out_short">تحويلات خارجية</string>
+    <string name="dashboard_bill_payments">سداد فواتير</string>
+    <string name="dashboard_pos_purchases">شراء نقاط بيع (مدى)</string>
+    <string name="dashboard_spending_split_title">ملخص إنفاقك</string>
+    <string name="dashboard_spending_from_account">من الحساب الجاري (نقد)</string>
+    <string name="dashboard_spending_on_card">على البطاقة (التزام)</string>
+    <string name="dashboard_spending_split_hint">شراء البطاقة يُسجّل التزاماً — يظهر في الجاري فقط عند تسديد البطاقة</string>
+    <string name="dashboard_credit_card_statement_day_hint">كشف الحساب يصدر يوم ١٠ من كل شهر</string>
     <string name="dashboard_period_summary_hint">ملخص فترة الراتب — لا يعرض رصيد الحساب البنكي</string>
     <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>
@@ -256,6 +274,11 @@
     <string name="dashboard_rescan_no_bank_sms">لا توجد رسائل بنك الجزيرة في صندوق الوارد</string>
     <string name="dashboard_rescan_no_transactions">وُجدت رسائل لكن لم تُحوَّل إلى عمليات بعد</string>
     <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
+    <string name="dashboard_rescan_permission_denied">لا يمكن استيراد الرسائل بدون صلاحية الوصول للرسائل</string>
+    <string name="dashboard_rescan_dismiss">إخفاء</string>
+    <string name="dashboard_sms_permission_title">صلاحية الرسائل غير مفعّلة</string>
+    <string name="dashboard_sms_permission_body">لاستيراد العمليات البنكية من صندوق الرسائل، اسمح لمصروف بقراءة الرسائل. السحب للتحديث يعيد تحميل البيانات فقط بدون هذه الصلاحية.</string>
+    <string name="dashboard_sms_permission_grant">السماح بقراءة الرسائل</string>
     <string name="dashboard_direction_out">صادر</string>
     <string name="dashboard_direction_in">وارد</string>
     <string name="dashboard_direction_income">دخل</string>

@@ -6,8 +6,10 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
@@ -312,6 +314,8 @@ class DashboardViewModelTest {
             DashboardOverview(
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
+                currentAccount = emptyCurrentAccount(),
+                spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
                 creditCards = emptyCreditCards(),
                 isCurrentPeriod = true,
@@ -346,6 +350,73 @@ class DashboardViewModelTest {
         assertEquals(listOf(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123")), vm.uiState.value.unknownCards)
     }
 
+    @Test
+    fun refreshWithSmsImport_withoutPermission_skipsRescanAndMarksDeniedState() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = false,
+            rescanService = {
+                rescanCalls++
+                SmsScanResult()
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(0, rescanCalls)
+        assertFalse(vm.uiState.value.smsPermissionGranted)
+    }
+
+    @Test
+    fun refreshWithSmsImport_withPermission_runsRescan() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = true,
+            rescanService = {
+                rescanCalls++
+                SmsScanResult(parsed = 1, scanned = 1, inserted = 1)
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(1, rescanCalls)
+        assertTrue(vm.uiState.value.smsPermissionGranted)
+        assertEquals(SmsRescanStatus.OK, vm.uiState.value.rescanStatus)
+    }
+
+    @Test
+    fun onAppResumed_afterPermissionGranted_triggersRescan() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var permissionGranted = false
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionStateProvider = { permissionGranted },
+            rescanService = {
+                rescanCalls++
+                SmsScanResult(parsed = 1, scanned = 1, inserted = 1)
+            },
+        )
+        vm.refresh()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.smsPermissionGranted)
+
+        permissionGranted = true
+        vm.onAppResumed()
+        advanceUntilIdle()
+
+        assertEquals(1, rescanCalls)
+        assertTrue(vm.uiState.value.smsPermissionGranted)
+    }
+
     private class FakeCardRegistry(
         vararg initial: CardRegistryEntry,
     ) : com.baraa.masroof.domain.repository.CardRegistryRepository {
@@ -370,6 +441,25 @@ class DashboardViewModelTest {
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
     }
 
+    private class FakeAccountRegistry(
+        vararg initial: com.baraa.masroof.domain.model.AccountRegistryEntry,
+    ) : com.baraa.masroof.domain.repository.AccountRegistryRepository {
+        private val entries = initial.toMutableList()
+
+        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
+
+        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
+
+        override suspend fun resolve(reference: AccountReference): OwnershipStatus =
+            entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }?.ownership
+                ?: OwnershipStatus.UNKNOWN
+
+        override suspend fun get(reference: AccountReference) =
+            entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
+
+        override suspend fun listAll() = entries.toList()
+    }
+
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
         val summary = state.summary
         if (summary != null) {
@@ -391,6 +481,8 @@ class DashboardViewModelTest {
                 spendingNet = SignedMoneyAmount.of(amount),
                 transactionCount = transactionCount,
             ),
+            currentAccount = emptyCurrentAccount(),
+            spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
             creditCards = emptyCreditCards(),
             isCurrentPeriod = period == currentPeriod,
@@ -407,14 +499,42 @@ class DashboardViewModelTest {
             currency = Currency.SAR,
         )
 
+    companion object {
+        fun emptyCurrentAccount(currency: Currency = Currency.SAR): CurrentAccountSummary =
+            CurrentAccountSummary(
+                currency = currency,
+                income = Money.zero(currency),
+                externalTransfersIn = Money.zero(currency),
+                creditCardPayments = Money.zero(currency),
+                billPayments = Money.zero(currency),
+                externalTransfersOut = Money.zero(currency),
+                cashWithdrawals = Money.zero(currency),
+                posPurchases = Money.zero(currency),
+                fees = Money.zero(currency),
+            )
+
+        fun emptySpendingSplit(currency: Currency = Currency.SAR): SpendingSplitSummary =
+            SpendingSplitSummary(
+                currency = currency,
+                fromCurrentAccount = Money.zero(currency),
+                onCreditCard = SignedMoneyAmount.zero(currency),
+            )
+    }
+
     private fun viewModel(
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
+        accountRegistry: com.baraa.masroof.domain.repository.AccountRegistryRepository = FakeAccountRegistry(),
+        permissionGranted: Boolean = true,
+        permissionStateProvider: () -> Boolean = { permissionGranted },
+        rescanService: suspend () -> SmsScanResult = { SmsScanResult() },
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
             cardRegistryRepository = cardRegistry,
-            rescanService = { SmsScanResult() },
+            accountRegistryRepository = accountRegistry,
+            rescanService = rescanService,
+            permissionStateProvider = permissionStateProvider,
             reclassificationService = TransactionReclassificationService(
                 financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
                     override suspend fun save(
@@ -508,6 +628,8 @@ class DashboardViewModelTest {
                 ?: DashboardOverview(
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
+                    currentAccount = DashboardViewModelTest.emptyCurrentAccount(),
+                    spendingSplit = DashboardViewModelTest.emptySpendingSplit(),
                     transactions = emptyList(),
                     creditCards = CreditCardsOverview(
                         cards = emptyList(),

@@ -17,6 +17,8 @@ import java.time.ZoneId
 data class DashboardOverview(
     val period: FinancialPeriod,
     val summary: MonthlyFinancialSummary,
+    val currentAccount: CurrentAccountSummary,
+    val spendingSplit: SpendingSplitSummary,
     /** All transactions in the selected period, newest first. */
     val transactions: List<FinancialTransaction>,
     val creditCards: CreditCardsOverview,
@@ -64,6 +66,18 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
+        val currentAccount = CurrentAccountSummaryCalculator.summarize(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+        )
+        val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+        )
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
@@ -100,6 +114,8 @@ class DashboardService(
         return DashboardOverview(
             period = period,
             summary = summary,
+            currentAccount = currentAccount,
+            spendingSplit = spendingSplit,
             transactions = transactions,
             creditCards = creditCards,
             isCurrentPeriod = period == current,

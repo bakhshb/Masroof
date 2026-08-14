@@ -68,6 +68,31 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun transferOutInter_d360BeneficiaryBank_realWorldShape() {
+        val result = parse(
+            """
+            عملية حوالة مالية صادرة مقبولة
+            خصمت من حساب: 3001
+            الى: براء ف. صالح بخ
+            مبلغ العملية: 100.00 SAR
+            المعرف البديل \الايبان : 2670
+            [بنك دال ثلاثمائة وستون]
+            في: 2026-08-14 18:41
+            رقم المعاملة: 2BTMS11841719460
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.TRANSFER_OUT, result.event.messageFamily)
+        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
+        assertEquals("2670", result.event.destinationAccountRef?.maskedNumber)
+        assertEquals(Bank.UNKNOWN, result.event.destinationAccountRef?.bank)
+        assertEquals(Money.of("100.00", Currency.SAR), result.event.amount)
+        assertEquals("براء ف. صالح بخ", result.event.counterparty)
+        assertEquals("2BTMS11841719460", result.details.transactionReference)
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+    }
+
+    @Test
     fun transferOutInter_sourceAlJazira_destinationUnknown() {
         val result = parse(
             """

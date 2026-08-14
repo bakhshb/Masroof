@@ -15,7 +15,10 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.sms.scanner.SmsScanFailure
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -34,8 +37,10 @@ import java.util.Locale
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
     private val cardRegistryRepository: CardRegistryRepository,
-    private val rescanService: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult,
+    private val accountRegistryRepository: AccountRegistryRepository,
+    private val rescanService: suspend () -> SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
+    private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
     private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -64,7 +69,54 @@ class DashboardViewModel(
     }
 
     fun refresh() {
+        syncSmsPermissionState()
         load(activePeriod, preserveSelectionId = _uiState.value.selectedTransactionId)
+    }
+
+    /**
+     * Pull-to-refresh: re-import inbox SMS when permission is granted, then reload the dashboard.
+     */
+    fun refreshWithSmsImport() {
+        syncSmsPermissionState()
+        if (!permissionStateProvider()) {
+            refresh()
+            return
+        }
+        if (rescanJob?.isActive == true) return
+        rescanJob = viewModelScope.launch {
+            _uiState.update { it.copy(rescanning = true, rescanStatus = null) }
+            try {
+                val result = rescanService()
+                _uiState.update {
+                    it.copy(
+                        rescanning = false,
+                        rescanStatus = mapRescanStatus(result),
+                    )
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(rescanning = false, rescanStatus = SmsRescanStatus.FAILED)
+                }
+            }
+            refresh()
+        }
+    }
+
+    fun onAppResumed() {
+        val granted = permissionStateProvider()
+        val wasGranted = _uiState.value.smsPermissionGranted
+        _uiState.update { it.copy(smsPermissionGranted = granted) }
+        if (granted && !wasGranted) {
+            rescanSms()
+        } else {
+            refresh()
+        }
+    }
+
+    fun clearRescanStatus() {
+        _uiState.update { it.copy(rescanStatus = null) }
     }
 
     fun goToPreviousPeriod() {
@@ -83,19 +135,22 @@ class DashboardViewModel(
     }
 
     fun rescanSms() {
+        syncSmsPermissionState()
+        if (!permissionStateProvider()) {
+            _uiState.update { it.copy(rescanStatus = SmsRescanStatus.PERMISSION_DENIED) }
+            return
+        }
         if (rescanJob?.isActive == true) return
         rescanJob = viewModelScope.launch {
             _uiState.update { it.copy(rescanning = true, rescanStatus = null) }
             try {
                 val result = rescanService()
-                val status = when {
-                    result.failure != null -> SmsRescanStatus.FAILED
-                    result.parsed == 0 && result.scanned == 0 -> SmsRescanStatus.NO_MESSAGES
-                    result.parsed == 0 && result.notRelevant == result.scanned -> SmsRescanStatus.NO_BANK_SMS
-                    result.parsed == 0 -> SmsRescanStatus.NO_TRANSACTIONS
-                    else -> SmsRescanStatus.OK
+                _uiState.update {
+                    it.copy(
+                        rescanning = false,
+                        rescanStatus = mapRescanStatus(result),
+                    )
                 }
-                _uiState.update { it.copy(rescanning = false, rescanStatus = status) }
                 refresh()
             } catch (ce: CancellationException) {
                 throw ce
@@ -104,6 +159,22 @@ class DashboardViewModel(
             }
         }
     }
+
+    private fun syncSmsPermissionState() {
+        _uiState.update { it.copy(smsPermissionGranted = permissionStateProvider()) }
+    }
+
+    private fun mapRescanStatus(result: SmsScanResult): SmsRescanStatus =
+        when (result.failure) {
+            SmsScanFailure.PermissionDenied -> SmsRescanStatus.PERMISSION_DENIED
+            is SmsScanFailure.ProviderError -> SmsRescanStatus.FAILED
+            null -> when {
+                result.parsed == 0 && result.scanned == 0 -> SmsRescanStatus.NO_MESSAGES
+                result.parsed == 0 && result.notRelevant == result.scanned -> SmsRescanStatus.NO_BANK_SMS
+                result.parsed == 0 -> SmsRescanStatus.NO_TRANSACTIONS
+                else -> SmsRescanStatus.OK
+            }
+        }
 
     fun openTransactionDetail(transactionId: String) {
         _uiState.update {
@@ -188,6 +259,8 @@ class DashboardViewModel(
                         periodLabel = periodLabel,
                         periodAdjustmentHint = periodAdjustmentHint,
                         summary = null,
+                        currentAccount = null,
+                        spendingSplit = null,
                         creditCards = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
@@ -199,6 +272,7 @@ class DashboardViewModel(
                 val overview = overviewLoader.loadOverview(period)
                 val unknownCards = loadUnknownCards()
                 val ownedCards = loadOwnedCards()
+                val ownedAccounts = loadOwnedAccounts()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -212,6 +286,8 @@ class DashboardViewModel(
                         periodLabel = loadedLabel,
                         periodAdjustmentHint = loadedHint,
                         summary = overview.summary,
+                        currentAccount = overview.currentAccount,
+                        spendingSplit = overview.spendingSplit,
                         creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
@@ -220,6 +296,7 @@ class DashboardViewModel(
                         selectedTransactionId = preserveSelectionId,
                         unknownCards = unknownCards,
                         ownedCards = ownedCards,
+                        ownedAccounts = ownedAccounts,
                     )
                 }
             } catch (ce: CancellationException) {
@@ -245,6 +322,8 @@ class DashboardViewModel(
                             periodLabel = periodLabel,
                             periodAdjustmentHint = periodAdjustmentHint,
                             summary = null,
+                            currentAccount = null,
+                            spendingSplit = null,
                             creditCards = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
@@ -286,6 +365,12 @@ class DashboardViewModel(
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN }
             .map { UnknownCardCandidateUi(bank = it.bank, last4 = it.last4) }
             .sortedBy { it.last4 }
+
+    private suspend fun loadOwnedAccounts(): List<OwnedAccountUi> =
+        accountRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
+            .map { OwnedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber) }
+            .sortedBy { it.maskedNumber }
 
     private suspend fun loadOwnedCards(): List<OwnedCardUi> =
         cardRegistryRepository.listAll()

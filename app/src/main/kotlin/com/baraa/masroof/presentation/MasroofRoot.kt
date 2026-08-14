@@ -102,6 +102,8 @@ fun MasroofRoot(
                 onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
+                onRequestSmsPermission = onRequestPermissions,
+                onOpenAppSettings = onOpenAppSettings,
             )
             HomeDestination.Review -> ReviewRoute(
                 viewModel = reviewViewModel,
@@ -129,6 +131,8 @@ fun MasroofRoot(
                 onLocaleChanged = onLocaleChanged,
                 onRequestExport = onRequestExport,
                 onRequestImport = onRequestImport,
+                onRequestSmsPermission = onRequestPermissions,
+                onOpenAppSettings = onOpenAppSettings,
             )
         }
     } else {
