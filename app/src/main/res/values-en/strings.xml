@@ -168,9 +168,14 @@
     <string name="dashboard_bill_payments">Bill payments</string>
     <string name="dashboard_pos_purchases">POS purchases (mada)</string>
     <string name="dashboard_spending_split_title">Spending summary</string>
-    <string name="dashboard_spending_from_account">From current account (cash)</string>
-    <string name="dashboard_spending_on_card">On credit card (liability)</string>
-    <string name="dashboard_spending_split_hint">Card purchases are liability until you pay the card from your account</string>
+    <string name="dashboard_spending_from_account">Mada POS &amp; bills</string>
+    <string name="dashboard_spending_on_card">Card purchases</string>
+    <string name="dashboard_spending_total">Total spending</string>
+    <string name="dashboard_spending_split_account_hint">Matches «POS purchases (mada)» in the current account section — excludes transfers, cash, and card settlement</string>
+    <string name="dashboard_spending_split_excluded">Not included here: transfers %1$s • cash %2$s • card payment %3$s</string>
+    <string name="dashboard_spending_split_card_hint">Card purchases are liability until you pay from your account — card settlement appears under outflows, not here</string>
+    <string name="dashboard_spending_split_other_cards">Includes other cards not shown above: +%1$s</string>
+    <string name="dashboard_spending_split_unknown_cards">%1$d unregistered card(s) — register them in Settings to see details</string>
     <string name="dashboard_credit_card_statement_day_hint">Statement is issued on the 10th of each month</string>
     <string name="dashboard_period_summary_hint">Salary period summary — does not show your live bank balance</string>
     <string name="dashboard_salary_period_label">Salary period: %1$s</string>

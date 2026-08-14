@@ -199,8 +199,12 @@ private fun DashboardScreen(
                 }
 
                 SpendingSplitSection(
-                    fromCurrentAccount = spendingSplit.fromCurrentAccount,
-                    onCreditCard = spendingSplit.onCreditCard,
+                    spendingSplit = spendingSplit,
+                    currentAccount = currentAccount,
+                    followedCardsSpending = state.creditCards?.followedSalarySpendingTotal(
+                        state.ownedCards.map { it.last4 }.toSet(),
+                    ),
+                    unknownCardCount = state.unknownCards.size,
                 )
 
                 if (summary.refunds.amount.signum() > 0) {

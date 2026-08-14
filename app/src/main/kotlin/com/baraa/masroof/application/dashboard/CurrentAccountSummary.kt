@@ -60,6 +60,15 @@ data class SpendingSplitSummary(
     val fromCurrentAccount: Money,
     val onCreditCard: SignedMoneyAmount,
 ) {
+    /** Purchases and bills (mada + bills), excluding transfers, cash, and card settlement. */
+    val totalNet: SignedMoneyAmount
+        get() {
+            val net = fromCurrentAccount.amount
+                .add(onCreditCard.amount)
+                .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
+            return SignedMoneyAmount(net, currency)
+        }
+
     init {
         require(fromCurrentAccount.currency == currency)
         require(onCreditCard.currency == currency)

@@ -175,9 +175,14 @@
     <string name="dashboard_bill_payments">سداد فواتير</string>
     <string name="dashboard_pos_purchases">شراء نقاط بيع (مدى)</string>
     <string name="dashboard_spending_split_title">ملخص إنفاقك</string>
-    <string name="dashboard_spending_from_account">من الحساب الجاري (نقد)</string>
-    <string name="dashboard_spending_on_card">على البطاقة (التزام)</string>
-    <string name="dashboard_spending_split_hint">شراء البطاقة يُسجّل التزاماً — يظهر في الجاري فقط عند تسديد البطاقة</string>
+    <string name="dashboard_spending_from_account">شراء مدى وفواتير</string>
+    <string name="dashboard_spending_on_card">مشتريات البطاقة</string>
+    <string name="dashboard_spending_total">إجمالي الإنفاق</string>
+    <string name="dashboard_spending_split_account_hint">يطابق «شراء نقاط بيع (مدى)» في قسم الجاري — لا يشمل التحويلات أو السحب أو سداد البطاقة</string>
+    <string name="dashboard_spending_split_excluded">غير مشمول هنا: تحويلات %1$s • سحب %2$s • سداد بطاقة %3$s</string>
+    <string name="dashboard_spending_split_card_hint">شراء البطاقة التزام حتى تسدّده من الجاري — سداد البطاقة يظهر في «صادر من الجاري» وليس هنا</string>
+    <string name="dashboard_spending_split_other_cards">يشمل بطاقات أخرى غير المعروضة أعلاه: +%1$s</string>
+    <string name="dashboard_spending_split_unknown_cards">توجد %1$d بطاقة غير مسجّلة — سجّلها من الإعدادات لعرض تفاصيلها</string>
     <string name="dashboard_credit_card_statement_day_hint">كشف الحساب يصدر يوم ١٠ من كل شهر</string>
     <string name="dashboard_period_summary_hint">ملخص فترة الراتب — لا يعرض رصيد الحساب البنكي</string>
     <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>

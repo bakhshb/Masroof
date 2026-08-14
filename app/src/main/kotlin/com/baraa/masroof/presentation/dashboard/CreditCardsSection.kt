@@ -22,10 +22,12 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
+import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -209,3 +211,16 @@ private fun formatSnapshotTime(
 
 fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview =
     copy(cards = cards.filter { it.last4 in ownedLast4s })
+
+fun CreditCardsOverview.followedSalarySpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount {
+    val followed = cards.filter { it.last4 in ownedLast4s }
+    if (followed.isEmpty()) return SignedMoneyAmount.zero(currency)
+    var sum = java.math.BigDecimal.ZERO
+    for (row in followed) {
+        sum = sum.add(row.salaryPeriodSpendingNet.amount)
+    }
+    return SignedMoneyAmount(
+        sum.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN),
+        currency,
+    )
+}

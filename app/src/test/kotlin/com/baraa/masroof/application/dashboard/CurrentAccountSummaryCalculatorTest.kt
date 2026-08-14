@@ -57,6 +57,20 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun spendingSplit_totalNet_sumsAccountAndCard() {
+        val accountId = "account:bank_aljazira:3001"
+        val cardId = "card:bank_aljazira:7271"
+        val split = CurrentAccountSummaryCalculator.spendingSplit(
+            transactions = listOf(
+                tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId),
+                tx("card", FinancialTransactionType.EXPENSE, "75", source = cardId),
+            ),
+            parsedRecords = emptyList(),
+        )
+        assertEquals(SignedMoneyAmount.of(Money.of("165.00", Currency.SAR)), split.totalNet)
+    }
+
+    @Test
     fun spendingSplit_separatesAccountAndCard() {
         val accountId = "account:bank_aljazira:3001"
         val cardId = "card:bank_aljazira:7271"
