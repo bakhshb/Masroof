@@ -101,7 +101,16 @@ fun SettingsRoute(
 
         SettingsDestination.About -> SettingsAboutScreen(
             appVersion = state.appVersion,
+            githubTokenConfigured = state.githubTokenConfigured,
+            updateState = state.updateState,
+            updateMessage = state.updateMessage,
             onBack = { destination = SettingsDestination.Hub },
+            onSaveGithubToken = viewModel::saveGithubToken,
+            onClearGithubToken = viewModel::clearGithubToken,
+            onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
+            onDownloadUpdate = viewModel::downloadUpdate,
+            onInstallUpdate = viewModel::installPendingUpdate,
+            onClearUpdateMessage = viewModel::clearUpdateMessage,
         )
     }
 }

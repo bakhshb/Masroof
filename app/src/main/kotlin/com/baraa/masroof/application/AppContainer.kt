@@ -11,11 +11,18 @@ import com.baraa.masroof.application.transaction.TransactionReconciliationServic
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.update.ApkInstaller
+import com.baraa.masroof.application.update.AppUpdateService
+import com.baraa.masroof.application.update.GitHubReleaseClient
+import com.baraa.masroof.application.update.UpdateChecker
+import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.presentation.locale.AppLocaleContext
+import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
@@ -278,7 +285,35 @@ class AppContainer(
             appContext = appContext,
             database = database,
             closeDatabase = { database.close() },
-            appVersionName = com.baraa.masroof.BuildConfig.VERSION_NAME,
+            appVersionName = BuildConfig.VERSION_NAME,
         )
+    }
+
+    val githubTokenRepository: com.baraa.masroof.application.update.GitHubTokenRepository =
+        SharedPrefsGitHubTokenRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsGitHubTokenRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
+    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
+
+    val appUpdateService: AppUpdateService by lazy {
+        AppUpdateService(
+            context = appContext,
+            tokenRepository = githubTokenRepository,
+            releaseClient =
+                GitHubReleaseClient(
+                    httpClient = updateHttpClient,
+                    owner = BuildConfig.GITHUB_OWNER,
+                    repo = BuildConfig.GITHUB_REPO,
+                ),
+            updateChecker = UpdateChecker(installedVersionCode = BuildConfig.VERSION_CODE),
+        )
+    }
+
+    val apkInstaller: ApkInstaller by lazy {
+        ApkInstaller(appContext)
     }
 }

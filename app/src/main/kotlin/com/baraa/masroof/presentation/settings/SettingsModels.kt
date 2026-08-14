@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.OwnershipStatus
 
@@ -36,6 +37,9 @@ data class SettingsUiState(
     val awaitingImportConfirm: Boolean = false,
     val backupMessage: BackupMessage? = null,
     val error: SettingsError? = null,
+    val githubTokenConfigured: Boolean = false,
+    val updateState: AppUpdateUiState = AppUpdateUiState.Idle,
+    val updateMessage: AppUpdateMessage? = null,
 )
 
 enum class BackupMessage {
@@ -47,6 +51,41 @@ enum class BackupMessage {
 
 enum class SettingsError {
     UPDATE_FAILED,
+}
+
+enum class AppUpdateMessage {
+    UP_TO_DATE,
+    UPDATE_AVAILABLE,
+    DOWNLOAD_SUCCESS,
+    TOKEN_SAVED,
+    TOKEN_REQUIRED,
+    AUTH_FAILED,
+    CHECK_FAILED,
+    DOWNLOAD_FAILED,
+    INSTALL_FAILED,
+    INSTALL_PERMISSION_REQUIRED,
+}
+
+sealed interface AppUpdateUiState {
+    data object Idle : AppUpdateUiState
+
+    data object Checking : AppUpdateUiState
+
+    data object UpToDate : AppUpdateUiState
+
+    data class Available(
+        val manifest: UpdateManifest,
+    ) : AppUpdateUiState
+
+    data class Downloading(
+        val manifest: UpdateManifest,
+        val bytesRead: Long,
+        val totalBytes: Long,
+    ) : AppUpdateUiState
+
+    data class ReadyToInstall(
+        val manifest: UpdateManifest,
+    ) : AppUpdateUiState
 }
 
 enum class SettingsDestination {

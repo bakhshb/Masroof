@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.baraa.masroof.application.backup.BackupPackageFormat
 import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.update.InstallPermissionHelper
 import com.baraa.masroof.presentation.MasroofRoot
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
 import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
@@ -39,6 +40,7 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
+    private var silentUpdateCheckDone = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(
@@ -69,6 +71,9 @@ class MainActivity : ComponentActivity() {
             container = container,
             appVersion = BuildConfig.VERSION_NAME,
             onThemeModeChanged = { mode -> themeModeState.value = mode },
+            onRequestInstallPermission = {
+                startActivity(InstallPermissionHelper.buildManageUnknownSourcesIntent(this))
+            },
         )
     }
 
@@ -157,9 +162,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         onboardingViewModel.reloadFromCurrentState()
+        settingsViewModel.retryInstallAfterPermissionGranted()
         if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
             dashboardViewModel.refresh()
             reviewViewModel.refresh()
+            if (!silentUpdateCheckDone) {
+                silentUpdateCheckDone = true
+                settingsViewModel.checkForUpdates(silent = true)
+            }
         }
     }
 
