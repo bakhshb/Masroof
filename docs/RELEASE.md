@@ -51,13 +51,11 @@ See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
 
 ## Releasing a new version
 
-1. Bump version in `app/build.gradle.kts`:
-   - `appVersionCode` (must increase every release)
-   - `appVersionName` (display version, e.g. `0.2.2`)
-2. Open a PR → wait for **CI** to pass → merge to `main`.
-3. **Release** workflow runs automatically and publishes `masroof-<version>.apk` + `version.json`.
+1. Open a PR with your changes (version bump is **automatic** on merge).
+2. Wait for **CI** to pass → merge to `main`.
+3. **Release** workflow bumps version, builds APK, publishes GitHub Release, and commits the new version to `main`.
 
-No manual `git tag` is required. Tagging `v*` still works as an optional trigger.
+No manual `git tag` or version edit in Gradle is required.
 
 ## Updating the app on your phone
 
@@ -81,4 +79,4 @@ Output: `app/build/outputs/apk/release/app-release.apk`
 
 - **Debug APK → release APK**: different signing keys; uninstall the debug build first, then install release.
 - **Private repo**: only devices with a valid read token can fetch updates.
-- **versionCode** in Gradle must increase for each release; the workflow reads it from `app/build.gradle.kts`.
+- **versionCode** increases automatically on each merge to `main` (committed back by Release workflow).
