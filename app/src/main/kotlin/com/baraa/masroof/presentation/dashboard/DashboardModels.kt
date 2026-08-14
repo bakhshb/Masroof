@@ -1,7 +1,9 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -17,6 +19,11 @@ data class UnknownCardCandidateUi(
 data class OwnedCardUi(
     val bank: Bank,
     val last4: String,
+)
+
+data class OwnedAccountUi(
+    val bank: Bank,
+    val maskedNumber: String,
 )
 
 enum class TransactionDirectionUi {
@@ -49,6 +56,8 @@ data class DashboardUiState(
     val periodLabel: String = "",
     val periodAdjustmentHint: String? = null,
     val summary: MonthlyFinancialSummary? = null,
+    val currentAccount: CurrentAccountSummary? = null,
+    val spendingSplit: SpendingSplitSummary? = null,
     val creditCards: CreditCardsOverview? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
     val allTransactions: List<TransactionPreviewUi> = emptyList(),
@@ -63,6 +72,7 @@ data class DashboardUiState(
     val reclassifySuccess: Boolean = false,
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
+    val ownedAccounts: List<OwnedAccountUi> = emptyList(),
     val smsPermissionGranted: Boolean = true,
 )
 

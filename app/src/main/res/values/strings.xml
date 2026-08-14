@@ -164,6 +164,21 @@
     <string name="bank_unknown">بنك غير معروف</string>
 
     <string name="dashboard_net_spending">صافي المصروفات</string>
+    <string name="dashboard_current_account_section">الحساب الجاري — حركة نقدية فعلية</string>
+    <string name="dashboard_current_account_net_title">صافي حركة الجاري</string>
+    <string name="dashboard_current_account_net_subtitle">ما دخل وخرج من حسابك</string>
+    <string name="dashboard_current_account_net_formula">وارد %1$s − صادر %2$s</string>
+    <string name="dashboard_current_account_inflows">وارد إلى الجاري</string>
+    <string name="dashboard_current_account_outflows">صادر من الجاري</string>
+    <string name="dashboard_external_in_short">حوالات واردة</string>
+    <string name="dashboard_external_out_short">تحويلات خارجية</string>
+    <string name="dashboard_bill_payments">سداد فواتير</string>
+    <string name="dashboard_pos_purchases">شراء نقاط بيع (مدى)</string>
+    <string name="dashboard_spending_split_title">ملخص إنفاقك</string>
+    <string name="dashboard_spending_from_account">من الحساب الجاري (نقد)</string>
+    <string name="dashboard_spending_on_card">على البطاقة (التزام)</string>
+    <string name="dashboard_spending_split_hint">شراء البطاقة يُسجّل التزاماً — يظهر في الجاري فقط عند تسديد البطاقة</string>
+    <string name="dashboard_credit_card_statement_day_hint">كشف الحساب يصدر يوم ١٠ من كل شهر</string>
     <string name="dashboard_period_summary_hint">ملخص فترة الراتب — لا يعرض رصيد الحساب البنكي</string>
     <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>

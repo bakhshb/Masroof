@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.sms.scanner.SmsScanFailure
 import com.baraa.masroof.sms.scanner.SmsScanResult
@@ -36,6 +37,7 @@ import java.util.Locale
 class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
     private val cardRegistryRepository: CardRegistryRepository,
+    private val accountRegistryRepository: AccountRegistryRepository,
     private val rescanService: suspend () -> SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
     private val permissionStateProvider: () -> Boolean,
@@ -257,6 +259,8 @@ class DashboardViewModel(
                         periodLabel = periodLabel,
                         periodAdjustmentHint = periodAdjustmentHint,
                         summary = null,
+                        currentAccount = null,
+                        spendingSplit = null,
                         creditCards = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
@@ -268,6 +272,7 @@ class DashboardViewModel(
                 val overview = overviewLoader.loadOverview(period)
                 val unknownCards = loadUnknownCards()
                 val ownedCards = loadOwnedCards()
+                val ownedAccounts = loadOwnedAccounts()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -281,6 +286,8 @@ class DashboardViewModel(
                         periodLabel = loadedLabel,
                         periodAdjustmentHint = loadedHint,
                         summary = overview.summary,
+                        currentAccount = overview.currentAccount,
+                        spendingSplit = overview.spendingSplit,
                         creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
@@ -289,6 +296,7 @@ class DashboardViewModel(
                         selectedTransactionId = preserveSelectionId,
                         unknownCards = unknownCards,
                         ownedCards = ownedCards,
+                        ownedAccounts = ownedAccounts,
                     )
                 }
             } catch (ce: CancellationException) {
@@ -314,6 +322,8 @@ class DashboardViewModel(
                             periodLabel = periodLabel,
                             periodAdjustmentHint = periodAdjustmentHint,
                             summary = null,
+                            currentAccount = null,
+                            spendingSplit = null,
                             creditCards = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
@@ -355,6 +365,12 @@ class DashboardViewModel(
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN }
             .map { UnknownCardCandidateUi(bank = it.bank, last4 = it.last4) }
             .sortedBy { it.last4 }
+
+    private suspend fun loadOwnedAccounts(): List<OwnedAccountUi> =
+        accountRegistryRepository.listAll()
+            .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
+            .map { OwnedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber) }
+            .sortedBy { it.maskedNumber }
 
     private suspend fun loadOwnedCards(): List<OwnedCardUi> =
         cardRegistryRepository.listAll()

@@ -30,13 +30,11 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
 import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
-import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.ForeignCurrencyNotice
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.LongPullToRefreshBox
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MetricHighlightCard
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.SmsPermissionNotice
 import com.baraa.masroof.presentation.common.SmsRescanStatusNotice
@@ -177,71 +175,17 @@ private fun DashboardScreen(
 
             else -> {
                 val summary = state.summary
-                if (summary != null) {
-                MetricHighlightCard(
-                    title = stringResource(R.string.dashboard_net_spending),
-                    value = formatLocalizedMoney(summary.spendingNet),
-                    icon = MasroofIcons.netSpending,
-                    subtitle = if (summary.refunds.amount.signum() > 0) {
-                        stringResource(
-                            R.string.dashboard_gross_before_refunds,
-                            formatLocalizedMoney(summary.spendingGross),
-                        )
-                    } else {
-                        null
-                    },
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryMiniCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(R.string.dashboard_income),
-                        value = formatLocalizedMoney(summary.income),
-                        icon = MasroofIcons.income,
-                    )
-                    SummaryMiniCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(R.string.dashboard_refunds),
-                        value = formatLocalizedMoney(summary.refunds),
-                        icon = MasroofIcons.refunds,
-                    )
+                val currentAccount = state.currentAccount
+                val spendingSplit = state.spendingSplit
+                if (summary != null && currentAccount != null && spendingSplit != null) {
+                val accountBadge = state.ownedAccounts.firstOrNull()?.let { account ->
+                    "···${account.maskedNumber}"
                 }
 
-                MetricHighlightCard(
-                    title = stringResource(R.string.dashboard_net_cash_flow),
-                    value = formatLocalizedMoney(summary.netCashFlow),
-                    icon = MasroofIcons.netCashFlow,
+                CurrentAccountSection(
+                    summary = currentAccount,
+                    accountBadge = accountBadge,
                 )
-
-                SectionHeader(
-                    title = stringResource(R.string.dashboard_money_movement),
-                    icon = MasroofIcons.moneyMovement,
-                )
-                MovementRow(
-                    stringResource(R.string.dashboard_combined_incoming),
-                    summary.combinedIncoming,
-                    MasroofIcons.income,
-                )
-                MovementRow(stringResource(R.string.dashboard_external_in), summary.externalTransfersIn, MasroofIcons.externalIn)
-                if (summary.income.amount.signum() > 0 && summary.externalTransfersIn.amount.signum() == 0) {
-                    Text(
-                        stringResource(R.string.dashboard_external_in_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                MovementRow(stringResource(R.string.dashboard_external_out), summary.externalTransfersOut, MasroofIcons.externalOut)
-                MovementRow(stringResource(R.string.dashboard_card_payments), summary.creditCardPayments, MasroofIcons.cardPayment)
-                MovementRow(stringResource(R.string.dashboard_cash_withdrawals), summary.cashWithdrawals, MasroofIcons.cashWithdrawal)
-                MovementRow(stringResource(R.string.dashboard_self_transfers), summary.selfTransfers, MasroofIcons.selfTransfer)
-
-                state.unknownCards.firstOrNull()?.let { firstUnknown ->
-                    UnregisteredCardsNotice(
-                        firstLast4 = firstUnknown.last4,
-                        extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
-                        onOpenSettings = onOpenSettings,
-                    )
-                }
 
                 state.creditCards?.let { creditCards ->
                     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
@@ -254,10 +198,32 @@ private fun DashboardScreen(
                     }
                 }
 
+                SpendingSplitSection(
+                    fromCurrentAccount = spendingSplit.fromCurrentAccount,
+                    onCreditCard = spendingSplit.onCreditCard,
+                )
+
+                if (summary.refunds.amount.signum() > 0) {
+                    SummaryMiniCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = stringResource(R.string.dashboard_refunds),
+                        value = formatLocalizedMoney(summary.refunds),
+                        icon = MasroofIcons.refunds,
+                    )
+                }
+
                 SectionHeader(
                     title = stringResource(R.string.dashboard_recent_title),
                     icon = MasroofIcons.recentTransactions,
                 )
+
+                state.unknownCards.firstOrNull()?.let { firstUnknown ->
+                    UnregisteredCardsNotice(
+                        firstLast4 = firstUnknown.last4,
+                        extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
+                        onOpenSettings = onOpenSettings,
+                    )
+                }
                 if (summary.transactionCount == 0) {
                     Text(stringResource(R.string.dashboard_empty_period))
                     Spacer(Modifier.height(8.dp))
@@ -434,15 +400,6 @@ private fun PeriodSelector(
             )
         }
     }
-}
-
-@Composable
-private fun MovementRow(title: String, value: Money, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    IconLabelRow(
-        icon = icon,
-        label = title,
-        trailing = formatLocalizedMoney(value),
-    )
 }
 
 @Composable

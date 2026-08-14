@@ -20,6 +20,7 @@ class DashboardViewModelFactory(
         return DashboardViewModel(
             overviewLoader = container.dashboardService,
             cardRegistryRepository = container.cardRegistryRepository,
+            accountRegistryRepository = container.accountRegistryRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
             permissionStateProvider = permissionStateProvider,
