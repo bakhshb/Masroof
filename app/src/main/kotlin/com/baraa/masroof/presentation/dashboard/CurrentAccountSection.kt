@@ -156,35 +156,28 @@ fun CurrentAccountSection(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FlowRow(
+                    OutflowRow(
                         label = stringResource(R.string.dashboard_external_out_short),
                         amount = summary.externalTransfersOut,
-                        positive = false,
                     )
-                    FlowRow(
-                        label = stringResource(R.string.dashboard_card_payments),
+                    OutflowRow(
+                        label = stringResource(R.string.dashboard_credit_card_payment),
                         amount = summary.creditCardPayments,
-                        positive = false,
                     )
-                    FlowRow(
+                    OutflowRow(
                         label = stringResource(R.string.dashboard_cash_withdrawals),
                         amount = summary.cashWithdrawals,
-                        positive = false,
                     )
-                    if (summary.billPayments.amount.signum() > 0) {
-                        FlowRow(
-                            label = stringResource(R.string.dashboard_bill_payments),
-                            amount = summary.billPayments,
-                            positive = false,
-                        )
-                    }
-                    FlowRow(
-                        label = stringResource(R.string.dashboard_pos_purchases),
+                    OutflowRow(
+                        label = stringResource(R.string.dashboard_bill_payments),
+                        amount = summary.billPayments,
+                    )
+                    OutflowRow(
+                        label = stringResource(R.string.dashboard_pos_purchases_short),
                         amount = summary.posPurchases + summary.fees,
-                        positive = false,
                     )
                     TotalRow(
-                        label = stringResource(R.string.dashboard_total_outflow),
+                        label = stringResource(R.string.dashboard_total_spent),
                         amount = summary.totalOutflow,
                         amountColor = MaterialTheme.colorScheme.error,
                     )
@@ -266,6 +259,11 @@ fun SpendingSplitSection(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    stringResource(R.string.dashboard_spending_breakdown_formula),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (spendingSplit.creditCardPurchases.amount.signum() > 0) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -298,6 +296,30 @@ fun SpendingSplitSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OutflowRow(
+    label: String,
+    amount: Money,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "↓ $label",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            formatLocalizedMoney(amount),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
