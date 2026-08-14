@@ -20,16 +20,16 @@ Branch → open PR → CI runs (must pass)
 
 ## What you do for each release
 
-1. On your branch, bump in `app/build.gradle.kts`:
-   - `appVersionCode` — must increase every time
-   - `appVersionName` — e.g. `0.2.2`
-2. Commit, push branch, open PR.
-3. Wait for **CI** to pass (or fix failures).
-4. Merge PR to `main`.
-5. **Release** runs automatically — no `git tag` needed.
-6. Download from GitHub Releases or use in-app update on your phone.
+1. Open a PR with your code changes (**do not** edit version in `app/build.gradle.kts`).
+2. Wait for **CI** to pass.
+3. Merge PR to `main`.
+4. **Release** automatically:
+   - bumps `appVersionCode` (+1) and patch `appVersionName` (e.g. `0.2.1` → `0.2.2`)
+   - builds signed APK and publishes GitHub Release
+   - commits the version bump back to `main`
+5. Update on your phone via Settings → About or wait for in-app update check.
 
-If you merge without bumping the version, Release skips (release for that version already exists).
+Every merge to `main` produces a new version. Merge only when you want to ship.
 
 ## What you do once (already done if you followed RELEASE.md)
 
