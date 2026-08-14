@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -9,20 +11,58 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve version and tag
+        id: version
+        run: |
+          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${VERSION_NAME}"
+          fi
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
+
+      - name: Skip if release already published
+        id: skip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${TAG} already exists — skipping build."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "No existing release for ${TAG} — will build."
+          fi
+
       - name: Set up JDK 17
+        if: steps.skip.outputs.skip != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Decode release keystore
+        if: steps.skip.outputs.skip != 'true'
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
@@ -33,6 +73,7 @@ jobs:
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
 
       - name: Create keystore.properties
+        if: steps.skip.outputs.skip != 'true'
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -46,12 +87,14 @@ jobs:
           EOF
 
       - name: Build release APK
+        if: steps.skip.outputs.skip != 'true'
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare release artifacts
+        if: steps.skip.outputs.skip != 'true'
         run: |
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
           APK_PATH="app/build/outputs/apk/release/app-release.apk"
           RELEASE_APK="masroof-${VERSION_NAME}.apk"
           cp "$APK_PATH" "$RELEASE_APK"
@@ -67,8 +110,11 @@ jobs:
           cat version.json
 
       - name: Publish GitHub Release
+        if: steps.skip.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           files: |
             masroof-*.apk
             version.json
