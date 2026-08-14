@@ -172,6 +172,8 @@ class SettingsViewModelTest {
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
+            importSmsFromInbox = { com.baraa.masroof.sms.scanner.SmsScanResult() },
+            permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
             appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),

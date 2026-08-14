@@ -45,6 +45,8 @@ fun SettingsRoute(
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onRequestSmsPermission: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -66,6 +68,10 @@ fun SettingsRoute(
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
             onReparseStored = viewModel::reparseStoredMessages,
+            onImportSms = viewModel::importSmsFromPhone,
+            onClearSmsImportMessage = viewModel::clearSmsImportMessage,
+            onRequestSmsPermission = onRequestSmsPermission,
+            onOpenAppSettings = onOpenAppSettings,
             onSelectLanguage = { tag ->
                 viewModel.setLanguageTag(tag, onLocaleChanged)
             },
@@ -126,6 +132,10 @@ private fun SettingsHubScreen(
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
+    onImportSms: () -> Unit,
+    onClearSmsImportMessage: () -> Unit,
+    onRequestSmsPermission: () -> Unit,
+    onOpenAppSettings: () -> Unit,
     onSelectLanguage: (String) -> Unit,
     onSelectTheme: (ThemeMode) -> Unit,
     onRequestExport: () -> Unit,
@@ -188,6 +198,44 @@ private fun SettingsHubScreen(
             confirmButton = {
                 TextButton(onClick = onClearBackupMessage) {
                     Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+    state.smsImportMessage?.let { message ->
+        val text = when (message) {
+            SmsImportMessage.OK -> stringResource(R.string.dashboard_rescan_ok)
+            SmsImportMessage.PERMISSION_DENIED -> stringResource(R.string.settings_import_sms_permission_denied)
+            SmsImportMessage.NO_MESSAGES -> stringResource(R.string.dashboard_rescan_no_messages)
+            SmsImportMessage.NO_BANK_SMS -> stringResource(R.string.dashboard_rescan_no_bank_sms)
+            SmsImportMessage.NO_TRANSACTIONS -> stringResource(R.string.dashboard_rescan_no_transactions)
+            SmsImportMessage.FAILED -> stringResource(R.string.dashboard_rescan_failed)
+        }
+        AlertDialog(
+            onDismissRequest = onClearSmsImportMessage,
+            title = { Text(stringResource(R.string.settings_import_sms_title)) },
+            text = { Text(text) },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (message == SmsImportMessage.PERMISSION_DENIED) {
+                        onRequestSmsPermission()
+                    }
+                    onClearSmsImportMessage()
+                }) {
+                    Text(
+                        if (message == SmsImportMessage.PERMISSION_DENIED) {
+                            stringResource(R.string.dashboard_sms_permission_grant)
+                        } else {
+                            stringResource(R.string.settings_cancel)
+                        },
+                    )
+                }
+            },
+            dismissButton = {
+                if (message == SmsImportMessage.PERMISSION_DENIED) {
+                    TextButton(onClick = onClearSmsImportMessage) {
+                        Text(stringResource(R.string.settings_cancel))
+                    }
                 }
             },
         )
@@ -266,6 +314,25 @@ private fun SettingsHubScreen(
             SectionHeader(
                 title = stringResource(R.string.settings_data_section),
                 icon = MasroofIcons.rescan,
+            )
+
+            if (!state.smsPermissionGranted) {
+                com.baraa.masroof.presentation.common.SmsPermissionNotice(
+                    onRequestPermission = onRequestSmsPermission,
+                    onOpenAppSettings = onOpenAppSettings,
+                )
+            }
+
+            SettingsReparseRow(
+                title = stringResource(R.string.settings_import_sms_title),
+                subtitle = stringResource(R.string.settings_import_sms_subtitle),
+                detail = null,
+                icon = MasroofIcons.externalIn,
+                actionIcon = MasroofIcons.rescan,
+                running = state.importingSms,
+                enabled = !state.importingSms && !state.reparsingStored && !state.updating &&
+                    !state.exportingBackup && !state.importingBackup,
+                onRefresh = onImportSms,
             )
 
             SettingsReparseRow(

@@ -32,6 +32,9 @@ data class SettingsUiState(
     val stopConfirmCardTarget: ManagedCardUi? = null,
     val stopConfirmAccountTarget: ManagedAccountUi? = null,
     val reparsingStored: Boolean = false,
+    val importingSms: Boolean = false,
+    val smsImportMessage: SmsImportMessage? = null,
+    val smsPermissionGranted: Boolean = true,
     val exportingBackup: Boolean = false,
     val importingBackup: Boolean = false,
     val awaitingImportConfirm: Boolean = false,
@@ -47,6 +50,15 @@ enum class BackupMessage {
     EXPORT_FAILED,
     IMPORT_FAILED,
     IMPORT_INVALID,
+}
+
+enum class SmsImportMessage {
+    OK,
+    PERMISSION_DENIED,
+    NO_MESSAGES,
+    NO_BANK_SMS,
+    NO_TRANSACTIONS,
+    FAILED,
 }
 
 enum class SettingsError {

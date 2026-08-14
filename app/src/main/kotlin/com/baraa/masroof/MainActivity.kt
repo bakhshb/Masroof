@@ -57,7 +57,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val dashboardViewModel: DashboardViewModel by viewModels {
-        DashboardViewModelFactory(container = container)
+        DashboardViewModelFactory(
+            container = container,
+            permissionStateProvider = { hasSmsPermissions() },
+        )
     }
 
     private val reviewViewModel: ReviewViewModel by viewModels {
@@ -70,6 +73,7 @@ class MainActivity : ComponentActivity() {
         SettingsViewModelFactory(
             container = container,
             appVersion = BuildConfig.VERSION_NAME,
+            permissionStateProvider = { hasSmsPermissions() },
             onThemeModeChanged = { mode -> themeModeState.value = mode },
             onRequestInstallPermission = {
                 startActivity(InstallPermissionHelper.buildManageUnknownSourcesIntent(this))
@@ -92,7 +96,15 @@ class MainActivity : ComponentActivity() {
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestMultiplePermissions(),
                     ) { _ ->
-                        onboardingViewModel.onPermissionResult(hasSmsPermissions())
+                        val granted = hasSmsPermissions()
+                        onboardingViewModel.onPermissionResult(granted)
+                        if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
+                            if (granted) {
+                                dashboardViewModel.rescanSms()
+                            } else {
+                                dashboardViewModel.refresh()
+                            }
+                        }
                     }
 
                     val exportLauncher = rememberLauncherForActivityResult(
@@ -164,7 +176,7 @@ class MainActivity : ComponentActivity() {
         onboardingViewModel.reloadFromCurrentState()
         settingsViewModel.retryInstallAfterPermissionGranted()
         if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
-            dashboardViewModel.refresh()
+            dashboardViewModel.onAppResumed()
             reviewViewModel.refresh()
             if (!silentUpdateCheckDone) {
                 silentUpdateCheckDone = true

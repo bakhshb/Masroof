@@ -13,6 +13,8 @@ import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.MissingGitHubTokenException
 import com.baraa.masroof.application.update.UpdateCheckResult
+import com.baraa.masroof.sms.scanner.SmsScanFailure
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -38,6 +40,8 @@ class SettingsViewModel(
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
+    private val importSmsFromInbox: suspend () -> SmsScanResult,
+    private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
     private val appUpdateService: AppUpdateService,
     private val apkInstaller: ApkInstaller,
@@ -64,6 +68,7 @@ class SettingsViewModel(
                     languageTag = appLocaleRepository.getLanguageTag(),
                     themeMode = themePreferencesRepository.getThemeMode(),
                     githubTokenConfigured = appUpdateService.hasConfiguredToken(),
+                    smsPermissionGranted = permissionStateProvider(),
                 )
             }
             try {
@@ -128,7 +133,7 @@ class SettingsViewModel(
     }
 
     fun reparseStoredMessages() {
-        if (_uiState.value.reparsingStored || _uiState.value.updating) return
+        if (_uiState.value.reparsingStored || _uiState.value.updating || _uiState.value.importingSms) return
         viewModelScope.launch {
             _uiState.update { it.copy(reparsingStored = true, error = null) }
             try {
@@ -146,6 +151,53 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun importSmsFromPhone() {
+        if (_uiState.value.importingSms || _uiState.value.reparsingStored) return
+        if (!permissionStateProvider()) {
+            _uiState.update { it.copy(smsImportMessage = SmsImportMessage.PERMISSION_DENIED) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(importingSms = true, smsImportMessage = null, error = null) }
+            try {
+                val result = importSmsFromInbox()
+                refreshReviewQueue()
+                applyRegistries(
+                    cards = cardRegistryRepository.listAll(),
+                    accounts = accountRegistryRepository.listAll(),
+                )
+                _uiState.update {
+                    it.copy(
+                        importingSms = false,
+                        smsImportMessage = mapSmsImportMessage(result),
+                    )
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(importingSms = false, smsImportMessage = SmsImportMessage.FAILED)
+                }
+            }
+        }
+    }
+
+    fun clearSmsImportMessage() {
+        _uiState.update { it.copy(smsImportMessage = null) }
+    }
+
+    private fun mapSmsImportMessage(result: SmsScanResult): SmsImportMessage =
+        when (result.failure) {
+            SmsScanFailure.PermissionDenied -> SmsImportMessage.PERMISSION_DENIED
+            is SmsScanFailure.ProviderError -> SmsImportMessage.FAILED
+            null -> when {
+                result.parsed == 0 && result.scanned == 0 -> SmsImportMessage.NO_MESSAGES
+                result.parsed == 0 && result.notRelevant == result.scanned -> SmsImportMessage.NO_BANK_SMS
+                result.parsed == 0 -> SmsImportMessage.NO_TRANSACTIONS
+                else -> SmsImportMessage.OK
+            }
+        }
 
     fun clearUpdateMessage() {
         _uiState.update { it.copy(updateMessage = null) }

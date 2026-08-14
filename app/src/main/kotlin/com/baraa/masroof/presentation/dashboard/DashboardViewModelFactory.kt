@@ -10,6 +10,7 @@ import java.time.ZoneId
 
 class DashboardViewModelFactory(
     private val container: AppContainer,
+    private val permissionStateProvider: () -> Boolean,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModelProvider.Factory {
@@ -21,6 +22,7 @@ class DashboardViewModelFactory(
             cardRegistryRepository = container.cardRegistryRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
+            permissionStateProvider = permissionStateProvider,
             appContext = container.applicationContext,
             appLocaleRepository = container.appLocaleRepository,
             zoneId = zoneId,

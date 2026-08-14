@@ -38,6 +38,8 @@ import com.baraa.masroof.presentation.common.LongPullToRefreshBox
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MetricHighlightCard
 import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.SmsPermissionNotice
+import com.baraa.masroof.presentation.common.SmsRescanStatusNotice
 import com.baraa.masroof.presentation.common.SummaryMiniCard
 
 @Composable
@@ -47,6 +49,8 @@ fun DashboardRoute(
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onRequestSmsPermission: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -57,12 +61,15 @@ fun DashboardRoute(
         onPrevious = viewModel::goToPreviousPeriod,
         onNext = viewModel::goToNextPeriod,
         onCurrent = viewModel::goToCurrentPeriod,
-        onRetry = viewModel::refresh,
+        onRetry = viewModel::refreshWithSmsImport,
         onRescan = viewModel::rescanSms,
         onOpenReview = onOpenReview,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
+        onRequestSmsPermission = onRequestSmsPermission,
+        onOpenAppSettings = onOpenAppSettings,
+        onDismissRescanStatus = viewModel::clearRescanStatus,
     )
 }
 
@@ -78,8 +85,11 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onRequestSmsPermission: () -> Unit,
+    onOpenAppSettings: () -> Unit,
+    onDismissRescanStatus: () -> Unit,
 ) {
-    val isPullRefreshing = state.loading && state.summary != null
+    val isPullRefreshing = (state.loading && state.summary != null) || state.rescanning
     Column(modifier = Modifier.fillMaxSize()) {
         DashboardAppBar(
             reviewCount = state.summary?.reviewRequiredCount ?: 0,
@@ -123,6 +133,20 @@ private fun DashboardScreen(
             onNext = onNext,
             onCurrent = onCurrent,
         )
+
+        if (!state.smsPermissionGranted) {
+            SmsPermissionNotice(
+                onRequestPermission = onRequestSmsPermission,
+                onOpenAppSettings = onOpenAppSettings,
+            )
+        }
+
+        state.rescanStatus?.let { status ->
+            SmsRescanStatusNotice(
+                status = status,
+                onDismiss = onDismissRescanStatus,
+            )
+        }
 
         when {
             state.loading && state.summary == null -> {
@@ -268,6 +292,19 @@ private fun DashboardScreen(
                         ),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (state.smsPermissionGranted) {
+                        IconTextButtonOutlined(
+                            onClick = onRescan,
+                            enabled = !state.rescanning,
+                            icon = MasroofIcons.rescan,
+                            text = if (state.rescanning) {
+                                stringResource(R.string.dashboard_rescanning)
+                            } else {
+                                stringResource(R.string.dashboard_rescan_sms)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
 
                 if (summary.excludedOtherCurrencyCount > 0) {
@@ -416,6 +453,7 @@ private fun rescanStatusMessage(status: SmsRescanStatus): String =
             SmsRescanStatus.NO_MESSAGES -> R.string.dashboard_rescan_no_messages
             SmsRescanStatus.NO_BANK_SMS -> R.string.dashboard_rescan_no_bank_sms
             SmsRescanStatus.NO_TRANSACTIONS -> R.string.dashboard_rescan_no_transactions
+            SmsRescanStatus.PERMISSION_DENIED -> R.string.dashboard_rescan_permission_denied
             SmsRescanStatus.FAILED -> R.string.dashboard_rescan_failed
         },
     )

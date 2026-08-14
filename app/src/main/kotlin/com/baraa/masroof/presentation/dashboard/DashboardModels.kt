@@ -63,6 +63,7 @@ data class DashboardUiState(
     val reclassifySuccess: Boolean = false,
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
+    val smsPermissionGranted: Boolean = true,
 )
 
 enum class DashboardError {
@@ -74,6 +75,7 @@ enum class SmsRescanStatus {
     NO_MESSAGES,
     NO_BANK_SMS,
     NO_TRANSACTIONS,
+    PERMISSION_DENIED,
     FAILED,
 }
 

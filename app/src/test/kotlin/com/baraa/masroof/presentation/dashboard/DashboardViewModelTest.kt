@@ -346,6 +346,73 @@ class DashboardViewModelTest {
         assertEquals(listOf(UnknownCardCandidateUi(Bank.BANK_ALJAZIRA, "5123")), vm.uiState.value.unknownCards)
     }
 
+    @Test
+    fun refreshWithSmsImport_withoutPermission_skipsRescanAndMarksDeniedState() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = false,
+            rescanService = {
+                rescanCalls++
+                SmsScanResult()
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(0, rescanCalls)
+        assertFalse(vm.uiState.value.smsPermissionGranted)
+    }
+
+    @Test
+    fun refreshWithSmsImport_withPermission_runsRescan() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = true,
+            rescanService = {
+                rescanCalls++
+                SmsScanResult(parsed = 1, scanned = 1, inserted = 1)
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(1, rescanCalls)
+        assertTrue(vm.uiState.value.smsPermissionGranted)
+        assertEquals(SmsRescanStatus.OK, vm.uiState.value.rescanStatus)
+    }
+
+    @Test
+    fun onAppResumed_afterPermissionGranted_triggersRescan() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        var permissionGranted = false
+        var rescanCalls = 0
+        val vm = viewModel(
+            loader = loader,
+            permissionStateProvider = { permissionGranted },
+            rescanService = {
+                rescanCalls++
+                SmsScanResult(parsed = 1, scanned = 1, inserted = 1)
+            },
+        )
+        vm.refresh()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.smsPermissionGranted)
+
+        permissionGranted = true
+        vm.onAppResumed()
+        advanceUntilIdle()
+
+        assertEquals(1, rescanCalls)
+        assertTrue(vm.uiState.value.smsPermissionGranted)
+    }
+
     private class FakeCardRegistry(
         vararg initial: CardRegistryEntry,
     ) : com.baraa.masroof.domain.repository.CardRegistryRepository {
@@ -410,11 +477,15 @@ class DashboardViewModelTest {
     private fun viewModel(
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
+        permissionGranted: Boolean = true,
+        permissionStateProvider: () -> Boolean = { permissionGranted },
+        rescanService: suspend () -> SmsScanResult = { SmsScanResult() },
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
             cardRegistryRepository = cardRegistry,
-            rescanService = { SmsScanResult() },
+            rescanService = rescanService,
+            permissionStateProvider = permissionStateProvider,
             reclassificationService = TransactionReclassificationService(
                 financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
                     override suspend fun save(
