@@ -28,6 +28,7 @@ object TransactionListFilterEngine {
         FinancialTransactionType.CREDIT_CARD_PAYMENT,
         FinancialTransactionType.REFUND,
         FinancialTransactionType.CASH_WITHDRAWAL,
+        FinancialTransactionType.BILL_PAYMENT,
         FinancialTransactionType.FEE,
         FinancialTransactionType.SELF_TRANSFER,
         FinancialTransactionType.ADJUSTMENT,

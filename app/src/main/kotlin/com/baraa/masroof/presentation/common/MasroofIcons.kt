@@ -93,6 +93,7 @@ object MasroofIcons {
             FinancialTransactionType.CREDIT_CARD_PAYMENT -> Icons.Filled.CreditCard
             FinancialTransactionType.REFUND -> Icons.AutoMirrored.Filled.Undo
             FinancialTransactionType.CASH_WITHDRAWAL -> Icons.Filled.LocalAtm
+            FinancialTransactionType.BILL_PAYMENT -> Icons.Filled.Receipt
             FinancialTransactionType.FEE -> Icons.Filled.Receipt
             FinancialTransactionType.ADJUSTMENT -> Icons.Filled.SwapHoriz
             FinancialTransactionType.UNKNOWN -> Icons.Filled.Info

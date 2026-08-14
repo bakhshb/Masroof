@@ -320,6 +320,7 @@
     <string name="txn_type_card_payment">سداد بطاقة</string>
     <string name="txn_type_refund">استرداد</string>
     <string name="txn_type_cash_withdrawal">سحب نقدي</string>
+    <string name="txn_type_bill_payment">سداد فاتورة</string>
     <string name="txn_type_fee">رسوم</string>
     <string name="txn_type_adjustment">تسوية</string>
     <string name="txn_type_unknown">غير محدد</string>

@@ -62,9 +62,6 @@ object TransactionAssembler {
             MessageFamily.NON_FINANCIAL,
             -> return Outcome.Ignored
 
-            MessageFamily.BILL_PAYMENT ->
-                return Outcome.NeedsReview(listOf("bill_payment_financial_treatment_unresolved"))
-
             MessageFamily.UNKNOWN ->
                 return Outcome.NeedsReview(listOf("unknown_message_family"))
 
@@ -291,6 +288,7 @@ object TransactionAssembler {
                 null to (durableDestAccountId ?: durableCardId)
 
             MessageFamily.WITHDRAWAL,
+            MessageFamily.BILL_PAYMENT,
             MessageFamily.FEE,
             MessageFamily.TRANSFER_OUT,
             MessageFamily.TRANSFER_IN,

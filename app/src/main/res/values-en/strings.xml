@@ -312,6 +312,7 @@
     <string name="txn_type_card_payment">Card payment</string>
     <string name="txn_type_refund">Refund</string>
     <string name="txn_type_cash_withdrawal">Cash withdrawal</string>
+    <string name="txn_type_bill_payment">Bill payment</string>
     <string name="txn_type_fee">Fee</string>
     <string name="txn_type_adjustment">Adjustment</string>
     <string name="txn_type_unknown">Unknown</string>

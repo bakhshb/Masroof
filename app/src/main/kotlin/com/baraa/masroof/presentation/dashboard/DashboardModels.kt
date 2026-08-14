@@ -97,6 +97,7 @@ object TransactionTypePresentation {
             FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
             FinancialTransactionType.CREDIT_CARD_PAYMENT,
             FinancialTransactionType.CASH_WITHDRAWAL,
+            FinancialTransactionType.BILL_PAYMENT,
             -> TransactionDirectionUi.OUTWARD
 
             FinancialTransactionType.INCOME,

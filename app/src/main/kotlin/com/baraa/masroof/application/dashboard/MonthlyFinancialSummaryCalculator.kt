@@ -36,6 +36,7 @@ object MonthlyFinancialSummaryCalculator {
             val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
+                FinancialTransactionType.BILL_PAYMENT,
                 FinancialTransactionType.FEE,
                 -> spendingGross = spendingGross + amount
 

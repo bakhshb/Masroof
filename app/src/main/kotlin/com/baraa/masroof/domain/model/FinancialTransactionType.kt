@@ -22,6 +22,7 @@ enum class FinancialTransactionType {
     CREDIT_CARD_PAYMENT,
     REFUND,
     CASH_WITHDRAWAL,
+    BILL_PAYMENT,
     FEE,
     ADJUSTMENT,
     UNKNOWN,

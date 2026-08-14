@@ -120,21 +120,20 @@ class ReviewWorkflowServiceTest {
     @Test
     fun needsReview_createsRequiredReview() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
             ),
         )
         workflow.refreshReviewQueue()
-        val review = reviewRepo.findByRawSmsId("sms-bill")!!
+        val review = reviewRepo.findByRawSmsId("sms-unknown")!!
         assertEquals(ReviewStatus.REQUIRED, review.status)
         assertEquals(ReviewKind.NEEDS_REVIEW, review.kind)
-        assertTrue(review.reasons.contains("bill_payment_financial_treatment_unresolved"))
-        assertEquals(ReviewIdFactory.fromRawSmsId("sms-bill"), review.id)
+        assertTrue(review.reasons.contains("unknown_message_family"))
+        assertEquals(ReviewIdFactory.fromRawSmsId("sms-unknown"), review.id)
     }
 
     @Test
@@ -190,22 +189,22 @@ class ReviewWorkflowServiceTest {
     @Test
     fun refreshRerun_isIdempotent_oneReviewPerRawSms() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
             ),
         )
         workflow.refreshReviewQueue()
-        val first = reviewRepo.findByRawSmsId("sms-bill")!!
+        val first = reviewRepo.findByRawSmsId("sms-unknown")!!
         val createdAt = first.createdAt
         now.set(Instant.parse("2026-08-11T13:00:00Z"))
         workflow.refreshReviewQueue()
         workflow.refreshReviewQueue()
         assertEquals(1, reviewRepo.listAll().size)
-        val again = reviewRepo.findByRawSmsId("sms-bill")!!
+        val again = reviewRepo.findByRawSmsId("sms-unknown")!!
         assertEquals(createdAt, again.createdAt)
         assertEquals(first.id, again.id)
         assertEquals(ReviewStatus.REQUIRED, again.status)
@@ -401,17 +400,17 @@ class ReviewWorkflowServiceTest {
     @Test
     fun insufficientCorrection_keepsRequired() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
             ),
         )
         workflow.refreshReviewQueue()
         val result = workflow.applyCorrection(
-            reviewId = ReviewIdFactory.fromRawSmsId("sms-bill"),
+            reviewId = ReviewIdFactory.fromRawSmsId("sms-unknown"),
             correctedMerchant = "Biller",
         ) as ReviewWorkflowResult.Success
         assertEquals(ReviewStatus.REQUIRED, result.review.status)
@@ -586,7 +585,7 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
-    fun billPayment_userFinancialTypeExpense() = runBlocking {
+    fun billPayment_userFinancialTypeBillPayment() = runBlocking {
         persistEvent(
             smsId = "sms-bill",
             event = event(
@@ -598,18 +597,12 @@ class ReviewWorkflowServiceTest {
             ),
         )
         workflow.refreshReviewQueue()
-        assertEquals(0, ftRepo.listAll().size)
-        val result = workflow.resolveAsFinancialType(
-            reviewId = ReviewIdFactory.fromRawSmsId("sms-bill"),
-            type = FinancialTransactionType.EXPENSE,
-        ) as ReviewWorkflowResult.Success
-        assertEquals(FinancialTransactionType.EXPENSE, result.transaction!!.type)
-        assertEquals(ReviewStatus.RESOLVED, result.review.status)
-        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, result.review.resolutionKind)
+        assertEquals(1, ftRepo.listAll().size)
+        assertEquals(FinancialTransactionType.BILL_PAYMENT, ftRepo.listAll().single().type)
     }
 
     @Test
-    fun billPayment_withoutUserDecision_staysNeedsReview() = runBlocking {
+    fun billPayment_withoutSource_autoAssembles() = runBlocking {
         persistEvent(
             smsId = "sms-bill",
             event = event(
@@ -620,24 +613,24 @@ class ReviewWorkflowServiceTest {
             ),
         )
         workflow.refreshReviewQueue()
-        assertEquals(ReviewKind.NEEDS_REVIEW, reviewRepo.findByRawSmsId("sms-bill")!!.kind)
-        assertEquals(0, ftRepo.listAll().size)
+        assertNull(reviewRepo.findByRawSmsId("sms-bill"))
+        assertEquals(FinancialTransactionType.BILL_PAYMENT, ftRepo.listAll().single().type)
     }
 
     @Test
     fun resolveAsFinancialType_rejectsSelfTransfer() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
             ),
         )
         workflow.refreshReviewQueue()
         val result = workflow.resolveAsFinancialType(
-            reviewId = ReviewIdFactory.fromRawSmsId("sms-bill"),
+            reviewId = ReviewIdFactory.fromRawSmsId("sms-unknown"),
             type = FinancialTransactionType.SELF_TRANSFER,
         )
         assertTrue(result is ReviewWorkflowResult.Rejected)
@@ -693,18 +686,17 @@ class ReviewWorkflowServiceTest {
     @Test
     fun resolvedReview_upsertRequired_doesNotReopen() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
             ),
         )
         workflow.refreshReviewQueue()
         val success = workflow.resolveAsFinancialType(
-            reviewId = ReviewIdFactory.fromRawSmsId("sms-bill"),
+            reviewId = ReviewIdFactory.fromRawSmsId("sms-unknown"),
             type = FinancialTransactionType.EXPENSE,
         ) as ReviewWorkflowResult.Success
         val resolved = success.review
@@ -715,7 +707,7 @@ class ReviewWorkflowServiceTest {
 
         now.set(Instant.parse("2026-08-12T12:00:00Z"))
         val after = reviewRepo.upsertRequired(
-            rawSmsId = "sms-bill",
+            rawSmsId = "sms-unknown",
             kind = ReviewKind.PENDING_MATCH,
             reasons = listOf("stale_candidate"),
             now = clock.now(),
@@ -786,17 +778,16 @@ class ReviewWorkflowServiceTest {
     @Test
     fun concurrentResolveSameReview_oneTransactionConsistent() = runBlocking {
         persistEvent(
-            smsId = "sms-bill",
+            smsId = "sms-unknown",
             event = event(
-                id = "pe-bill",
-                rawSmsId = "sms-bill",
-                family = MessageFamily.BILL_PAYMENT,
+                id = "pe-unknown",
+                rawSmsId = "sms-unknown",
+                family = MessageFamily.UNKNOWN,
                 amount = money("80.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
             ),
         )
         workflow.refreshReviewQueue()
-        val reviewId = ReviewIdFactory.fromRawSmsId("sms-bill")
+        val reviewId = ReviewIdFactory.fromRawSmsId("sms-unknown")
         val first = async {
             workflow.resolveAsFinancialType(reviewId, FinancialTransactionType.EXPENSE)
         }
@@ -806,8 +797,8 @@ class ReviewWorkflowServiceTest {
         val results = listOf(first.await(), second.await())
         assertTrue(results.any { it is ReviewWorkflowResult.Success })
         assertEquals(1, ftRepo.listAll().size)
-        assertTrue(ftRepo.isRawSmsLinked("sms-bill"))
-        val review = reviewRepo.findByRawSmsId("sms-bill")!!
+        assertTrue(ftRepo.isRawSmsLinked("sms-unknown"))
+        val review = reviewRepo.findByRawSmsId("sms-unknown")!!
         assertEquals(ReviewStatus.RESOLVED, review.status)
         assertEquals(ftRepo.listAll().single().id, review.resolvedTransactionId)
         // Loser is rejected or idempotent success — never a second FT / stolen link.

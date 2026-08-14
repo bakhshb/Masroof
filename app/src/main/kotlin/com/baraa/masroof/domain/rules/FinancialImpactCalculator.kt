@@ -72,6 +72,13 @@ object FinancialImpactCalculator {
                     netWorthEffect = NetWorthEffect.ZERO,
                 )
 
+            FinancialTransactionType.BILL_PAYMENT ->
+                FinancialImpact(
+                    countsAsExpense = true,
+                    countsAsIncome = false,
+                    netWorthEffect = NetWorthEffect.DECREASE,
+                )
+
             FinancialTransactionType.FEE ->
                 // Fee is its own type; economically it reduces net worth like spending.
                 FinancialImpact(

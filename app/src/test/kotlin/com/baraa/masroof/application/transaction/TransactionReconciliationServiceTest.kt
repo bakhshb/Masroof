@@ -613,7 +613,7 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun billPayment_needsReview() = runBlocking {
+    fun billPayment_autoAssembles() = runBlocking {
         persistEvent(
             smsId = "sms-bill",
             event = event(
@@ -625,8 +625,9 @@ class TransactionReconciliationServiceTest {
             ),
         )
         val summary = reconciliation.reconcileStoredEvents()
-        assertEquals(0, ftRepo.listAll().size)
-        assertTrue(summary.needsReview >= 1)
+        assertEquals(1, ftRepo.listAll().size)
+        assertEquals(FinancialTransactionType.BILL_PAYMENT, ftRepo.listAll().single().type)
+        assertEquals(0, summary.needsReview)
     }
 
     @Test
