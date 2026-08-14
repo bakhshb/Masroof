@@ -187,6 +187,11 @@ private fun DashboardScreen(
                     ownedAccountCount = state.ownedAccounts.size.coerceAtLeast(1),
                 )
 
+                SpendingSplitSection(
+                    spendingSplit = spendingSplit,
+                    unknownCardCount = state.unknownCards.size,
+                )
+
                 state.creditCards?.let { creditCards ->
                     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
                     val followedOverview = creditCards.followedOnly(ownedLast4s)
@@ -197,15 +202,6 @@ private fun DashboardScreen(
                         )
                     }
                 }
-
-                SpendingSplitSection(
-                    spendingSplit = spendingSplit,
-                    currentAccount = currentAccount,
-                    followedCardsSpending = state.creditCards?.followedSalarySpendingTotal(
-                        state.ownedCards.map { it.last4 }.toSet(),
-                    ),
-                    unknownCardCount = state.unknownCards.size,
-                )
 
                 if (summary.refunds.amount.signum() > 0) {
                     SummaryMiniCard(

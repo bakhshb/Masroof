@@ -85,6 +85,11 @@ object CreditCardOverviewBuilder {
         val globalStatementStart = resolveGlobalStatementStart(parsedRecords, rawSmsById, zoneId, clock)
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = dayMonth.format(salaryPeriod.startDate)
+        val calendarMonthStart = LocalDate.now(clock)
+            .withDayOfMonth(1)
+            .atStartOfDay(zoneId)
+            .toInstant()
+        val calendarMonthLabel = dayMonth.format(LocalDate.now(clock).withDayOfMonth(1))
 
         val latestPurchaseDueByCard = snapshotCandidates
             .filter { !it.isStatement && it.details.outstandingBalance != null }
@@ -125,10 +130,18 @@ object CreditCardOverviewBuilder {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )
+            val calendarMonthNet = netSpending(
+                transactions = cardTransactions,
+                cardId = cardId,
+                startInclusive = calendarMonthStart,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents,
+            )
 
             CreditCardDashboardRow(
                 bank = ref.bank,
                 last4 = ref.last4.orEmpty(),
+                calendarMonthSpendingNet = calendarMonthNet,
                 statementSpendingNet = statementNet,
                 salaryPeriodSpendingNet = salaryNet,
                 statementPeriodLabel = statementLabel,
@@ -148,6 +161,7 @@ object CreditCardOverviewBuilder {
             aggregateDueAmount = latestStatement?.details?.outstandingBalance,
             aggregateDueUpdatedAt = latestStatement?.updatedAt,
             aggregateDueDate = latestStatement?.dueDate,
+            calendarMonthLabel = calendarMonthLabel,
             salaryPeriodLabel = salaryPeriodLabel,
             currency = primaryCurrency,
         )

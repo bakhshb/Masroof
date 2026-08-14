@@ -495,6 +495,7 @@ class DashboardViewModelTest {
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
+            calendarMonthLabel = null,
             salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
@@ -503,8 +504,11 @@ class DashboardViewModelTest {
         fun emptyCurrentAccount(currency: Currency = Currency.SAR): CurrentAccountSummary =
             CurrentAccountSummary(
                 currency = currency,
-                income = Money.zero(currency),
+                salary = Money.zero(currency),
+                otherIncome = Money.zero(currency),
                 externalTransfersIn = Money.zero(currency),
+                selfTransfersIn = Money.zero(currency),
+                selfTransfersOut = Money.zero(currency),
                 creditCardPayments = Money.zero(currency),
                 billPayments = Money.zero(currency),
                 externalTransfersOut = Money.zero(currency),
@@ -516,8 +520,8 @@ class DashboardViewModelTest {
         fun emptySpendingSplit(currency: Currency = Currency.SAR): SpendingSplitSummary =
             SpendingSplitSummary(
                 currency = currency,
-                fromCurrentAccount = Money.zero(currency),
-                onCreditCard = SignedMoneyAmount.zero(currency),
+                totalSpending = Money.zero(currency),
+                creditCardPurchases = SignedMoneyAmount.zero(currency),
             )
     }
 
@@ -636,6 +640,7 @@ class DashboardViewModelTest {
                         aggregateDueAmount = null,
                         aggregateDueUpdatedAt = null,
                         aggregateDueDate = null,
+                        calendarMonthLabel = null,
                         salaryPeriodLabel = null,
                         currency = Currency.SAR,
                     ),

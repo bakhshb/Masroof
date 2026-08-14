@@ -9,11 +9,15 @@ import java.math.RoundingMode
  * Cash movement on owned current-account containers for a salary period.
  *
  * Credit-card purchases are excluded — they are tracked as liability on the card section.
+ * Self-transfers between owned accounts are neutral and do not affect [netMovement].
  */
 data class CurrentAccountSummary(
     val currency: Currency,
-    val income: Money,
+    val salary: Money,
+    val otherIncome: Money,
     val externalTransfersIn: Money,
+    val selfTransfersIn: Money,
+    val selfTransfersOut: Money,
     val creditCardPayments: Money,
     val billPayments: Money,
     val externalTransfersOut: Money,
@@ -22,7 +26,7 @@ data class CurrentAccountSummary(
     val fees: Money,
 ) {
     val totalInflow: Money
-        get() = income + externalTransfersIn
+        get() = salary + otherIncome + externalTransfersIn
 
     val totalOutflow: Money
         get() = creditCardPayments + billPayments + externalTransfersOut + cashWithdrawals + posPurchases + fees
@@ -40,8 +44,11 @@ data class CurrentAccountSummary(
 
     init {
         listOf(
-            income,
+            salary,
+            otherIncome,
             externalTransfersIn,
+            selfTransfersIn,
+            selfTransfersOut,
             creditCardPayments,
             billPayments,
             externalTransfersOut,
@@ -53,24 +60,15 @@ data class CurrentAccountSummary(
 }
 
 /**
- * Period spending split: cash left the account vs liability on credit cards.
+ * Period spending: everything that left the current account in the period.
  */
 data class SpendingSplitSummary(
     val currency: Currency,
-    val fromCurrentAccount: Money,
-    val onCreditCard: SignedMoneyAmount,
+    val totalSpending: Money,
+    val creditCardPurchases: SignedMoneyAmount,
 ) {
-    /** Purchases and bills (mada + bills), excluding transfers, cash, and card settlement. */
-    val totalNet: SignedMoneyAmount
-        get() {
-            val net = fromCurrentAccount.amount
-                .add(onCreditCard.amount)
-                .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
-            return SignedMoneyAmount(net, currency)
-        }
-
     init {
-        require(fromCurrentAccount.currency == currency)
-        require(onCreditCard.currency == currency)
+        require(totalSpending.currency == currency)
+        require(creditCardPurchases.currency == currency)
     }
 }

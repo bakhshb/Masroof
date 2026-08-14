@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,7 +29,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
-import com.baraa.masroof.presentation.common.SummaryMiniCard
 
 @Composable
 fun CurrentAccountSection(
@@ -64,7 +64,7 @@ fun CurrentAccountSection(
                     ) {
                         Column {
                             Text(
-                                stringResource(R.string.dashboard_current_account_net_title),
+                                stringResource(R.string.dashboard_remaining_title),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -114,7 +114,7 @@ fun CurrentAccountSection(
                     )
                     Text(
                         stringResource(
-                            R.string.dashboard_current_account_net_formula,
+                            R.string.dashboard_remaining_formula,
                             formatLocalizedMoney(summary.totalInflow),
                             formatLocalizedMoney(summary.totalOutflow),
                         ),
@@ -129,8 +129,8 @@ fun CurrentAccountSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     FlowRow(
-                        label = stringResource(R.string.dashboard_income),
-                        amount = summary.income,
+                        label = stringResource(R.string.dashboard_salary),
+                        amount = summary.salary,
                         positive = true,
                     )
                     FlowRow(
@@ -138,16 +138,37 @@ fun CurrentAccountSection(
                         amount = summary.externalTransfersIn,
                         positive = true,
                     )
+                    if (summary.otherIncome.amount.signum() > 0) {
+                        FlowRow(
+                            label = stringResource(R.string.dashboard_other_income),
+                            amount = summary.otherIncome,
+                            positive = true,
+                        )
+                    }
+                    TotalRow(
+                        label = stringResource(R.string.dashboard_total_inflow),
+                        amount = summary.totalInflow,
+                    )
 
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        stringResource(R.string.dashboard_current_account_outflows),
+                        stringResource(R.string.dashboard_money_movement),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     FlowRow(
+                        label = stringResource(R.string.dashboard_external_out_short),
+                        amount = summary.externalTransfersOut,
+                        positive = false,
+                    )
+                    FlowRow(
                         label = stringResource(R.string.dashboard_card_payments),
                         amount = summary.creditCardPayments,
+                        positive = false,
+                    )
+                    FlowRow(
+                        label = stringResource(R.string.dashboard_cash_withdrawals),
+                        amount = summary.cashWithdrawals,
                         positive = false,
                     )
                     if (summary.billPayments.amount.signum() > 0) {
@@ -158,20 +179,42 @@ fun CurrentAccountSection(
                         )
                     }
                     FlowRow(
-                        label = stringResource(R.string.dashboard_external_out_short),
-                        amount = summary.externalTransfersOut,
-                        positive = false,
-                    )
-                    FlowRow(
-                        label = stringResource(R.string.dashboard_cash_withdrawals),
-                        amount = summary.cashWithdrawals,
-                        positive = false,
-                    )
-                    FlowRow(
                         label = stringResource(R.string.dashboard_pos_purchases),
                         amount = summary.posPurchases + summary.fees,
                         positive = false,
                     )
+                    TotalRow(
+                        label = stringResource(R.string.dashboard_total_outflow),
+                        amount = summary.totalOutflow,
+                        amountColor = MaterialTheme.colorScheme.error,
+                    )
+
+                    if (
+                        summary.selfTransfersIn.amount.signum() > 0 ||
+                        summary.selfTransfersOut.amount.signum() > 0
+                    ) {
+                        HorizontalDivider()
+                        Text(
+                            stringResource(R.string.dashboard_self_transfers),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(
+                            label = stringResource(R.string.dashboard_self_transfer_in),
+                            amount = summary.selfTransfersIn,
+                            neutral = true,
+                        )
+                        FlowRow(
+                            label = stringResource(R.string.dashboard_self_transfer_out),
+                            amount = summary.selfTransfersOut,
+                            neutral = true,
+                        )
+                        Text(
+                            stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -181,8 +224,6 @@ fun CurrentAccountSection(
 @Composable
 fun SpendingSplitSection(
     spendingSplit: SpendingSplitSummary,
-    currentAccount: CurrentAccountSummary,
-    followedCardsSpending: SignedMoneyAmount? = null,
     unknownCardCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
@@ -191,23 +232,6 @@ fun SpendingSplitSection(
             title = stringResource(R.string.dashboard_spending_split_title),
             icon = MasroofIcons.netSpending,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SummaryMiniCard(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.dashboard_spending_from_account),
-                value = formatLocalizedMoney(spendingSplit.fromCurrentAccount),
-                icon = MasroofIcons.externalOut,
-            )
-            SummaryMiniCard(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.dashboard_spending_on_card),
-                value = formatLocalizedMoney(spendingSplit.onCreditCard),
-                icon = MasroofIcons.cardPayment,
-            )
-        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -230,53 +254,40 @@ fun SpendingSplitSection(
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Text(
-                        formatLocalizedMoney(spendingSplit.totalNet),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    )
-                }
-                Text(
-                    stringResource(R.string.dashboard_spending_split_account_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val excludedTransfers = currentAccount.externalTransfersOut
-                val excludedCash = currentAccount.cashWithdrawals
-                val excludedCardPay = currentAccount.creditCardPayments
-                if (
-                    excludedTransfers.amount.signum() > 0 ||
-                    excludedCash.amount.signum() > 0 ||
-                    excludedCardPay.amount.signum() > 0
-                ) {
-                    Text(
-                        stringResource(
-                            R.string.dashboard_spending_split_excluded,
-                            formatLocalizedMoney(excludedTransfers),
-                            formatLocalizedMoney(excludedCash),
-                            formatLocalizedMoney(excludedCardPay),
+                        formatLocalizedMoney(spendingSplit.totalSpending),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error,
                         ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    stringResource(R.string.dashboard_spending_split_card_hint),
+                    stringResource(R.string.dashboard_spending_total_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                followedCardsSpending?.let { followed ->
-                    val otherCardsDelta = spendingSplit.onCreditCard.amount
-                        .subtract(followed.amount)
-                        .setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN)
-                    if (otherCardsDelta.signum() > 0) {
+                if (spendingSplit.creditCardPurchases.amount.signum() > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            stringResource(
-                                R.string.dashboard_spending_split_other_cards,
-                                formatLocalizedMoney(SignedMoneyAmount(otherCardsDelta, spendingSplit.currency)),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
+                            stringResource(R.string.dashboard_spending_on_card),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            formatLocalizedMoney(spendingSplit.creditCardPurchases),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Text(
+                        stringResource(R.string.dashboard_spending_excludes_card_purchases),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (unknownCardCount > 0) {
                     Text(
@@ -294,7 +305,8 @@ fun SpendingSplitSection(
 private fun FlowRow(
     label: String,
     amount: Money,
-    positive: Boolean,
+    positive: Boolean = false,
+    neutral: Boolean = false,
 ) {
     if (amount.amount.signum() == 0) return
     Row(
@@ -304,18 +316,48 @@ private fun FlowRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val prefix = when {
+            neutral -> "↔ "
+            positive -> "↑ "
+            else -> "↓ "
+        }
         Text(
-            (if (positive) "↑ " else "↓ ") + label,
+            prefix + label,
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
             formatLocalizedMoney(amount),
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = if (positive) {
-                MaterialTheme.colorScheme.tertiary
-            } else {
-                MaterialTheme.colorScheme.error
+            color = when {
+                neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+                positive -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.error
             },
+        )
+    }
+}
+
+@Composable
+private fun TotalRow(
+    label: String,
+    amount: Money,
+    amountColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Text(
+            formatLocalizedMoney(amount),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = amountColor,
         )
     }
 }

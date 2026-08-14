@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
@@ -105,7 +106,7 @@ fun CreditCardsSection(
         overview.cards.forEach { row ->
             CreditCardRowCard(
                 row = row,
-                salaryPeriodLabel = overview.salaryPeriodLabel,
+                calendarMonthLabel = overview.calendarMonthLabel,
                 zoneId = zoneId,
                 dateFormatter = dateTimeFormatter,
             )
@@ -116,7 +117,7 @@ fun CreditCardsSection(
 @Composable
 private fun CreditCardRowCard(
     row: CreditCardDashboardRow,
-    salaryPeriodLabel: String?,
+    calendarMonthLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
@@ -139,7 +140,19 @@ private fun CreditCardRowCard(
                 )
             }
 
-            SnapshotMetricRow(
+            SpendingMetricRow(
+                label = if (calendarMonthLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_card_month_spending,
+                        calendarMonthLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_card_month_spending_fallback)
+                },
+                value = formatLocalizedMoney(row.calendarMonthSpendingNet),
+            )
+
+            SpendingMetricRow(
                 label = if (row.statementPeriodLabel != null) {
                     stringResource(
                         R.string.dashboard_credit_card_statement_spending,
@@ -149,18 +162,6 @@ private fun CreditCardRowCard(
                     stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
                 },
                 value = formatLocalizedMoney(row.statementSpendingNet),
-            )
-
-            SnapshotMetricRow(
-                label = if (salaryPeriodLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_card_salary_spending,
-                        salaryPeriodLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
-                },
-                value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
             )
 
             row.snapshot?.availableBalance?.let { available ->
@@ -192,6 +193,22 @@ private fun CreditCardRowCard(
 }
 
 @Composable
+private fun SpendingMetricRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
 private fun SnapshotMetricRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -212,12 +229,12 @@ private fun formatSnapshotTime(
 fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview =
     copy(cards = cards.filter { it.last4 in ownedLast4s })
 
-fun CreditCardsOverview.followedSalarySpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount {
+fun CreditCardsOverview.followedCalendarSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount {
     val followed = cards.filter { it.last4 in ownedLast4s }
     if (followed.isEmpty()) return SignedMoneyAmount.zero(currency)
     var sum = java.math.BigDecimal.ZERO
     for (row in followed) {
-        sum = sum.add(row.salaryPeriodSpendingNet.amount)
+        sum = sum.add(row.calendarMonthSpendingNet.amount)
     }
     return SignedMoneyAmount(
         sum.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN),

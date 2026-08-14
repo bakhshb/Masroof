@@ -22,6 +22,7 @@ class CreditCardsOverviewFilterTest {
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
+            calendarMonthLabel = null,
             salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
@@ -33,7 +34,7 @@ class CreditCardsOverviewFilterTest {
     }
 
     @Test
-    fun followedSalarySpendingTotal_sumsFollowedCards() {
+    fun followedCalendarSpendingTotal_sumsFollowedCards() {
         val overview = CreditCardsOverview(
             cards = listOf(
                 row("3478", "100.00"),
@@ -43,21 +44,23 @@ class CreditCardsOverviewFilterTest {
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
+            calendarMonthLabel = null,
             salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
 
-        val total = overview.followedSalarySpendingTotal(setOf("3478", "7271"))
+        val total = overview.followedCalendarSpendingTotal(setOf("3478", "7271"))
 
         assertEquals(SignedMoneyAmount.of(Money.of("150.25", Currency.SAR)), total)
     }
 
-    private fun row(last4: String, salaryAmount: String = "0.00"): CreditCardDashboardRow =
+    private fun row(last4: String, monthAmount: String = "0.00"): CreditCardDashboardRow =
         CreditCardDashboardRow(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
+            calendarMonthSpendingNet = SignedMoneyAmount.of(Money.of(monthAmount, Currency.SAR)),
             statementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            salaryPeriodSpendingNet = SignedMoneyAmount.of(Money.of(salaryAmount, Currency.SAR)),
+            salaryPeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
             statementPeriodLabel = null,
             snapshot = null,
         )
