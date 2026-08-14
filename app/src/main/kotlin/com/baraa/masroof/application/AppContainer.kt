@@ -211,6 +211,7 @@ class AppContainer(
             parsedEventRepository = parsedEventRepository,
             rawSmsRepository = rawSmsRepository,
             appLocaleRepository = appLocaleRepository,
+            accountRegistryRepository = accountRegistryRepository,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()

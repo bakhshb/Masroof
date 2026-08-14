@@ -13,6 +13,7 @@ object CurrentAccountSummaryCalculator {
         parsedRecords: List<ParsedEventRecord>,
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
+        ownedAccountContainerIds: Set<String> = emptySet(),
     ): CurrentAccountSummary {
         val billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords)
 
@@ -28,23 +29,34 @@ object CurrentAccountSummaryCalculator {
         for (tx in transactions) {
             val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
-                FinancialTransactionType.INCOME ->
+                FinancialTransactionType.INCOME -> {
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     income += amount
+                }
 
-                FinancialTransactionType.EXTERNAL_TRANSFER_IN ->
+                FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
+                    if (!involvesOwnedAccount(tx.destinationContainerId, ownedAccountContainerIds)) continue
                     externalTransfersIn += amount
+                }
 
-                FinancialTransactionType.CREDIT_CARD_PAYMENT ->
+                FinancialTransactionType.CREDIT_CARD_PAYMENT -> {
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     creditCardPayments += amount
+                }
 
-                FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
+                FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> {
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     externalTransfersOut += amount
+                }
 
-                FinancialTransactionType.CASH_WITHDRAWAL ->
+                FinancialTransactionType.CASH_WITHDRAWAL -> {
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     cashWithdrawals += amount
+                }
 
                 FinancialTransactionType.EXPENSE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     if (tx.id in billPaymentTxIds) {
                         billPayments += amount
                     } else {
@@ -54,6 +66,7 @@ object CurrentAccountSummaryCalculator {
 
                 FinancialTransactionType.FEE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
+                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                     fees += amount
                 }
 
@@ -83,6 +96,7 @@ object CurrentAccountSummaryCalculator {
         parsedRecords: List<ParsedEventRecord>,
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
+        ownedAccountContainerIds: Set<String> = emptySet(),
     ): SpendingSplitSummary {
         var accountGross = Money.zero(primaryCurrency)
         var cardGross = Money.zero(primaryCurrency)
@@ -97,6 +111,7 @@ object CurrentAccountSummaryCalculator {
                     if (isCreditCardContainer(tx.sourceContainerId)) {
                         cardGross += amount
                     } else {
+                        if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
                         accountGross += amount
                     }
                 }
@@ -131,6 +146,14 @@ object CurrentAccountSummaryCalculator {
 
     private fun isCreditCardContainer(containerId: String?): Boolean =
         containerId?.startsWith("card:") == true
+
+    private fun involvesOwnedAccount(
+        containerId: String?,
+        ownedAccountContainerIds: Set<String>,
+    ): Boolean {
+        if (ownedAccountContainerIds.isEmpty()) return true
+        return containerId != null && containerId in ownedAccountContainerIds
+    }
 
     private fun effectiveAmount(
         tx: FinancialTransaction,

@@ -34,6 +34,7 @@ import com.baraa.masroof.presentation.common.SummaryMiniCard
 fun CurrentAccountSection(
     summary: CurrentAccountSummary,
     accountBadge: String?,
+    ownedAccountCount: Int = 1,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -68,7 +69,13 @@ fun CurrentAccountSection(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                stringResource(R.string.dashboard_current_account_net_subtitle),
+                                stringResource(
+                                    if (ownedAccountCount > 1) {
+                                        R.string.dashboard_current_account_net_subtitle_multi
+                                    } else {
+                                        R.string.dashboard_current_account_net_subtitle
+                                    },
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

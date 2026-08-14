@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
@@ -178,13 +179,12 @@ private fun DashboardScreen(
                 val currentAccount = state.currentAccount
                 val spendingSplit = state.spendingSplit
                 if (summary != null && currentAccount != null && spendingSplit != null) {
-                val accountBadge = state.ownedAccounts.firstOrNull()?.let { account ->
-                    "···${account.maskedNumber}"
-                }
+                val accountBadge = formatOwnedAccountsBadge(state.ownedAccounts, LocalContext.current)
 
                 CurrentAccountSection(
                     summary = currentAccount,
                     accountBadge = accountBadge,
+                    ownedAccountCount = state.ownedAccounts.size.coerceAtLeast(1),
                 )
 
                 state.creditCards?.let { creditCards ->

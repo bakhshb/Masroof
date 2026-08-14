@@ -160,6 +160,8 @@
     <string name="dashboard_current_account_section">Current account — actual cash movement</string>
     <string name="dashboard_current_account_net_title">Net current-account movement</string>
     <string name="dashboard_current_account_net_subtitle">Cash that entered and left your account</string>
+    <string name="dashboard_current_account_net_subtitle_multi">Total across your registered accounts in Settings</string>
+    <string name="dashboard_owned_accounts_badge_count">%1$d accounts</string>
     <string name="dashboard_current_account_net_formula">In %1$s − out %2$s</string>
     <string name="dashboard_current_account_inflows">Into current account</string>
     <string name="dashboard_current_account_outflows">Out of current account</string>

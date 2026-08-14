@@ -57,6 +57,21 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun summarize_filtersToOwnedAccountsOnly() {
+        val owned = "account:bank_aljazira:3001"
+        val other = "account:bank_aljazira:3002"
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(
+                tx("owned-pos", FinancialTransactionType.EXPENSE, "90", source = owned),
+                tx("other-pos", FinancialTransactionType.EXPENSE, "40", source = other),
+            ),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(owned),
+        )
+        assertEquals(Money.of("90.00", Currency.SAR), summary.posPurchases)
+    }
+
+    @Test
     fun spendingSplit_totalNet_sumsAccountAndCard() {
         val accountId = "account:bank_aljazira:3001"
         val cardId = "card:bank_aljazira:7271"

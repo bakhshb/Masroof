@@ -167,6 +167,8 @@
     <string name="dashboard_current_account_section">الحساب الجاري — حركة نقدية فعلية</string>
     <string name="dashboard_current_account_net_title">صافي حركة الجاري</string>
     <string name="dashboard_current_account_net_subtitle">ما دخل وخرج من حسابك</string>
+    <string name="dashboard_current_account_net_subtitle_multi">مجموع حساباتك المسجّلة في الإعدادات</string>
+    <string name="dashboard_owned_accounts_badge_count">%1$d حسابات</string>
     <string name="dashboard_current_account_net_formula">وارد %1$s − صادر %2$s</string>
     <string name="dashboard_current_account_inflows">وارد إلى الجاري</string>
     <string name="dashboard_current_account_outflows">صادر من الجاري</string>

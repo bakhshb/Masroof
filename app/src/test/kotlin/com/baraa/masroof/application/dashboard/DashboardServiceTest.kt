@@ -4,6 +4,9 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.AccountRegistryEntry
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewItem
@@ -12,6 +15,8 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -143,6 +148,7 @@ class DashboardServiceTest {
     private fun dashboardService(
         ftRepo: FinancialTransactionRepository,
         reviewRepo: ReviewRepository,
+        accountRepo: AccountRegistryRepository = FakeAccountRepo(),
     ): DashboardService =
         DashboardService(
             financialTransactionRepository = ftRepo,
@@ -150,9 +156,20 @@ class DashboardServiceTest {
             parsedEventRepository = FakeParsedRepo(),
             rawSmsRepository = FakeRawRepo(),
             appLocaleRepository = FakeAppLocaleRepository(),
+            accountRegistryRepository = accountRepo,
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeAccountRepo(
+        private val entries: List<AccountRegistryEntry> = emptyList(),
+    ) : AccountRegistryRepository {
+        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
+        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
+        override suspend fun resolve(reference: AccountReference): OwnershipStatus = OwnershipStatus.UNKNOWN
+        override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
+        override suspend fun listAll(): List<AccountRegistryEntry> = entries
+    }
 
     private class FakeAppLocaleRepository : AppLocaleRepository {
         override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
