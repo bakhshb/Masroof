@@ -64,12 +64,17 @@ class DashboardService(
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
-        val ownedAccountContainerIds = accountRegistryRepository.listAll()
+        val ownedAccounts = accountRegistryRepository.listAll()
             .asSequence()
             .filter { it.bank != Bank.UNKNOWN }
             .filter { it.ownership == OwnershipStatus.OWNED }
+            .toList()
+        val ownedAccountContainerIds = ownedAccounts
             .mapNotNull { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
             .toSet()
+        val ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
+            ownedAccounts.map { it.maskedNumber },
+        )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
             transactions = transactions,
@@ -83,6 +88,7 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
+            ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
@@ -91,6 +97,7 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
+            ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
         )
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(

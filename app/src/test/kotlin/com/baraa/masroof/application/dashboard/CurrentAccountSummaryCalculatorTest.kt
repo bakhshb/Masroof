@@ -2,6 +2,9 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -90,6 +93,95 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun cashWithdrawalWithNullSourceContainer_countsWhenTyped() {
+        val owned = "account:bank_aljazira:3478"
+        val cashWithdrawal = tx(
+            id = "cash-withdrawal",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "2200.00",
+            source = null,
+            linked = emptyList(),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(cashWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3478"),
+            rawSmsById = emptyMap(),
+        )
+        assertEquals(Money.of("2200.00", Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.of("2200.00", Currency.SAR), summary.totalOutflow)
+    }
+
+    @Test
+    fun expenseResolvedFromReview_countsUsingLinkedAccountAndSmsFamily() {
+        val owned = "account:bank_aljazira:3001"
+        val cardPay = tx(
+            id = "card-pay-expense",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "802.62",
+            source = null,
+            linked = listOf("evt-card-pay"),
+        )
+        val cash = tx(
+            id = "cash-expense",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "500.00",
+            source = null,
+            linked = listOf("evt-cash"),
+        )
+        val bill = tx(
+            id = "bill-expense",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "210.00",
+            source = null,
+            linked = listOf("evt-bill"),
+        )
+        val parsedRecords = listOf(
+            parsedRecord(
+                id = "evt-card-pay",
+                family = MessageFamily.CARD_PAYMENT,
+                sourceLast4 = "3001",
+                cardLast4 = "7271",
+                rawBody = "سداد بطاقة ائتمانية\nمن حساب: 3001\nبطاقة: 7271",
+            ),
+            parsedRecord(
+                id = "evt-cash",
+                family = MessageFamily.WITHDRAWAL,
+                sourceLast4 = "3001",
+                rawBody = "سحب نقدي\nمن حساب: 3001",
+            ),
+            parsedRecord(
+                id = "evt-bill",
+                family = MessageFamily.BILL_PAYMENT,
+                sourceLast4 = "3001",
+                rawBody = "سداد فاتورة\nالمفوتر: TEST",
+            ),
+        )
+        val rawSmsById = parsedRecords.associate { record ->
+            record.event.rawSmsId to RawSms(
+                id = record.event.rawSmsId,
+                sender = "AlJazira",
+                body = record.event.counterparty.orEmpty(),
+                receivedAt = Instant.parse("2026-08-10T12:00:00Z"),
+                deviceMessageId = record.event.id,
+                bodyHash = record.event.id,
+            )
+        }
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(cardPay, cash, bill),
+            parsedRecords = parsedRecords,
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = rawSmsById,
+        )
+        assertEquals(Money.of("802.62", Currency.SAR), summary.creditCardPayments)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.of("210.00", Currency.SAR), summary.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.posPurchases)
+    }
+
+    @Test
     fun summarize_filtersToOwnedAccountsOnly() {
         val owned = "account:bank_aljazira:3001"
         val other = "account:bank_aljazira:3002"
@@ -100,6 +192,7 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("90.00", Currency.SAR), summary.posPurchases)
     }
@@ -120,6 +213,7 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(ownedA, ownedB),
+            ownedAccountLast4s = setOf("3001", "3002"),
         )
         assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersIn)
         assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersOut)
@@ -164,20 +258,26 @@ class CurrentAccountSummaryCalculatorTest {
             linkedParsedEventIds = linked,
         )
 
-    private fun parsedRecord(id: String, family: MessageFamily): ParsedEventRecord {
+    private fun parsedRecord(
+        id: String,
+        family: MessageFamily,
+        sourceLast4: String? = null,
+        cardLast4: String? = null,
+        rawBody: String? = null,
+    ): ParsedEventRecord {
         val event = ParsedEvent(
             id = id,
             rawSmsId = "sms-$id",
-            bank = com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            bank = Bank.BANK_ALJAZIRA,
             messageFamily = family,
             direction = com.baraa.masroof.domain.model.MoneyDirection.INCOMING,
             amount = Money.of("1.00", Currency.SAR),
             purchaseChannel = null,
-            sourceAccountRef = null,
+            sourceAccountRef = sourceLast4?.let { AccountReference(Bank.BANK_ALJAZIRA, it) },
             destinationAccountRef = null,
-            cardRef = null,
+            cardRef = cardLast4?.let { CardReference(Bank.BANK_ALJAZIRA, it) },
             merchant = null,
-            counterparty = null,
+            counterparty = rawBody,
             occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
             bankNetworkType = null,
             confidence = com.baraa.masroof.domain.model.Confidence(1.0),
