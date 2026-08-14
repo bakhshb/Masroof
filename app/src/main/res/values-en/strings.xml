@@ -168,7 +168,7 @@
     <string name="dashboard_self_transfer_in">In from another account</string>
     <string name="dashboard_self_transfer_out">Out to another account</string>
     <string name="dashboard_self_transfers_neutral_hint">Transfer between your accounts — not counted as income or spending</string>
-    <string name="dashboard_spending_breakdown_formula">= outgoing transfers + bill payments + card payment + mada + cash withdrawal</string>
+    <string name="dashboard_spending_breakdown_formula">= outgoing transfers + bill payments + card payment + mada + fees + cash withdrawal</string>
     <string name="dashboard_spending_excludes_card_purchases">Does not include credit card purchases until you pay them from your account</string>
     <string name="dashboard_credit_card_month_spending">Spent since %1$s (month start)</string>
     <string name="dashboard_credit_card_month_spending_fallback">Spent since month start</string>
@@ -187,6 +187,7 @@
     <string name="dashboard_bill_payments">Bill payments</string>
     <string name="dashboard_spending_total_hint">Includes everything that left your current account in this period</string>
     <string name="dashboard_pos_purchases_short">Mada purchase</string>
+    <string name="dashboard_fees_short">Fees</string>
     <string name="dashboard_credit_card_payment">Credit card payment</string>
     <string name="dashboard_spending_split_title">Spending summary</string>
     <string name="dashboard_spending_from_account">Mada POS &amp; bills</string>

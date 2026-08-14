@@ -175,7 +175,7 @@
     <string name="dashboard_self_transfer_in">وارد من حساب آخر</string>
     <string name="dashboard_self_transfer_out">صادر إلى حساب آخر</string>
     <string name="dashboard_self_transfers_neutral_hint">تحويل بين حساباتك — لا يُحسب دخلاً ولا إنفاقاً</string>
-    <string name="dashboard_spending_breakdown_formula">= تحويلات خارجية + سداد فواتير + سداد بطاقة + شراء مدى + سحب نقدي</string>
+    <string name="dashboard_spending_breakdown_formula">= تحويلات خارجية + سداد فواتير + سداد بطاقة + شراء مدى + رسوم + سحب نقدي</string>
     <string name="dashboard_spending_excludes_card_purchases">لا يشمل مشتريات البطاقة الائتمانية حتى تسدّدها من الجاري</string>
     <string name="dashboard_credit_card_month_spending">منصرف منذ %1$s (بداية الشهر)</string>
     <string name="dashboard_credit_card_month_spending_fallback">منصرف منذ بداية الشهر</string>
@@ -194,6 +194,7 @@
     <string name="dashboard_bill_payments">سداد فواتير</string>
     <string name="dashboard_spending_total_hint">يشمل كل ما خرج من حسابك الجاري في هذه الفترة</string>
     <string name="dashboard_pos_purchases_short">شراء مدى</string>
+    <string name="dashboard_fees_short">رسوم</string>
     <string name="dashboard_credit_card_payment">سداد بطاقة ائتمانية</string>
     <string name="dashboard_spending_split_title">ملخص إنفاقك</string>
     <string name="dashboard_spending_from_account">شراء مدى وفواتير</string>

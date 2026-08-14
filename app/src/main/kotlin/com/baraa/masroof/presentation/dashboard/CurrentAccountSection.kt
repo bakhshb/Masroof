@@ -174,7 +174,11 @@ fun CurrentAccountSection(
                     )
                     OutflowRow(
                         label = stringResource(R.string.dashboard_pos_purchases_short),
-                        amount = summary.posPurchases + summary.fees,
+                        amount = summary.posPurchases,
+                    )
+                    OutflowRow(
+                        label = stringResource(R.string.dashboard_fees_short),
+                        amount = summary.fees,
                     )
                     TotalRow(
                         label = stringResource(R.string.dashboard_total_spent),
