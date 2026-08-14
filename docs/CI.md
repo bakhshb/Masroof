@@ -54,6 +54,16 @@ Then merges are blocked until tests pass.
 
 Pushing a `v*` tag still triggers Release (optional; not required for normal flow).
 
+## Release did not publish after merge?
+
+If **Release** shows green but no new APK on [Releases](https://github.com/bakhshb/Masroof/releases):
+
+1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, `main` was behind the latest tag (common when the version-bump commit could not push to `main`).
+2. Merge the workflow fix or run **Actions → Release → Run workflow** manually after syncing `app/build.gradle.kts` to the latest published version.
+3. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
+
+Every successful Release should produce a **new** tag (e.g. `v0.2.4`). If the tag already exists, the job skips the build by design.
+
 ## PR debug APK
 
 Each PR uploads `masroof-debug-apk-pr-<number>` under **Actions → run → Artifacts** (unsigned debug build for quick testing).
