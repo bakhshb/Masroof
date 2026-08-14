@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,6 +25,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
@@ -111,6 +113,32 @@ fun CreditCardsSection(
                 dateFormatter = dateTimeFormatter,
             )
         }
+
+        if (overview.cards.isNotEmpty()) {
+            AggregateSpendingCard(
+                title = if (overview.salaryPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_cards_aggregate_period_spending,
+                        overview.salaryPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
+                },
+                amount = overview.aggregatePeriodSpendingNet,
+            )
+
+            AggregateSpendingCard(
+                title = if (overview.aggregateStatementPeriodLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_cards_aggregate_statement_spending,
+                        overview.aggregateStatementPeriodLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+                },
+                amount = overview.aggregateStatementSpendingNet,
+            )
+        }
     }
 }
 
@@ -193,6 +221,38 @@ private fun CreditCardRowCard(
 }
 
 @Composable
+private fun AggregateSpendingCard(
+    title: String,
+    amount: SignedMoneyAmount,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatLocalizedMoney(amount),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
 private fun SpendingMetricRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -226,18 +286,30 @@ private fun formatSnapshotTime(
     formatter: DateTimeFormatter,
 ): String = formatter.format(instant.atZone(zoneId))
 
-fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview =
-    copy(cards = cards.filter { it.last4 in ownedLast4s })
+fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview {
+    val filteredCards = cards.filter { it.last4 in ownedLast4s }
+    return copy(
+        cards = filteredCards,
+        aggregatePeriodSpendingNet = sumFollowedSpending(filteredCards) { it.salaryPeriodSpendingNet },
+        aggregateStatementSpendingNet = sumFollowedSpending(filteredCards) { it.statementSpendingNet },
+    )
+}
 
-fun CreditCardsOverview.followedCalendarSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount {
-    val followed = cards.filter { it.last4 in ownedLast4s }
-    if (followed.isEmpty()) return SignedMoneyAmount.zero(currency)
+fun CreditCardsOverview.followedCalendarSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount =
+    sumFollowedSpending(cards.filter { it.last4 in ownedLast4s }) { it.calendarMonthSpendingNet }
+
+private fun sumFollowedSpending(
+    rows: List<CreditCardDashboardRow>,
+    selector: (CreditCardDashboardRow) -> SignedMoneyAmount,
+): SignedMoneyAmount {
+    if (rows.isEmpty()) return SignedMoneyAmount.zero(Currency.SAR)
     var sum = java.math.BigDecimal.ZERO
-    for (row in followed) {
-        sum = sum.add(row.calendarMonthSpendingNet.amount)
+    val rowCurrency = rows.first().statementSpendingNet.currency
+    for (row in rows) {
+        sum = sum.add(selector(row).amount)
     }
     return SignedMoneyAmount(
         sum.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN),
-        currency,
+        rowCurrency,
     )
 }

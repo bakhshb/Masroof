@@ -179,6 +179,10 @@
     <string name="dashboard_spending_excludes_card_purchases">لا يشمل مشتريات البطاقة الائتمانية حتى تسدّدها من الجاري</string>
     <string name="dashboard_credit_card_month_spending">منصرف منذ %1$s (بداية الشهر)</string>
     <string name="dashboard_credit_card_month_spending_fallback">منصرف منذ بداية الشهر</string>
+    <string name="dashboard_credit_cards_aggregate_period_spending">مجموع مشتريات البطاقات في الفترة (من %1$s)</string>
+    <string name="dashboard_credit_cards_aggregate_period_spending_fallback">مجموع مشتريات البطاقات في الفترة</string>
+    <string name="dashboard_credit_cards_aggregate_statement_spending">مجموع مشتريات البطاقات منذ كشف %1$s</string>
+    <string name="dashboard_credit_cards_aggregate_statement_spending_fallback">مجموع مشتريات البطاقات منذ آخر كشف</string>
     <string name="dashboard_current_account_net_subtitle">ما دخل وخرج من حسابك</string>
     <string name="dashboard_current_account_net_subtitle_multi">مجموع حساباتك المسجّلة في الإعدادات</string>
     <string name="dashboard_owned_accounts_badge_count">%1$d حسابات</string>

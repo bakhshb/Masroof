@@ -22,6 +22,9 @@ class CreditCardsOverviewFilterTest {
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementPeriodLabel = null,
             calendarMonthLabel = null,
             salaryPeriodLabel = null,
             currency = Currency.SAR,
@@ -34,16 +37,50 @@ class CreditCardsOverviewFilterTest {
     }
 
     @Test
-    fun followedCalendarSpendingTotal_sumsFollowedCards() {
+    fun followedOnly_recalculatesAggregateTotals() {
         val overview = CreditCardsOverview(
             cards = listOf(
-                row("3478", "100.00"),
-                row("7271", "50.25"),
-                row("9999", "900.00"),
+                row("3478", periodAmount = "100.00", statementAmount = "80.00"),
+                row("7271", periodAmount = "50.25", statementAmount = "40.00"),
+                row("9999", periodAmount = "900.00", statementAmount = "10.00"),
             ),
             aggregateDueAmount = null,
             aggregateDueUpdatedAt = null,
             aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount.of(Money.of("1050.25", Currency.SAR)),
+            aggregateStatementSpendingNet = SignedMoneyAmount.of(Money.of("130.00", Currency.SAR)),
+            aggregateStatementPeriodLabel = null,
+            calendarMonthLabel = null,
+            salaryPeriodLabel = null,
+            currency = Currency.SAR,
+        )
+
+        val filtered = overview.followedOnly(setOf("3478", "7271"))
+
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("150.25", Currency.SAR)),
+            filtered.aggregatePeriodSpendingNet,
+        )
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("120.00", Currency.SAR)),
+            filtered.aggregateStatementSpendingNet,
+        )
+    }
+
+    @Test
+    fun followedCalendarSpendingTotal_sumsFollowedCards() {
+        val overview = CreditCardsOverview(
+            cards = listOf(
+                row("3478", monthAmount = "100.00"),
+                row("7271", monthAmount = "50.25"),
+                row("9999", monthAmount = "900.00"),
+            ),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementPeriodLabel = null,
             calendarMonthLabel = null,
             salaryPeriodLabel = null,
             currency = Currency.SAR,
@@ -54,13 +91,18 @@ class CreditCardsOverviewFilterTest {
         assertEquals(SignedMoneyAmount.of(Money.of("150.25", Currency.SAR)), total)
     }
 
-    private fun row(last4: String, monthAmount: String = "0.00"): CreditCardDashboardRow =
+    private fun row(
+        last4: String,
+        monthAmount: String = "0.00",
+        periodAmount: String = "0.00",
+        statementAmount: String = "0.00",
+    ): CreditCardDashboardRow =
         CreditCardDashboardRow(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             calendarMonthSpendingNet = SignedMoneyAmount.of(Money.of(monthAmount, Currency.SAR)),
-            statementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            salaryPeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            statementSpendingNet = SignedMoneyAmount.of(Money.of(statementAmount, Currency.SAR)),
+            salaryPeriodSpendingNet = SignedMoneyAmount.of(Money.of(periodAmount, Currency.SAR)),
             statementPeriodLabel = null,
             snapshot = null,
         )
