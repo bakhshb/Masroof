@@ -96,7 +96,10 @@ class SettingsImportConfirmTest {
             databaseBackupService = backup,
             refreshReviewQueue = {},
             reparseStoredEvents = { 0 },
-            appVersion = "1.0-test",
+            appVersion = SettingsViewModelTestFixtures.APP_VERSION,
+            appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),
+            apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
+            canInstallPackages = { true },
         )
 
     private class RecordingBackupGateway : DatabaseBackupGateway {

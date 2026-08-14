@@ -11,7 +11,7 @@ class BackupPackageCodecTest {
     fun encodeDecode_roundTripsManifest() {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
-            appVersionName = "0.1.0-test",
+            appVersionName = "0.2.0",
             roomVersion = MasroofDatabase.VERSION,
             identityHash = MasroofDatabase.IDENTITY_HASH,
             exportedAtEpochMillis = 1_700_000_000_000L,
@@ -38,7 +38,7 @@ class BackupPackageCodecTest {
     fun validateManifest_acceptsCurrentSchema() {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
-            appVersionName = "0.1.0-test",
+            appVersionName = "0.2.0",
             roomVersion = MasroofDatabase.VERSION,
             identityHash = MasroofDatabase.IDENTITY_HASH,
             exportedAtEpochMillis = 1L,
@@ -56,7 +56,7 @@ class BackupPackageCodecTest {
     fun validateManifest_rejectsWrongIdentityHash() {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
-            appVersionName = "0.1.0-test",
+            appVersionName = "0.2.0",
             roomVersion = MasroofDatabase.VERSION,
             identityHash = "deadbeef",
             exportedAtEpochMillis = 1L,
@@ -74,7 +74,7 @@ class BackupPackageCodecTest {
     fun validateManifest_rejectsWrongRoomVersion() {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
-            appVersionName = "0.1.0-test",
+            appVersionName = "0.2.0",
             roomVersion = 1,
             identityHash = MasroofDatabase.IDENTITY_HASH,
             exportedAtEpochMillis = 1L,
@@ -93,7 +93,7 @@ class BackupPackageCodecTest {
         val raw = """
             {
               "formatVersion": 1,
-              "appVersionName": "0.1.0-test",
+              "appVersionName": "0.2.0",
               "roomVersion": 4,
               "identityHash": "${MasroofDatabase.IDENTITY_HASH}",
               "exportedAtEpochMillis": 42,

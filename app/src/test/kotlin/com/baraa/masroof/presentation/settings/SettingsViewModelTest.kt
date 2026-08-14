@@ -28,8 +28,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
 class SettingsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
@@ -57,7 +60,7 @@ class SettingsViewModelTest {
         assertEquals("7271", vm.uiState.value.followedCards.single().last4)
         assertEquals("5123", vm.uiState.value.unregisteredCards.single().last4)
         assertEquals("9999", vm.uiState.value.stoppedCards.single().last4)
-        assertEquals("1.0-test", vm.uiState.value.appVersion)
+        assertEquals(SettingsViewModelTestFixtures.APP_VERSION, vm.uiState.value.appVersion)
     }
 
     @Test
@@ -169,7 +172,10 @@ class SettingsViewModelTest {
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
-            appVersion = "1.0-test",
+            appVersion = SettingsViewModelTestFixtures.APP_VERSION,
+            appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),
+            apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
+            canInstallPackages = { true },
         )
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

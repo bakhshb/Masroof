@@ -3,12 +3,14 @@ package com.baraa.masroof.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.update.InstallPermissionHelper
 import com.baraa.masroof.application.theme.ThemeMode
 
 class SettingsViewModelFactory(
     private val container: AppContainer,
     private val appVersion: String,
     private val onThemeModeChanged: (ThemeMode) -> Unit = {},
+    private val onRequestInstallPermission: () -> Unit = {},
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -23,7 +25,13 @@ class SettingsViewModelFactory(
             refreshReviewQueue = { container.refreshReviewQueue() },
             reparseStoredEvents = { container.reparseAllStoredEvents() },
             appVersion = appVersion,
+            appUpdateService = container.appUpdateService,
+            apkInstaller = container.apkInstaller,
+            canInstallPackages = {
+                InstallPermissionHelper.canInstallPackages(container.applicationContext)
+            },
             onThemeModeChanged = onThemeModeChanged,
+            onRequestInstallPermission = onRequestInstallPermission,
         ) as T
     }
 }

@@ -14,6 +14,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+val appVersionName = "0.2.0"
+val appVersionCode = 3
+val githubOwner = "bakhshb"
+val githubRepo = "Masroof"
+
 android {
     namespace = "com.baraa.masroof"
     compileSdk = 34
@@ -22,8 +27,11 @@ android {
         applicationId = "com.baraa.masroof"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.0-test"
+        versionCode = appVersionCode
+        versionName = appVersionName
+
+        buildConfigField("String", "GITHUB_OWNER", "\"$githubOwner\"")
+        buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +48,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -114,6 +125,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
+
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.serialization.json)
