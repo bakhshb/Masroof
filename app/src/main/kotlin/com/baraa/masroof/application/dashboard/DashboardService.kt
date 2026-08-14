@@ -72,10 +72,9 @@ class DashboardService(
         val ownedAccountContainerIds = ownedAccounts
             .mapNotNull { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
             .toSet()
-        val ownedAccountLast4s = ownedAccounts
-            .map { it.maskedNumber.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
+        val ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
+            ownedAccounts.map { it.maskedNumber },
+        )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
             transactions = transactions,

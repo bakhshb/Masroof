@@ -41,7 +41,7 @@ object CurrentAccountSummaryCalculator {
             val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.INCOME -> {
-                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) continue
                     if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
                         salary += amount
                     } else {
@@ -50,7 +50,7 @@ object CurrentAccountSummaryCalculator {
                 }
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
-                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) continue
                     if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
                         salary += amount
                     } else {
@@ -59,23 +59,23 @@ object CurrentAccountSummaryCalculator {
                 }
 
                 FinancialTransactionType.CREDIT_CARD_PAYMENT -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     creditCardPayments += amount
                 }
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     externalTransfersOut += amount
                 }
 
                 FinancialTransactionType.CASH_WITHDRAWAL -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     cashWithdrawals += amount
                 }
 
                 FinancialTransactionType.EXPENSE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     when {
                         scope.isCreditCardPayment(tx, parsedRecordsById, rawSmsById) ->
                             creditCardPayments += amount
@@ -92,15 +92,15 @@ object CurrentAccountSummaryCalculator {
 
                 FinancialTransactionType.FEE -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) continue
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById)) continue
+                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     fees += amount
                 }
 
                 FinancialTransactionType.SELF_TRANSFER -> {
-                    if (scope.involvesOwnedDestination(tx, parsedRecordsById)) {
+                    if (scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
                         selfTransfersIn += amount
                     }
-                    if (scope.involvesOwnedSource(tx, parsedRecordsById)) {
+                    if (scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
                         selfTransfersOut += amount
                     }
                 }

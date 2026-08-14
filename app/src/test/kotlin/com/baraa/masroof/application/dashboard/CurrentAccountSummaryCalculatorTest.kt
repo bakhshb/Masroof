@@ -93,6 +93,27 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun cashWithdrawalWithNullSourceContainer_countsWhenTyped() {
+        val owned = "account:bank_aljazira:3478"
+        val cashWithdrawal = tx(
+            id = "cash-withdrawal",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "2200.00",
+            source = null,
+            linked = emptyList(),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(cashWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3478"),
+            rawSmsById = emptyMap(),
+        )
+        assertEquals(Money.of("2200.00", Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.of("2200.00", Currency.SAR), summary.totalOutflow)
+    }
+
+    @Test
     fun expenseResolvedFromReview_countsUsingLinkedAccountAndSmsFamily() {
         val owned = "account:bank_aljazira:3001"
         val cardPay = tx(
