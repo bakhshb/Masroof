@@ -85,6 +85,11 @@ object CreditCardOverviewBuilder {
         val globalStatementStart = resolveGlobalStatementStart(parsedRecords, rawSmsById, zoneId, clock)
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = dayMonth.format(salaryPeriod.startDate)
+        val calendarMonthStart = LocalDate.now(clock)
+            .withDayOfMonth(1)
+            .atStartOfDay(zoneId)
+            .toInstant()
+        val calendarMonthLabel = dayMonth.format(LocalDate.now(clock).withDayOfMonth(1))
 
         val latestPurchaseDueByCard = snapshotCandidates
             .filter { !it.isStatement && it.details.outstandingBalance != null }
@@ -125,10 +130,18 @@ object CreditCardOverviewBuilder {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )
+            val calendarMonthNet = netSpending(
+                transactions = cardTransactions,
+                cardId = cardId,
+                startInclusive = calendarMonthStart,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents,
+            )
 
             CreditCardDashboardRow(
                 bank = ref.bank,
                 last4 = ref.last4.orEmpty(),
+                calendarMonthSpendingNet = calendarMonthNet,
                 statementSpendingNet = statementNet,
                 salaryPeriodSpendingNet = salaryNet,
                 statementPeriodLabel = statementLabel,
@@ -143,13 +156,39 @@ object CreditCardOverviewBuilder {
             .filter { it.isStatement }
             .maxByOrNull { it.updatedAt }
 
+        val aggregatePeriodSpending = sumSpending(rows) { it.salaryPeriodSpendingNet }
+        val aggregateStatementSpending = sumSpending(rows) { it.statementSpendingNet }
+        val aggregateStatementLabel = latestStatement?.updatedAt?.let {
+            dayMonth.format(it.atZone(zoneId).toLocalDate())
+        } ?: dayMonth.format(globalStatementStart.atZone(zoneId).toLocalDate())
+
         return CreditCardsOverview(
             cards = rows,
             aggregateDueAmount = latestStatement?.details?.outstandingBalance,
             aggregateDueUpdatedAt = latestStatement?.updatedAt,
             aggregateDueDate = latestStatement?.dueDate,
+            aggregatePeriodSpendingNet = aggregatePeriodSpending,
+            aggregateStatementSpendingNet = aggregateStatementSpending,
+            aggregateStatementPeriodLabel = aggregateStatementLabel,
+            calendarMonthLabel = calendarMonthLabel,
             salaryPeriodLabel = salaryPeriodLabel,
             currency = primaryCurrency,
+        )
+    }
+
+    private fun sumSpending(
+        rows: List<CreditCardDashboardRow>,
+        selector: (CreditCardDashboardRow) -> SignedMoneyAmount,
+    ): SignedMoneyAmount {
+        if (rows.isEmpty()) return SignedMoneyAmount.zero(Currency.SAR)
+        var sum = java.math.BigDecimal.ZERO
+        val currency = rows.first().statementSpendingNet.currency
+        for (row in rows) {
+            sum = sum.add(selector(row).amount)
+        }
+        return SignedMoneyAmount(
+            sum.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN),
+            currency,
         )
     }
 

@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 object CurrentAccountSummaryCalculator {
@@ -14,11 +15,16 @@ object CurrentAccountSummaryCalculator {
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
+        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): CurrentAccountSummary {
         val billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords)
+        val parsedRecordsById = parsedRecords.associateBy { it.event.id }
 
-        var income = Money.zero(primaryCurrency)
+        var salary = Money.zero(primaryCurrency)
+        var otherIncome = Money.zero(primaryCurrency)
         var externalTransfersIn = Money.zero(primaryCurrency)
+        var selfTransfersIn = Money.zero(primaryCurrency)
+        var selfTransfersOut = Money.zero(primaryCurrency)
         var creditCardPayments = Money.zero(primaryCurrency)
         var billPayments = Money.zero(primaryCurrency)
         var externalTransfersOut = Money.zero(primaryCurrency)
@@ -30,13 +36,21 @@ object CurrentAccountSummaryCalculator {
             val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.INCOME -> {
-                    if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
-                    income += amount
+                    if (!ownedAccountReceiving(tx, ownedAccountContainerIds)) continue
+                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
+                        salary += amount
+                    } else {
+                        otherIncome += amount
+                    }
                 }
 
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
-                    if (!involvesOwnedAccount(tx.destinationContainerId, ownedAccountContainerIds)) continue
-                    externalTransfersIn += amount
+                    if (!ownedAccountReceiving(tx, ownedAccountContainerIds)) continue
+                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
+                        salary += amount
+                    } else {
+                        externalTransfersIn += amount
+                    }
                 }
 
                 FinancialTransactionType.CREDIT_CARD_PAYMENT -> {
@@ -70,8 +84,16 @@ object CurrentAccountSummaryCalculator {
                     fees += amount
                 }
 
+                FinancialTransactionType.SELF_TRANSFER -> {
+                    if (involvesOwnedAccount(tx.destinationContainerId, ownedAccountContainerIds)) {
+                        selfTransfersIn += amount
+                    }
+                    if (involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) {
+                        selfTransfersOut += amount
+                    }
+                }
+
                 FinancialTransactionType.REFUND,
-                FinancialTransactionType.SELF_TRANSFER,
                 FinancialTransactionType.ADJUSTMENT,
                 FinancialTransactionType.UNKNOWN,
                 -> Unit
@@ -80,8 +102,11 @@ object CurrentAccountSummaryCalculator {
 
         return CurrentAccountSummary(
             currency = primaryCurrency,
-            income = income,
+            salary = salary,
+            otherIncome = otherIncome,
             externalTransfersIn = externalTransfersIn,
+            selfTransfersIn = selfTransfersIn,
+            selfTransfersOut = selfTransfersOut,
             creditCardPayments = creditCardPayments,
             billPayments = billPayments,
             externalTransfersOut = externalTransfersOut,
@@ -97,8 +122,17 @@ object CurrentAccountSummaryCalculator {
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
+        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): SpendingSplitSummary {
-        var accountGross = Money.zero(primaryCurrency)
+        val currentAccount = summarize(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            ownedAccountContainerIds = ownedAccountContainerIds,
+            rawSmsById = rawSmsById,
+        )
+
         var cardGross = Money.zero(primaryCurrency)
         var cardRefunds = Money.zero(primaryCurrency)
 
@@ -110,9 +144,6 @@ object CurrentAccountSummaryCalculator {
                 -> {
                     if (isCreditCardContainer(tx.sourceContainerId)) {
                         cardGross += amount
-                    } else {
-                        if (!involvesOwnedAccount(tx.sourceContainerId, ownedAccountContainerIds)) continue
-                        accountGross += amount
                     }
                 }
 
@@ -128,8 +159,8 @@ object CurrentAccountSummaryCalculator {
 
         return SpendingSplitSummary(
             currency = primaryCurrency,
-            fromCurrentAccount = accountGross,
-            onCreditCard = SignedMoneyAmount.difference(cardGross, cardRefunds),
+            totalSpending = currentAccount.totalOutflow,
+            creditCardPurchases = SignedMoneyAmount.difference(cardGross, cardRefunds),
         )
     }
 
@@ -154,6 +185,14 @@ object CurrentAccountSummaryCalculator {
         if (ownedAccountContainerIds.isEmpty()) return true
         return containerId != null && containerId in ownedAccountContainerIds
     }
+
+    private fun ownedAccountReceiving(
+        tx: FinancialTransaction,
+        ownedAccountContainerIds: Set<String>,
+    ): Boolean = involvesOwnedAccount(
+        containerId = tx.destinationContainerId ?: tx.sourceContainerId,
+        ownedAccountContainerIds = ownedAccountContainerIds,
+    )
 
     private fun effectiveAmount(
         tx: FinancialTransaction,

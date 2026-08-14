@@ -83,6 +83,7 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
+            rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
             transactions = transactions,
@@ -90,6 +91,7 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
+            rawSmsById = rawSmsById,
         )
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,

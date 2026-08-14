@@ -6,6 +6,7 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
@@ -30,7 +31,8 @@ class CurrentAccountSummaryCalculatorTest {
             parsedRecords = emptyList(),
         )
 
-        assertEquals(Money.of("15000.00", Currency.SAR), summary.income)
+        assertEquals(Money.of("15000.00", Currency.SAR), summary.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.otherIncome)
         assertEquals(Money.of("200.00", Currency.SAR), summary.externalTransfersIn)
         assertEquals(Money.of("500.00", Currency.SAR), summary.creditCardPayments)
         assertEquals(Money.of("100.00", Currency.SAR), summary.externalTransfersOut)
@@ -40,6 +42,37 @@ class CurrentAccountSummaryCalculatorTest {
             SignedMoneyAmount.of(Money.of("14460.00", Currency.SAR)),
             summary.netMovement,
         )
+    }
+
+    @Test
+    fun salaryTransferDetectedFromSmsWording() {
+        val accountId = "account:bank_aljazira:3001"
+        val salaryTx = tx(
+            id = "salary-xfer",
+            type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            amount = "3191.68",
+            dest = accountId,
+            linked = listOf("evt-salary"),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(salaryTx),
+            parsedRecords = listOf(
+                parsedRecord("evt-salary", MessageFamily.TRANSFER_IN),
+            ),
+            rawSmsById = mapOf(
+                "sms-evt-salary" to RawSms(
+                    id = "sms-evt-salary",
+                    sender = "AlJazira",
+                    body = "حوالة واردة راتب\nمبلغ: SAR 3,191.68",
+                    receivedAt = Instant.parse("2026-07-27T01:12:00Z"),
+                    deviceMessageId = "evt-salary",
+                    bodyHash = "evt-salary",
+                ),
+            ),
+        )
+
+        assertEquals(Money.of("3191.68", Currency.SAR), summary.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.externalTransfersIn)
     }
 
     @Test
@@ -72,33 +105,42 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun spendingSplit_totalNet_sumsAccountAndCard() {
-        val accountId = "account:bank_aljazira:3001"
-        val cardId = "card:bank_aljazira:7271"
-        val split = CurrentAccountSummaryCalculator.spendingSplit(
+    fun selfTransfersTrackedSeparatelyWithoutAffectingNet() {
+        val ownedA = "account:bank_aljazira:3001"
+        val ownedB = "account:bank_aljazira:3002"
+        val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(
-                tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId),
-                tx("card", FinancialTransactionType.EXPENSE, "75", source = cardId),
+                tx(
+                    id = "self",
+                    type = FinancialTransactionType.SELF_TRANSFER,
+                    amount = "500",
+                    source = ownedA,
+                    dest = ownedB,
+                ),
             ),
             parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(ownedA, ownedB),
         )
-        assertEquals(SignedMoneyAmount.of(Money.of("165.00", Currency.SAR)), split.totalNet)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersIn)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersOut)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.netMovement)
     }
 
     @Test
-    fun spendingSplit_separatesAccountAndCard() {
+    fun spendingSplit_totalSpending_matchesCurrentAccountOutflow() {
         val accountId = "account:bank_aljazira:3001"
         val cardId = "card:bank_aljazira:7271"
         val split = CurrentAccountSummaryCalculator.spendingSplit(
             transactions = listOf(
                 tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId),
+                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId),
+                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "50", source = accountId, dest = cardId),
                 tx("card", FinancialTransactionType.EXPENSE, "75", source = cardId),
-                tx("refund", FinancialTransactionType.REFUND, "10", dest = cardId),
             ),
             parsedRecords = emptyList(),
         )
-        assertEquals(Money.of("90.00", Currency.SAR), split.fromCurrentAccount)
-        assertEquals(SignedMoneyAmount.of(Money.of("65.00", Currency.SAR)), split.onCreditCard)
+        assertEquals(Money.of("240.00", Currency.SAR), split.totalSpending)
+        assertEquals(SignedMoneyAmount.of(Money.of("75.00", Currency.SAR)), split.creditCardPurchases)
     }
 
     private fun tx(
@@ -128,7 +170,7 @@ class CurrentAccountSummaryCalculatorTest {
             rawSmsId = "sms-$id",
             bank = com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
             messageFamily = family,
-            direction = com.baraa.masroof.domain.model.MoneyDirection.OUTGOING,
+            direction = com.baraa.masroof.domain.model.MoneyDirection.INCOMING,
             amount = Money.of("1.00", Currency.SAR),
             purchaseChannel = null,
             sourceAccountRef = null,

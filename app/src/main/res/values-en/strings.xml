@@ -159,6 +159,23 @@
     <string name="dashboard_net_spending">Net spending</string>
     <string name="dashboard_current_account_section">Current account — actual cash movement</string>
     <string name="dashboard_current_account_net_title">Net current-account movement</string>
+    <string name="dashboard_remaining_title">Remaining</string>
+    <string name="dashboard_remaining_formula">In %1$s − out %2$s = remaining</string>
+    <string name="dashboard_salary">Salary</string>
+    <string name="dashboard_other_income">Other income</string>
+    <string name="dashboard_total_inflow">Total inflow</string>
+    <string name="dashboard_total_outflow">Total outflow</string>
+    <string name="dashboard_self_transfer_in">In from another account</string>
+    <string name="dashboard_self_transfer_out">Out to another account</string>
+    <string name="dashboard_self_transfers_neutral_hint">Transfer between your accounts — not counted as income or spending</string>
+    <string name="dashboard_spending_total_hint">Includes everything that left your current account in this period</string>
+    <string name="dashboard_spending_excludes_card_purchases">Does not include credit card purchases until you pay them from your account</string>
+    <string name="dashboard_credit_card_month_spending">Spent since %1$s (month start)</string>
+    <string name="dashboard_credit_card_month_spending_fallback">Spent since month start</string>
+    <string name="dashboard_credit_cards_aggregate_period_spending">Total card purchases in period (from %1$s)</string>
+    <string name="dashboard_credit_cards_aggregate_period_spending_fallback">Total card purchases in period</string>
+    <string name="dashboard_credit_cards_aggregate_statement_spending">Total card purchases since statement %1$s</string>
+    <string name="dashboard_credit_cards_aggregate_statement_spending_fallback">Total card purchases since last statement</string>
     <string name="dashboard_current_account_net_subtitle">Cash that entered and left your account</string>
     <string name="dashboard_current_account_net_subtitle_multi">Total across your registered accounts in Settings</string>
     <string name="dashboard_owned_accounts_badge_count">%1$d accounts</string>
