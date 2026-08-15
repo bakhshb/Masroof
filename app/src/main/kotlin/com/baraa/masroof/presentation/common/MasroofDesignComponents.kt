@@ -273,6 +273,7 @@ fun MasroofMoneyRow(
     value: String,
     modifier: Modifier = Modifier,
     style: MasroofMoneyRowStyle = MasroofMoneyRowStyle.Neutral,
+    leadingIcon: ImageVector? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val (background, borderColor) = when (style) {
@@ -303,13 +304,26 @@ fun MasroofMoneyRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
+        Row(
             modifier = Modifier.weight(1f, fill = false),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = valueColor,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             value,

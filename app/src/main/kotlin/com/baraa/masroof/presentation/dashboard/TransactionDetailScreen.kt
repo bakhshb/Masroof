@@ -206,9 +206,9 @@ fun TransactionDetailScreen(
                         trailing = formatLocalizedTransactionDate(transaction.localDate),
                     )
                     IconLabelRow(
-                        icon = directionIcon(transaction.direction),
+                        icon = TransactionDirectionPresentation.icon(transaction.direction),
                         label = stringResource(R.string.transaction_detail_direction),
-                        trailing = stringResource(directionLabelRes(transaction.direction)),
+                        trailing = stringResource(TransactionDirectionPresentation.labelRes(transaction.direction)),
                     )
                     transaction.cardLast4?.let { last4 ->
                         IconLabelRow(
@@ -273,20 +273,3 @@ fun TransactionDetailScreen(
     }
 }
 
-private fun directionIcon(direction: TransactionDirectionUi) =
-    when (direction) {
-        TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
-        TransactionDirectionUi.INWARD -> MasroofIcons.refunds
-        TransactionDirectionUi.INCOME -> MasroofIcons.income
-        TransactionDirectionUi.TRANSFER_IN -> MasroofIcons.externalIn
-        TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
-    }
-
-private fun directionLabelRes(direction: TransactionDirectionUi): Int =
-    when (direction) {
-        TransactionDirectionUi.OUTWARD -> R.string.dashboard_direction_out
-        TransactionDirectionUi.INWARD -> R.string.dashboard_direction_in
-        TransactionDirectionUi.INCOME -> R.string.dashboard_direction_income
-        TransactionDirectionUi.TRANSFER_IN -> R.string.dashboard_direction_transfer_in
-        TransactionDirectionUi.NEUTRAL -> R.string.dashboard_direction_neutral
-    }
