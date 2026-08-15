@@ -28,8 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -158,21 +156,7 @@ fun MasroofCard(
         MasroofCardAccent.Liability -> extended.liability
     }
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (accent != MasroofCardAccent.None) {
-                    Modifier.drawBehind {
-                        drawRect(
-                            color = accentColor,
-                            topLeft = Offset.Zero,
-                            size = size.copy(height = 4.dp.toPx()),
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            ),
+        modifier = modifier.fillMaxWidth(),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -180,15 +164,22 @@ fun MasroofCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = if (accent != MasroofCardAccent.None) 4.dp else 0.dp,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (accent != MasroofCardAccent.None) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(accentColor),
                 )
-                .padding(14.dp),
-            content = content,
-        )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                content = content,
+            )
+        }
     }
 }
 
