@@ -30,7 +30,7 @@ fun transactionDetailShareText(transaction: TransactionPreviewUi): String {
         ),
         TransactionShareText.field(
             stringResource(R.string.transaction_detail_direction),
-            stringResource(directionShareLabelRes(transaction.direction)),
+            stringResource(TransactionDirectionPresentation.labelRes(transaction.direction)),
         ),
         transaction.cardLast4?.let { last4 ->
             TransactionShareText.field(
@@ -97,11 +97,3 @@ fun transactionListShareText(
     )
 }
 
-private fun directionShareLabelRes(direction: TransactionDirectionUi): Int =
-    when (direction) {
-        TransactionDirectionUi.OUTWARD -> R.string.dashboard_direction_out
-        TransactionDirectionUi.INWARD -> R.string.dashboard_direction_in
-        TransactionDirectionUi.INCOME -> R.string.dashboard_direction_income
-        TransactionDirectionUi.TRANSFER_IN -> R.string.dashboard_direction_transfer_in
-        TransactionDirectionUi.NEUTRAL -> R.string.dashboard_direction_neutral
-    }

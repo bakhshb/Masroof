@@ -18,12 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofBadge
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
-import com.baraa.masroof.presentation.common.MasroofMiniCard
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.SectionHeader
@@ -105,18 +103,18 @@ fun CurrentAccountSection(
                 FlowRow(
                     label = stringResource(R.string.dashboard_salary),
                     amount = summary.salary,
-                    positive = true,
+                    direction = TransactionDirectionUi.INCOME,
                 )
                 FlowRow(
                     label = stringResource(R.string.dashboard_external_in_short),
                     amount = summary.externalTransfersIn,
-                    positive = true,
+                    direction = TransactionDirectionUi.TRANSFER_IN,
                 )
                 if (summary.otherIncome.amount.signum() > 0) {
                     FlowRow(
                         label = stringResource(R.string.dashboard_other_income),
                         amount = summary.otherIncome,
-                        positive = true,
+                        direction = TransactionDirectionUi.INCOME,
                     )
                 }
             }
@@ -132,29 +130,35 @@ fun CurrentAccountSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_external_out_short),
                     amount = summary.externalTransfersOut,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_credit_card_payment),
                     amount = summary.creditCardPayments,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_cash_withdrawals),
                     amount = summary.cashWithdrawals,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_bill_payments),
                     amount = summary.billPayments,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_pos_purchases_short),
                     amount = summary.posPurchases,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
-                OutflowRow(
+                DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_fees_short),
                     amount = summary.fees,
+                    direction = TransactionDirectionUi.OUTWARD,
                 )
             }
             TotalRow(
@@ -177,12 +181,12 @@ fun CurrentAccountSection(
                     FlowRow(
                         label = stringResource(R.string.dashboard_self_transfer_in),
                         amount = summary.selfTransfersIn,
-                        neutral = true,
+                        direction = TransactionDirectionUi.NEUTRAL,
                     )
                     FlowRow(
                         label = stringResource(R.string.dashboard_self_transfer_out),
                         amount = summary.selfTransfersOut,
-                        neutral = true,
+                        direction = TransactionDirectionUi.NEUTRAL,
                     )
                 }
                 Text(
@@ -197,94 +201,17 @@ fun CurrentAccountSection(
 }
 
 @Composable
-fun SpendingSplitSection(
-    spendingSplit: SpendingSplitSummary,
-    unknownCardCount: Int = 0,
-    modifier: Modifier = Modifier,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
-            title = stringResource(R.string.dashboard_spending_split_title),
-            icon = com.baraa.masroof.presentation.common.MasroofIcons.netSpending,
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MasroofMiniCard(
-                label = stringResource(R.string.dashboard_spending_from_account),
-                value = formatLocalizedMoney(spendingSplit.totalSpending),
-                valueColor = extended.account,
-                modifier = Modifier.weight(1f),
-            )
-            MasroofMiniCard(
-                label = stringResource(R.string.dashboard_spending_on_card),
-                value = formatLocalizedMoney(spendingSplit.creditCardPurchases),
-                valueColor = extended.card,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        MasroofCard {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_total),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Text(
-                        formatLocalizedMoney(spendingSplit.totalSpending),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = extended.outflow,
-                        ),
-                    )
-                }
-                Text(
-                    stringResource(R.string.dashboard_spending_total_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.dashboard_spending_breakdown_formula),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (spendingSplit.creditCardPurchases.amount.signum() > 0) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_excludes_card_purchases),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (unknownCardCount > 0) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_split_unknown_cards, unknownCardCount),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = extended.card,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OutflowRow(
+private fun DirectionMoneyRow(
     label: String,
     amount: Money,
+    direction: TransactionDirectionUi,
 ) {
     if (amount.amount.signum() == 0) return
     MasroofMoneyRow(
-        label = "↓ $label",
+        label = label,
         value = formatLocalizedMoney(amount),
-        style = MasroofMoneyRowStyle.Outflow,
+        style = directionMoneyRowStyle(direction),
+        leadingIcon = TransactionDirectionPresentation.icon(direction),
     )
 }
 
@@ -292,25 +219,20 @@ private fun OutflowRow(
 private fun FlowRow(
     label: String,
     amount: Money,
-    positive: Boolean = false,
-    neutral: Boolean = false,
+    direction: TransactionDirectionUi,
 ) {
-    if (amount.amount.signum() == 0) return
-    val prefix = when {
-        neutral -> "↔ "
-        positive -> "↑ "
-        else -> "↓ "
-    }
-    MasroofMoneyRow(
-        label = prefix + label,
-        value = formatLocalizedMoney(amount),
-        style = when {
-            neutral -> MasroofMoneyRowStyle.Neutral
-            positive -> MasroofMoneyRowStyle.Inflow
-            else -> MasroofMoneyRowStyle.Outflow
-        },
-    )
+    DirectionMoneyRow(label = label, amount = amount, direction = direction)
 }
+
+private fun directionMoneyRowStyle(direction: TransactionDirectionUi): MasroofMoneyRowStyle =
+    when (direction) {
+        TransactionDirectionUi.INCOME,
+        TransactionDirectionUi.INWARD,
+        TransactionDirectionUi.TRANSFER_IN,
+        -> MasroofMoneyRowStyle.Inflow
+        TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
+        TransactionDirectionUi.NEUTRAL -> MasroofMoneyRowStyle.Neutral
+    }
 
 @Composable
 private fun TotalRow(

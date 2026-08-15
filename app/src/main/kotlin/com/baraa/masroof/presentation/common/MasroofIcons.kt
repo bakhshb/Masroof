@@ -42,6 +42,8 @@ import com.baraa.masroof.domain.model.ReviewKind
 
 /**
  * Central icon mapping so dashboard, review, and onboarding stay visually consistent.
+ *
+ * For the Masroof brand mark, prefer [MasroofLogo] / [MasroofLogoMark] composables.
  */
 object MasroofIcons {
     val appLogo: ImageVector = Icons.Filled.AccountBalanceWallet

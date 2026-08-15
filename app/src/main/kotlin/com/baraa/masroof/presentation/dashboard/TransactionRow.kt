@@ -41,22 +41,14 @@ fun TransactionRow(
         row.direction == TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
         else -> MasroofMoneyRowStyle.Neutral
     }
-    val amountPrefix = when (row.direction) {
-        TransactionDirectionUi.INCOME,
-        TransactionDirectionUi.INWARD,
-        TransactionDirectionUi.TRANSFER_IN,
-        -> "+"
-        TransactionDirectionUi.OUTWARD -> "−"
-        else -> ""
-    }
-
     MasroofCard(
         modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         MasroofMoneyRow(
             label = title,
-            value = amountPrefix + formatLocalizedMoney(row.amount),
+            value = formatLocalizedMoney(row.amount),
             style = rowStyle,
+            leadingIcon = TransactionDirectionPresentation.icon(row.direction),
         )
         Text(
             subtitle,

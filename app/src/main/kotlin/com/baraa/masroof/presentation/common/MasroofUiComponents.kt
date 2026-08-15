@@ -22,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
@@ -154,11 +155,15 @@ fun MetricHighlightCard(
 @Composable
 fun IconTextButton(
     onClick: () -> Unit,
-    icon: ImageVector,
     text: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    icon: ImageVector? = null,
+    brandedLogo: Boolean = false,
 ) {
+    require(icon != null || brandedLogo) {
+        "IconTextButton requires either icon or brandedLogo"
+    }
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -168,11 +173,15 @@ fun IconTextButton(
             containerColor = MaterialTheme.colorScheme.primary,
         ),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-        )
+        if (brandedLogo) {
+            MasroofLogoMark(size = 18.dp)
+        } else {
+            Icon(
+                imageVector = icon!!,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(text)
     }

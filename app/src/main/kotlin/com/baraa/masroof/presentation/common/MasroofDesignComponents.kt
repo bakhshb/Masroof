@@ -28,8 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.presentation.theme.MasroofBadgeShape
 import com.baraa.masroof.presentation.theme.MasroofCardShape
-import com.baraa.masroof.presentation.theme.MasroofLogoDotShape
 import com.baraa.masroof.presentation.theme.MasroofPillShape
 import com.baraa.masroof.presentation.theme.MasroofRowShape
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
@@ -116,11 +114,9 @@ fun MasroofAppBar(
                         )
                     }
                     if (showLogo) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(MasroofLogoDotShape)
-                                .background(MaterialTheme.colorScheme.primary),
+                        MasroofLogo(
+                            size = 28.dp,
+                            contentDescription = null,
                         )
                         Spacer(Modifier.width(8.dp))
                     }
@@ -160,35 +156,42 @@ fun MasroofCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (accent != MasroofCardAccent.None) {
-                    Modifier.drawBehind {
-                        drawRect(
-                            color = accentColor,
-                            topLeft = Offset.Zero,
-                            size = size.copy(height = 4.dp.toPx()),
-                        )
-                    }
-                } else {
-                    Modifier
-                },
+            .shadow(
+                elevation = 8.dp,
+                shape = MasroofCardShape,
+                ambientColor = extended.cardShadow,
+                spotColor = extended.cardShadow,
             ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = extended.cardSurface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            focusedElevation = 0.dp,
+            hoveredElevation = 0.dp,
+            draggedElevation = 0.dp,
+            disabledElevation = 0.dp,
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = if (accent != MasroofCardAccent.None) 4.dp else 0.dp,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (accent != MasroofCardAccent.None) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(accentColor),
                 )
-                .padding(14.dp),
-            content = content,
-        )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                content = content,
+            )
+        }
     }
 }
 
@@ -234,7 +237,7 @@ fun MasroofMiniCard(
         modifier = modifier,
         shape = MasroofCardShape,
         color = extended.miniBackground,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -267,13 +270,14 @@ fun MasroofMoneyRow(
     value: String,
     modifier: Modifier = Modifier,
     style: MasroofMoneyRowStyle = MasroofMoneyRowStyle.Neutral,
+    leadingIcon: ImageVector? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val (background, borderColor) = when (style) {
-        MasroofMoneyRowStyle.Inflow -> extended.inflowSoft to Color.Transparent
-        MasroofMoneyRowStyle.Outflow -> extended.outflowSoft to Color.Transparent
+        MasroofMoneyRowStyle.Inflow -> extended.inflowSoft to extended.inflowRowBorder
+        MasroofMoneyRowStyle.Outflow -> extended.outflowSoft to extended.outflowRowBorder
         MasroofMoneyRowStyle.Highlight -> extended.highlight to extended.highlightBorder
-        MasroofMoneyRowStyle.Neutral -> extended.miniBackground to Color.Transparent
+        MasroofMoneyRowStyle.Neutral -> extended.miniBackground to extended.cardBorder
     }
     val valueColor = when (style) {
         MasroofMoneyRowStyle.Inflow -> extended.inflow
@@ -297,13 +301,26 @@ fun MasroofMoneyRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
+        Row(
             modifier = Modifier.weight(1f, fill = false),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = valueColor,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             value,
@@ -448,16 +465,24 @@ fun MasroofNavCard(
     enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val extended = MasroofThemeExtras.extendedColors
     Card(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 6.dp,
+                shape = MasroofCardShape,
+                ambientColor = extended.cardShadow,
+                spotColor = extended.cardShadow,
+            ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = extended.cardSurface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),

@@ -1,6 +1,9 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
@@ -87,6 +90,26 @@ enum class SmsRescanStatus {
     NO_TRANSACTIONS,
     PERMISSION_DENIED,
     FAILED,
+}
+
+object TransactionDirectionPresentation {
+    fun icon(direction: TransactionDirectionUi): ImageVector =
+        when (direction) {
+            TransactionDirectionUi.OUTWARD -> MasroofIcons.externalOut
+            TransactionDirectionUi.INWARD -> MasroofIcons.refunds
+            TransactionDirectionUi.INCOME -> MasroofIcons.income
+            TransactionDirectionUi.TRANSFER_IN -> MasroofIcons.externalIn
+            TransactionDirectionUi.NEUTRAL -> MasroofIcons.selfTransfer
+        }
+
+    fun labelRes(direction: TransactionDirectionUi): Int =
+        when (direction) {
+            TransactionDirectionUi.OUTWARD -> R.string.dashboard_direction_out
+            TransactionDirectionUi.INWARD -> R.string.dashboard_direction_in
+            TransactionDirectionUi.INCOME -> R.string.dashboard_direction_income
+            TransactionDirectionUi.TRANSFER_IN -> R.string.dashboard_direction_transfer_in
+            TransactionDirectionUi.NEUTRAL -> R.string.dashboard_direction_neutral
+        }
 }
 
 object TransactionTypePresentation {
