@@ -18,12 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofBadge
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
-import com.baraa.masroof.presentation.common.MasroofMiniCard
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.SectionHeader
@@ -191,85 +189,6 @@ fun CurrentAccountSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun SpendingSplitSection(
-    spendingSplit: SpendingSplitSummary,
-    unknownCardCount: Int = 0,
-    modifier: Modifier = Modifier,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
-            title = stringResource(R.string.dashboard_spending_split_title),
-            icon = com.baraa.masroof.presentation.common.MasroofIcons.netSpending,
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MasroofMiniCard(
-                label = stringResource(R.string.dashboard_spending_from_account),
-                value = formatLocalizedMoney(spendingSplit.totalSpending),
-                valueColor = extended.account,
-                modifier = Modifier.weight(1f),
-            )
-            MasroofMiniCard(
-                label = stringResource(R.string.dashboard_spending_on_card),
-                value = formatLocalizedMoney(spendingSplit.creditCardPurchases),
-                valueColor = extended.card,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        MasroofCard {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_total),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Text(
-                        formatLocalizedMoney(spendingSplit.totalSpending),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = extended.outflow,
-                        ),
-                    )
-                }
-                Text(
-                    stringResource(R.string.dashboard_spending_total_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(R.string.dashboard_spending_breakdown_formula),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (spendingSplit.creditCardPurchases.amount.signum() > 0) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_excludes_card_purchases),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (unknownCardCount > 0) {
-                    Text(
-                        stringResource(R.string.dashboard_spending_split_unknown_cards, unknownCardCount),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = extended.card,
-                    )
-                }
             }
         }
     }

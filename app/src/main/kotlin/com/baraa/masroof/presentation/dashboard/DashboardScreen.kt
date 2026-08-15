@@ -182,19 +182,13 @@ private fun DashboardScreen(
             else -> {
                 val summary = state.summary
                 val currentAccount = state.currentAccount
-                val spendingSplit = state.spendingSplit
-                if (summary != null && currentAccount != null && spendingSplit != null) {
+                if (summary != null && currentAccount != null) {
                 val accountBadge = formatOwnedAccountsBadge(state.ownedAccounts, LocalContext.current)
 
                 CurrentAccountSection(
                     summary = currentAccount,
                     accountBadge = accountBadge,
                     ownedAccountCount = state.ownedAccounts.size.coerceAtLeast(1),
-                )
-
-                SpendingSplitSection(
-                    spendingSplit = spendingSplit,
-                    unknownCardCount = state.unknownCards.size,
                 )
 
                 state.creditCards?.let { creditCards ->
