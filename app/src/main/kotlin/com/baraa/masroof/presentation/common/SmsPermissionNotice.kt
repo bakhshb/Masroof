@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @Composable
 fun SmsPermissionNotice(
@@ -25,21 +24,17 @@ fun SmsPermissionNotice(
     onOpenAppSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    val extended = MasroofThemeExtras.extendedColors
+    MasroofCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-        ),
+        accent = MasroofCardAccent.Liability,
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = MasroofIcons.error,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = extended.outflow,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.size(8.dp))

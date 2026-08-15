@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Badge
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,6 +27,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.baraa.masroof.presentation.common.MasroofNavCard
 
 @Composable
 fun SettingsNavRow(
@@ -39,16 +39,13 @@ fun SettingsNavRow(
     badgeCount: Int? = null,
     enabled: Boolean = true,
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { role = Role.Button }
-            .clickable(enabled = enabled, onClick = onClick),
+    MasroofNavCard(
+        onClick = onClick,
+        modifier = modifier.semantics { role = Role.Button },
+        enabled = enabled,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -104,12 +101,14 @@ fun SettingsReparseRow(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    MasroofNavCard(
+        onClick = onRefresh,
+        modifier = modifier,
+        enabled = enabled && !running,
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
         ) {
             Icon(
                 imageVector = icon,
@@ -119,41 +118,39 @@ fun SettingsReparseRow(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start,
-                )
+                Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start,
                 )
                 detail?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Start,
                     )
                 }
             }
             if (running) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
             } else {
                 IconButton(onClick = onRefresh, enabled = enabled) {
                     Icon(
                         imageVector = actionIcon,
-                        contentDescription = title,
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
         }
-        HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
     }
+}
+
+@Composable
+fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 4.dp),
+        color = MaterialTheme.colorScheme.outline,
+    )
 }

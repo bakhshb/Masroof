@@ -1,12 +1,12 @@
 package com.baraa.masroof.presentation.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.dashboard.SmsRescanStatus
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @Composable
 fun SmsRescanStatusNotice(
@@ -26,20 +27,10 @@ fun SmsRescanStatusNotice(
     modifier: Modifier = Modifier,
 ) {
     val isError = status == SmsRescanStatus.FAILED || status == SmsRescanStatus.PERMISSION_DENIED
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isError) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer
-            },
-        ),
-    ) {
+    val extended = MasroofThemeExtras.extendedColors
+    MasroofCard(modifier = modifier) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -50,7 +41,7 @@ fun SmsRescanStatusNotice(
                 Icon(
                     imageVector = if (isError) MasroofIcons.error else MasroofIcons.rescan,
                     contentDescription = null,
-                    tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    tint = if (isError) extended.outflow else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp),
                 )
                 Text(

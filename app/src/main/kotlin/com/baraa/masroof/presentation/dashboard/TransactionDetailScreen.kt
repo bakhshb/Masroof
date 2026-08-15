@@ -36,13 +36,16 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.ShareActionIcon
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,59 +144,57 @@ fun TransactionDetailScreen(
     val shareSubject = stringResource(R.string.transaction_detail_title)
     val shareText = transactionDetailShareText(transaction)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.transaction_detail_title)) },
-                navigationIcon = {
-                    BackNavigationIcon(
-                        onClick = onBack,
-                        contentDescription = stringResource(R.string.review_back),
-                    )
-                },
-                actions = {
-                    ShareActionIcon(
-                        enabled = true,
-                        onClick = {
-                            SharePlainText.share(
-                                context = context,
-                                text = shareText,
-                                chooserTitle = shareChooserTitle,
-                                subject = shareSubject,
-                            )
-                        },
+    val extended = MasroofThemeExtras.extendedColors
+    MasroofSecondaryScaffold(
+        title = stringResource(R.string.transaction_detail_title),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.review_back),
+        actions = {
+            ShareActionIcon(
+                enabled = true,
+                onClick = {
+                    SharePlainText.share(
+                        context = context,
+                        text = shareText,
+                        chooserTitle = shareChooserTitle,
+                        subject = shareSubject,
                     )
                 },
             )
         },
-    ) { padding ->
+    ) { contentModifier ->
         Column(
-            modifier = Modifier
+            modifier = contentModifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                transaction.title ?: transactionTypeLabel(transaction.type),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Text(
-                formatLocalizedMoney(transaction.amount),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            MasroofCard {
+                Text(
+                    transaction.title ?: transactionTypeLabel(transaction.type),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    formatLocalizedMoney(transaction.amount),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = when (transaction.direction) {
+                        TransactionDirectionUi.INCOME,
+                        TransactionDirectionUi.INWARD,
+                        TransactionDirectionUi.TRANSFER_IN,
+                        -> extended.inflow
+                        TransactionDirectionUi.OUTWARD -> extended.outflow
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
 
             SectionHeader(
                 title = stringResource(R.string.transaction_detail_info_section),
                 icon = MasroofIcons.recentTransactions,
             )
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+            MasroofCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     IconLabelRow(
                         icon = MasroofIcons.transactionType(transaction.type),
                         label = stringResource(R.string.transaction_detail_type),
