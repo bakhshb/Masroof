@@ -45,7 +45,7 @@ import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofHintBox
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
-import com.baraa.masroof.presentation.theme.MasroofLogoDotShape
+import com.baraa.masroof.presentation.common.MasroofLogo
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -173,11 +173,9 @@ private fun WelcomeStep(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(MasroofLogoDotShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                MasroofLogo(
+                    size = 56.dp,
+                    contentDescription = null,
                 )
                 Text(
                     stringResource(R.string.onboarding_welcome_title),
@@ -202,7 +200,7 @@ private fun WelcomeStep(
         }
         IconTextButton(
             onClick = onStart,
-            icon = MasroofIcons.appLogo,
+            brandedLogo = true,
             text = stringResource(R.string.onboarding_start),
             modifier = Modifier.fillMaxWidth(),
             enabled = !restoringBackup,
@@ -608,7 +606,7 @@ private fun CompletionStep(modifier: Modifier, state: OnboardingUiState, onEnter
         Spacer(Modifier.height(20.dp))
         IconTextButton(
             onClick = onEnterApp,
-            icon = MasroofIcons.appLogo,
+            brandedLogo = true,
             text = stringResource(R.string.onboarding_enter_app),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -622,11 +620,9 @@ private fun HomePlaceholder(modifier: Modifier, state: OnboardingUiState) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            imageVector = MasroofIcons.appLogo,
+        MasroofLogo(
+            size = 48.dp,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(48.dp),
         )
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)

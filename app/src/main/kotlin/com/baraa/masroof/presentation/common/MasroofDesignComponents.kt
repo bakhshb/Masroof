@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.presentation.theme.MasroofBadgeShape
 import com.baraa.masroof.presentation.theme.MasroofCardShape
-import com.baraa.masroof.presentation.theme.MasroofLogoDotShape
 import com.baraa.masroof.presentation.theme.MasroofPillShape
 import com.baraa.masroof.presentation.theme.MasroofRowShape
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
@@ -115,11 +114,9 @@ fun MasroofAppBar(
                         )
                     }
                     if (showLogo) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(MasroofLogoDotShape)
-                                .background(MaterialTheme.colorScheme.primary),
+                        MasroofLogo(
+                            size = 28.dp,
+                            contentDescription = null,
                         )
                         Spacer(Modifier.width(8.dp))
                     }

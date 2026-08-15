@@ -44,6 +44,7 @@ import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofLogo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,11 +85,9 @@ fun SettingsAboutScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-            Icon(
-                imageVector = MasroofIcons.appLogo,
+            MasroofLogo(
+                size = 72.dp,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(56.dp),
             )
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
             Text(
