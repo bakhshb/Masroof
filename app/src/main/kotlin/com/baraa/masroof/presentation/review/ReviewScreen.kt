@@ -115,7 +115,10 @@ private fun ReviewListScreen(
                             tint = MaterialTheme.colorScheme.error,
                         )
                         Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.review_load_error))
+                        Text(
+                            stringResource(R.string.review_load_error),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                     Spacer(Modifier.height(12.dp))
                     IconTextButton(
@@ -142,6 +145,7 @@ private fun ReviewListScreen(
                         stringResource(R.string.review_empty),
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(12.dp))
                     IconTextButton(
@@ -209,11 +213,25 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(item.title, style = MaterialTheme.typography.titleSmall)
-                    item.amountLabel?.let { Text(it) }
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    item.amountLabel?.let {
+                        Text(it, color = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
-                Text(stringResource(item.kindLabelRes), style = MaterialTheme.typography.bodySmall)
-                Text(item.dateLabel, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(item.kindLabelRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    item.dateLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = MasroofIcons.error,
@@ -270,12 +288,17 @@ private fun ReviewDetailScreen(
                         modifier = Modifier.size(28.dp),
                     )
                     Spacer(Modifier.size(10.dp))
-                    Text(stringResource(detail.kindLabelRes), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(detail.kindLabelRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 detail.amountLabel?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -300,7 +323,10 @@ private fun ReviewDetailScreen(
             )
             detail.reasonLabels.forEach { reason ->
                 val reasonRes = ReviewReasonLabels.labelRes(reason)
-                Text("• ${reasonRes?.let { stringResource(it) } ?: reason}")
+                Text(
+                    "• ${reasonRes?.let { stringResource(it) } ?: reason}",
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
 
             if (detail.showOwnershipActions && detail.ownershipCard?.last4 != null) {
@@ -314,6 +340,7 @@ private fun ReviewDetailScreen(
                         formatCardLast4(detail.ownershipCard.last4),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 CardOwnershipInlinePrompt(
                     enabled = !resolving,
@@ -330,6 +357,7 @@ private fun ReviewDetailScreen(
                 Text(
                     detail.body,
                     textAlign = TextAlign.Start,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
 

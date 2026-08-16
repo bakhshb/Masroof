@@ -186,5 +186,5 @@ fun SettingsStopConfirmDialog(
 
 @Composable
 private fun SettingsCardGroupTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
+    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 }

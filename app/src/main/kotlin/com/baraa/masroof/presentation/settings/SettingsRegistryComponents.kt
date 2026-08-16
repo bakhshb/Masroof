@@ -69,7 +69,7 @@ fun SettingsRegistryItemCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(title, style = MaterialTheme.typography.titleSmall)
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             endAction?.let { action ->
