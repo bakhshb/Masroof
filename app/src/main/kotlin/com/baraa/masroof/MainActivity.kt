@@ -14,8 +14,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import androidx.core.content.ContextCompat
@@ -67,14 +67,11 @@ class MainActivity : ComponentActivity() {
         ReviewViewModelFactory(container = container)
     }
 
-    private var themeModeState = mutableStateOf(ThemeMode.DEFAULT)
-
     private val settingsViewModel: SettingsViewModel by viewModels {
         SettingsViewModelFactory(
             container = container,
             appVersion = BuildConfig.VERSION_NAME,
             permissionStateProvider = { hasSmsPermissions() },
-            onThemeModeChanged = { mode -> themeModeState.value = mode },
             onRequestInstallPermission = {
                 startActivity(InstallPermissionHelper.buildManageUnknownSourcesIntent(this))
             },
@@ -83,9 +80,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        themeModeState.value = container.themePreferencesRepository.getThemeMode()
         setContent {
-            val themeMode by themeModeState
+            val settingsState by settingsViewModel.uiState.collectAsState()
+            val themeMode = settingsState.themeMode
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
