@@ -5,13 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.onboarding.HistoricalSmsRescanService
 import com.baraa.masroof.application.update.InstallPermissionHelper
-import com.baraa.masroof.application.theme.ThemeMode
-
 class SettingsViewModelFactory(
     private val container: AppContainer,
     private val appVersion: String,
     private val permissionStateProvider: () -> Boolean,
-    private val onThemeModeChanged: (ThemeMode) -> Unit = {},
     private val onRequestInstallPermission: () -> Unit = {},
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
@@ -34,7 +31,6 @@ class SettingsViewModelFactory(
             canInstallPackages = {
                 InstallPermissionHelper.canInstallPackages(container.applicationContext)
             },
-            onThemeModeChanged = onThemeModeChanged,
             onRequestInstallPermission = onRequestInstallPermission,
         ) as T
     }

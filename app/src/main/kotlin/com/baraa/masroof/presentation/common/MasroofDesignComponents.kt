@@ -126,6 +126,7 @@ fun MasroofAppBar(
                             fontWeight = FontWeight.Bold,
                             fontSize = MaterialTheme.typography.titleLarge.fontSize,
                         ),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -165,6 +166,7 @@ fun MasroofCard(
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
             containerColor = extended.cardSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp,
@@ -317,6 +319,7 @@ fun MasroofMoneyRow(
             Text(
                 label,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -385,6 +388,7 @@ fun MasroofPeriodPill(
             Text(
                 label,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -480,6 +484,7 @@ fun MasroofNavCard(
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
             containerColor = extended.cardSurface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),

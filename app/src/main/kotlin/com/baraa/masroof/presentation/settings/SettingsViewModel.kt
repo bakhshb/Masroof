@@ -46,7 +46,6 @@ class SettingsViewModel(
     private val appUpdateService: AppUpdateService,
     private val apkInstaller: ApkInstaller,
     private val canInstallPackages: () -> Boolean,
-    private val onThemeModeChanged: (ThemeMode) -> Unit = {},
     private val onRequestInstallPermission: () -> Unit = {},
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
@@ -375,7 +374,6 @@ class SettingsViewModel(
         if (mode == themePreferencesRepository.getThemeMode()) return
         themePreferencesRepository.setThemeMode(mode)
         _uiState.update { it.copy(themeMode = mode) }
-        onThemeModeChanged(mode)
     }
 
     fun clearBackupMessage() {

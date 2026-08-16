@@ -79,6 +79,7 @@ fun CreditCardsSection(
                         Text(
                             stringResource(R.string.dashboard_credit_card_liability_subtitle),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     MasroofBadge(
@@ -187,6 +188,7 @@ private fun CreditCardRowCard(
                 Text(
                     stringResource(R.string.dashboard_credit_card_spending_subtitle),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             MasroofBadge(

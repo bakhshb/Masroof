@@ -59,6 +59,7 @@ fun SettingsNavRow(
                 Text(
                     title,
                     style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start,
                 )
@@ -118,7 +119,7 @@ fun SettingsReparseRow(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,

@@ -63,6 +63,7 @@ fun CurrentAccountSection(
                             },
                         ),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 accountBadge?.let { badge ->
@@ -247,7 +248,7 @@ private fun TotalRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
         Text(
             formatLocalizedMoney(amount),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
