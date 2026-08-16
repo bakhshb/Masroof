@@ -122,7 +122,7 @@ fun CreditCardsSection(
         overview.cards.forEach { row ->
             CreditCardRowCard(
                 row = row,
-                calendarMonthLabel = overview.calendarMonthLabel,
+                salaryPeriodLabel = overview.salaryPeriodLabel,
                 zoneId = zoneId,
                 dateFormatter = dateTimeFormatter,
             )
@@ -165,7 +165,7 @@ fun CreditCardsSection(
 @Composable
 private fun CreditCardRowCard(
     row: CreditCardDashboardRow,
-    calendarMonthLabel: String?,
+    salaryPeriodLabel: String?,
     zoneId: ZoneId,
     dateFormatter: DateTimeFormatter,
 ) {
@@ -217,15 +217,15 @@ private fun CreditCardRowCard(
                 modifier = Modifier.weight(1f),
             )
             MasroofMiniCard(
-                label = if (calendarMonthLabel != null) {
+                label = if (salaryPeriodLabel != null) {
                     stringResource(
-                        R.string.dashboard_credit_card_month_spending,
-                        calendarMonthLabel,
+                        R.string.dashboard_credit_card_salary_spending,
+                        salaryPeriodLabel,
                     )
                 } else {
-                    stringResource(R.string.dashboard_credit_card_month_spending_fallback)
+                    stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
                 },
-                value = formatLocalizedMoney(row.calendarMonthSpendingNet),
+                value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
                 valueColor = extended.card,
                 modifier = Modifier.weight(1f),
             )
@@ -298,8 +298,8 @@ fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverv
     )
 }
 
-fun CreditCardsOverview.followedCalendarSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount =
-    sumFollowedSpending(cards.filter { it.last4 in ownedLast4s }) { it.calendarMonthSpendingNet }
+fun CreditCardsOverview.followedSalaryPeriodSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount =
+    sumFollowedSpending(cards.filter { it.last4 in ownedLast4s }) { it.salaryPeriodSpendingNet }
 
 private fun sumFollowedSpending(
     rows: List<CreditCardDashboardRow>,
