@@ -147,7 +147,7 @@ fun SettingsMyAccountsScreen(
 
 @Composable
 private fun SettingsAccountGroupTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
+    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 }
 
 @Composable

@@ -89,7 +89,11 @@ fun SettingsAboutScreen(
                 size = 72.dp,
                 contentDescription = null,
             )
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 stringResource(R.string.settings_about_version, appVersion),
                 style = MaterialTheme.typography.bodyMedium,
@@ -99,6 +103,7 @@ fun SettingsAboutScreen(
                 stringResource(R.string.settings_about_tagline),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -228,6 +233,7 @@ private fun UpdateSectionCard(
                                 updateState.manifest.versionName,
                             ),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         updateState.manifest.releaseNotes?.let { notes ->
                             Text(
@@ -260,6 +266,7 @@ private fun UpdateSectionCard(
                         Text(
                             stringResource(R.string.settings_downloading_update),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
