@@ -19,7 +19,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 class TransactionSarEquivalentResolverTest {
-    private val noMarketRate = UsdSarMarketRateProvider { null }
+    private val noMarketRate = ForeignSarMarketRateProvider { _, _ -> null }
 
     @Test
     fun usdRefund_usesHistoricalRateFromPriorPurchase() = runBlocking {
@@ -46,6 +46,7 @@ class TransactionSarEquivalentResolverTest {
             rawSmsId = "sms-purchase",
             family = MessageFamily.PURCHASE,
             merchant = "CURSOR, AI POWERED IDE",
+            amount = Money.of("23.00", Currency.USD),
         )
         val refundEvent = parsedEvent(
             id = "pe-refund",
@@ -111,7 +112,9 @@ class TransactionSarEquivalentResolverTest {
             merchant = "UNKNOWN MERCHANT",
         )
         val resolver = TransactionSarEquivalentResolver(
-            marketRateProvider = UsdSarMarketRateProvider { BigDecimal("3.75") },
+            marketRateProvider = ForeignSarMarketRateProvider { currency, _ ->
+                if (currency == Currency.USD) BigDecimal("3.75") else null
+            },
         )
         val resolution = resolver.resolve(
             transactions = listOf(refundTx),
@@ -127,18 +130,63 @@ class TransactionSarEquivalentResolverTest {
         assertEquals(ExchangeRateSource.MARKET, resolution.source)
     }
 
+    @Test
+    fun eurRefund_usesMarketRateWhenNoSmsOrHistoricalRate() = runBlocking {
+        val refundBody = """
+            بطاقة إئتمانية: إسترداد مبلغ
+            من: AMAZON EU
+            مبلغ: 20.00 EUR
+        """.trimIndent()
+        val refundTx = FinancialTransaction(
+            id = "tx-eur-refund",
+            type = FinancialTransactionType.REFUND,
+            amount = Money.of("20.00", Currency.EUR),
+            occurredAt = Instant.parse("2026-08-17T15:23:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "AMAZON EU",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-refund"),
+        )
+        val refundEvent = parsedEvent(
+            id = "pe-refund",
+            rawSmsId = "sms-refund",
+            family = MessageFamily.REFUND,
+            merchant = "AMAZON EU",
+        )
+        val resolver = TransactionSarEquivalentResolver(
+            marketRateProvider = ForeignSarMarketRateProvider { currency, _ ->
+                if (currency == Currency.EUR) BigDecimal("4.3466") else null
+            },
+        )
+        val resolution = resolver.resolve(
+            transactions = listOf(refundTx),
+            parsedRecords = listOf(
+                ParsedEventRecord(refundEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
+            ),
+            rawSmsById = mapOf("sms-refund" to raw("sms-refund", refundBody)),
+        )["tx-eur-refund"]
+
+        assertNotNull(resolution)
+        assertEquals(Money.of("86.93", Currency.SAR), resolution!!.sarAmount)
+        assertEquals(BigDecimal("4.3466"), resolution.exchangeRate)
+        assertEquals(ExchangeRateSource.MARKET, resolution.source)
+    }
+
     private fun parsedEvent(
         id: String,
         rawSmsId: String,
         family: MessageFamily,
         merchant: String,
+        amount: Money? = null,
     ) = ParsedEvent(
         id = id,
         rawSmsId = rawSmsId,
         bank = Bank.BANK_ALJAZIRA,
         messageFamily = family,
         direction = null,
-        amount = null,
+        amount = amount,
         purchaseChannel = null,
         sourceAccountRef = null,
         destinationAccountRef = null,

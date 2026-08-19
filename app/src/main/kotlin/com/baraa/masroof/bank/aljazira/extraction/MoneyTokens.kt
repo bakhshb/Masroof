@@ -6,14 +6,14 @@ import java.math.BigDecimal
 
 /**
  * Shared money-token parsing for fixture-proven forms:
- * `51.99 SAR`, `SAR 51.99`, `USD 23.00`, `23.00 USD`.
+ * `51.99 SAR`, `SAR 51.99`, `USD 23.00`, `23.00 USD`, `EUR 50.00`, `GBP 30.00`.
  */
 internal object MoneyTokens {
     /** Prefer comma-grouped thousands, else plain integer/decimal (avoids matching only first 3 digits of 17230.03). */
     private val number = """\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2}|\d+"""
     val numberRegex = Regex(number)
 
-    private val currencyCode = """sar|usd"""
+    private val currencyCode = """sar|usd|eur|gbp"""
 
     /** NUMBER CURRENCY or CURRENCY NUMBER, with optional label punctuation/spaces. */
     val moneyAfterLabel = Regex(
@@ -25,6 +25,8 @@ internal object MoneyTokens {
         val currency = when (currencyCode.uppercase()) {
             "SAR" -> Currency.SAR
             "USD" -> Currency.USD
+            "EUR" -> Currency.EUR
+            "GBP" -> Currency.GBP
             else -> return null
         }
         val normalized = raw.replace(",", "")

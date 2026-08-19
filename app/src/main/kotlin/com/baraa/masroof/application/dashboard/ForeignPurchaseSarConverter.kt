@@ -18,7 +18,7 @@ object ForeignPurchaseSarConverter {
     ): Money? {
         if (foreignAmount.currency == targetCurrency) return foreignAmount
         val facts = InternationalPurchaseFactsExtractor.extract(rawSmsBody) ?: return null
-        return usdToSar(
+        return foreignToSar(
             foreignAmount = foreignAmount,
             exchangeRate = facts.exchangeRate,
             internationalFee = if (includeInternationalFee) facts.internationalFee else null,
@@ -26,13 +26,13 @@ object ForeignPurchaseSarConverter {
         )
     }
 
-    fun usdToSar(
+    fun foreignToSar(
         foreignAmount: Money,
         exchangeRate: BigDecimal,
         internationalFee: Money? = null,
         targetCurrency: Currency = Currency.SAR,
     ): Money? {
-        if (foreignAmount.currency != Currency.USD || targetCurrency != Currency.SAR) return null
+        if (!foreignAmount.currency.convertsToSar() || targetCurrency != Currency.SAR) return null
         val converted = foreignAmount.amount
             .multiply(exchangeRate)
             .setScale(Money.SCALE, RoundingMode.HALF_EVEN)

@@ -263,7 +263,7 @@
     <string name="transaction_detail_card">البطاقة</string>
     <string name="transaction_detail_merchant">التاجر / الوصف</string>
     <string name="transaction_detail_sar_equivalent">المبلغ بالريال</string>
-    <string name="transaction_detail_exchange_rate">سعر الصرف المستخدم</string>
+    <string name="transaction_detail_exchange_rate">سعر الصرف المستخدم (%1$s→SAR)</string>
     <string name="transaction_detail_exchange_rate_source">مصدر سعر الصرف</string>
     <string name="exchange_rate_source_sms">رسالة البنك</string>
     <string name="exchange_rate_source_historical_merchant">مشترى سابق لنفس التاجر</string>

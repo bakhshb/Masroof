@@ -157,7 +157,7 @@ class DashboardServiceTest {
             rawSmsRepository = FakeRawRepo(),
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(UsdSarMarketRateProvider { null }),
+            sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,
         )

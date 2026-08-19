@@ -1,7 +1,7 @@
 package com.baraa.masroof.domain.model
 
 /**
- * Provenance for a USD→SAR rate applied to a foreign-currency transaction.
+ * Provenance for a foreign→SAR rate applied to a foreign-currency transaction.
  */
 enum class ExchangeRateSource {
     /** سعر الصرف مذكور في رسالة البنك. */

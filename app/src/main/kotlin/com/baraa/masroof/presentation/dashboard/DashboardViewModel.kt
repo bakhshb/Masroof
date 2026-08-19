@@ -376,8 +376,8 @@ class DashboardViewModel(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
         ).joinToString(" ").lowercase(Locale.getDefault())
-        val sarEquivalent = if (tx.amount.currency != Currency.SAR && tx.appliedExchangeRate != null) {
-            ForeignPurchaseSarConverter.usdToSar(
+        val sarEquivalent = if (tx.amount.currency.convertsToSar() && tx.appliedExchangeRate != null) {
+            ForeignPurchaseSarConverter.foreignToSar(
                 foreignAmount = tx.amount,
                 exchangeRate = tx.appliedExchangeRate,
                 internationalFee = null,

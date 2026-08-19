@@ -28,7 +28,7 @@ data class FinancialTransaction(
     val counterparty: String?,
     val categoryId: String?,
     val linkedParsedEventIds: List<String>,
-    /** USD→SAR rate used for dashboard SAR totals when [amount] is foreign currency. */
+    /** Foreign→SAR rate used for dashboard SAR totals when [amount] is foreign currency. */
     val appliedExchangeRate: BigDecimal? = null,
     val exchangeRateSource: ExchangeRateSource? = null,
 )

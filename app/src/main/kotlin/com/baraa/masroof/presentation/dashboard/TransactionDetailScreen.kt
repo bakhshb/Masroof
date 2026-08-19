@@ -240,7 +240,10 @@ fun TransactionDetailScreen(
                     transaction.appliedExchangeRate?.let { rate ->
                         IconLabelRow(
                             icon = MasroofIcons.externalOut,
-                            label = stringResource(R.string.transaction_detail_exchange_rate),
+                            label = stringResource(
+                                R.string.transaction_detail_exchange_rate,
+                                transaction.amount.currency.name,
+                            ),
                             trailing = rate.stripTrailingZeros().toPlainString(),
                         )
                     }

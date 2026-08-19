@@ -46,7 +46,10 @@ fun transactionDetailShareText(transaction: TransactionPreviewUi): String {
         },
         transaction.appliedExchangeRate?.let { rate ->
             TransactionShareText.field(
-                stringResource(R.string.transaction_detail_exchange_rate),
+                stringResource(
+                    R.string.transaction_detail_exchange_rate,
+                    transaction.amount.currency.name,
+                ),
                 rate.stripTrailingZeros().toPlainString(),
             )
         },

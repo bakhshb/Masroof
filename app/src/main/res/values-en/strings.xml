@@ -256,7 +256,7 @@
     <string name="transaction_detail_card">Card</string>
     <string name="transaction_detail_merchant">Merchant / description</string>
     <string name="transaction_detail_sar_equivalent">Amount in SAR</string>
-    <string name="transaction_detail_exchange_rate">Exchange rate used</string>
+    <string name="transaction_detail_exchange_rate">Exchange rate used (%1$s→SAR)</string>
     <string name="transaction_detail_exchange_rate_source">Rate source</string>
     <string name="exchange_rate_source_sms">Bank message</string>
     <string name="exchange_rate_source_historical_merchant">Prior purchase from same merchant</string>

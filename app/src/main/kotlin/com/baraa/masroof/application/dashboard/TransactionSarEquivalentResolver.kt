@@ -11,7 +11,7 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.ZoneId
 
 class TransactionSarEquivalentResolver(
-    private val marketRateProvider: UsdSarMarketRateProvider,
+    private val marketRateProvider: ForeignSarMarketRateProvider,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun resolve(
@@ -25,6 +25,7 @@ class TransactionSarEquivalentResolver(
         val result = mutableMapOf<String, SarEquivalentResolution>()
         for (tx in transactions) {
             if (tx.amount.currency == primaryCurrency) continue
+            if (!tx.amount.currency.convertsToSar()) continue
 
             val rawSmsBody = linkedRawSmsBody(tx, parsedByEventId, rawSmsById)
             val includeFee = tx.type != FinancialTransactionType.REFUND
@@ -45,7 +46,7 @@ class TransactionSarEquivalentResolver(
 
             val smsFacts = InternationalPurchaseFactsExtractor.extract(rawSmsBody)
             if (smsFacts != null) {
-                ForeignPurchaseSarConverter.usdToSar(
+                ForeignPurchaseSarConverter.foreignToSar(
                     foreignAmount = tx.amount,
                     exchangeRate = smsFacts.exchangeRate,
                     internationalFee = if (includeFee) smsFacts.internationalFee else null,
@@ -62,9 +63,9 @@ class TransactionSarEquivalentResolver(
 
             val merchant = tx.merchant
                 ?: tx.linkedParsedEventIds.firstNotNullOfOrNull { parsedByEventId[it]?.event?.merchant }
-            val historicalRate = rateIndex.rateForMerchant(merchant)
+            val historicalRate = rateIndex.rateForMerchant(merchant, tx.amount.currency)
             if (historicalRate != null) {
-                ForeignPurchaseSarConverter.usdToSar(
+                ForeignPurchaseSarConverter.foreignToSar(
                     foreignAmount = tx.amount,
                     exchangeRate = historicalRate,
                     internationalFee = null,
@@ -80,8 +81,8 @@ class TransactionSarEquivalentResolver(
             }
 
             val onDate = tx.occurredAt.atZone(zoneId).toLocalDate()
-            val marketRate = marketRateProvider.rateFor(onDate) ?: continue
-            ForeignPurchaseSarConverter.usdToSar(
+            val marketRate = marketRateProvider.rateFor(tx.amount.currency, onDate) ?: continue
+            ForeignPurchaseSarConverter.foreignToSar(
                 foreignAmount = tx.amount,
                 exchangeRate = marketRate,
                 internationalFee = null,
@@ -121,7 +122,7 @@ class TransactionSarEquivalentResolver(
         } else {
             null
         }
-        val sar = ForeignPurchaseSarConverter.usdToSar(
+        val sar = ForeignPurchaseSarConverter.foreignToSar(
             foreignAmount = tx.amount,
             exchangeRate = exchangeRate,
             internationalFee = internationalFee,
