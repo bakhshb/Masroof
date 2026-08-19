@@ -58,8 +58,12 @@ class DashboardService(
             .distinct()
             .mapNotNull { id -> rawSmsRepository.getById(id)?.let { id to it } }
             .toMap()
-        val sarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = transactions,
+            parsedRecords = parsedRecords,
+        )
+        val sarEquivalents = TransactionSarEquivalentResolver.resolve(
+            transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
@@ -77,13 +81,13 @@ class DashboardService(
         )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
-            transactions = transactions,
+            transactions = enrichedTransactions,
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
         val currentAccount = CurrentAccountSummaryCalculator.summarize(
-            transactions = transactions,
+            transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -92,7 +96,7 @@ class DashboardService(
             rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-            transactions = transactions,
+            transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -115,15 +119,19 @@ class DashboardService(
             startInclusive = cardQueryStart,
             endExclusive = cardQueryEndExclusive,
         )
-        val cardSarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = cardTransactions,
+            parsedRecords = parsedRecords,
+        )
+        val cardSarEquivalents = TransactionSarEquivalentResolver.resolve(
+            transactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
         val creditCards = CreditCardOverviewBuilder.build(
             salaryPeriod = period,
-            cardTransactions = cardTransactions,
+            cardTransactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
@@ -138,7 +146,7 @@ class DashboardService(
             summary = summary,
             currentAccount = currentAccount,
             spendingSplit = spendingSplit,
-            transactions = transactions,
+            transactions = enrichedTransactions,
             creditCards = creditCards,
             isCurrentPeriod = period == current,
         )

@@ -7,6 +7,7 @@ import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
@@ -272,6 +273,11 @@ class AppContainer(
         }
         discoverFromStoredEvents()
         reconcileStoredEvents()
+        FinancialTransactionEvidenceSyncer.syncMerchants(
+            transactions = financialTransactionRepository.listAll(),
+            parsedRecords = parsedEventRepository.listAll(),
+            repository = financialTransactionRepository,
+        )
         refreshReviewQueue()
         return count
     }
