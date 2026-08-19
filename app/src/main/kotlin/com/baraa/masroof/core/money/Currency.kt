@@ -2,11 +2,17 @@ package com.baraa.masroof.core.money
 
 /**
  * Supported currency codes for Masroof.
- *
- * Initial scope is SAR only. Additional codes can be added when another
- * currency is proven by fixtures or product requirements.
  */
 enum class Currency {
     SAR,
     USD,
+    EUR,
+    GBP,
+    ;
+
+    fun convertsToSar(): Boolean = this in FOREIGN_FOR_SAR_CONVERSION
+
+    companion object {
+        val FOREIGN_FOR_SAR_CONVERSION: Set<Currency> = setOf(USD, EUR, GBP)
+    }
 }

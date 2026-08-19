@@ -262,6 +262,12 @@
     <string name="transaction_detail_direction">الاتجاه</string>
     <string name="transaction_detail_card">البطاقة</string>
     <string name="transaction_detail_merchant">التاجر / الوصف</string>
+    <string name="transaction_detail_sar_equivalent">المبلغ بالريال</string>
+    <string name="transaction_detail_exchange_rate">سعر الصرف المستخدم (%1$s→SAR)</string>
+    <string name="transaction_detail_exchange_rate_source">مصدر سعر الصرف</string>
+    <string name="exchange_rate_source_sms">رسالة البنك</string>
+    <string name="exchange_rate_source_historical_merchant">مشترى سابق لنفس التاجر</string>
+    <string name="exchange_rate_source_market">سعر السوق (من الإنترنت)</string>
     <string name="transaction_detail_sms_section">نص الرسالة</string>
     <string name="transaction_detail_sms_index">رسالة %1$d من %2$d</string>
     <string name="transaction_detail_current_type">التصنيف الحالي: %1$s</string>

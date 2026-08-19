@@ -6,9 +6,11 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.ForeignPurchaseSarConverter
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -374,6 +376,16 @@ class DashboardViewModel(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
         ).joinToString(" ").lowercase(Locale.getDefault())
+        val sarEquivalent = if (tx.amount.currency.convertsToSar() && tx.appliedExchangeRate != null) {
+            ForeignPurchaseSarConverter.foreignToSar(
+                foreignAmount = tx.amount,
+                exchangeRate = tx.appliedExchangeRate,
+                internationalFee = null,
+                targetCurrency = Currency.SAR,
+            )
+        } else {
+            null
+        }
         return TransactionPreviewUi(
             id = tx.id,
             title = title,
@@ -389,6 +401,9 @@ class DashboardViewModel(
                 destinationContainerId = tx.destinationContainerId,
             ),
             searchText = searchText,
+            sarEquivalent = sarEquivalent,
+            appliedExchangeRate = tx.appliedExchangeRate,
+            exchangeRateSource = tx.exchangeRateSource,
         )
     }
 

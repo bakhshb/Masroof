@@ -40,5 +40,7 @@ object MoneyUiFormatter {
         when (currency) {
             Currency.SAR -> if (languageTag == AppLocale.TAG_EN) "SAR" else "ر.س"
             Currency.USD -> "USD"
+            Currency.EUR -> "EUR"
+            Currency.GBP -> "GBP"
         }
 }

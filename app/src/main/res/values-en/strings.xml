@@ -255,6 +255,12 @@
     <string name="transaction_detail_direction">Direction</string>
     <string name="transaction_detail_card">Card</string>
     <string name="transaction_detail_merchant">Merchant / description</string>
+    <string name="transaction_detail_sar_equivalent">Amount in SAR</string>
+    <string name="transaction_detail_exchange_rate">Exchange rate used (%1$s→SAR)</string>
+    <string name="transaction_detail_exchange_rate_source">Rate source</string>
+    <string name="exchange_rate_source_sms">Bank message</string>
+    <string name="exchange_rate_source_historical_merchant">Prior purchase from same merchant</string>
+    <string name="exchange_rate_source_market">Market rate (from internet)</string>
     <string name="transaction_detail_sms_section">Message text</string>
     <string name="transaction_detail_sms_index">Message %1$d of %2$d</string>
     <string name="transaction_detail_edit_category">Edit category</string>

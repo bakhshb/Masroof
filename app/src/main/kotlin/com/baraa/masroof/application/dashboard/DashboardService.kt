@@ -39,6 +39,7 @@ class DashboardService(
     private val rawSmsRepository: RawSmsRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
+    private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
@@ -58,12 +59,22 @@ class DashboardService(
             .distinct()
             .mapNotNull { id -> rawSmsRepository.getById(id)?.let { id to it } }
             .toMap()
-        val sarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = transactions,
+            parsedRecords = parsedRecords,
+        )
+        val sarResolutions = sarEquivalentResolver.resolve(
+            transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
+        val syncedTransactions = AppliedExchangeRateSyncer.sync(
+            transactions = enrichedTransactions,
+            resolutions = sarResolutions,
+            repository = financialTransactionRepository,
+        )
+        val sarEquivalents = sarResolutions.sarAmounts()
         val ownedAccounts = accountRegistryRepository.listAll()
             .asSequence()
             .filter { it.bank != Bank.UNKNOWN }
@@ -77,13 +88,13 @@ class DashboardService(
         )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
-            transactions = transactions,
+            transactions = syncedTransactions,
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
         val currentAccount = CurrentAccountSummaryCalculator.summarize(
-            transactions = transactions,
+            transactions = syncedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -92,7 +103,7 @@ class DashboardService(
             rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-            transactions = transactions,
+            transactions = syncedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -115,15 +126,25 @@ class DashboardService(
             startInclusive = cardQueryStart,
             endExclusive = cardQueryEndExclusive,
         )
-        val cardSarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = cardTransactions,
+            parsedRecords = parsedRecords,
+        )
+        val cardSarResolutions = sarEquivalentResolver.resolve(
+            transactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
+        AppliedExchangeRateSyncer.sync(
+            transactions = enrichedCardTransactions,
+            resolutions = cardSarResolutions,
+            repository = financialTransactionRepository,
+        )
+        val cardSarEquivalents = cardSarResolutions.sarAmounts()
         val creditCards = CreditCardOverviewBuilder.build(
             salaryPeriod = period,
-            cardTransactions = cardTransactions,
+            cardTransactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
@@ -138,7 +159,7 @@ class DashboardService(
             summary = summary,
             currentAccount = currentAccount,
             spendingSplit = spendingSplit,
-            transactions = transactions,
+            transactions = syncedTransactions,
             creditCards = creditCards,
             isCurrentPeriod = period == current,
         )

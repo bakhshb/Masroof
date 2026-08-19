@@ -157,6 +157,7 @@ class DashboardServiceTest {
             rawSmsRepository = FakeRawRepo(),
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
+            sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,
         )
@@ -243,6 +244,11 @@ class DashboardServiceTest {
         override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
         override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
         override suspend fun update(transaction: FinancialTransaction): Boolean = false
+        override suspend fun updateAppliedExchangeRate(
+            id: String,
+            exchangeRate: java.math.BigDecimal,
+            source: com.baraa.masroof.domain.model.ExchangeRateSource,
+        ): Boolean = false
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
     }
 

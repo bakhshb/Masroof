@@ -1,6 +1,7 @@
 package com.baraa.masroof.domain.model
 
 import com.baraa.masroof.core.money.Money
+import java.math.BigDecimal
 import java.time.Instant
 
 /**
@@ -27,4 +28,7 @@ data class FinancialTransaction(
     val counterparty: String?,
     val categoryId: String?,
     val linkedParsedEventIds: List<String>,
+    /** Foreign→SAR rate used for dashboard SAR totals when [amount] is foreign currency. */
+    val appliedExchangeRate: BigDecimal? = null,
+    val exchangeRateSource: ExchangeRateSource? = null,
 )

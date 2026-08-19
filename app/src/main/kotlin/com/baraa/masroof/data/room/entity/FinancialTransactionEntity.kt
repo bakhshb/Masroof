@@ -21,4 +21,6 @@ data class FinancialTransactionEntity(
     val merchant: String?,
     val counterparty: String?,
     val categoryId: String?,
+    val appliedExchangeRate: String? = null,
+    val exchangeRateSource: String? = null,
 )

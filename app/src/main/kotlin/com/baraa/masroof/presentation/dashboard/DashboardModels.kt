@@ -9,8 +9,10 @@ import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+import java.math.BigDecimal
 import java.time.LocalDate
 
 data class UnknownCardCandidateUi(
@@ -56,6 +58,9 @@ data class TransactionPreviewUi(
     val cardLast4: String?,
     /** Lowercase merchant/counterparty text for in-memory search. */
     val searchText: String,
+    val sarEquivalent: Money? = null,
+    val appliedExchangeRate: BigDecimal? = null,
+    val exchangeRateSource: ExchangeRateSource? = null,
 )
 
 data class DashboardUiState(
@@ -143,5 +148,14 @@ object TransactionTypePresentation {
             FinancialTransactionType.ADJUSTMENT,
             FinancialTransactionType.UNKNOWN,
             -> TransactionDirectionUi.NEUTRAL
+        }
+}
+
+object ExchangeRateSourcePresentation {
+    fun labelRes(source: ExchangeRateSource): Int =
+        when (source) {
+            ExchangeRateSource.SMS -> R.string.exchange_rate_source_sms
+            ExchangeRateSource.HISTORICAL_MERCHANT -> R.string.exchange_rate_source_historical_merchant
+            ExchangeRateSource.MARKET -> R.string.exchange_rate_source_market
         }
 }

@@ -4,9 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
+import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
+import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
@@ -204,6 +207,8 @@ class AppContainer(
             ownershipResolver = ownershipResolver,
         )
 
+    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
+
     val dashboardService: DashboardService =
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
@@ -212,6 +217,9 @@ class AppContainer(
             rawSmsRepository = rawSmsRepository,
             appLocaleRepository = appLocaleRepository,
             accountRegistryRepository = accountRegistryRepository,
+            sarEquivalentResolver = TransactionSarEquivalentResolver(
+                marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
+            ),
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
@@ -272,6 +280,11 @@ class AppContainer(
         }
         discoverFromStoredEvents()
         reconcileStoredEvents()
+        FinancialTransactionEvidenceSyncer.syncMerchants(
+            transactions = financialTransactionRepository.listAll(),
+            parsedRecords = parsedEventRepository.listAll(),
+            repository = financialTransactionRepository,
+        )
         refreshReviewQueue()
         return count
     }
@@ -297,8 +310,6 @@ class AppContainer(
                 Context.MODE_PRIVATE,
             ),
         )
-
-    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
     val appUpdateService: AppUpdateService by lazy {
         AppUpdateService(

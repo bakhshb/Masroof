@@ -38,6 +38,12 @@ interface FinancialTransactionRepository {
 
     suspend fun update(transaction: FinancialTransaction): Boolean
 
+    suspend fun updateAppliedExchangeRate(
+        id: String,
+        exchangeRate: java.math.BigDecimal,
+        source: com.baraa.masroof.domain.model.ExchangeRateSource,
+    ): Boolean
+
     /**
      * Removes a transaction when [rawSmsId] is its only linked SMS evidence.
      * Used after reparse when a message is reclassified as non-financial (e.g. OTP).
