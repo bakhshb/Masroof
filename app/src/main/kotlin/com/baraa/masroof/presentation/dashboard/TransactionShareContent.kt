@@ -38,6 +38,24 @@ fun transactionDetailShareText(transaction: TransactionPreviewUi): String {
                 stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4)),
             )
         },
+        transaction.sarEquivalent?.let { sar ->
+            TransactionShareText.field(
+                stringResource(R.string.transaction_detail_sar_equivalent),
+                formatLocalizedMoney(sar),
+            )
+        },
+        transaction.appliedExchangeRate?.let { rate ->
+            TransactionShareText.field(
+                stringResource(R.string.transaction_detail_exchange_rate),
+                rate.stripTrailingZeros().toPlainString(),
+            )
+        },
+        transaction.exchangeRateSource?.let { source ->
+            TransactionShareText.field(
+                stringResource(R.string.transaction_detail_exchange_rate_source),
+                stringResource(ExchangeRateSourcePresentation.labelRes(source)),
+            )
+        },
     )
 }
 

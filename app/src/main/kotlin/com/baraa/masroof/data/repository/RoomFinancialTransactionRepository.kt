@@ -4,9 +4,11 @@ import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.mapper.FinancialTransactionMapper
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import java.math.BigDecimal
 import java.time.Instant
 
 class RoomFinancialTransactionRepository(
@@ -79,8 +81,21 @@ class RoomFinancialTransactionRepository(
             merchant = entity.merchant,
             counterparty = entity.counterparty,
             categoryId = entity.categoryId,
+            appliedExchangeRate = entity.appliedExchangeRate,
+            exchangeRateSource = entity.exchangeRateSource,
         ) > 0
     }
+
+    override suspend fun updateAppliedExchangeRate(
+        id: String,
+        exchangeRate: BigDecimal,
+        source: ExchangeRateSource,
+    ): Boolean =
+        dao.updateAppliedExchangeRate(
+            id = id,
+            exchangeRate = exchangeRate.toPlainString(),
+            source = source.name,
+        ) > 0
 
     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean {
         val link = dao.findLinkByRawSmsId(rawSmsId) ?: return false

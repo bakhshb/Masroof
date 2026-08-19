@@ -20,11 +20,12 @@ import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.data.room.migration.MIGRATION_1_2
 import com.baraa.masroof.data.room.migration.MIGRATION_2_3
 import com.baraa.masroof.data.room.migration.MIGRATION_3_4
+import com.baraa.masroof.data.room.migration.MIGRATION_4_5
 
 /**
  * Clean rewrite persistence schema — version 4 (P9 review + user corrections).
  *
- * Migrations: 1→2 ownership registries; 2→3 financial transactions; 3→4 review workflow.
+ * Migrations: 1→2 ownership registries; 2→3 financial transactions; 3→4 review workflow; 4→5 exchange rates.
  * Does not use destructive migration.
  */
 @Database(
@@ -38,7 +39,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_3_4
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -58,11 +59,11 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 4
+        const val VERSION: Int = 5
 
-        /** Must match app/schemas/.../4.json identityHash. */
-        const val IDENTITY_HASH: String = "927b7cd577af432ddcea1436a87715d2"
+        /** Must match app/schemas/.../5.json identityHash. */
+        const val IDENTITY_HASH: String = "d192ca81655b31f5e6c203239148ad42"
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

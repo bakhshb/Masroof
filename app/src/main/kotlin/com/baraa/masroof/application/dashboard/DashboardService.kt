@@ -39,6 +39,7 @@ class DashboardService(
     private val rawSmsRepository: RawSmsRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
+    private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
@@ -62,12 +63,18 @@ class DashboardService(
             transactions = transactions,
             parsedRecords = parsedRecords,
         )
-        val sarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val sarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
+        val syncedTransactions = AppliedExchangeRateSyncer.sync(
+            transactions = enrichedTransactions,
+            resolutions = sarResolutions,
+            repository = financialTransactionRepository,
+        )
+        val sarEquivalents = sarResolutions.sarAmounts()
         val ownedAccounts = accountRegistryRepository.listAll()
             .asSequence()
             .filter { it.bank != Bank.UNKNOWN }
@@ -81,13 +88,13 @@ class DashboardService(
         )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
-            transactions = enrichedTransactions,
+            transactions = syncedTransactions,
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
         val currentAccount = CurrentAccountSummaryCalculator.summarize(
-            transactions = enrichedTransactions,
+            transactions = syncedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -96,7 +103,7 @@ class DashboardService(
             rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-            transactions = enrichedTransactions,
+            transactions = syncedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -123,12 +130,18 @@ class DashboardService(
             transactions = cardTransactions,
             parsedRecords = parsedRecords,
         )
-        val cardSarEquivalents = TransactionSarEquivalentResolver.resolve(
+        val cardSarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
+        AppliedExchangeRateSyncer.sync(
+            transactions = enrichedCardTransactions,
+            resolutions = cardSarResolutions,
+            repository = financialTransactionRepository,
+        )
+        val cardSarEquivalents = cardSarResolutions.sarAmounts()
         val creditCards = CreditCardOverviewBuilder.build(
             salaryPeriod = period,
             cardTransactions = enrichedCardTransactions,
@@ -146,7 +159,7 @@ class DashboardService(
             summary = summary,
             currentAccount = currentAccount,
             spendingSplit = spendingSplit,
-            transactions = enrichedTransactions,
+            transactions = syncedTransactions,
             creditCards = creditCards,
             isCurrentPeriod = period == current,
         )

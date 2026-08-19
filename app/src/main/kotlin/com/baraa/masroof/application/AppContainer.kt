@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
+import com.baraa.masroof.application.dashboard.FrankfurterUsdSarRateProvider
+import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
@@ -205,6 +207,8 @@ class AppContainer(
             ownershipResolver = ownershipResolver,
         )
 
+    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
+
     val dashboardService: DashboardService =
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
@@ -213,6 +217,9 @@ class AppContainer(
             rawSmsRepository = rawSmsRepository,
             appLocaleRepository = appLocaleRepository,
             accountRegistryRepository = accountRegistryRepository,
+            sarEquivalentResolver = TransactionSarEquivalentResolver(
+                marketRateProvider = FrankfurterUsdSarRateProvider(updateHttpClient),
+            ),
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
@@ -303,8 +310,6 @@ class AppContainer(
                 Context.MODE_PRIVATE,
             ),
         )
-
-    private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
     val appUpdateService: AppUpdateService by lazy {
         AppUpdateService(

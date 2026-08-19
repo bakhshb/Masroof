@@ -24,7 +24,9 @@ interface FinancialTransactionDao {
           destinationContainerId = :destinationContainerId,
           merchant = :merchant,
           counterparty = :counterparty,
-          categoryId = :categoryId
+          categoryId = :categoryId,
+          appliedExchangeRate = :appliedExchangeRate,
+          exchangeRateSource = :exchangeRateSource
         WHERE id = :id
         """,
     )
@@ -39,6 +41,22 @@ interface FinancialTransactionDao {
         merchant: String?,
         counterparty: String?,
         categoryId: String?,
+        appliedExchangeRate: String?,
+        exchangeRateSource: String?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE financial_transaction SET
+          appliedExchangeRate = :exchangeRate,
+          exchangeRateSource = :source
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateAppliedExchangeRate(
+        id: String,
+        exchangeRate: String,
+        source: String,
     ): Int
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -116,6 +134,8 @@ interface FinancialTransactionDao {
                 merchant = entity.merchant,
                 counterparty = entity.counterparty,
                 categoryId = entity.categoryId,
+                appliedExchangeRate = entity.appliedExchangeRate,
+                exchangeRateSource = entity.exchangeRateSource,
             )
         }
 

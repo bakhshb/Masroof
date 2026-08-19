@@ -230,6 +230,27 @@ fun TransactionDetailScreen(
                             trailing = title,
                         )
                     }
+                    transaction.sarEquivalent?.let { sar ->
+                        IconLabelRow(
+                            icon = MasroofIcons.income,
+                            label = stringResource(R.string.transaction_detail_sar_equivalent),
+                            trailing = formatLocalizedMoney(sar),
+                        )
+                    }
+                    transaction.appliedExchangeRate?.let { rate ->
+                        IconLabelRow(
+                            icon = MasroofIcons.externalOut,
+                            label = stringResource(R.string.transaction_detail_exchange_rate),
+                            trailing = rate.stripTrailingZeros().toPlainString(),
+                        )
+                    }
+                    transaction.exchangeRateSource?.let { source ->
+                        IconLabelRow(
+                            icon = MasroofIcons.reviewQueue,
+                            label = stringResource(R.string.transaction_detail_exchange_rate_source),
+                            trailing = stringResource(ExchangeRateSourcePresentation.labelRes(source)),
+                        )
+                    }
                 }
             }
 

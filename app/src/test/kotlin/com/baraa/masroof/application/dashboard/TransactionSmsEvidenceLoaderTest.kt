@@ -88,6 +88,11 @@ class TransactionSmsEvidenceLoaderTest {
         override suspend fun isRawSmsLinked(rawSmsId: String) = false
         override suspend fun listRawSmsIds(transactionId: String) = links[transactionId].orEmpty()
         override suspend fun update(transaction: com.baraa.masroof.domain.model.FinancialTransaction) = false
+        override suspend fun updateAppliedExchangeRate(
+            id: String,
+            exchangeRate: java.math.BigDecimal,
+            source: com.baraa.masroof.domain.model.ExchangeRateSource,
+        ) = false
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
     }
 

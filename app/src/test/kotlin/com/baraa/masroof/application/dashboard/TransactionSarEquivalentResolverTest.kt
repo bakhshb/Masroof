@@ -3,6 +3,7 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -10,14 +11,18 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
+import java.math.BigDecimal
 import java.time.Instant
 
 class TransactionSarEquivalentResolverTest {
+    private val noMarketRate = UsdSarMarketRateProvider { null }
+
     @Test
-    fun usdRefund_usesHistoricalRateFromPriorPurchase() {
+    fun usdRefund_usesHistoricalRateFromPriorPurchase() = runBlocking {
         val purchaseBody = """
             شراء عبر الانترنت
             بطاقة ائتمانية: 7271
@@ -61,7 +66,8 @@ class TransactionSarEquivalentResolverTest {
             linkedParsedEventIds = listOf("pe-refund"),
         )
 
-        val sar = TransactionSarEquivalentResolver.resolve(
+        val resolver = TransactionSarEquivalentResolver(noMarketRate)
+        val resolution = resolver.resolve(
             transactions = listOf(refundTx),
             parsedRecords = listOf(
                 ParsedEventRecord(purchaseEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
@@ -73,8 +79,52 @@ class TransactionSarEquivalentResolverTest {
             ),
         )["tx-refund"]
 
-        assertNotNull(sar)
-        assertEquals(Money.of("24.46", Currency.SAR), sar)
+        assertNotNull(resolution)
+        assertEquals(Money.of("24.46", Currency.SAR), resolution!!.sarAmount)
+        assertEquals(BigDecimal("3.756957"), resolution.exchangeRate)
+        assertEquals(ExchangeRateSource.HISTORICAL_MERCHANT, resolution.source)
+    }
+
+    @Test
+    fun usdRefund_usesMarketRateWhenNoSmsOrHistoricalRate() = runBlocking {
+        val refundBody = """
+            بطاقة إئتمانية: إسترداد مبلغ
+            من: UNKNOWN MERCHANT
+            مبلغ: 10.00 USD
+        """.trimIndent()
+        val refundTx = FinancialTransaction(
+            id = "tx-refund",
+            type = FinancialTransactionType.REFUND,
+            amount = Money.of("10.00", Currency.USD),
+            occurredAt = Instant.parse("2026-08-17T15:23:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "UNKNOWN MERCHANT",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-refund"),
+        )
+        val refundEvent = parsedEvent(
+            id = "pe-refund",
+            rawSmsId = "sms-refund",
+            family = MessageFamily.REFUND,
+            merchant = "UNKNOWN MERCHANT",
+        )
+        val resolver = TransactionSarEquivalentResolver(
+            marketRateProvider = UsdSarMarketRateProvider { BigDecimal("3.75") },
+        )
+        val resolution = resolver.resolve(
+            transactions = listOf(refundTx),
+            parsedRecords = listOf(
+                ParsedEventRecord(refundEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
+            ),
+            rawSmsById = mapOf("sms-refund" to raw("sms-refund", refundBody)),
+        )["tx-refund"]
+
+        assertNotNull(resolution)
+        assertEquals(Money.of("37.50", Currency.SAR), resolution!!.sarAmount)
+        assertEquals(BigDecimal("3.75"), resolution.exchangeRate)
+        assertEquals(ExchangeRateSource.MARKET, resolution.source)
     }
 
     private fun parsedEvent(

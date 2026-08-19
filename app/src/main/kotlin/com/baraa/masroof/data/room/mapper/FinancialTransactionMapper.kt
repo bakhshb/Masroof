@@ -1,8 +1,10 @@
 package com.baraa.masroof.data.room.mapper
 
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import java.math.BigDecimal
 import java.time.Instant
 
 object FinancialTransactionMapper {
@@ -20,6 +22,8 @@ object FinancialTransactionMapper {
             merchant = transaction.merchant,
             counterparty = transaction.counterparty,
             categoryId = transaction.categoryId,
+            appliedExchangeRate = transaction.appliedExchangeRate?.toPlainString(),
+            exchangeRateSource = transaction.exchangeRateSource?.name,
         )
     }
 
@@ -40,5 +44,7 @@ object FinancialTransactionMapper {
             counterparty = entity.counterparty,
             categoryId = entity.categoryId,
             linkedParsedEventIds = linkedParsedEventIds.sorted(),
+            appliedExchangeRate = entity.appliedExchangeRate?.let { BigDecimal(it) },
+            exchangeRateSource = entity.exchangeRateSource?.let { ExchangeRateSource.valueOf(it) },
         )
 }
