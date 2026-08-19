@@ -37,6 +37,21 @@ object InformationalMessagePolicy {
         "المبلغ المستحق",
     )
 
+    private val TRANSACTION_BODY_MARKERS = listOf(
+        "refund",
+        "purchase",
+        "withdrawal",
+        "شراء",
+        "سحب نقدي",
+        "حوالة واردة",
+        "حوالة صادرة",
+        "سداد بطاقة",
+        "سداد فاتورة",
+        "رسوم",
+    )
+
+    private val REFUND_AR_PATTERN = Regex("""[اأإآ]سترداد""")
+
     fun shouldAutoIgnore(event: ParsedEvent, smsBody: String): Boolean =
         shouldAutoIgnore(
             messageFamily = event.messageFamily,
@@ -62,6 +77,9 @@ object InformationalMessagePolicy {
     }
 
     private fun isInformationalUnknown(parsedAmount: Money?, smsBody: String): Boolean {
+        if (parsedAmount.isSignificantTransactionAmount() && looksLikeTransactionBody(smsBody)) {
+            return false
+        }
         if (looksLikeInformationalBody(smsBody)) {
             return true
         }
@@ -69,6 +87,13 @@ object InformationalMessagePolicy {
             return !smsBody.containsNonZeroMoneyWording()
         }
         return false
+    }
+
+    private fun looksLikeTransactionBody(smsBody: String): Boolean {
+        val comparison = smsBody.lowercase()
+        return TRANSACTION_BODY_MARKERS.any { marker ->
+            comparison.contains(marker.lowercase())
+        } || REFUND_AR_PATTERN.containsMatchIn(comparison)
     }
 
     private fun looksLikeInformationalBody(smsBody: String): Boolean {

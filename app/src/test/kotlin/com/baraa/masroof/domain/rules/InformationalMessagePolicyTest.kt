@@ -67,4 +67,24 @@ class InformationalMessagePolicyTest {
             ),
         )
     }
+
+    @Test
+    fun unknownCreditCardRefundWithDueAmount_isNotAutoIgnored() {
+        assertFalse(
+            InformationalMessagePolicy.shouldAutoIgnore(
+                messageFamily = MessageFamily.UNKNOWN,
+                parsedAmount = Money.of("6.51", Currency.USD),
+                smsBody = """
+                    بطاقة إئتمانية: إسترداد مبلغ
+                    بطاقة: Credit
+                    رقم: 7271
+                    من: CURSOR, AI POWERED IDE
+                    مبلغ: 6.51 USD
+                    رصيد: 11303.00 SAR
+                    في: 18:23 17-08-2026
+                    إجمالي المبلغ المستحق:7683.86 SAR
+                """.trimIndent(),
+            ),
+        )
+    }
 }

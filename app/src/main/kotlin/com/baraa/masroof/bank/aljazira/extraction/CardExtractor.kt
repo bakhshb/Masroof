@@ -22,6 +22,8 @@ class CardExtractor {
         private val PATTERNS = listOf(
             Regex("""بطاقة\s*ائتمانية\s*:\s*(\d{4})"""),
             Regex("""بطاقة\s*مدى\s*:\s*(\d{4})"""),
+            Regex("""رقم\s*:\s*(\d{4})"""),
+            Regex("""(?<![\p{L}])number\s*:\s*(\d{4})""", RegexOption.IGNORE_CASE),
             Regex("""بطاقة\s*:\s*(\d{4})"""),
             Regex("""credit\s*card\s*:\s*(\d{4})""", RegexOption.IGNORE_CASE),
             Regex("""(?<![\p{L}])card\s*:\s*(\d{4})""", RegexOption.IGNORE_CASE),

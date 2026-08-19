@@ -55,7 +55,8 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         assertEquals(fixture.id, expected.bankNetworkType?.let { BankNetworkType.valueOf(it) }, e.bankNetworkType)
 
         if (expected.amount != null) {
-            assertEquals(fixture.id, Money.of(expected.amount, Currency.SAR), e.amount)
+            val currency = expected.currency?.let { Currency.valueOf(it) } ?: Currency.SAR
+            assertEquals(fixture.id, Money.of(expected.amount, currency), e.amount)
         } else {
             assertNull(fixture.id, e.amount)
         }

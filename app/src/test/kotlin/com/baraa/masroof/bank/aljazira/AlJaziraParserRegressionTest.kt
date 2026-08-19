@@ -464,6 +464,28 @@ class AlJaziraParserRegressionTest {
         ) as ParseResult.Success
         assertEquals(MessageFamily.REFUND, result.event.messageFamily)
         assertEquals(Money.of("75.65", Currency.SAR), result.event.amount)
+        assertEquals("Tamara", result.event.merchant)
+    }
+
+    @Test
+    fun creditCardRefund_hamzaSpellingAndNumberLabel_isParsed() {
+        val result = parse(
+            """
+            بطاقة إئتمانية: إسترداد مبلغ
+            بطاقة: Credit
+            رقم: 7271
+            من: CURSOR, AI POWERED IDE
+            مبلغ: 6.51 USD
+            رصيد: 11303.00 SAR
+            في: 18:23 17-08-2026
+            إجمالي المبلغ المستحق:7683.86 SAR
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.REFUND, result.event.messageFamily)
+        assertEquals(Money.of("6.51", Currency.USD), result.event.amount)
+        assertEquals("7271", result.event.cardRef?.last4)
+        assertEquals("CURSOR, AI POWERED IDE", result.event.merchant)
+        assertEquals(ParseStatus.SUCCESS, result.event.parseStatus)
     }
 
     @Test

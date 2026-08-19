@@ -1,0 +1,17 @@
+{
+  "id": "refund_ar_cc_hamza_001",
+  "sender": "AlJazira",
+  "body": "بطاقة إئتمانية: إسترداد مبلغ\nبطاقة: Credit\nرقم: 7271\nمن: CURSOR, AI POWERED IDE\nمبلغ: 6.51 USD\nرصيد: 11303.00 SAR\nفي: 18:23 17-08-2026\nإجمالي المبلغ المستحق:7683.86 SAR",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "REFUND",
+    "direction": "INCOMING",
+    "amount": "6.51",
+    "currency": "USD",
+    "cardLast4": "7271",
+    "merchant": "CURSOR, AI POWERED IDE",
+    "occurredAt": "2026-08-17T18:23:00",
+    "outstandingBalance": "7683.86",
+    "parseStatus": "SUCCESS"
+  }
+}
