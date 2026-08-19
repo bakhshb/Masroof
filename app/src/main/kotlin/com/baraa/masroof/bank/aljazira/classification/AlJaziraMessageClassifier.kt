@@ -111,7 +111,7 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("استرداد") || text.contains("refund") ->
+            isRefund(text) ->
                 return AlJaziraClassification(
                     family = MessageFamily.REFUND,
                     direction = MoneyDirection.INCOMING,
@@ -184,6 +184,9 @@ class AlJaziraMessageClassifier {
         }
     }
 
+    private fun isRefund(text: String): Boolean =
+        text.contains("refund") || REFUND_AR_PATTERN.containsMatchIn(text)
+
     private fun isPosPurchase(text: String): Boolean {
         val hasPos = text.contains("نقاط البيع") ||
             text.contains("pos purchase") ||
@@ -224,5 +227,10 @@ class AlJaziraMessageClassifier {
             return BankNetworkType.INTER_BANK
         }
         return BankNetworkType.UNKNOWN
+    }
+
+    companion object {
+        /** Bank SMS uses both ا and إ spellings (e.g. استرداد vs إسترداد). */
+        private val REFUND_AR_PATTERN = Regex("""[اأإآ]سترداد""")
     }
 }

@@ -24,6 +24,8 @@ class MerchantExtractor {
 
         private val PATTERNS: List<Pair<Regex, Int>> = listOf(
             Regex("""لدى\s*:\s*$VALUE""", RegexOption.IGNORE_CASE) to 1,
+            Regex("""من\s*:\s*$VALUE""", RegexOption.IGNORE_CASE) to 1,
+            Regex("""(?<![\p{L}])from\s*:\s*$VALUE""", RegexOption.IGNORE_CASE) to 1,
             Regex("""(?<![\p{L}])at\s*:\s*$VALUE""", RegexOption.IGNORE_CASE) to 1,
             Regex("""(?<![\p{L}])at\s+$VALUE""", RegexOption.IGNORE_CASE) to 1,
         )
