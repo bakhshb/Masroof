@@ -6,6 +6,7 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
@@ -40,6 +41,7 @@ class DashboardViewModel(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val rescanService: suspend () -> SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
+    private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
     private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
     private val appLocaleRepository: AppLocaleRepository,
@@ -180,20 +182,49 @@ class DashboardViewModel(
         _uiState.update {
             it.copy(
                 selectedTransactionId = transactionId,
+                selectedTransactionSms = emptyList(),
+                selectedTransactionSmsLoading = true,
                 reclassifySuccess = false,
                 reclassifyError = null,
             )
         }
+        loadSelectedTransactionSms(transactionId)
     }
 
     fun closeTransactionDetail() {
         _uiState.update {
             it.copy(
                 selectedTransactionId = null,
+                selectedTransactionSms = emptyList(),
+                selectedTransactionSmsLoading = false,
                 reclassifying = false,
                 reclassifySuccess = false,
                 reclassifyError = null,
             )
+        }
+    }
+
+    private fun loadSelectedTransactionSms(transactionId: String) {
+        viewModelScope.launch {
+            val evidence = try {
+                smsEvidenceLoader.loadForTransaction(transactionId).map { item ->
+                    TransactionSmsEvidenceUi(body = item.body, sender = item.sender)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                emptyList()
+            }
+            _uiState.update { current ->
+                if (current.selectedTransactionId != transactionId) {
+                    current
+                } else {
+                    current.copy(
+                        selectedTransactionSms = evidence,
+                        selectedTransactionSmsLoading = false,
+                    )
+                }
+            }
         }
     }
 
@@ -299,6 +330,7 @@ class DashboardViewModel(
                         ownedAccounts = ownedAccounts,
                     )
                 }
+                preserveSelectionId?.let(::loadSelectedTransactionSms)
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {

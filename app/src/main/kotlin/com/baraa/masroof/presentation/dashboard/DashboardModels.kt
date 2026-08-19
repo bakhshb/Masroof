@@ -37,6 +37,11 @@ enum class TransactionDirectionUi {
     NEUTRAL,
 }
 
+data class TransactionSmsEvidenceUi(
+    val body: String,
+    val sender: String?,
+)
+
 data class TransactionPreviewUi(
     val id: String,
     /** Merchant/counterparty when present; Compose falls back to Arabic type label when null. */
@@ -70,6 +75,8 @@ data class DashboardUiState(
     val rescanStatus: SmsRescanStatus? = null,
     val reparsingStored: Boolean = false,
     val selectedTransactionId: String? = null,
+    val selectedTransactionSms: List<TransactionSmsEvidenceUi> = emptyList(),
+    val selectedTransactionSmsLoading: Boolean = false,
     val reclassifying: Boolean = false,
     val reclassifyError: String? = null,
     val reclassifySuccess: Boolean = false,

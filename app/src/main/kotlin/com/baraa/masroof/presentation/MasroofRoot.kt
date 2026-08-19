@@ -81,6 +81,8 @@ fun MasroofRoot(
             if (selected != null) {
                 TransactionDetailScreen(
                     transaction = selected,
+                    smsEvidence = dashboardState.selectedTransactionSms,
+                    smsLoading = dashboardState.selectedTransactionSmsLoading,
                     reclassifying = dashboardState.reclassifying,
                     reclassifySuccess = dashboardState.reclassifySuccess,
                     error = dashboardState.reclassifyError,

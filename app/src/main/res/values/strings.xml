@@ -262,6 +262,8 @@
     <string name="transaction_detail_direction">الاتجاه</string>
     <string name="transaction_detail_card">البطاقة</string>
     <string name="transaction_detail_merchant">التاجر / الوصف</string>
+    <string name="transaction_detail_sms_section">نص الرسالة</string>
+    <string name="transaction_detail_sms_index">رسالة %1$d من %2$d</string>
     <string name="transaction_detail_current_type">التصنيف الحالي: %1$s</string>
     <string name="transaction_detail_reclassify_title">إعادة التصنيف</string>
     <string name="transaction_detail_reclassify_hint">اختر التصنيف الصحيح — سيتم تحديث لوحة التحكم فوراً.</string>

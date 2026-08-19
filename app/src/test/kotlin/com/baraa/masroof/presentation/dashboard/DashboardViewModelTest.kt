@@ -8,6 +8,7 @@ import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
@@ -535,12 +536,49 @@ class DashboardViewModelTest {
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
         rescanService: suspend () -> SmsScanResult = { SmsScanResult() },
+        smsEvidenceLoader: TransactionSmsEvidenceLoader = TransactionSmsEvidenceLoader(
+            financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
+                override suspend fun save(
+                    transaction: FinancialTransaction,
+                    rawSmsIds: Collection<String>,
+                ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
+
+                override suspend fun getById(id: String) = null
+                override suspend fun findByRawSmsId(rawSmsId: String) = null
+                override suspend fun listAll() = emptyList<FinancialTransaction>()
+                override suspend fun listOccurredBetween(
+                    startInclusive: java.time.Instant,
+                    endExclusive: java.time.Instant,
+                ) = emptyList<FinancialTransaction>()
+
+                override suspend fun isRawSmsLinked(rawSmsId: String) = false
+                override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
+                override suspend fun update(transaction: FinancialTransaction) = false
+                override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+            },
+            rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository {
+                override suspend fun insertIfAbsent(rawSms: com.baraa.masroof.domain.model.RawSms) =
+                    com.baraa.masroof.domain.repository.RawSmsInsertResult.Inserted
+
+                override suspend fun getById(id: String) = null
+                override suspend fun existsById(id: String) = false
+                override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
+                override suspend fun findCrossSourceNearDuplicate(
+                    sender: String,
+                    bodyHash: String,
+                    fromInclusive: java.time.Instant,
+                    toInclusive: java.time.Instant,
+                    lookingForLiveRow: Boolean,
+                ) = null
+            },
+        ),
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
             cardRegistryRepository = cardRegistry,
             accountRegistryRepository = accountRegistry,
             rescanService = rescanService,
+            smsEvidenceLoader = smsEvidenceLoader,
             permissionStateProvider = permissionStateProvider,
             reclassificationService = TransactionReclassificationService(
                 financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {

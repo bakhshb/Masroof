@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -51,6 +52,8 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 @Composable
 fun TransactionDetailScreen(
     transaction: TransactionPreviewUi,
+    smsEvidence: List<TransactionSmsEvidenceUi>,
+    smsLoading: Boolean,
     reclassifying: Boolean,
     reclassifySuccess: Boolean,
     error: String?,
@@ -225,6 +228,41 @@ fun TransactionDetailScreen(
                             icon = MasroofIcons.merchant,
                             label = stringResource(R.string.transaction_detail_merchant),
                             trailing = title,
+                        )
+                    }
+                }
+            }
+
+            if (smsLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            } else if (smsEvidence.isNotEmpty()) {
+                SectionHeader(
+                    title = stringResource(R.string.transaction_detail_sms_section),
+                    icon = MasroofIcons.sms,
+                )
+                smsEvidence.forEachIndexed { index, evidence ->
+                    if (smsEvidence.size > 1) {
+                        Text(
+                            stringResource(
+                                R.string.transaction_detail_sms_index,
+                                index + 1,
+                                smsEvidence.size,
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    evidence.sender?.let { sender ->
+                        IconLabelRow(
+                            icon = MasroofIcons.sender,
+                            label = stringResource(R.string.review_sender, sender),
+                        )
+                    }
+                    MasroofCard {
+                        Text(
+                            evidence.body,
+                            textAlign = TextAlign.Start,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
