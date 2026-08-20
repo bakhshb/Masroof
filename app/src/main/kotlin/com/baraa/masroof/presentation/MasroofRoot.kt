@@ -11,12 +11,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-<<<<<<< HEAD
 import androidx.compose.ui.Modifier
-import com.baraa.masroof.domain.model.FinancialTransactionType
-=======
 import com.baraa.masroof.application.notification.NotificationAction
->>>>>>> 452b163 (Add notification center with read state and unified alerts)
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
@@ -200,7 +197,6 @@ fun MasroofRoot(
     }
 }
 
-<<<<<<< HEAD
 /**
  * Shows transaction detail when a selection exists.
  *
@@ -231,7 +227,8 @@ private fun showTransactionDetail(
     }
     // Keep the detail destination while a refresh reloads rows for the same period.
     return dashboardState.loading
-=======
+}
+
 private fun handleNotificationAction(
     action: NotificationAction,
     onRequestPermissions: () -> Unit,
@@ -250,5 +247,4 @@ private fun handleNotificationAction(
         NotificationAction.DISMISS_RESCAN -> onDismissRescanStatus()
         NotificationAction.MARK_READ_ONLY -> Unit
     }
->>>>>>> 452b163 (Add notification center with read state and unified alerts)
 }
