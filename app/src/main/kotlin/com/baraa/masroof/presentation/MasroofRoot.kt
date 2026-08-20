@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.application.notification.NotificationAction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
@@ -167,6 +168,7 @@ fun MasroofRoot(
                         dashboardState = dashboardState,
                         onBack = dashboardViewModel::closeTransactionDetail,
                         onReclassify = dashboardViewModel::reclassifySelectedTransaction,
+                        overlayOnList = true,
                     )
                 }
             }
@@ -208,21 +210,29 @@ private fun showTransactionDetail(
     dashboardState: DashboardUiState,
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
+    overlayOnList: Boolean = false,
 ): Boolean {
     val selectedId = dashboardState.selectedTransactionId ?: return false
     val selected = dashboardState.allTransactions.find { it.id == selectedId }
         ?: dashboardState.recentTransactions.find { it.id == selectedId }
     if (selected != null) {
-        TransactionDetailScreen(
-            transaction = selected,
-            smsEvidence = dashboardState.selectedTransactionSms,
-            smsLoading = dashboardState.selectedTransactionSmsLoading,
-            reclassifying = dashboardState.reclassifying,
-            reclassifySuccess = dashboardState.reclassifySuccess,
-            error = dashboardState.reclassifyError,
-            onBack = onBack,
-            onReclassify = onReclassify,
-        )
+        val detailContent: @Composable () -> Unit = {
+            TransactionDetailScreen(
+                transaction = selected,
+                smsEvidence = dashboardState.selectedTransactionSms,
+                smsLoading = dashboardState.selectedTransactionSmsLoading,
+                reclassifying = dashboardState.reclassifying,
+                reclassifySuccess = dashboardState.reclassifySuccess,
+                error = dashboardState.reclassifyError,
+                onBack = onBack,
+                onReclassify = onReclassify,
+            )
+        }
+        if (overlayOnList) {
+            MasroofScreenBackground(modifier = Modifier.fillMaxSize(), content = detailContent)
+        } else {
+            detailContent()
+        }
         return true
     }
     // Keep the detail destination while a refresh reloads rows for the same period.
