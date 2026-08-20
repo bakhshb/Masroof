@@ -283,11 +283,46 @@ class TransactionReconciliationService(
         for (candidate in stillOpen) {
             if (candidate.event.rawSmsId in matchedRawSmsIds) continue
             if (financialTransactionRepository.isRawSmsLinked(candidate.event.rawSmsId)) continue
-            reviewCandidates += ReconciliationReviewCandidate(
-                rawSmsId = candidate.event.rawSmsId,
-                kind = ReviewKind.PENDING_MATCH,
-                reasons = listOf("transfer_pending_match"),
-            )
+            when (
+                val unmatched = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+                    event = candidate.event,
+                    receivedAt = candidate.receivedAt,
+                    sourceOwnership = candidate.sourceOwnership,
+                    destinationOwnership = candidate.destinationOwnership,
+                )
+            ) {
+                is TransactionAssembler.Outcome.Assembled -> {
+                    when (persist(unmatched.transaction, unmatched.rawSmsIds)) {
+                        PersistOutcome.Saved -> {
+                            assembledSingle++
+                            pendingMatch = (pendingMatch - 1).coerceAtLeast(0)
+                            settledRawSmsIds += candidate.event.rawSmsId
+                        }
+
+                        PersistOutcome.Already -> {
+                            alreadyLinked++
+                            pendingMatch = (pendingMatch - 1).coerceAtLeast(0)
+                            settledRawSmsIds += candidate.event.rawSmsId
+                        }
+
+                        PersistOutcome.Failed -> {
+                            reviewCandidates += ReconciliationReviewCandidate(
+                                rawSmsId = candidate.event.rawSmsId,
+                                kind = ReviewKind.PENDING_MATCH,
+                                reasons = listOf("transfer_pending_match"),
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    reviewCandidates += ReconciliationReviewCandidate(
+                        rawSmsId = candidate.event.rawSmsId,
+                        kind = ReviewKind.PENDING_MATCH,
+                        reasons = listOf("transfer_pending_match"),
+                    )
+                }
+            }
         }
 
         val summary = ReconciliationSummary(

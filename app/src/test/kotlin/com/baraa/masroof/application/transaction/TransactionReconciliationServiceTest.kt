@@ -337,13 +337,85 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun outgoingUnknownWithoutCounterpart_staysPending() = runBlocking {
+    fun outgoingUnknownWithoutCounterpart_postsExternalOut() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         persistEvent(
             smsId = "sms-unk",
             event = event(
                 id = "pe-unk",
                 rawSmsId = "sms-unk",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
+                counterparty = "TEST_BENEFICIARY",
+            ),
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(1, ftRepo.listAll().size)
+        assertEquals(0, summary.pendingMatch)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, tx.type)
+        assertNotEquals(FinancialTransactionType.EXPENSE, tx.type)
+        assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.sourceContainerId)
+        assertNull(tx.destinationContainerId)
+        assertEquals("TEST_BENEFICIARY", tx.counterparty)
+    }
+
+    @Test
+    fun incomingUnknownWithoutCounterpart_postsExternalIn() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        persistEvent(
+            smsId = "sms-in-unk",
+            event = event(
+                id = "pe-in-unk",
+                rawSmsId = "sms-in-unk",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("200.00"),
+                source = AccountReference(Bank.UNKNOWN, "9999"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                network = BankNetworkType.INTER_BANK,
+                counterparty = "TEST_COMPANY",
+            ),
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, summary.pendingMatch)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, tx.type)
+        assertNotEquals(FinancialTransactionType.INCOME, tx.type)
+        assertNull(tx.sourceContainerId)
+        assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.destinationContainerId)
+        assertEquals("TEST_COMPANY", tx.counterparty)
+    }
+
+    @Test
+    fun incomingMissingSource_ownedDestination_postsExternalIn() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        persistEvent(
+            smsId = "sms-in-nosrc",
+            event = event(
+                id = "pe-in-nosrc",
+                rawSmsId = "sms-in-nosrc",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("4445.67"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, tx.type)
+        assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.destinationContainerId)
+    }
+
+    @Test
+    fun unmatchedTransfer_unownedLocalSide_staysPending() = runBlocking {
+        persistEvent(
+            smsId = "sms-unowned",
+            event = event(
+                id = "pe-unowned",
+                rawSmsId = "sms-unowned",
                 family = MessageFamily.TRANSFER_OUT,
                 amount = money("500.00"),
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
@@ -826,6 +898,7 @@ class TransactionReconciliationServiceTest {
         network: BankNetworkType? = null,
         channel: PurchaseChannel? = null,
         merchant: String? = null,
+        counterparty: String? = null,
     ) = ParsedEvent(
         id = id,
         rawSmsId = rawSmsId,
@@ -838,7 +911,7 @@ class TransactionReconciliationServiceTest {
         destinationAccountRef = destination,
         cardRef = card,
         merchant = merchant,
-        counterparty = null,
+        counterparty = counterparty,
         occurredAt = null,
         bankNetworkType = network,
         confidence = Confidence(1.0),
