@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -42,6 +43,7 @@ fun TransactionListScreen(
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
     var selectedCardLast4s by rememberSaveable { mutableStateOf(listOf<String>()) }
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     val filterState = remember(searchQuery, selectedTypeNames, selectedCardLast4s) {
         TransactionListFilterState(
@@ -149,6 +151,7 @@ fun TransactionListScreen(
             Spacer(Modifier.height(8.dp))
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
