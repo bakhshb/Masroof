@@ -28,6 +28,8 @@ import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
 import com.baraa.masroof.presentation.onboarding.OnboardingPermissionPolicy
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModelFactory
+import com.baraa.masroof.presentation.notification.NotificationCenterViewModel
+import com.baraa.masroof.presentation.notification.NotificationCenterViewModelFactory
 import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.settings.SettingsViewModel
@@ -75,6 +77,13 @@ class MainActivity : ComponentActivity() {
             onRequestInstallPermission = {
                 startActivity(InstallPermissionHelper.buildManageUnknownSourcesIntent(this))
             },
+        )
+    }
+
+    private val notificationCenterViewModel: NotificationCenterViewModel by viewModels {
+        NotificationCenterViewModelFactory(
+            container = container,
+            permissionStateProvider = { hasSmsPermissions() },
         )
     }
 
@@ -142,6 +151,7 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel = dashboardViewModel,
                         reviewViewModel = reviewViewModel,
                         settingsViewModel = settingsViewModel,
+                        notificationCenterViewModel = notificationCenterViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
                         },

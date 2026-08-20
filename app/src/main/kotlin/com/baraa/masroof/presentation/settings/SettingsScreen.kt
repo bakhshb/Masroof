@@ -43,6 +43,8 @@ fun SettingsRoute(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
+    pendingDestination: SettingsDestination? = null,
+    onPendingDestinationConsumed: () -> Unit = {},
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
@@ -54,6 +56,13 @@ fun SettingsRoute(
     }
     val state by viewModel.uiState.collectAsState()
     var destination by rememberSaveable { mutableStateOf(SettingsDestination.Hub) }
+
+    LaunchedEffect(pendingDestination) {
+        if (pendingDestination != null) {
+            destination = pendingDestination
+            onPendingDestinationConsumed()
+        }
+    }
 
     BackHandler(enabled = destination != SettingsDestination.Hub) {
         destination = SettingsDestination.Hub

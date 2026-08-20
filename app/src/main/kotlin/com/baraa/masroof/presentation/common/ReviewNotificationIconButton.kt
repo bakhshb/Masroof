@@ -32,9 +32,9 @@ fun ReviewNotificationIconButton(
             Icon(
                 imageVector = MasroofIcons.notifications,
                 contentDescription = if (reviewCount > 0) {
-                    stringResource(R.string.dashboard_review_notifications_count, reviewCount)
+                    stringResource(R.string.notification_center_badge_count, reviewCount)
                 } else {
-                    stringResource(R.string.dashboard_review_notifications)
+                    stringResource(R.string.notification_center_title)
                 },
             )
         }

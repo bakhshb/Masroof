@@ -47,7 +47,8 @@ import com.baraa.masroof.presentation.common.SummaryMiniCard
 @Composable
 fun DashboardRoute(
     viewModel: DashboardViewModel,
-    onOpenReview: () -> Unit = {},
+    notificationUnreadCount: Int = 0,
+    onOpenNotificationCenter: () -> Unit = {},
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -65,7 +66,8 @@ fun DashboardRoute(
         onCurrent = viewModel::goToCurrentPeriod,
         onRetry = viewModel::refreshWithSmsImport,
         onRescan = viewModel::rescanSms,
-        onOpenReview = onOpenReview,
+        notificationUnreadCount = notificationUnreadCount,
+        onOpenNotificationCenter = onOpenNotificationCenter,
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
@@ -83,7 +85,8 @@ private fun DashboardScreen(
     onCurrent: () -> Unit,
     onRetry: () -> Unit,
     onRescan: () -> Unit,
-    onOpenReview: () -> Unit,
+    notificationUnreadCount: Int,
+    onOpenNotificationCenter: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
@@ -94,8 +97,8 @@ private fun DashboardScreen(
     val isPullRefreshing = (state.loading && state.summary != null) || state.rescanning
     Column(modifier = Modifier.fillMaxSize()) {
         DashboardAppBar(
-            reviewCount = state.summary?.reviewRequiredCount ?: 0,
-            onOpenReview = onOpenReview,
+            unreadCount = notificationUnreadCount,
+            onOpenNotificationCenter = onOpenNotificationCenter,
             onOpenSettings = onOpenSettings,
         )
         LongPullToRefreshBox(
@@ -302,16 +305,16 @@ private fun DashboardScreen(
 
 @Composable
 private fun DashboardAppBar(
-    reviewCount: Int,
-    onOpenReview: () -> Unit,
+    unreadCount: Int,
+    onOpenNotificationCenter: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     MasroofAppBar(
         title = stringResource(R.string.app_name),
     ) {
         ReviewNotificationIconButton(
-            reviewCount = reviewCount,
-            onClick = onOpenReview,
+            reviewCount = unreadCount,
+            onClick = onOpenNotificationCenter,
         )
         IconButton(onClick = onOpenSettings) {
             Icon(

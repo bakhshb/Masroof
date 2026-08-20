@@ -13,6 +13,8 @@ import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyn
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.notification.NotificationCenterService
+import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
@@ -26,6 +28,7 @@ import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
+import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
@@ -138,6 +141,19 @@ class AppContainer(
                 SharedPrefsThemePreferencesRepository.PREFS_NAME,
                 Context.MODE_PRIVATE,
             ),
+        )
+
+    val notificationPreferencesRepository: NotificationPreferencesRepository =
+        SharedPrefsNotificationPreferencesRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsNotificationPreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
+    val notificationCenterService: NotificationCenterService =
+        NotificationCenterService(
+            preferencesRepository = notificationPreferencesRepository,
         )
 
     val ownershipDiscoveryService: OwnershipDiscoveryService =
