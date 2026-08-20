@@ -147,6 +147,87 @@ object TransactionAssembler {
     }
 
     /**
+     * Fallback after pair matching failed: post a single owned-side transfer
+     * as external in/out instead of waiting forever for a counterpart SMS.
+     *
+     * Pairing still wins when both events are present in the same reconcile pass.
+     * Self-transfer (owned → owned) is unchanged. Local side not OWNED stays pending.
+     */
+    fun assembleUnmatchedOwnedTransfer(
+        event: ParsedEvent,
+        receivedAt: Instant,
+        sourceOwnership: OwnershipStatus,
+        destinationOwnership: OwnershipStatus,
+    ): Outcome {
+        when (event.messageFamily) {
+            MessageFamily.TRANSFER_OUT,
+            MessageFamily.TRANSFER_IN,
+            -> Unit
+            else -> return Outcome.PendingMatch
+        }
+
+        val amount = event.amount
+            ?: return Outcome.NeedsReview(listOf("missing_amount"))
+
+        if (sourceOwnership == OwnershipStatus.OWNED &&
+            destinationOwnership == OwnershipStatus.OWNED
+        ) {
+            return assembleSingle(
+                event = event,
+                receivedAt = receivedAt,
+                sourceOwnership = sourceOwnership,
+                destinationOwnership = destinationOwnership,
+                cardOwnership = OwnershipStatus.UNKNOWN,
+            )
+        }
+
+        return when (event.messageFamily) {
+            MessageFamily.TRANSFER_OUT -> {
+                if (sourceOwnership != OwnershipStatus.OWNED) {
+                    return Outcome.PendingMatch
+                }
+                val sourceRef = event.sourceAccountRef
+                    ?: return Outcome.NeedsReview(listOf("missing_source"))
+                val sourceId = FinancialContainerIdFactory.accountId(sourceRef)
+                    ?: return Outcome.NeedsReview(listOf("source_not_durable"))
+                val built = buildTransaction(
+                    type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+                    amount = amount,
+                    occurredAt = event.occurredAt ?: receivedAt,
+                    event = event,
+                    linkedEventIds = listOf(event.id),
+                    rawSmsIds = listOf(event.rawSmsId),
+                )
+                // Prefer durable owned source even if buildTransaction dropped UNKNOWN dest.
+                val tx = built.transaction.copy(sourceContainerId = sourceId)
+                Outcome.Assembled(tx, built.rawSmsIds)
+            }
+
+            MessageFamily.TRANSFER_IN -> {
+                if (destinationOwnership != OwnershipStatus.OWNED) {
+                    return Outcome.PendingMatch
+                }
+                val destRef = event.destinationAccountRef
+                    ?: return Outcome.NeedsReview(listOf("missing_destination"))
+                val destId = FinancialContainerIdFactory.accountId(destRef)
+                    ?: return Outcome.NeedsReview(listOf("destination_not_durable"))
+                val built = buildTransaction(
+                    type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                    amount = amount,
+                    occurredAt = event.occurredAt ?: receivedAt,
+                    event = event,
+                    linkedEventIds = listOf(event.id),
+                    rawSmsIds = listOf(event.rawSmsId),
+                )
+                val tx = built.transaction.copy(destinationContainerId = destId)
+                Outcome.Assembled(tx, built.rawSmsIds)
+            }
+
+            else -> Outcome.PendingMatch
+        }
+    }
+
+    /**
      * Assemble a mutually unique OUT↔IN pair into one SELF_TRANSFER when both
      * local known-bank endpoints resolve OWNED.
      */

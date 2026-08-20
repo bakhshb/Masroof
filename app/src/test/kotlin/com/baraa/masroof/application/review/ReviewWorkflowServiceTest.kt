@@ -137,8 +137,7 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
-    fun pendingMatch_createsRequiredReview() = runBlocking {
-        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+    fun pendingMatch_unownedLocalSide_createsRequiredReview() = runBlocking {
         persistEvent(
             smsId = "sms-out",
             event = event(
@@ -157,6 +156,29 @@ class ReviewWorkflowServiceTest {
         assertEquals(ReviewKind.PENDING_MATCH, review.kind)
         assertEquals(listOf("transfer_pending_match"), review.reasons)
         assertEquals(0, ftRepo.listAll().size)
+    }
+
+    @Test
+    fun refresh_unmatchedOwnedTransfer_postsExternalAndClearsReview() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        persistEvent(
+            smsId = "sms-out",
+            event = event(
+                id = "pe-out",
+                rawSmsId = "sms-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        workflow.refreshReviewQueue()
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, tx.type)
+        assertNotEquals(FinancialTransactionType.EXPENSE, tx.type)
+        val review = reviewRepo.findByRawSmsId("sms-out")
+        assertTrue(review == null || review.status == ReviewStatus.RESOLVED)
     }
 
     @Test
@@ -211,9 +233,8 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
-    fun automaticLaterMatch_resolvesStalePendingReview() = runBlocking {
+    fun unmatchedOwnedOutgoing_postsWithoutWaitingForCounterpart() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
         persistEvent(
             smsId = "sms-out",
             event = event(
@@ -225,37 +246,12 @@ class ReviewWorkflowServiceTest {
                 destination = AccountReference(Bank.UNKNOWN, "6810"),
                 network = BankNetworkType.INTER_BANK,
             ),
-            details = ParsedEventDetails(
-                occurredAtLocal = java.time.LocalDateTime.parse("2026-08-10T12:00:00"),
-            ),
-            at = Instant.parse("2026-08-10T09:00:00Z"),
         )
         workflow.refreshReviewQueue()
-        assertEquals(ReviewStatus.REQUIRED, reviewRepo.findByRawSmsId("sms-out")!!.status)
-
-        persistEvent(
-            smsId = "sms-in",
-            event = event(
-                id = "pe-in",
-                rawSmsId = "sms-in",
-                bank = Bank("D360"),
-                family = MessageFamily.TRANSFER_IN,
-                amount = money("500.00"),
-                destination = AccountReference(Bank("D360"), "6810"),
-                network = BankNetworkType.INTER_BANK,
-            ),
-            details = ParsedEventDetails(
-                occurredAtLocal = java.time.LocalDateTime.parse("2026-08-10T12:01:00"),
-            ),
-            at = Instant.parse("2026-08-10T09:01:00Z"),
-        )
-        workflow.refreshReviewQueue()
-        val outReview = reviewRepo.findByRawSmsId("sms-out")!!
-        assertEquals(ReviewStatus.RESOLVED, outReview.status)
-        assertEquals(ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED, outReview.resolutionKind)
-        assertEquals(1, ftRepo.listAll().size)
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, ftRepo.listAll().single().type)
-        assertNotNull(outReview.resolvedTransactionId)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, tx.type)
+        val review = reviewRepo.findByRawSmsId("sms-out")
+        assertTrue(review == null || review.status == ReviewStatus.RESOLVED)
     }
 
     @Test
@@ -432,7 +428,12 @@ class ReviewWorkflowServiceTest {
                 network = BankNetworkType.INTER_BANK,
             ),
         )
-        workflow.refreshReviewQueue()
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-out",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
         val result = workflow.resolveTransferAsExternal(
             ReviewIdFactory.fromRawSmsId("sms-out"),
         ) as ReviewWorkflowResult.Success
@@ -466,7 +467,12 @@ class ReviewWorkflowServiceTest {
                 network = BankNetworkType.INTER_BANK,
             ),
         )
-        workflow.refreshReviewQueue()
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-in",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
         val result = workflow.resolveTransferAsExternal(
             ReviewIdFactory.fromRawSmsId("sms-in"),
         ) as ReviewWorkflowResult.Success
@@ -507,7 +513,18 @@ class ReviewWorkflowServiceTest {
                 network = BankNetworkType.INTER_BANK,
             ),
         )
-        workflow.refreshReviewQueue()
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-out",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-in",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
         assertEquals(0, ftRepo.listAll().size)
         assertEquals(2, reviewRepo.listRequired().size)
 
@@ -555,7 +572,18 @@ class ReviewWorkflowServiceTest {
                 destination = AccountReference(Bank("D360"), "6810"),
             ),
         )
-        workflow.refreshReviewQueue()
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-out",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-in",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
         assertEquals(ReviewStatus.REQUIRED, reviewRepo.findByRawSmsId("sms-out")!!.status)
         // Consume outgoing RawSms into an FT without resolving the review row.
         ftRepo.save(
@@ -724,8 +752,6 @@ class ReviewWorkflowServiceTest {
 
     @Test
     fun autoResolvedReview_upsertRequired_doesNotReopen() = runBlocking {
-        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
         persistEvent(
             smsId = "sms-out",
             event = event(
@@ -737,32 +763,16 @@ class ReviewWorkflowServiceTest {
                 destination = AccountReference(Bank.UNKNOWN, "6810"),
                 network = BankNetworkType.INTER_BANK,
             ),
-            details = ParsedEventDetails(
-                occurredAtLocal = java.time.LocalDateTime.parse("2026-08-10T12:00:00"),
-            ),
-            at = Instant.parse("2026-08-10T09:00:00Z"),
         )
         workflow.refreshReviewQueue()
-        persistEvent(
-            smsId = "sms-in",
-            event = event(
-                id = "pe-in",
-                rawSmsId = "sms-in",
-                bank = Bank("D360"),
-                family = MessageFamily.TRANSFER_IN,
-                amount = money("500.00"),
-                destination = AccountReference(Bank("D360"), "6810"),
-                network = BankNetworkType.INTER_BANK,
-            ),
-            details = ParsedEventDetails(
-                occurredAtLocal = java.time.LocalDateTime.parse("2026-08-10T12:01:00"),
-            ),
-            at = Instant.parse("2026-08-10T09:01:00Z"),
-        )
+        assertEquals(ReviewStatus.REQUIRED, reviewRepo.findByRawSmsId("sms-out")!!.status)
+
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         workflow.refreshReviewQueue()
         val auto = reviewRepo.findByRawSmsId("sms-out")!!
         assertEquals(ReviewStatus.RESOLVED, auto.status)
         assertEquals(ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED, auto.resolutionKind)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftRepo.listAll().single().type)
         val after = reviewRepo.upsertRequired(
             rawSmsId = "sms-out",
             kind = ReviewKind.NEEDS_REVIEW,

@@ -164,6 +164,68 @@ class TransactionAssemblerTest {
     }
 
     @Test
+    fun unmatchedOutgoing_ownedSource_unknownDest_externalOut() {
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            event = event(
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "0593"),
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+        ) as TransactionAssembler.Outcome.Assembled
+
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, outcome.transaction.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            outcome.transaction.sourceContainerId,
+        )
+        assertNull(outcome.transaction.destinationContainerId)
+        assertFalse(outcome.transaction.type == FinancialTransactionType.EXPENSE)
+    }
+
+    @Test
+    fun unmatchedIncoming_ownedDest_unknownSource_externalIn() {
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            event = event(
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("200.00"),
+                source = AccountReference(Bank.UNKNOWN, "9999"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.OWNED,
+        ) as TransactionAssembler.Outcome.Assembled
+
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, outcome.transaction.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            outcome.transaction.destinationContainerId,
+        )
+        assertNull(outcome.transaction.sourceContainerId)
+        assertFalse(outcome.transaction.type == FinancialTransactionType.INCOME)
+    }
+
+    @Test
+    fun unmatchedOutgoing_unownedSource_staysPending() {
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            event = event(
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "0593"),
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+        )
+        assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
+    }
+
+    @Test
     fun bankUnknown_referenceDoesNotPersistDurableContainerId() {
         val outcome = TransactionAssembler.assembleSingle(
             event = event(
