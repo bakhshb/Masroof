@@ -147,6 +147,15 @@
     <string name="dashboard_open_settings">Settings</string>
     <string name="dashboard_review_notifications">Review queue</string>
     <string name="dashboard_review_notifications_count">%1$d transaction(s) need review</string>
+    <string name="notification_center_title">Notification center</string>
+    <string name="notification_center_badge_count">%1$d unread notification(s)</string>
+    <string name="notification_center_empty">No alerts right now.</string>
+    <string name="notification_center_sms_permission_title">SMS permission is off</string>
+    <string name="notification_center_sms_permission_body">Allow Masroof to read SMS to import bank transactions.</string>
+    <string name="notification_center_unregistered_cards_title">Unregistered cards</string>
+    <string name="notification_center_unregistered_accounts_title">Unregistered accounts</string>
+    <string name="notification_center_unregistered_accounts_body">%1$d account(s) need ownership confirmation</string>
+    <string name="notification_center_rescan_title">SMS import result</string>
     <string name="dashboard_unregistered_cards_body">Unregistered card — confirm it in Settings.</string>
     <string name="dashboard_unregistered_cards_more">And %1$d more unregistered card(s) — confirm them in Settings.</string>
     <string name="dashboard_manage_cards_in_settings">Manage cards</string>

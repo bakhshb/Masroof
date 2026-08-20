@@ -152,6 +152,15 @@
     <string name="dashboard_open_settings">الإعدادات</string>
     <string name="dashboard_review_notifications">عمليات المراجعة</string>
     <string name="dashboard_review_notifications_count">%1$d عملية تحتاج مراجعة</string>
+    <string name="notification_center_title">مركز الإشعارات</string>
+    <string name="notification_center_badge_count">%1$d إشعار غير مقروء</string>
+    <string name="notification_center_empty">لا توجد تنبيهات حالياً.</string>
+    <string name="notification_center_sms_permission_title">صلاحية الرسائل غير مفعّلة</string>
+    <string name="notification_center_sms_permission_body">اسمح لمصروف بقراءة الرسائل لاستيراد العمليات البنكية.</string>
+    <string name="notification_center_unregistered_cards_title">بطاقات غير مسجّلة</string>
+    <string name="notification_center_unregistered_accounts_title">حسابات غير مسجّلة</string>
+    <string name="notification_center_unregistered_accounts_body">%1$d حساب يحتاج تأكيد الملكية</string>
+    <string name="notification_center_rescan_title">نتيجة استيراد الرسائل</string>
     <string name="dashboard_unregistered_cards_body">بطاقة غير مسجّلة — أكّدها من الإعدادات.</string>
     <string name="dashboard_unregistered_cards_more">وب %1$d بطاقة غير مسجّلة أخرى — أكّدها من الإعدادات.</string>
     <string name="dashboard_manage_cards_in_settings">إدارة البطاقات</string>
