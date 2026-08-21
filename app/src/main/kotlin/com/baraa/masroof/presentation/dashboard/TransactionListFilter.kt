@@ -9,9 +9,13 @@ data class TransactionListFilterState(
     val searchQuery: String = "",
     val types: Set<FinancialTransactionType> = emptySet(),
     val cardLast4s: Set<String> = emptySet(),
+    val accountContainerIds: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
-        get() = searchQuery.isNotBlank() || types.isNotEmpty() || cardLast4s.isNotEmpty()
+        get() = searchQuery.isNotBlank() ||
+            types.isNotEmpty() ||
+            cardLast4s.isNotEmpty() ||
+            accountContainerIds.isNotEmpty()
 }
 
 data class TransactionListFilterResult(
@@ -43,6 +47,7 @@ object TransactionListFilterEngine {
         val filtered = transactions.filter { tx ->
             matchesTypes(tx, filter.types) &&
                 matchesCards(tx, filter.cardLast4s) &&
+                matchesAccounts(tx, filter.accountContainerIds) &&
                 matchesSearch(tx, filter.searchQuery)
         }
         return TransactionListFilterResult(
@@ -59,6 +64,13 @@ object TransactionListFilterEngine {
     fun availableCardLast4s(transactions: List<TransactionPreviewUi>): List<String> =
         transactions.mapNotNull { it.cardLast4 }.distinct().sorted()
 
+    fun availableAccountContainerIds(transactions: List<TransactionPreviewUi>): List<String> =
+        transactions.flatMap { tx ->
+            com.baraa.masroof.domain.ids.FinancialContainerIdParser
+                .accountContainerIdsFromContainers(tx.sourceContainerId, tx.destinationContainerId)
+                .toList()
+        }.distinct().sorted()
+
     private fun matchesTypes(
         tx: TransactionPreviewUi,
         types: Set<FinancialTransactionType>,
@@ -66,6 +78,12 @@ object TransactionListFilterEngine {
 
     private fun matchesCards(tx: TransactionPreviewUi, cardLast4s: Set<String>): Boolean =
         cardLast4s.isEmpty() || tx.cardLast4 in cardLast4s
+
+    private fun matchesAccounts(tx: TransactionPreviewUi, accountContainerIds: Set<String>): Boolean {
+        if (accountContainerIds.isEmpty()) return true
+        return tx.sourceContainerId in accountContainerIds ||
+            tx.destinationContainerId in accountContainerIds
+    }
 
     private fun matchesSearch(tx: TransactionPreviewUi, rawQuery: String): Boolean {
         val query = rawQuery.trim()

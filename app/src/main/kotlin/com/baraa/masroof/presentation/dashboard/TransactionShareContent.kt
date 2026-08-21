@@ -73,6 +73,11 @@ fun transactionListShareText(
     val cardLabels = filter.cardLast4s.map { last4 ->
         stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
     }.sorted()
+    val accountLabels = filter.accountContainerIds.mapNotNull { containerId ->
+        com.baraa.masroof.domain.ids.FinancialContainerIdParser.accountMaskedNumber(containerId)?.let { masked ->
+            stringResource(R.string.dashboard_account_item, formatCardLast4(masked))
+        }
+    }.sorted()
     val rows = transactions.map { tx ->
         TransactionShareText.listRow(
             date = formatLocalizedTransactionDate(tx.localDate),
@@ -100,6 +105,12 @@ fun transactionListShareText(
             cardLabels.takeIf { it.isNotEmpty() }?.let { labels ->
                 TransactionShareText.field(
                     stringResource(R.string.transaction_share_cards),
+                    labels.joinToString(" • "),
+                )
+            },
+            accountLabels.takeIf { it.isNotEmpty() }?.let { labels ->
+                TransactionShareText.field(
+                    stringResource(R.string.transaction_share_accounts),
                     labels.joinToString(" • "),
                 )
             },

@@ -13,4 +13,22 @@ object FinancialContainerIdParser {
 
     fun cardLast4FromContainers(sourceContainerId: String?, destinationContainerId: String?): String? =
         cardLast4(sourceContainerId) ?: cardLast4(destinationContainerId)
+
+    fun accountMaskedNumber(containerId: String?): String? {
+        if (containerId.isNullOrBlank()) return null
+        if (!containerId.startsWith("account:")) return null
+        return containerId.substringAfterLast(':').trim().takeIf { it.isNotEmpty() }
+    }
+
+    fun accountContainerIdsFromContainers(
+        sourceContainerId: String?,
+        destinationContainerId: String?,
+    ): Set<String> = buildSet {
+        if (!sourceContainerId.isNullOrBlank() && sourceContainerId.startsWith("account:")) {
+            add(sourceContainerId)
+        }
+        if (!destinationContainerId.isNullOrBlank() && destinationContainerId.startsWith("account:")) {
+            add(destinationContainerId)
+        }
+    }
 }
