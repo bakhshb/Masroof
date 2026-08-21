@@ -121,7 +121,7 @@ object CurrentAccountSummaryCalculator {
             }
         }
 
-        return CurrentAccountSummary(
+        return CurrentAccountSummary.of(
             currency = primaryCurrency,
             salary = salary,
             otherIncome = otherIncome,

@@ -514,20 +514,7 @@ class DashboardViewModelTest {
 
     companion object {
         fun emptyCurrentAccount(currency: Currency = Currency.SAR): CurrentAccountSummary =
-            CurrentAccountSummary(
-                currency = currency,
-                salary = Money.zero(currency),
-                otherIncome = Money.zero(currency),
-                externalTransfersIn = Money.zero(currency),
-                selfTransfersIn = Money.zero(currency),
-                selfTransfersOut = Money.zero(currency),
-                creditCardPayments = Money.zero(currency),
-                billPayments = Money.zero(currency),
-                externalTransfersOut = Money.zero(currency),
-                cashWithdrawals = Money.zero(currency),
-                posPurchases = Money.zero(currency),
-                fees = Money.zero(currency),
-            )
+            CurrentAccountSummary.zero(currency)
 
         fun emptySpendingSplit(currency: Currency = Currency.SAR): SpendingSplitSummary =
             SpendingSplitSummary(

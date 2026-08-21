@@ -260,7 +260,7 @@ private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummary
     if (summary.selfTransfersOut.amount.signum() > 0) {
         rows += FlowSummaryRow(
             labelRes = R.string.dashboard_self_transfer_out,
-            amount = summary.selfTransfersOut,
+            amount = summary.outflow.selfTransfersOut,
         )
     }
     return rows
@@ -275,7 +275,7 @@ private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryR
     if (summary.selfTransfersIn.amount.signum() > 0) {
         rows += FlowSummaryRow(
             labelRes = R.string.dashboard_self_transfer_in,
-            amount = summary.selfTransfersIn,
+            amount = summary.inflow.selfTransfersIn,
         )
     }
     return rows
@@ -283,19 +283,19 @@ private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryR
 
 private fun expenseAmount(summary: CurrentAccountSummary, category: FlowExpenseCategory): Money =
     when (category) {
-        FlowExpenseCategory.EXTERNAL_TRANSFER_OUT -> summary.externalTransfersOut
-        FlowExpenseCategory.CREDIT_CARD_PAYMENT -> summary.creditCardPayments
-        FlowExpenseCategory.CASH_WITHDRAWAL -> summary.cashWithdrawals
-        FlowExpenseCategory.BILL_PAYMENT -> summary.billPayments
-        FlowExpenseCategory.POS_PURCHASE -> summary.posPurchases
-        FlowExpenseCategory.FEE -> summary.fees
+        FlowExpenseCategory.EXTERNAL_TRANSFER_OUT -> summary.outflow.externalTransfersOut
+        FlowExpenseCategory.CREDIT_CARD_PAYMENT -> summary.outflow.creditCardPayments
+        FlowExpenseCategory.CASH_WITHDRAWAL -> summary.outflow.cashWithdrawals
+        FlowExpenseCategory.BILL_PAYMENT -> summary.outflow.billPayments
+        FlowExpenseCategory.POS_PURCHASE -> summary.outflow.posPurchases
+        FlowExpenseCategory.FEE -> summary.outflow.fees
     }
 
 private fun incomeAmount(summary: CurrentAccountSummary, category: FlowIncomeCategory): Money =
     when (category) {
-        FlowIncomeCategory.SALARY -> summary.salary
-        FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> summary.externalTransfersIn
-        FlowIncomeCategory.OTHER_INCOME -> summary.otherIncome
+        FlowIncomeCategory.SALARY -> summary.inflow.salary
+        FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> summary.inflow.externalTransfersIn
+        FlowIncomeCategory.OTHER_INCOME -> summary.inflow.otherIncome
     }
 
 private fun expenseCategoryLabelRes(category: FlowExpenseCategory): Int =
