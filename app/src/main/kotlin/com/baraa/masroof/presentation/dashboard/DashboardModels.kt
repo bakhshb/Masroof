@@ -30,6 +30,7 @@ data class OwnedCardUi(
 data class OwnedAccountUi(
     val bank: Bank,
     val maskedNumber: String,
+    val accountRemaining: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
     val periodNet: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
     val periodInflow: com.baraa.masroof.core.money.Money? = null,
     val periodOutflow: com.baraa.masroof.core.money.Money? = null,

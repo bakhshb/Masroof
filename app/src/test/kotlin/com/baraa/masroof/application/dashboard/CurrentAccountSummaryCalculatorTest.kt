@@ -153,7 +153,7 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun cashWithdrawalWithNullSourceContainer_countsWhenTyped() {
+    fun cashWithdrawalWithNullSourceContainer_ignoredWhenScopedToSingleAccount() {
         val owned = "account:bank_aljazira:3478"
         val cashWithdrawal = tx(
             id = "cash-withdrawal",
@@ -169,8 +169,93 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountLast4s = setOf("3478"),
             rawSmsById = emptyMap(),
         )
-        assertEquals(Money.of("2200.00", Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.of("2200.00", Currency.SAR), summary.totalOutflow)
+        assertEquals(Money.zero(Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summary.accountOutflow)
+    }
+
+    @Test
+    fun orphanOutflow_notDuplicatedAcrossOwnedAccounts() {
+        val accountA = "account:bank_aljazira:3001"
+        val accountB = "account:bank_aljazira:3002"
+        val orphanWithdrawal = tx(
+            id = "orphan-cash",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "100.00",
+            source = null,
+            linked = emptyList(),
+        )
+        val summaryA = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(orphanWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountA),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        val summaryB = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(orphanWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountB),
+            ownedAccountLast4s = setOf("3002"),
+        )
+        assertEquals(Money.zero(Currency.SAR), summaryA.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summaryB.cashWithdrawals)
+    }
+
+    @Test
+    fun accountRemaining_inflowMinusOutflowIncludingSelfTransfers() {
+        val accountA = "account:bank_aljazira:3001"
+        val accountB = "account:bank_aljazira:3002"
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(
+                tx(
+                    id = "transfer-in",
+                    type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                    amount = "1000",
+                    dest = accountA,
+                ),
+                tx(
+                    id = "purchase",
+                    type = FinancialTransactionType.EXPENSE,
+                    amount = "500",
+                    source = accountA,
+                ),
+                tx(
+                    id = "self-out",
+                    type = FinancialTransactionType.SELF_TRANSFER,
+                    amount = "200",
+                    source = accountA,
+                    dest = accountB,
+                ),
+            ),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountA),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.of("1000.00", Currency.SAR), summary.accountInflow)
+        assertEquals(Money.of("700.00", Currency.SAR), summary.accountOutflow)
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
+            summary.accountRemaining,
+        )
+    }
+
+    @Test
+    fun accountOutflow_includesListedCategories() {
+        val accountId = "account:bank_aljazira:3001"
+        val cardId = "card:bank_aljazira:7271"
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(
+                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId),
+                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "50", source = accountId, dest = cardId),
+                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "30", source = accountId),
+                tx("bill", FinancialTransactionType.BILL_PAYMENT, "40", source = accountId),
+                tx("pos", FinancialTransactionType.EXPENSE, "60", source = accountId),
+                tx("fee", FinancialTransactionType.FEE, "10", source = accountId),
+            ),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountId),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.of("290.00", Currency.SAR), summary.accountOutflow)
     }
 
     @Test

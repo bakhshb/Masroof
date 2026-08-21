@@ -14,8 +14,9 @@ data class OwnedAccountPeriodSummary(
     val summary: CurrentAccountSummary,
 ) {
     val periodNet: SignedMoneyAmount get() = summary.netMovement
-    val totalInflow: Money get() = summary.totalInflow
-    val totalOutflow: Money get() = summary.totalOutflow
+    val accountInflow: Money get() = summary.accountInflow
+    val accountOutflow: Money get() = summary.accountOutflow
+    val accountRemaining: SignedMoneyAmount get() = summary.accountRemaining
 }
 
 object OwnedAccountPeriodSummaryCalculator {
