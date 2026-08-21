@@ -29,9 +29,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.WarningAmber
@@ -79,6 +81,8 @@ object MasroofIcons {
     val warning: ImageVector = Icons.Filled.WarningAmber
     val ownership: ImageVector = Icons.Filled.VerifiedUser
     val settings: ImageVector = Icons.Filled.Settings
+    val customize: ImageVector = Icons.Filled.Tune
+    val savings: ImageVector = Icons.Filled.Savings
     val shopping: ImageVector = Icons.Filled.ShoppingCart
     val export: ImageVector = Icons.Filled.Upload
     val importBackup: ImageVector = Icons.Filled.Download

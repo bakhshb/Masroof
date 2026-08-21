@@ -44,19 +44,36 @@ fun SectionHeader(
     title: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    onViewAll: (() -> Unit)? = null,
+    viewAllLabel: String? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-        )
-        MasroofSectionTitle(title = title)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            MasroofSectionTitle(title = title, modifier = Modifier.fillMaxWidth())
+        }
+        if (onViewAll != null && viewAllLabel != null) {
+            TextButton(onClick = onViewAll) {
+                Text(
+                    viewAllLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
 
