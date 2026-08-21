@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +26,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
@@ -175,13 +180,17 @@ fun CreditCardSummaryTile(
                         label = salaryPeriodLabelText,
                         value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
                         valueColor = spendingColor(row.salaryPeriodSpendingNet),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(creditCardMetricTileHeight),
                     )
                     CreditCardMetricTile(
                         label = statementLabelText,
                         value = formatLocalizedMoney(row.statementSpendingNet),
                         valueColor = spendingColor(row.statementSpendingNet),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(creditCardMetricTileHeight),
                     )
                 }
 
@@ -195,14 +204,18 @@ fun CreditCardSummaryTile(
                             value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
                                 ?: stringResource(R.string.dashboard_value_unavailable),
                             valueColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(creditCardMetricTileHeight),
                         )
                         CreditCardMetricTile(
                             label = stringResource(R.string.dashboard_credit_card_card_due),
                             value = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
                                 ?: stringResource(R.string.dashboard_value_unavailable),
                             valueColor = extended.liability,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(creditCardMetricTileHeight),
                         )
                     }
                 }
@@ -257,6 +270,8 @@ private fun CreditCardBrandBadge(last4: String) {
     }
 }
 
+private val creditCardMetricTileHeight = 76.dp
+
 @Composable
 private fun CreditCardMetricTile(
     label: String,
@@ -266,7 +281,9 @@ private fun CreditCardMetricTile(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight(),
         shape = RoundedCornerShape(12.dp),
         color = extended.miniBackground,
         border = androidx.compose.foundation.BorderStroke(
@@ -274,17 +291,30 @@ private fun CreditCardMetricTile(
             extended.cardBorder,
         ),
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                ),
                 color = valueColor,
-                modifier = Modifier.padding(top = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
