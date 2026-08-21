@@ -458,6 +458,7 @@ class DashboardViewModel(
                             creditCards = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
+                            flowDetailGrouping = null,
                         )
                     }
                 }
