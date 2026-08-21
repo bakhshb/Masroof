@@ -30,6 +30,23 @@ class DashboardSummaryTransactionFilterTest {
     }
 
     @Test
+    fun forAccount_matchesContainerLast4WhenMaskedNumberDiffers() {
+        val txContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val transactions = listOf(
+            preview(id = "1", source = txContainerId, destination = null),
+            preview(id = "2", source = null, destination = txContainerId),
+        )
+
+        val filtered = DashboardSummaryTransactionFilter.forAccount(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            maskedNumber = "****3001",
+        )
+
+        assertEquals(listOf("1", "2"), filtered.map { it.id })
+    }
+
+    @Test
     fun forCard_matchesCardLast4() {
         val transactions = listOf(
             preview(id = "1", cardLast4 = "4821"),

@@ -2,22 +2,12 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.cashPosition
-import com.baraa.masroof.application.dashboard.externalMovement
-import com.baraa.masroof.presentation.common.MasroofCard
-import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.formatCardLast4
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
-import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @Composable
 fun AccountDetailScreen(
@@ -53,69 +43,19 @@ fun AccountDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AccountDetailHeroCard(
-                summary = account.periodSummary,
-            )
             if (summary != null) {
-                DashboardFlowBreakdownCard(summary = summary)
+                CurrentAccountSection(
+                    summary = summary,
+                    accountBadge = formatCardLast4(account.maskedNumber),
+                    presentationMode = AccountFlowPresentationMode.CashPosition,
+                    showSectionHeader = false,
+                )
             }
 
             DashboardSummaryTransactionsSection(
                 transactions = accountTransactions,
                 onOpenTransaction = onOpenTransaction,
                 onViewAll = onViewAllTransactions,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AccountDetailHeroCard(
-    summary: com.baraa.masroof.application.dashboard.CurrentAccountSummary?,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    val position = summary?.cashPosition()
-    val remaining = position?.remaining
-    val periodInflow = position?.inflow
-    val periodOutflow = position?.outflow
-    val remainingColor = when {
-        remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        remaining.amount.signum() > 0 -> extended.inflow
-        remaining.amount.signum() < 0 -> extended.outflow
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-
-    MasroofCard(accent = MasroofCardAccent.Account) {
-        Text(
-            stringResource(R.string.dashboard_account_remaining_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            remaining?.let { formatLocalizedMoney(it) }
-                ?: stringResource(R.string.dashboard_value_unavailable),
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = remainingColor,
-            ),
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        if (periodInflow != null && periodOutflow != null) {
-            Text(
-                stringResource(R.string.dashboard_account_remaining_calculated_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            Text(
-                stringResource(
-                    R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(periodInflow),
-                    formatLocalizedMoney(periodOutflow),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
