@@ -38,6 +38,48 @@ class AccountFlowValueObjectsTest {
     }
 
     @Test
+    fun aggregate_sumsPerAccountSummaries() {
+        val currency = Currency.SAR
+        val accountA = CurrentAccountSummary.of(
+            currency = currency,
+            salary = Money.of("1000", currency),
+            otherIncome = Money.zero(currency),
+            externalTransfersIn = Money.zero(currency),
+            selfTransfersIn = Money.zero(currency),
+            creditCardPayments = Money.zero(currency),
+            billPayments = Money.of("200", currency),
+            externalTransfersOut = Money.zero(currency),
+            cashWithdrawals = Money.zero(currency),
+            posPurchases = Money.zero(currency),
+            fees = Money.zero(currency),
+            selfTransfersOut = Money.of("300", currency),
+        )
+        val accountB = CurrentAccountSummary.of(
+            currency = currency,
+            salary = Money.zero(currency),
+            otherIncome = Money.zero(currency),
+            externalTransfersIn = Money.zero(currency),
+            selfTransfersIn = Money.of("300", currency),
+            selfTransfersOut = Money.zero(currency),
+            creditCardPayments = Money.zero(currency),
+            billPayments = Money.zero(currency),
+            externalTransfersOut = Money.zero(currency),
+            cashWithdrawals = Money.zero(currency),
+            posPurchases = Money.of("50", currency),
+            fees = Money.zero(currency),
+        )
+        val aggregate = CurrentAccountSummary.aggregate(listOf(accountA, accountB))
+        assertEquals(Money.of("1000.00", currency), aggregate.inflow.coreTotal)
+        assertEquals(Money.of("1300.00", currency), aggregate.inflow.total)
+        assertEquals(Money.of("250.00", currency), aggregate.outflow.coreTotal)
+        assertEquals(Money.of("550.00", currency), aggregate.outflow.total)
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("750.00", currency)),
+            aggregate.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+        )
+    }
+
+    @Test
     fun currentAccountSummary_accountRemaining_matchesInflowMinusOutflow() {
         val summary = CurrentAccountSummary.of(
             currency = Currency.SAR,
@@ -57,7 +99,7 @@ class AccountFlowValueObjectsTest {
         assertEquals(summary.outflow.total, summary.accountOutflow)
         assertEquals(
             SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.accountRemaining,
+            summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
         )
     }
 }

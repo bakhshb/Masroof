@@ -38,5 +38,21 @@ data class AccountInflow(
                 externalTransfersIn = Money.zero(currency),
                 selfTransfersIn = Money.zero(currency),
             )
+
+        fun sum(summaries: Collection<AccountInflow>): AccountInflow {
+            if (summaries.isEmpty()) return zero(Currency.SAR)
+            return summaries.reduce { acc, next -> acc + next }
+        }
+    }
+
+    operator fun plus(other: AccountInflow): AccountInflow {
+        require(currency == other.currency) { "Currency mismatch: $currency vs ${other.currency}" }
+        return AccountInflow(
+            currency = currency,
+            salary = salary + other.salary,
+            otherIncome = otherIncome + other.otherIncome,
+            externalTransfersIn = externalTransfersIn + other.externalTransfersIn,
+            selfTransfersIn = selfTransfersIn + other.selfTransfersIn,
+        )
     }
 }

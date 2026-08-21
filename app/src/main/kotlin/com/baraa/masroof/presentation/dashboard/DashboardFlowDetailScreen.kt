@@ -16,7 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
 import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
@@ -47,13 +50,13 @@ fun DashboardFlowDetailScreen(
     val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
-            total = summary.totalOutflow,
+            total = summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET),
             totalColor = extended.outflow,
             totalLabelRes = R.string.dashboard_flow_detail_expense_total,
         )
         DashboardFlowDetailMode.Income -> FlowDetailPresentation(
             titleRes = R.string.dashboard_income_details_title,
-            total = summary.totalInflow,
+            total = summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET),
             totalColor = extended.inflow,
             totalLabelRes = R.string.dashboard_flow_detail_income_total,
         )

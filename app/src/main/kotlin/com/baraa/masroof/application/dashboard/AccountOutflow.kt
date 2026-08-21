@@ -52,5 +52,24 @@ data class AccountOutflow(
                 fees = Money.zero(currency),
                 selfTransfersOut = Money.zero(currency),
             )
+
+        fun sum(summaries: Collection<AccountOutflow>): AccountOutflow {
+            if (summaries.isEmpty()) return zero(Currency.SAR)
+            return summaries.reduce { acc, next -> acc + next }
+        }
+    }
+
+    operator fun plus(other: AccountOutflow): AccountOutflow {
+        require(currency == other.currency) { "Currency mismatch: $currency vs ${other.currency}" }
+        return AccountOutflow(
+            currency = currency,
+            externalTransfersOut = externalTransfersOut + other.externalTransfersOut,
+            creditCardPayments = creditCardPayments + other.creditCardPayments,
+            cashWithdrawals = cashWithdrawals + other.cashWithdrawals,
+            billPayments = billPayments + other.billPayments,
+            posPurchases = posPurchases + other.posPurchases,
+            fees = fees + other.fees,
+            selfTransfersOut = selfTransfersOut + other.selfTransfersOut,
+        )
     }
 }

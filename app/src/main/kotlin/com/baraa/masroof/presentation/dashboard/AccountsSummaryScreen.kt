@@ -29,7 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
+import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
+import com.baraa.masroof.application.dashboard.flowRemaining
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
@@ -149,15 +153,13 @@ fun AccountsSummaryScreen(
 @Composable
 private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
     val extended = MasroofThemeExtras.extendedColors
-    val remainings = accounts.mapNotNull { it.accountRemaining }
-    val totalRemaining = remainings.reduceOrNull { acc, value ->
-        SignedMoneyAmount(
-            acc.amount.add(value.amount),
-            acc.currency,
-        )
-    }
+    val summaries = accounts.mapNotNull { it.periodSummary }
+    val aggregate = CurrentAccountSummary.aggregate(summaries)
+    val totalRemaining = aggregate.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val totalInflow = aggregate.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val totalOutflow = aggregate.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
     val remainingColor = when {
-        totalRemaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        summaries.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
         totalRemaining.amount.signum() > 0 -> extended.inflow
         totalRemaining.amount.signum() < 0 -> extended.outflow
         else -> MaterialTheme.colorScheme.onSurface
@@ -170,8 +172,8 @@ private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            if (remainings.isNotEmpty()) {
-                formatLocalizedMoney(totalRemaining!!)
+            if (summaries.isNotEmpty()) {
+                formatLocalizedMoney(totalRemaining)
             } else {
                 stringResource(R.string.dashboard_value_unavailable)
             },
@@ -181,11 +183,23 @@ private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
             ),
             modifier = Modifier.padding(top = 8.dp),
         )
+        if (summaries.isNotEmpty()) {
+            Text(
+                stringResource(
+                    R.string.dashboard_remaining_formula,
+                    formatLocalizedMoney(totalInflow),
+                    formatLocalizedMoney(totalOutflow),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         Text(
             stringResource(R.string.dashboard_account_remaining_calculated_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
@@ -215,7 +229,10 @@ private fun AccountsSummaryAccountCard(
     onClick: () -> Unit,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = account.accountRemaining
+    val summary = account.periodSummary
+    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow
@@ -258,12 +275,12 @@ private fun AccountsSummaryAccountCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (account.periodInflow != null && account.periodOutflow != null) {
+                if (periodInflow != null && periodOutflow != null) {
                     Text(
                         stringResource(
                             R.string.dashboard_account_period_in_out,
-                            formatLocalizedMoney(account.periodInflow),
-                            formatLocalizedMoney(account.periodOutflow),
+                            formatLocalizedMoney(periodInflow),
+                            formatLocalizedMoney(periodOutflow),
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

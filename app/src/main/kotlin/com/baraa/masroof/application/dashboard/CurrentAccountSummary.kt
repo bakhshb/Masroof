@@ -92,6 +92,9 @@ data class CurrentAccountSummary(
                 inflow = AccountInflow.zero(currency),
                 outflow = AccountOutflow.zero(currency),
             )
+
+        fun aggregate(summaries: Collection<CurrentAccountSummary>): CurrentAccountSummary =
+            AccountFlowAggregator.aggregate(summaries)
     }
 }
 
