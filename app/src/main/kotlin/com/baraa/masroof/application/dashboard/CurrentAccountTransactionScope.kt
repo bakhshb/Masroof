@@ -20,7 +20,7 @@ internal data class CurrentAccountTransactionScope(
         if (ownedContainerIds.isEmpty()) return true
         val sourceId = resolveSourceContainerId(tx, parsedRecordsById, rawSmsById)
         if (sourceId == null) {
-            return tx.type in TRUSTED_OWNED_SOURCE_TYPES
+            return ownedContainerIds.isEmpty() && tx.type in TRUSTED_OWNED_SOURCE_TYPES
         }
         return matchesOwnedContainer(sourceId)
     }
@@ -33,7 +33,7 @@ internal data class CurrentAccountTransactionScope(
         if (ownedContainerIds.isEmpty()) return true
         val destId = resolveDestinationContainerId(tx, parsedRecordsById, rawSmsById)
         if (destId == null) {
-            return tx.type in TRUSTED_OWNED_DESTINATION_TYPES
+            return ownedContainerIds.isEmpty() && tx.type in TRUSTED_OWNED_DESTINATION_TYPES
         }
         return matchesOwnedContainer(destId)
     }

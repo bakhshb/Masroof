@@ -50,6 +50,8 @@ fun CardDetailScreen(
                 row = row,
                 salaryPeriodLabel = salaryPeriodLabel,
                 zoneId = ZoneId.systemDefault(),
+                presentation = CreditCardMetricsPresentation.DetailSpending,
+                showBalanceAndDue = true,
                 modifier = Modifier.fillMaxWidth(),
             )
 

@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
@@ -148,7 +147,7 @@ fun CardsSummaryScreen(
 @Composable
 private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
     val extended = MasroofThemeExtras.extendedColors
-    val aggregateDue = sumFollowedCardDue(overview.cards)
+    val aggregateDue = overview.aggregateDueAmount
     val periodSpending = overview.aggregatePeriodSpendingNet
     val periodSpendingColor = when {
         periodSpending.amount.signum() > 0 -> extended.outflow
@@ -233,12 +232,4 @@ private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOve
     val overview = state.creditCards ?: return null
     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
     return overview.followedOnly(ownedLast4s)
-}
-
-private fun sumFollowedCardDue(
-    cards: List<com.baraa.masroof.application.dashboard.CreditCardDashboardRow>,
-): Money? {
-    val dues = cards.mapNotNull { it.snapshot?.dueAmount }
-    if (dues.isEmpty()) return null
-    return dues.reduce { acc, due -> acc + due }
 }

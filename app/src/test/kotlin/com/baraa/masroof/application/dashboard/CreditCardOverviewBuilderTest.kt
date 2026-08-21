@@ -34,11 +34,13 @@ class CreditCardOverviewBuilderTest {
 
     private val card7271 = CardReference(Bank.BANK_ALJAZIRA, "7271")
     private val card3478 = CardReference(Bank.BANK_ALJAZIRA, "3478")
+    private val card8332 = CardReference(Bank.BANK_ALJAZIRA, "8332")
     private val cardId7271 = FinancialContainerIdFactory.cardId(card7271)!!
     private val cardId3478 = FinancialContainerIdFactory.cardId(card3478)!!
+    private val cardId8332 = FinancialContainerIdFactory.cardId(card8332)!!
 
     @Test
-    fun aggregateDueFromStatement_purchaseDuePerCard() {
+    fun cardDueFromStatementOnly_notPurchaseOutstanding() {
         val purchaseAt = Instant.parse("2026-08-11T17:05:00Z")
         val statementAt = Instant.parse("2026-08-10T09:00:00Z")
         val beforeStatementAt = Instant.parse("2026-08-09T12:00:00Z")
@@ -139,14 +141,66 @@ class CreditCardOverviewBuilderTest {
         assertEquals(SignedMoneyAmount.of(Money.of("75.00", Currency.SAR)), row7271.statementSpendingNet)
         assertEquals(SignedMoneyAmount.of(Money.of("95.00", Currency.SAR)), row7271.calendarMonthSpendingNet)
         assertEquals(SignedMoneyAmount.of(Money.of("95.00", Currency.SAR)), row7271.salaryPeriodSpendingNet)
-        assertEquals(Money.of("3921.11", Currency.SAR), row7271.snapshot?.dueAmount)
+        assertEquals(Money.of("0.00", Currency.SAR), row7271.snapshot?.dueAmount)
 
         val row3478 = overview.cards.first { it.last4 == "3478" }
         assertEquals(SignedMoneyAmount.of(Money.of("50.00", Currency.SAR)), row3478.statementSpendingNet)
         assertEquals(SignedMoneyAmount.of(Money.of("50.00", Currency.SAR)), row3478.calendarMonthSpendingNet)
         assertEquals(SignedMoneyAmount.of(Money.of("50.00", Currency.SAR)), row3478.salaryPeriodSpendingNet)
-        assertEquals(Money.of("500.00", Currency.SAR), row3478.snapshot?.dueAmount)
+        assertNull(row3478.snapshot?.dueAmount)
         assertTrue(overview.hasContent)
+    }
+
+    @Test
+    fun linkedCards_shareAccountOutstandingInPurchaseSms_butDueUsesStatementOnly() {
+        val sharedAccountDue = Money.of("8755.50", Currency.SAR)
+        val purchaseAt = Instant.parse("2026-08-20T19:10:00Z")
+
+        fun purchaseSms(id: String, last4: String) = rawSms(
+            id = id,
+            body = """
+                شراء عبر الانترنت
+                بطاقة ائتمانية: $last4
+                بمبلغ: 85.00 SAR
+                الرصيد المتاح: 10242.76 SAR
+                إجمالي المبلغ المستحق:${sharedAccountDue.amount} SAR
+            """.trimIndent(),
+            at = purchaseAt,
+        )
+
+        val overview = CreditCardOverviewBuilder.build(
+            salaryPeriod = salaryPeriod,
+            cardTransactions = listOf(
+                cardExpense("tx-3478", cardId3478, "85.00", purchaseAt),
+                cardExpense("tx-7271", cardId7271, "85.00", purchaseAt),
+                cardExpense("tx-8332", cardId8332, "85.00", purchaseAt),
+            ),
+            parsedRecords = listOf("3478", "7271", "8332").map { last4 ->
+                val card = CardReference(Bank.BANK_ALJAZIRA, last4)
+                val raw = purchaseSms("sms-$last4", last4)
+                ParsedEventRecord(
+                    parsedEvent("pe-$last4", raw, card, purchaseAt),
+                    ParsedEventDetails(
+                        availableBalance = Money.of("10242.76", Currency.SAR),
+                        outstandingBalance = sharedAccountDue,
+                    ),
+                )
+            },
+            rawSmsById = listOf("3478", "7271", "8332").associate { last4 ->
+                val raw = purchaseSms("sms-$last4", last4)
+                raw.id to raw
+            },
+            zoneId = zone,
+            clock = clock,
+        )
+
+        assertNull(overview.aggregateDueAmount)
+        overview.cards.forEach { row ->
+            assertNull(
+                "Purchase SMS outstanding is account-level and must not appear as per-card due for ${row.last4}",
+                row.snapshot?.dueAmount,
+            )
+        }
     }
 
     @Test

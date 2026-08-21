@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -39,6 +38,11 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+enum class CreditCardMetricsPresentation {
+    SummaryPurchases,
+    DetailSpending,
+}
 
 @Composable
 fun CreditCardsSection(
@@ -58,7 +62,6 @@ fun CreditCardsSection(
         )
 
         LazyRow(
-            modifier = Modifier.height(372.dp),
             contentPadding = PaddingValues(horizontal = 0.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -67,9 +70,8 @@ fun CreditCardsSection(
                     row = row,
                     salaryPeriodLabel = overview.salaryPeriodLabel,
                     zoneId = zoneId,
-                    modifier = Modifier
-                        .width(268.dp)
-                        .fillMaxHeight(),
+                    presentation = CreditCardMetricsPresentation.SummaryPurchases,
+                    modifier = Modifier.width(268.dp),
                 )
             }
         }
@@ -82,101 +84,152 @@ fun CreditCardSummaryTile(
     salaryPeriodLabel: String?,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
+    presentation: CreditCardMetricsPresentation = CreditCardMetricsPresentation.SummaryPurchases,
+    showBalanceAndDue: Boolean = presentation == CreditCardMetricsPresentation.SummaryPurchases,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val locale = LocalConfiguration.current.locales[0]
     val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
-    MasroofCard(modifier = modifier.fillMaxHeight()) {
-        Column(modifier = Modifier.fillMaxHeight()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    val salaryPeriodLabelText = when (presentation) {
+        CreditCardMetricsPresentation.SummaryPurchases -> {
+            if (salaryPeriodLabel != null) {
+                stringResource(R.string.dashboard_credit_card_salary_purchases_total, salaryPeriodLabel)
+            } else {
+                stringResource(R.string.dashboard_credit_card_salary_purchases_total_fallback)
+            }
+        }
+
+        CreditCardMetricsPresentation.DetailSpending -> {
+            if (salaryPeriodLabel != null) {
+                stringResource(R.string.dashboard_credit_card_salary_spending, salaryPeriodLabel)
+            } else {
+                stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
+            }
+        }
+    }
+
+    val statementLabelText = when (presentation) {
+        CreditCardMetricsPresentation.SummaryPurchases -> {
+            if (row.statementPeriodLabel != null) {
+                stringResource(
+                    R.string.dashboard_credit_card_statement_purchases_total,
+                    row.statementPeriodLabel,
+                )
+            } else {
+                stringResource(R.string.dashboard_credit_card_statement_purchases_total_fallback)
+            }
+        }
+
+        CreditCardMetricsPresentation.DetailSpending -> {
+            if (row.statementPeriodLabel != null) {
+                stringResource(
+                    R.string.dashboard_credit_card_statement_spending,
+                    row.statementPeriodLabel,
+                )
+            } else {
+                stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
+            }
+        }
+    }
+
+    MasroofCard(modifier = modifier) {
+        Column(modifier = Modifier.padding(bottom = 4.dp)) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CreditCardBrandBadge(last4 = row.last4)
-                Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CreditCardBrandBadge(last4 = row.last4)
+                    Column {
+                        Text(
+                            stringResource(
+                                R.string.dashboard_credit_card_last4,
+                                formatCardLast4(row.last4),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            stringResource(R.string.dashboard_credit_card_credit_badge),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CreditCardMetricTile(
+                        label = salaryPeriodLabelText,
+                        value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
+                        valueColor = spendingColor(row.salaryPeriodSpendingNet),
+                        modifier = Modifier.weight(1f),
+                    )
+                    CreditCardMetricTile(
+                        label = statementLabelText,
+                        value = formatLocalizedMoney(row.statementSpendingNet),
+                        valueColor = spendingColor(row.statementSpendingNet),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                if (showBalanceAndDue) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CreditCardMetricTile(
+                            label = stringResource(R.string.dashboard_credit_card_current_balance),
+                            value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
+                                ?: stringResource(R.string.dashboard_value_unavailable),
+                            valueColor = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        CreditCardMetricTile(
+                            label = stringResource(R.string.dashboard_credit_card_card_due),
+                            value = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
+                                ?: stringResource(R.string.dashboard_value_unavailable),
+                            valueColor = extended.liability,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                row.snapshot?.updatedAt?.let { at ->
                     Text(
                         stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(row.last4),
+                            R.string.dashboard_credit_card_updated,
+                            formatSnapshotTime(at, zoneId, dateTimeFormatter),
                         ),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        stringResource(R.string.dashboard_credit_card_credit_badge),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
         }
+    }
+}
 
-        Column(
-            modifier = Modifier
-                .padding(top = 12.dp)
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            CreditCardMetricTile(
-                label = if (salaryPeriodLabel != null) {
-                    stringResource(R.string.dashboard_card_salary_remaining, salaryPeriodLabel)
-                } else {
-                    stringResource(R.string.dashboard_card_salary_remaining_fallback)
-                },
-                value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
-                    ?: stringResource(R.string.dashboard_value_unavailable),
-                valueColor = extended.inflow,
-                emphasized = true,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CreditCardMetricTile(
-                    label = if (row.statementPeriodLabel != null) {
-                        stringResource(
-                            R.string.dashboard_credit_card_statement_spending,
-                            row.statementPeriodLabel,
-                        )
-                    } else {
-                        stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
-                    },
-                    value = formatLocalizedMoney(row.statementSpendingNet),
-                    valueColor = extended.outflow,
-                    modifier = Modifier.weight(1f),
-                )
-                CreditCardMetricTile(
-                    label = stringResource(R.string.dashboard_credit_card_current_balance),
-                    value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
-                        ?: stringResource(R.string.dashboard_value_unavailable),
-                    valueColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            CreditCardMetricTile(
-                label = stringResource(R.string.dashboard_credit_card_card_due),
-                value = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
-                    ?: stringResource(R.string.dashboard_value_unavailable),
-                valueColor = extended.liability,
-            )
-            row.snapshot?.updatedAt?.let { at ->
-                Text(
-                    stringResource(
-                        R.string.dashboard_credit_card_updated,
-                        formatSnapshotTime(at, zoneId, dateTimeFormatter),
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        }
+@Composable
+private fun spendingColor(amount: SignedMoneyAmount): androidx.compose.ui.graphics.Color {
+    val extended = MasroofThemeExtras.extendedColors
+    return when {
+        amount.amount.signum() > 0 -> extended.outflow
+        amount.amount.signum() < 0 -> extended.inflow
+        else -> MaterialTheme.colorScheme.onSurface
     }
 }
 
@@ -210,16 +263,15 @@ private fun CreditCardMetricTile(
     value: String,
     valueColor: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = if (emphasized) extended.inflowSoft else extended.miniBackground,
+        color = extended.miniBackground,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (emphasized) extended.inflowRowBorder else extended.cardBorder,
+            extended.cardBorder,
         ),
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -230,8 +282,7 @@ private fun CreditCardMetricTile(
             )
             Text(
                 value,
-                style = (if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium)
-                    .copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = valueColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -247,10 +298,14 @@ private fun formatSnapshotTime(
 
 fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview {
     val filteredCards = cards.filter { it.last4 in ownedLast4s }
+    val statementDue = resolveLatestStatementDue(filteredCards)
     return copy(
         cards = filteredCards,
         aggregatePeriodSpendingNet = sumFollowedSpending(filteredCards) { it.salaryPeriodSpendingNet },
         aggregateStatementSpendingNet = sumFollowedSpending(filteredCards) { it.statementSpendingNet },
+        aggregateDueAmount = statementDue?.amount,
+        aggregateDueUpdatedAt = statementDue?.updatedAt,
+        aggregateDueDate = statementDue?.dueDate,
     )
 }
 
