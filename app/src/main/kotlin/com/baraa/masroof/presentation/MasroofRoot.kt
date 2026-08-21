@@ -128,6 +128,14 @@ fun MasroofRoot(
                 onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
+                onOpenAccountsSettings = {
+                    pendingSettingsDestination = SettingsDestination.MyAccounts
+                    homeDestination = HomeDestination.Settings
+                },
+                onOpenCardsSettings = {
+                    pendingSettingsDestination = SettingsDestination.MyCards
+                    homeDestination = HomeDestination.Settings
+                },
                 onRequestSmsPermission = onRequestPermissions,
                 onOpenAppSettings = onOpenAppSettings,
             )

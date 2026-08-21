@@ -26,6 +26,7 @@ data class DashboardOverview(
     /** All transactions in the selected period, newest first. */
     val transactions: List<FinancialTransaction>,
     val creditCards: CreditCardsOverview,
+    val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
     val isCurrentPeriod: Boolean,
 )
 
@@ -153,6 +154,14 @@ class DashboardService(
             sarEquivalents = cardSarEquivalents,
             displayLocale = displayLocale,
         )
+        val ownedAccountPeriodSummaries = OwnedAccountPeriodSummaryCalculator.summarize(
+            ownedAccounts = ownedAccounts,
+            transactions = syncedTransactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            rawSmsById = rawSmsById,
+        )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(
             period = period,
@@ -161,6 +170,7 @@ class DashboardService(
             spendingSplit = spendingSplit,
             transactions = syncedTransactions,
             creditCards = creditCards,
+            ownedAccountPeriodSummaries = ownedAccountPeriodSummaries,
             isCurrentPeriod = period == current,
         )
     }

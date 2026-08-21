@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -246,23 +248,29 @@ private fun DashboardQuickCard(
     onClick: (() -> Unit)? = null,
 ) {
     Surface(
-        modifier = modifier.then(
-            if (clickable && onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        ),
+        modifier = modifier
+            .heightIn(min = 118.dp)
+            .then(
+                if (clickable && onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+            ),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         shadowElevation = 2.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = contentPadding, vertical = contentPadding + 2.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = contentPadding, vertical = contentPadding + 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (clickable) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                if (clickable) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                         contentDescription = null,
@@ -382,9 +390,15 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
             )
         }
         Text(
-            "—",
+            account.periodNet?.let { formatLocalizedMoney(it) } ?: stringResource(R.string.dashboard_value_unavailable),
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = account.periodNet?.let { net ->
+                when {
+                    net.amount.signum() > 0 -> extended.inflow
+                    net.amount.signum() < 0 -> extended.outflow
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+            } ?: MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

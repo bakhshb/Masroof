@@ -30,6 +30,7 @@ data class OwnedCardUi(
 data class OwnedAccountUi(
     val bank: Bank,
     val maskedNumber: String,
+    val periodNet: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
 )
 
 enum class TransactionDirectionUi {

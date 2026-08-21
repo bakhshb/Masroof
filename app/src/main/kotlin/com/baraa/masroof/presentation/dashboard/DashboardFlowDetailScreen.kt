@@ -2,13 +2,11 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +38,7 @@ fun DashboardFlowDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val (title, totalAmount, totalColor, totalLabelRes) = when (mode) {
+    val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
             total = summary.totalOutflow,
@@ -54,46 +52,41 @@ fun DashboardFlowDetailScreen(
             totalLabelRes = R.string.dashboard_flow_detail_income_total,
         )
     }
-    val formattedTotal = formatLocalizedMoney(totalAmount)
+    val formattedTotal = formatLocalizedMoney(presentation.total)
 
     MasroofSecondaryScaffold(
-        title = stringResource(title),
+        title = stringResource(presentation.titleRes),
         onBack = onBack,
         backContentDescription = stringResource(R.string.dashboard_flow_detail_back),
         modifier = modifier,
     ) { contentModifier ->
         Column(
             modifier = contentModifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.dashboard_flow_detail_period, periodRangeLabel),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth(),
+            FlowDetailHeroCard(
+                periodRangeLabel = periodRangeLabel,
+                totalLabel = stringResource(presentation.totalLabelRes, formattedTotal),
+                totalColor = presentation.totalColor,
             )
 
             MasroofCard {
                 Text(
-                    stringResource(totalLabelRes, formattedTotal),
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = totalColor,
-                    ),
+                    stringResource(R.string.dashboard_flow_detail_breakdown_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                when (mode) {
+                    DashboardFlowDetailMode.Income -> IncomeBreakdown(summary)
+                    DashboardFlowDetailMode.Expense -> ExpenseBreakdown(summary)
+                }
             }
-
-            when (mode) {
-                DashboardFlowDetailMode.Income -> IncomeBreakdown(summary)
-                DashboardFlowDetailMode.Expense -> ExpenseBreakdown(summary)
-            }
-
-            FlowDetailFooter(
-                label = stringResource(totalLabelRes, formattedTotal),
-                amountColor = totalColor,
-            )
         }
     }
 }
@@ -106,8 +99,31 @@ private data class FlowDetailPresentation(
 )
 
 @Composable
+private fun FlowDetailHeroCard(
+    periodRangeLabel: String,
+    totalLabel: String,
+    totalColor: androidx.compose.ui.graphics.Color,
+) {
+    MasroofCard {
+        Text(
+            stringResource(R.string.dashboard_flow_detail_period, periodRangeLabel),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            totalLabel,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = totalColor,
+            ),
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
 private fun IncomeBreakdown(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FlowDetailRow(
             label = stringResource(R.string.dashboard_salary),
             amount = summary.salary,
@@ -130,7 +146,7 @@ private fun IncomeBreakdown(summary: CurrentAccountSummary) {
 
 @Composable
 private fun ExpenseBreakdown(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FlowDetailRow(
             label = stringResource(R.string.dashboard_external_out_short),
             amount = summary.externalTransfersOut,
@@ -183,19 +199,4 @@ private fun FlowDetailRow(
         },
         leadingIcon = TransactionDirectionPresentation.icon(direction),
     )
-}
-
-@Composable
-private fun FlowDetailFooter(
-    label: String,
-    amountColor: androidx.compose.ui.graphics.Color,
-) {
-    Spacer(Modifier.height(4.dp))
-    MasroofCard {
-        Text(
-            label,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            color = amountColor,
-        )
-    }
 }

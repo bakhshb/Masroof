@@ -322,6 +322,7 @@ class DashboardViewModelTest {
                 spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
                 creditCards = emptyCreditCards(),
+                ownedAccountPeriodSummaries = emptyList(),
                 isCurrentPeriod = true,
             ),
         )
@@ -489,6 +490,7 @@ class DashboardViewModelTest {
             spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
             creditCards = emptyCreditCards(),
+            ownedAccountPeriodSummaries = emptyList(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
@@ -754,6 +756,7 @@ class DashboardViewModelTest {
                         salaryPeriodLabel = null,
                         currency = Currency.SAR,
                     ),
+                    ownedAccountPeriodSummaries = emptyList(),
                     isCurrentPeriod = false,
                 )
         }

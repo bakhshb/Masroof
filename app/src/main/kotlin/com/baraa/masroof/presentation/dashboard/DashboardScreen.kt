@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,6 +55,8 @@ fun DashboardRoute(
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenAccountsSettings: () -> Unit = onOpenSettings,
+    onOpenCardsSettings: () -> Unit = onOpenSettings,
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -73,6 +76,8 @@ fun DashboardRoute(
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
+        onOpenAccountsSettings = onOpenAccountsSettings,
+        onOpenCardsSettings = onOpenCardsSettings,
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
@@ -101,6 +106,8 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccountsSettings: () -> Unit,
+    onOpenCardsSettings: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
@@ -123,6 +130,7 @@ private fun DashboardScreen(
     val activeLayout = state.customizeDraft ?: state.dashboardLayout
 
     if (flowDetailMode != null && state.currentAccount != null) {
+        BackHandler { flowDetailMode = null }
         DashboardFlowDetailScreen(
             mode = flowDetailMode!!,
             summary = state.currentAccount,
@@ -234,6 +242,8 @@ private fun DashboardScreen(
                                 onOpenExpenseDetails = { flowDetailMode = DashboardFlowDetailMode.Expense },
                                 onOpenIncomeDetails = { flowDetailMode = DashboardFlowDetailMode.Income },
                                 onOpenSettings = onOpenSettings,
+                                onOpenAccountsSettings = onOpenAccountsSettings,
+                                onOpenCardsSettings = onOpenCardsSettings,
                                 onOpenAllTransactions = onOpenAllTransactions,
                                 onOpenTransaction = onOpenTransaction,
                                 onRescan = onRescan,
@@ -264,6 +274,8 @@ private fun DashboardCustomizableSections(
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccountsSettings: () -> Unit,
+    onOpenCardsSettings: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onRescan: () -> Unit,
@@ -299,7 +311,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
-                        onViewAll = onOpenSettings,
+                        onViewAll = onOpenAccountsSettings,
                     )
                 }
 
@@ -311,7 +323,7 @@ private fun DashboardCustomizableSections(
                             CreditCardsSection(
                                 overview = followedOverview,
                                 zoneId = ZoneId.systemDefault(),
-                                onViewAll = onOpenSettings,
+                                onViewAll = onOpenCardsSettings,
                             )
                         }
                     }

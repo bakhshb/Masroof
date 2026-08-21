@@ -200,6 +200,7 @@
     <string name="dashboard_flow_detail_back">Back</string>
     <string name="dashboard_flow_detail_total">Total</string>
     <string name="dashboard_flow_detail_period">Salary period: %1$s</string>
+    <string name="dashboard_flow_detail_breakdown_title">Breakdown</string>
     <string name="dashboard_flow_detail_expense_total">Total spent: %1$s</string>
     <string name="dashboard_flow_detail_income_total">Total income: %1$s</string>
     <string name="dashboard_card_salary_remaining">Remaining in salary cycle (from %1$s)</string>

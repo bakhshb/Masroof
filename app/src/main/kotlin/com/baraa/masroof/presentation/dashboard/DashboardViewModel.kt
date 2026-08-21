@@ -397,7 +397,10 @@ class DashboardViewModel(
                 val overview = overviewLoader.loadOverview(period)
                 val unknownCards = loadUnknownCards()
                 val ownedCards = loadOwnedCards()
-                val ownedAccounts = loadOwnedAccounts()
+                val ownedAccounts = mergeOwnedAccounts(
+                    registryAccounts = loadOwnedAccounts(),
+                    periodSummaries = overview.ownedAccountPeriodSummaries,
+                )
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -510,6 +513,17 @@ class DashboardViewModel(
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
             .map { OwnedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber) }
             .sortedBy { it.maskedNumber }
+
+    private fun mergeOwnedAccounts(
+        registryAccounts: List<OwnedAccountUi>,
+        periodSummaries: List<com.baraa.masroof.application.dashboard.OwnedAccountPeriodSummary>,
+    ): List<OwnedAccountUi> {
+        val netsByKey = periodSummaries.associateBy { "${it.bank.id}:${it.maskedNumber}" }
+        return registryAccounts.map { account ->
+            val net = netsByKey["${account.bank.id}:${account.maskedNumber}"]?.periodNet
+            account.copy(periodNet = net)
+        }
+    }
 
     private suspend fun loadOwnedCards(): List<OwnedCardUi> =
         cardRegistryRepository.listAll()
