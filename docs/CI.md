@@ -56,13 +56,15 @@ Pushing a `v*` tag still triggers Release (optional; not required for normal flo
 
 ## Release did not publish after merge?
 
-If **Release** shows green but no new APK on [Releases](https://github.com/bakhshb/Masroof/releases):
+If **Release** failed on **Bump version** with `Could not find a free release tag after N bumps`:
 
-1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, `main` was behind the latest tag (common when the version-bump commit could not push to `main`).
-2. Merge the workflow fix or run **Actions → Release → Run workflow** manually after syncing `app/build.gradle.kts` to the latest published version.
-3. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
+- `main` was still on an old `appVersionName` while many tags already exist on [Releases](https://github.com/bakhshb/Masroof/releases) (common when the `chore: bump version` commit could not push to protected `main`).
+- Fix: merge a PR that syncs `app/build.gradle.kts` to the next free version, or run **Actions → Release → Run workflow** after that sync.
 
-Every successful Release should produce a **new** tag (e.g. `v0.2.4`). If the tag already exists, the job skips the build by design.
+If **Release** shows green but no new APK:
+
+1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, the resolved tag was already published.
+2. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
 
 ## PR debug APK
 
