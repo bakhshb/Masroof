@@ -27,6 +27,7 @@ data class DashboardOverview(
     val transactions: List<FinancialTransaction>,
     val creditCards: CreditCardsOverview,
     val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
+    val flowDetailGrouping: CurrentAccountFlowDetailGrouping,
     val isCurrentPeriod: Boolean,
 )
 
@@ -162,6 +163,15 @@ class DashboardService(
             sarEquivalents = sarEquivalents,
             rawSmsById = rawSmsById,
         )
+        val flowDetailGrouping = CurrentAccountFlowDetailGrouper.group(
+            transactions = syncedTransactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            ownedAccountContainerIds = ownedAccountContainerIds,
+            ownedAccountLast4s = ownedAccountLast4s,
+            rawSmsById = rawSmsById,
+        )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(
             period = period,
@@ -171,6 +181,7 @@ class DashboardService(
             transactions = syncedTransactions,
             creditCards = creditCards,
             ownedAccountPeriodSummaries = ownedAccountPeriodSummaries,
+            flowDetailGrouping = flowDetailGrouping,
             isCurrentPeriod = period == current,
         )
     }

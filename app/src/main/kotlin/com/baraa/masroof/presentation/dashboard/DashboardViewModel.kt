@@ -389,6 +389,7 @@ class DashboardViewModel(
                         creditCards = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
+                        flowDetailGrouping = null,
                     )
                 }
             }
@@ -419,6 +420,7 @@ class DashboardViewModel(
                         creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
+                        flowDetailGrouping = overview.flowDetailGrouping,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,

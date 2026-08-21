@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
+import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.presentation.common.IconTextButton
@@ -135,7 +136,10 @@ private fun DashboardScreen(
             mode = flowDetailMode!!,
             summary = state.currentAccount,
             periodRangeLabel = periodRangeLabel,
+            transactions = state.allTransactions,
+            grouping = state.flowDetailGrouping ?: CurrentAccountFlowDetailGrouping.empty(),
             onBack = { flowDetailMode = null },
+            onOpenTransaction = onOpenTransaction,
         )
         return
     }
