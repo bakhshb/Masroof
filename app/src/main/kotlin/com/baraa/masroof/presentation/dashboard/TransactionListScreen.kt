@@ -11,10 +11,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
@@ -27,7 +26,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.ShareActionIcon
 
@@ -38,20 +36,40 @@ fun TransactionListScreen(
     transactions: List<TransactionPreviewUi>,
     onBack: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    seedFilter: TransactionListFilterState? = null,
+    onSeedFilterApplied: () -> Unit = {},
+    openGeneration: Int = 0,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
     var selectedCardLast4s by rememberSaveable { mutableStateOf(listOf<String>()) }
-    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
+    var selectedAccountContainerIds by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var filtersSheetOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    val filterState = remember(searchQuery, selectedTypeNames, selectedCardLast4s) {
+    LaunchedEffect(openGeneration) {
+        val filter = seedFilter ?: TransactionListFilterState()
+        searchQuery = filter.searchQuery
+        selectedTypeNames = filter.types.map { it.name }
+        selectedCardLast4s = filter.cardLast4s.toList()
+        selectedAccountContainerIds = filter.accountContainerIds.toList()
+        filtersSheetOpen = false
+        onSeedFilterApplied()
+    }
+
+    val filterState = remember(
+        searchQuery,
+        selectedTypeNames,
+        selectedCardLast4s,
+        selectedAccountContainerIds,
+    ) {
         TransactionListFilterState(
             searchQuery = searchQuery,
             types = selectedTypeNames.mapNotNull { name ->
                 runCatching { FinancialTransactionType.valueOf(name) }.getOrNull()
             }.toSet(),
             cardLast4s = selectedCardLast4s.toSet(),
+            accountContainerIds = selectedAccountContainerIds.toSet(),
         )
     }
 
@@ -64,6 +82,9 @@ fun TransactionListScreen(
     val availableCards = remember(transactions) {
         TransactionListFilterEngine.availableCardLast4s(transactions)
     }
+    val availableAccounts = remember(transactions) {
+        TransactionListFilterEngine.availableAccountContainerIds(transactions)
+    }
     val activeFilterCount = filterState.activeFilterCount()
     val context = LocalContext.current
     val shareChooserTitle = stringResource(R.string.transaction_share)
@@ -75,6 +96,14 @@ fun TransactionListScreen(
         totalAmount = filterResult.totalAmount,
     )
     val canShare = filterResult.transactions.isNotEmpty()
+
+    val clearFilters = {
+        searchQuery = ""
+        selectedTypeNames = emptyList()
+        selectedCardLast4s = emptyList()
+        selectedAccountContainerIds = emptyList()
+        filtersSheetOpen = false
+    }
 
     MasroofSecondaryScaffold(
         title = stringResource(R.string.transaction_list_title),
@@ -115,34 +144,9 @@ fun TransactionListScreen(
                 periodLabel = periodLabel,
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
-                filtersExpanded = filtersExpanded,
-                onToggleFiltersExpanded = { filtersExpanded = !filtersExpanded },
+                onOpenFilters = { filtersSheetOpen = true },
                 activeFilterCount = activeFilterCount,
-                filterState = filterState,
-                availableTypes = availableTypes,
-                availableCards = availableCards,
-                onTypeToggle = { type ->
-                    selectedTypeNames = if (type.name in selectedTypeNames) {
-                        selectedTypeNames - type.name
-                    } else {
-                        selectedTypeNames + type.name
-                    }
-                },
-                onClearTypes = { selectedTypeNames = emptyList() },
-                onCardToggle = { last4 ->
-                    selectedCardLast4s = if (last4 in selectedCardLast4s) {
-                        selectedCardLast4s - last4
-                    } else {
-                        selectedCardLast4s + last4
-                    }
-                },
-                onClearCards = { selectedCardLast4s = emptyList() },
-                onClearFilters = {
-                    searchQuery = ""
-                    selectedTypeNames = emptyList()
-                    selectedCardLast4s = emptyList()
-                    filtersExpanded = false
-                },
+                onClearFilters = clearFilters,
                 filteredCount = filterResult.transactions.size,
                 totalCount = transactions.size,
                 totalAmount = filterResult.totalAmount,
@@ -179,5 +183,39 @@ fun TransactionListScreen(
                 item { Spacer(Modifier.height(16.dp)) }
             }
         }
+
+        TransactionListFilterBottomSheet(
+            visible = filtersSheetOpen,
+            onDismiss = { filtersSheetOpen = false },
+            filterState = filterState,
+            availableTypes = availableTypes,
+            availableCards = availableCards,
+            availableAccounts = availableAccounts,
+            onTypeToggle = { type ->
+                selectedTypeNames = if (type.name in selectedTypeNames) {
+                    selectedTypeNames - type.name
+                } else {
+                    selectedTypeNames + type.name
+                }
+            },
+            onClearTypes = { selectedTypeNames = emptyList() },
+            onCardToggle = { last4 ->
+                selectedCardLast4s = if (last4 in selectedCardLast4s) {
+                    selectedCardLast4s - last4
+                } else {
+                    selectedCardLast4s + last4
+                }
+            },
+            onClearCards = { selectedCardLast4s = emptyList() },
+            onAccountToggle = { containerId ->
+                selectedAccountContainerIds = if (containerId in selectedAccountContainerIds) {
+                    selectedAccountContainerIds - containerId
+                } else {
+                    selectedAccountContainerIds + containerId
+                }
+            },
+            onClearAccounts = { selectedAccountContainerIds = emptyList() },
+            onClearFilters = clearFilters,
+        )
     }
 }

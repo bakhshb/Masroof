@@ -187,6 +187,37 @@ class TransactionListFilterEngineTest {
         )
     }
 
+    @Test
+    fun accountFilter_limitsResults() {
+        val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "1234567890123001",
+        )
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "100", sourceAccountId = accountId),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "50"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(accountContainerIds = setOf(accountId)),
+        )
+        assertEquals(1, result.transactions.size)
+        assertEquals(Money.of("100.00", Currency.SAR), result.totalAmount)
+    }
+
+    @Test
+    fun availableAccountContainerIds_listsDistinctSorted() {
+        val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "1", sourceAccountId = accountId),
+            preview(type = FinancialTransactionType.INCOME, amount = "2", destinationAccountId = accountId),
+        )
+        assertEquals(listOf(accountId), TransactionListFilterEngine.availableAccountContainerIds(txs))
+    }
+
     private fun preview(
         type: FinancialTransactionType,
         amount: String,
@@ -194,6 +225,8 @@ class TransactionListFilterEngineTest {
         counterparty: String? = null,
         card: String? = null,
         currency: Currency = Currency.SAR,
+        sourceAccountId: String? = null,
+        destinationAccountId: String? = null,
     ): TransactionPreviewUi {
         val money = Money.of(amount, currency)
         val title = merchant ?: counterparty
@@ -209,6 +242,8 @@ class TransactionListFilterEngineTest {
             typeLabelResHint = type,
             direction = TransactionTypePresentation.direction(type),
             cardLast4 = card,
+            sourceContainerId = sourceAccountId,
+            destinationContainerId = destinationAccountId,
             searchText = searchText,
         )
     }

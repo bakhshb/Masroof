@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,6 +58,7 @@ fun CreditCardsSection(
         )
 
         LazyRow(
+            modifier = Modifier.height(372.dp),
             contentPadding = PaddingValues(horizontal = 0.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -64,7 +67,9 @@ fun CreditCardsSection(
                     row = row,
                     salaryPeriodLabel = overview.salaryPeriodLabel,
                     zoneId = zoneId,
-                    modifier = Modifier.width(268.dp),
+                    modifier = Modifier
+                        .width(268.dp)
+                        .fillMaxHeight(),
                 )
             }
         }
@@ -72,7 +77,7 @@ fun CreditCardsSection(
 }
 
 @Composable
-private fun CreditCardSummaryTile(
+fun CreditCardSummaryTile(
     row: CreditCardDashboardRow,
     salaryPeriodLabel: String?,
     zoneId: ZoneId,
@@ -82,7 +87,8 @@ private fun CreditCardSummaryTile(
     val locale = LocalConfiguration.current.locales[0]
     val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
-    MasroofCard(modifier = modifier) {
+    MasroofCard(modifier = modifier.fillMaxHeight()) {
+        Column(modifier = Modifier.fillMaxHeight()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -112,7 +118,9 @@ private fun CreditCardSummaryTile(
         }
 
         Column(
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier
+                .padding(top = 12.dp)
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             CreditCardMetricTile(
@@ -167,6 +175,7 @@ private fun CreditCardSummaryTile(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
         }
     }
 }

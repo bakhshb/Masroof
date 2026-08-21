@@ -8,6 +8,7 @@ import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesReposit
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
@@ -322,6 +323,8 @@ class DashboardViewModelTest {
                 spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
                 creditCards = emptyCreditCards(),
+                ownedAccountPeriodSummaries = emptyList(),
+                flowDetailGrouping = CurrentAccountFlowDetailGrouping.empty(),
                 isCurrentPeriod = true,
             ),
         )
@@ -489,6 +492,8 @@ class DashboardViewModelTest {
             spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
             creditCards = emptyCreditCards(),
+            ownedAccountPeriodSummaries = emptyList(),
+            flowDetailGrouping = CurrentAccountFlowDetailGrouping.empty(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
@@ -754,6 +759,8 @@ class DashboardViewModelTest {
                         salaryPeriodLabel = null,
                         currency = Currency.SAR,
                     ),
+                    ownedAccountPeriodSummaries = emptyList(),
+                    flowDetailGrouping = CurrentAccountFlowDetailGrouping.empty(),
                     isCurrentPeriod = false,
                 )
         }

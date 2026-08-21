@@ -15,10 +15,13 @@ import androidx.compose.ui.Modifier
 import com.baraa.masroof.application.notification.NotificationAction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
+import com.baraa.masroof.presentation.dashboard.AccountsSummaryRoute
+import com.baraa.masroof.presentation.dashboard.CardsSummaryRoute
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
 import com.baraa.masroof.presentation.dashboard.TransactionDetailScreen
+import com.baraa.masroof.presentation.dashboard.TransactionListFilterState
 import com.baraa.masroof.presentation.dashboard.TransactionListScreen
 import com.baraa.masroof.presentation.notification.NotificationCenterRoute
 import com.baraa.masroof.presentation.notification.NotificationCenterViewModel
@@ -34,6 +37,8 @@ import com.baraa.masroof.presentation.settings.SettingsViewModel
 
 private enum class HomeDestination {
     Dashboard,
+    AccountsSummary,
+    CardsSummary,
     NotificationCenter,
     Review,
     AllTransactions,
@@ -64,6 +69,21 @@ fun MasroofRoot(
     val notificationState by notificationCenterViewModel.uiState.collectAsState()
     var homeDestination by rememberSaveable { mutableStateOf(HomeDestination.Dashboard) }
     var pendingSettingsDestination by remember { mutableStateOf<SettingsDestination?>(null) }
+    var transactionListSeedFilter by remember { mutableStateOf<TransactionListFilterState?>(null) }
+    var transactionListReturnDestination by rememberSaveable {
+        mutableStateOf(HomeDestination.Dashboard)
+    }
+    var transactionListOpenGeneration by remember { mutableStateOf(0) }
+
+    fun openTransactionList(
+        filter: TransactionListFilterState? = null,
+        returnTo: HomeDestination = HomeDestination.Dashboard,
+    ) {
+        transactionListSeedFilter = filter
+        transactionListReturnDestination = returnTo
+        transactionListOpenGeneration++
+        homeDestination = HomeDestination.AllTransactions
+    }
 
     val notificationExternalState = notificationCenterExternalState(
         dashboardState = dashboardState,
@@ -81,6 +101,12 @@ fun MasroofRoot(
                     dashboardViewModel.closeTransactionDetail()
 
                 homeDestination == HomeDestination.AllTransactions ->
+                    homeDestination = transactionListReturnDestination
+
+                homeDestination == HomeDestination.AccountsSummary ->
+                    homeDestination = HomeDestination.Dashboard
+
+                homeDestination == HomeDestination.CardsSummary ->
                     homeDestination = HomeDestination.Dashboard
 
                 homeDestination == HomeDestination.NotificationCenter ->
@@ -125,11 +151,43 @@ fun MasroofRoot(
                 viewModel = dashboardViewModel,
                 notificationUnreadCount = notificationState.unreadCount,
                 onOpenNotificationCenter = { homeDestination = HomeDestination.NotificationCenter },
-                onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
+                onOpenAllTransactions = { openTransactionList() },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
+                onOpenAccountsSummary = { homeDestination = HomeDestination.AccountsSummary },
+                onOpenCardsSummary = { homeDestination = HomeDestination.CardsSummary },
                 onRequestSmsPermission = onRequestPermissions,
                 onOpenAppSettings = onOpenAppSettings,
+            )
+            HomeDestination.AccountsSummary -> AccountsSummaryRoute(
+                viewModel = dashboardViewModel,
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onManageAccounts = {
+                    pendingSettingsDestination = SettingsDestination.MyAccounts
+                    homeDestination = HomeDestination.Settings
+                },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                onOpenAllTransactions = { filter ->
+                    openTransactionList(
+                        filter = filter,
+                        returnTo = HomeDestination.AccountsSummary,
+                    )
+                },
+            )
+            HomeDestination.CardsSummary -> CardsSummaryRoute(
+                viewModel = dashboardViewModel,
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onManageCards = {
+                    pendingSettingsDestination = SettingsDestination.MyCards
+                    homeDestination = HomeDestination.Settings
+                },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                onOpenAllTransactions = { filter ->
+                    openTransactionList(
+                        filter = filter,
+                        returnTo = HomeDestination.CardsSummary,
+                    )
+                },
             )
             HomeDestination.NotificationCenter -> NotificationCenterRoute(
                 viewModel = notificationCenterViewModel,
@@ -161,8 +219,11 @@ fun MasroofRoot(
                     TransactionListScreen(
                         periodLabel = dashboardState.periodLabel,
                         transactions = dashboardState.allTransactions,
-                        onBack = { homeDestination = HomeDestination.Dashboard },
+                        onBack = { homeDestination = transactionListReturnDestination },
                         onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                        seedFilter = transactionListSeedFilter,
+                        onSeedFilterApplied = { transactionListSeedFilter = null },
+                        openGeneration = transactionListOpenGeneration,
                     )
                     showTransactionDetail(
                         dashboardState = dashboardState,

@@ -1,18 +1,11 @@
 package com.baraa.masroof.presentation.dashboard
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -23,8 +16,6 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +33,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,16 +41,8 @@ fun TransactionListToolbar(
     periodLabel: String,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    filtersExpanded: Boolean,
-    onToggleFiltersExpanded: () -> Unit,
+    onOpenFilters: () -> Unit,
     activeFilterCount: Int,
-    filterState: TransactionListFilterState,
-    availableTypes: List<FinancialTransactionType>,
-    availableCards: List<String>,
-    onTypeToggle: (FinancialTransactionType) -> Unit,
-    onClearTypes: () -> Unit,
-    onCardToggle: (String) -> Unit,
-    onClearCards: () -> Unit,
     onClearFilters: () -> Unit,
     filteredCount: Int,
     totalCount: Int,
@@ -130,7 +112,7 @@ fun TransactionListToolbar(
                 },
             ) {
                 AssistChip(
-                    onClick = onToggleFiltersExpanded,
+                    onClick = onOpenFilters,
                     label = { Text(stringResource(R.string.transaction_list_filters_toggle)) },
                     leadingIcon = {
                         Icon(
@@ -140,7 +122,7 @@ fun TransactionListToolbar(
                         )
                     },
                     colors = AssistChipDefaults.assistChipColors(
-                        containerColor = if (filtersExpanded || activeFilterCount > 0) {
+                        containerColor = if (activeFilterCount > 0) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerHigh
@@ -156,124 +138,12 @@ fun TransactionListToolbar(
             }
         }
 
-        AnimatedVisibility(
-            visible = filtersExpanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            TransactionListFilterSheet(
-                filterState = filterState,
-                availableTypes = availableTypes,
-                availableCards = availableCards,
-                onTypeToggle = onTypeToggle,
-                onClearTypes = onClearTypes,
-                onCardToggle = onCardToggle,
-                onClearCards = onClearCards,
-            )
-        }
-
         TransactionListResultsBanner(
             filteredCount = filteredCount,
             totalCount = totalCount,
             totalAmount = totalAmount,
             filterActive = filterActive,
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TransactionListFilterSheet(
-    filterState: TransactionListFilterState,
-    availableTypes: List<FinancialTransactionType>,
-    availableCards: List<String>,
-    onTypeToggle: (FinancialTransactionType) -> Unit,
-    onClearTypes: () -> Unit,
-    onCardToggle: (String) -> Unit,
-    onClearCards: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.transaction_list_multi_filter_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (availableTypes.isNotEmpty()) {
-                FilterChipSection(
-                    title = stringResource(R.string.transaction_list_filter_type_section),
-                ) {
-                    FilterChip(
-                        selected = filterState.types.isEmpty(),
-                        onClick = onClearTypes,
-                        label = { Text(stringResource(R.string.transaction_list_filter_all_types)) },
-                        colors = filterChipColors(),
-                    )
-                    availableTypes.forEach { type ->
-                        FilterChip(
-                            selected = type in filterState.types,
-                            onClick = { onTypeToggle(type) },
-                            label = { Text(transactionTypeLabel(type)) },
-                            colors = filterChipColors(),
-                        )
-                    }
-                }
-            }
-
-            if (availableCards.isNotEmpty()) {
-                FilterChipSection(
-                    title = stringResource(R.string.transaction_list_filter_card_section),
-                ) {
-                    FilterChip(
-                        selected = filterState.cardLast4s.isEmpty(),
-                        onClick = onClearCards,
-                        label = { Text(stringResource(R.string.transaction_list_filter_all_cards)) },
-                        colors = filterChipColors(),
-                    )
-                    availableCards.forEach { last4 ->
-                        FilterChip(
-                            selected = last4 in filterState.cardLast4s,
-                            onClick = { onCardToggle(last4) },
-                            label = {
-                                Text(stringResource(R.string.dashboard_credit_card_last4, last4))
-                            },
-                            colors = filterChipColors(),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterChipSection(
-    title: String,
-    chips: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            chips()
-        }
     }
 }
 
@@ -321,15 +191,8 @@ private fun TransactionListResultsBanner(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun filterChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-)
-
 fun TransactionListFilterState.activeFilterCount(): Int {
-    var count = types.size + cardLast4s.size
+    var count = types.size + cardLast4s.size + accountContainerIds.size
     if (searchQuery.isNotBlank()) count++
     return count
 }

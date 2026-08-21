@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
+import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.presentation.common.IconTextButton
@@ -54,6 +56,8 @@ fun DashboardRoute(
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenAccountsSummary: () -> Unit = onOpenSettings,
+    onOpenCardsSummary: () -> Unit = onOpenSettings,
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -73,6 +77,8 @@ fun DashboardRoute(
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
+        onOpenAccountsSummary = onOpenAccountsSummary,
+        onOpenCardsSummary = onOpenCardsSummary,
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
@@ -101,6 +107,8 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccountsSummary: () -> Unit,
+    onOpenCardsSummary: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
@@ -123,11 +131,15 @@ private fun DashboardScreen(
     val activeLayout = state.customizeDraft ?: state.dashboardLayout
 
     if (flowDetailMode != null && state.currentAccount != null) {
+        BackHandler { flowDetailMode = null }
         DashboardFlowDetailScreen(
             mode = flowDetailMode!!,
             summary = state.currentAccount,
             periodRangeLabel = periodRangeLabel,
+            transactions = state.allTransactions,
+            grouping = state.flowDetailGrouping ?: CurrentAccountFlowDetailGrouping.empty(),
             onBack = { flowDetailMode = null },
+            onOpenTransaction = onOpenTransaction,
         )
         return
     }
@@ -234,6 +246,8 @@ private fun DashboardScreen(
                                 onOpenExpenseDetails = { flowDetailMode = DashboardFlowDetailMode.Expense },
                                 onOpenIncomeDetails = { flowDetailMode = DashboardFlowDetailMode.Income },
                                 onOpenSettings = onOpenSettings,
+                                onOpenAccountsSummary = onOpenAccountsSummary,
+                                onOpenCardsSummary = onOpenCardsSummary,
                                 onOpenAllTransactions = onOpenAllTransactions,
                                 onOpenTransaction = onOpenTransaction,
                                 onRescan = onRescan,
@@ -264,6 +278,8 @@ private fun DashboardCustomizableSections(
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccountsSummary: () -> Unit,
+    onOpenCardsSummary: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onRescan: () -> Unit,
@@ -299,7 +315,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
-                        onViewAll = onOpenSettings,
+                        onViewAll = onOpenAccountsSummary,
                     )
                 }
 
@@ -311,7 +327,7 @@ private fun DashboardCustomizableSections(
                             CreditCardsSection(
                                 overview = followedOverview,
                                 zoneId = ZoneId.systemDefault(),
-                                onViewAll = onOpenSettings,
+                                onViewAll = onOpenCardsSummary,
                             )
                         }
                     }

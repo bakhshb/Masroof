@@ -389,6 +389,7 @@ class DashboardViewModel(
                         creditCards = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
+                        flowDetailGrouping = null,
                     )
                 }
             }
@@ -397,7 +398,10 @@ class DashboardViewModel(
                 val overview = overviewLoader.loadOverview(period)
                 val unknownCards = loadUnknownCards()
                 val ownedCards = loadOwnedCards()
-                val ownedAccounts = loadOwnedAccounts()
+                val ownedAccounts = mergeOwnedAccounts(
+                    registryAccounts = loadOwnedAccounts(),
+                    periodSummaries = overview.ownedAccountPeriodSummaries,
+                )
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -416,6 +420,7 @@ class DashboardViewModel(
                         creditCards = overview.creditCards,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
+                        flowDetailGrouping = overview.flowDetailGrouping,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,
@@ -453,6 +458,7 @@ class DashboardViewModel(
                             creditCards = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
+                            flowDetailGrouping = null,
                         )
                     }
                 }
@@ -492,6 +498,8 @@ class DashboardViewModel(
                 sourceContainerId = tx.sourceContainerId,
                 destinationContainerId = tx.destinationContainerId,
             ),
+            sourceContainerId = tx.sourceContainerId,
+            destinationContainerId = tx.destinationContainerId,
             searchText = searchText,
             sarEquivalent = sarEquivalent,
             appliedExchangeRate = tx.appliedExchangeRate,
@@ -510,6 +518,22 @@ class DashboardViewModel(
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
             .map { OwnedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber) }
             .sortedBy { it.maskedNumber }
+
+    private fun mergeOwnedAccounts(
+        registryAccounts: List<OwnedAccountUi>,
+        periodSummaries: List<com.baraa.masroof.application.dashboard.OwnedAccountPeriodSummary>,
+    ): List<OwnedAccountUi> {
+        val netsByKey = periodSummaries.associateBy { "${it.bank.id}:${it.maskedNumber}" }
+        return registryAccounts.map { account ->
+            val summary = netsByKey["${account.bank.id}:${account.maskedNumber}"]
+            account.copy(
+                periodNet = summary?.periodNet,
+                periodInflow = summary?.totalInflow,
+                periodOutflow = summary?.totalOutflow,
+                periodSummary = summary?.summary,
+            )
+        }
+    }
 
     private suspend fun loadOwnedCards(): List<OwnedCardUi> =
         cardRegistryRepository.listAll()

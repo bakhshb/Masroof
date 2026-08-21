@@ -30,6 +30,10 @@ data class OwnedCardUi(
 data class OwnedAccountUi(
     val bank: Bank,
     val maskedNumber: String,
+    val periodNet: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
+    val periodInflow: com.baraa.masroof.core.money.Money? = null,
+    val periodOutflow: com.baraa.masroof.core.money.Money? = null,
+    val periodSummary: CurrentAccountSummary? = null,
 )
 
 enum class TransactionDirectionUi {
@@ -57,6 +61,8 @@ data class TransactionPreviewUi(
     val typeLabelResHint: FinancialTransactionType,
     val direction: TransactionDirectionUi,
     val cardLast4: String?,
+    val sourceContainerId: String? = null,
+    val destinationContainerId: String? = null,
     /** Lowercase merchant/counterparty text for in-memory search. */
     val searchText: String,
     val sarEquivalent: Money? = null,
@@ -89,6 +95,7 @@ data class DashboardUiState(
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),
+    val flowDetailGrouping: com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping? = null,
     val smsPermissionGranted: Boolean = true,
     val dashboardLayout: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
     val customizeSheetOpen: Boolean = false,
