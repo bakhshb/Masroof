@@ -199,14 +199,39 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       margin-bottom: 12px;
       box-shadow: var(--shadow-sm);
     }
+
+    .period-nav-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .period-arrow {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border);
+      background: #fafafa;
+      border-radius: 10px;
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .period-arrow:hover { background: var(--primary-soft); border-color: #99f6e4; }
+    .period-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
 
     .period-info {
       display: flex;
@@ -214,6 +239,7 @@
       gap: 8px;
       flex: 1;
       min-width: 0;
+      justify-content: center;
     }
 
     .period-info svg { flex-shrink: 0; color: var(--primary); }
@@ -851,6 +877,106 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    .detail-sheet {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      transform: translateX(100%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: 35;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-sheet.open { transform: translateX(0); }
+
+    .detail-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .detail-back {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      background: #fafafa;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+
+    .detail-header h3 {
+      font-size: 0.95rem;
+      flex: 1;
+    }
+
+    .detail-header .total {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .detail-header .total.out { color: var(--out); }
+    .detail-header .total.in { color: var(--in); }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px 20px;
+    }
+
+    .detail-period {
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .detail-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .detail-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .detail-stat .label { font-size: 0.72rem; color: var(--muted); }
+    .detail-stat .value { font-size: 0.95rem; font-weight: 700; margin-top: 4px; }
+
+    .detail-list-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+
+    .detail-row .name { font-weight: 600; }
+    .detail-row .sub { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .detail-row .amount { font-weight: 700; white-space: nowrap; }
+    .detail-row .amount.out { color: var(--out); }
+    .detail-row .amount.in { color: var(--in); }
+
     .side-notes {
       max-width: 360px;
       background: var(--surface);
@@ -914,12 +1040,16 @@
           <div class="scroll-area" id="dashboard">
             <!-- Period bar -->
             <div class="period-bar">
-              <div class="period-info">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <div>
-                  <div class="period-label">فترة الراتب</div>
-                  <div class="period-value">27 يوليو — 26 أغسطس</div>
+              <div class="period-nav-group">
+                <button type="button" class="period-arrow" id="periodPrev" aria-label="الفترة السابقة">›</button>
+                <div class="period-info">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <div>
+                    <div class="period-label">فترة الراتب</div>
+                    <div class="period-value" id="periodValue">27 يوليو — 26 أغسطس</div>
+                  </div>
                 </div>
+                <button type="button" class="period-arrow" id="periodNext" aria-label="الفترة التالية">‹</button>
               </div>
               <button type="button" class="customize-btn" id="customizeBtn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
@@ -1184,6 +1314,15 @@
           </div>
 
           <div class="toast" id="toast">تم حفظ التخصيص</div>
+
+          <div class="detail-sheet" id="detailSheet">
+            <div class="detail-header">
+              <button type="button" class="detail-back" id="detailBack" aria-label="رجوع">›</button>
+              <h3 id="detailTitle">تفاصيل</h3>
+              <span class="total" id="detailTotal">0</span>
+            </div>
+            <div class="detail-body" id="detailBody"></div>
+          </div>
         </div>
       </div>
 
@@ -1191,7 +1330,8 @@
         <h2>ملاحظات النموذج</h2>
         <ul>
           <li>الترتيب: شريط علوي → فترة الراتب → المتبقي → ملخص سريع → حسابات → بطاقات → عمليات.</li>
-          <li>بطاقتا المصروف والوارد قابلة للضغط (تظهر رسالة تجريبية).</li>
+          <li>فترة الراتب: أسهم للفترة السابقة/التالية + زر تخصيص.</li>
+          <li>بطاقتا المصروف والوارد قابلة للضغط وتفتح شاشة تفاصيل داخل النموذج.</li>
           <li>ملخص البطاقات يبرز: المتبقي (أخضر) → مصروف الكشف (أحمر) → الرصيد → المستحق.</li>
           <li>زر «تخصيص» يفتح Bottom Sheet: إظهار/إخفاء، حجم، وسحب لإعادة الترتيب.</li>
           <li>لا يوجد قسم «حركة الأموال» مستقل في هذه النسخة.</li>
@@ -1201,6 +1341,47 @@
   </div>
 
   <script>
+    const PERIODS = [
+      { label: "27 يونيو — 26 يوليو", remaining: "8,120", income: "72,400", expense: "64,280", days: "31 يوم" },
+      { label: "27 يوليو — 26 أغسطس", remaining: "5,673", income: "79,283", expense: "73,610", days: "12 يوم متبقية من أصل 31" },
+      { label: "27 أغسطس — 26 سبتمبر", remaining: "—", income: "—", expense: "—", days: "لم تبدأ بعد" }
+    ];
+
+    const DETAIL_DATA = {
+      expenses: {
+        title: "تفاصيل المنصرف",
+        total: "73,610 ر.س",
+        tone: "out",
+        stats: [
+          { label: "عدد العمليات", value: "142" },
+          { label: "متوسط يومي", value: "2,374" }
+        ],
+        rows: [
+          { name: "مطاعم ومقاهي", sub: "38 عملية", amount: "−12,480", tone: "out" },
+          { name: "تسوق", sub: "24 عملية", amount: "−9,320", tone: "out" },
+          { name: "فواتير", sub: "6 عمليات", amount: "−4,850", tone: "out" },
+          { name: "تسديد بطاقة", sub: "2 عمليات", amount: "−3,200", tone: "out" },
+          { name: "تحويلات خارجية", sub: "5 عمليات", amount: "−1,760", tone: "out" }
+        ]
+      },
+      income: {
+        title: "تفاصيل الوارد",
+        total: "79,283 ر.س",
+        tone: "in",
+        stats: [
+          { label: "عدد العمليات", value: "18" },
+          { label: "أكبر وارد", value: "15,800" }
+        ],
+        rows: [
+          { name: "راتب", sub: "1 عملية", amount: "+15,800", tone: "in" },
+          { name: "حوالات واردة", sub: "7 عمليات", amount: "+12,400", tone: "in" },
+          { name: "Amazon SA", sub: "3 عمليات", amount: "+850", tone: "in" },
+          { name: "استرداد", sub: "2 عملية", amount: "+320", tone: "in" },
+          { name: "أخرى", sub: "5 عمليات", amount: "+1,913", tone: "in" }
+        ]
+      }
+    };
+
     const SECTIONS = [
       { id: "hero", label: "بطاقة المتبقي", icon: "💰", visible: true, size: "lg" },
       { id: "quick", label: "بطاقات الملخص السريع", icon: "📊", visible: true, size: "md", children: [
@@ -1215,6 +1396,7 @@
     let config = JSON.parse(JSON.stringify(SECTIONS));
     let editMode = false;
     let dragSrc = null;
+    let periodIndex = 1;
 
     const body = document.body;
     const customizeBtn = document.getElementById("customizeBtn");
@@ -1225,11 +1407,76 @@
     const toast = document.getElementById("toast");
     const sectionsContainer = document.getElementById("sectionsContainer");
     const openCustomizeDemo = document.getElementById("openCustomizeDemo");
+    const periodValue = document.getElementById("periodValue");
+    const periodPrev = document.getElementById("periodPrev");
+    const periodNext = document.getElementById("periodNext");
+    const detailSheet = document.getElementById("detailSheet");
+    const detailBack = document.getElementById("detailBack");
+    const detailTitle = document.getElementById("detailTitle");
+    const detailTotal = document.getElementById("detailTotal");
+    const detailBody = document.getElementById("detailBody");
 
     function showToast(msg) {
       toast.textContent = msg;
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function renderPeriod() {
+      const p = PERIODS[periodIndex];
+      periodValue.textContent = p.label;
+      periodPrev.disabled = periodIndex === 0;
+      periodNext.disabled = periodIndex === PERIODS.length - 1;
+
+      const heroAmount = document.querySelector(".hero-amount");
+      const daysChip = document.querySelector(".days-chip");
+      const quickValues = document.querySelectorAll(".quick-card .value");
+      const heroFooter = document.querySelector(".hero-footer");
+
+      if (heroAmount) heroAmount.innerHTML = `${p.remaining} <span style="font-size:0.55em;font-weight:600">ر.س</span>`;
+      if (daysChip) daysChip.textContent = `📅 ${p.days}`;
+      if (quickValues[0]) quickValues[0].textContent = p.remaining.replace(/[^\d,]/g, "") || "—";
+      if (quickValues[1]) quickValues[1].textContent = p.expense.replace(/[^\d,]/g, "") || "—";
+      if (quickValues[2]) quickValues[2].textContent = p.income.replace(/[^\d,]/g, "") || "—";
+      if (heroFooter) {
+        heroFooter.innerHTML = `
+          <span>من إجمالي الوارد <strong style="color:var(--in)">${p.income.replace(/[^\d,]/g, "") || "—"}</strong> ر.س</span>
+          <span class="dot">•</span>
+          <span>المصروف <strong style="color:var(--out)">${p.expense.replace(/[^\d,]/g, "") || "—"}</strong> ر.س</span>
+          <span style="margin-right:auto">ℹ️</span>`;
+      }
+    }
+
+    function openDetail(type) {
+      const data = DETAIL_DATA[type];
+      if (!data) return;
+      detailTitle.textContent = data.title;
+      detailTotal.textContent = data.total;
+      detailTotal.className = `total ${data.tone}`;
+      detailBody.innerHTML = `
+        <div class="detail-period">${PERIODS[periodIndex].label}</div>
+        <div class="detail-summary">
+          ${data.stats.map(s => `
+            <div class="detail-stat">
+              <div class="label">${s.label}</div>
+              <div class="value">${s.value}</div>
+            </div>`).join("")}
+        </div>
+        <div class="detail-list-title">التفصيل</div>
+        ${data.rows.map(r => `
+          <div class="detail-row">
+            <div>
+              <div class="name">${r.name}</div>
+              <div class="sub">${r.sub}</div>
+            </div>
+            <div class="amount ${r.tone}">${r.amount}</div>
+          </div>`).join("")}
+      `;
+      detailSheet.classList.add("open");
+    }
+
+    function closeDetail() {
+      detailSheet.classList.remove("open");
     }
 
     function openCustomize() {
@@ -1384,6 +1631,15 @@
     openCustomizeDemo.addEventListener("click", openCustomize);
     overlay.addEventListener("click", closeCustomize);
 
+    periodPrev.addEventListener("click", () => {
+      if (periodIndex > 0) { periodIndex--; renderPeriod(); }
+    });
+    periodNext.addEventListener("click", () => {
+      if (periodIndex < PERIODS.length - 1) { periodIndex++; renderPeriod(); }
+    });
+
+    detailBack.addEventListener("click", closeDetail);
+
     saveBtn.addEventListener("click", () => {
       syncConfigFromDom();
       applyConfig();
@@ -1392,13 +1648,11 @@
     });
 
     document.querySelectorAll(".quick-card.clickable").forEach(card => {
-      card.addEventListener("click", () => {
-        const type = card.dataset.link;
-        showToast(type === "expenses" ? "→ صفحة تفاصيل المصروف" : "→ صفحة تفاصيل الوارد");
-      });
+      card.addEventListener("click", () => openDetail(card.dataset.link));
     });
 
     applyConfig();
+    renderPeriod();
   </script>
 </body>
 </html>
