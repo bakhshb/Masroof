@@ -79,6 +79,10 @@ fun DashboardFlowDetailScreen(
                 periodRangeLabel = periodRangeLabel,
                 totalLabel = stringResource(presentation.totalLabelRes, formattedTotal),
                 totalColor = presentation.totalColor,
+                totalHintRes = when (mode) {
+                    DashboardFlowDetailMode.Expense -> R.string.dashboard_flow_detail_expense_total_hint
+                    DashboardFlowDetailMode.Income -> R.string.dashboard_flow_detail_income_total_hint
+                },
             )
 
             when (mode) {
@@ -113,6 +117,7 @@ private fun FlowDetailHeroCard(
     periodRangeLabel: String,
     totalLabel: String,
     totalColor: androidx.compose.ui.graphics.Color,
+    totalHintRes: Int,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -127,17 +132,40 @@ private fun FlowDetailHeroCard(
                 color = totalColor,
             ),
         )
+        Text(
+            stringResource(totalHintRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
 private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        expenseSummaryRows(summary).forEach { row ->
+        coreExpenseSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
                 label = stringResource(row.labelRes),
                 amount = row.amount,
                 direction = TransactionDirectionUi.OUTWARD,
+            )
+        }
+        if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
+            Text(
+                stringResource(R.string.dashboard_self_transfers),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            FlowDetailSummaryRow(
+                label = stringResource(R.string.dashboard_self_transfer_out),
+                amount = summary.outflow.selfTransfersOut,
+                direction = TransactionDirectionUi.NEUTRAL,
+            )
+            Text(
+                stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -146,11 +174,29 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
 @Composable
 private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        incomeSummaryRows(summary).forEach { row ->
+        coreIncomeSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
                 label = stringResource(row.labelRes),
                 amount = row.amount,
                 direction = TransactionDirectionUi.INCOME,
+            )
+        }
+        if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
+            Text(
+                stringResource(R.string.dashboard_self_transfers),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            FlowDetailSummaryRow(
+                label = stringResource(R.string.dashboard_self_transfer_in),
+                amount = summary.inflow.selfTransfersIn,
+                direction = TransactionDirectionUi.NEUTRAL,
+            )
+            Text(
+                stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -180,8 +226,7 @@ private fun flowExpenseTransactions(
     grouping: CurrentAccountFlowDetailGrouping,
     previewsById: Map<String, TransactionPreviewUi>,
 ): List<TransactionPreviewUi> =
-    grouping.expense.values
-        .flatten()
+    (grouping.expense.values.flatten() + grouping.selfTransfersOut)
         .mapNotNull { previewsById[it.id] }
         .sortedByDateDesc()
 
@@ -189,8 +234,7 @@ private fun flowIncomeTransactions(
     grouping: CurrentAccountFlowDetailGrouping,
     previewsById: Map<String, TransactionPreviewUi>,
 ): List<TransactionPreviewUi> =
-    grouping.income.values
-        .flatten()
+    (grouping.income.values.flatten() + grouping.selfTransfersIn)
         .mapNotNull { previewsById[it.id] }
         .sortedByDateDesc()
 
@@ -233,17 +277,16 @@ private fun FlowDetailSummaryRow(
     amount: Money,
     direction: TransactionDirectionUi,
 ) {
+    val style = when {
+        amount.amount.signum() == 0 -> MasroofMoneyRowStyle.Neutral
+        direction == TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
+        direction == TransactionDirectionUi.NEUTRAL -> MasroofMoneyRowStyle.Neutral
+        else -> MasroofMoneyRowStyle.Inflow
+    }
     MasroofMoneyRow(
         label = label,
         value = formatLocalizedMoney(amount),
-        style = when (direction) {
-            TransactionDirectionUi.INCOME,
-            TransactionDirectionUi.INWARD,
-            TransactionDirectionUi.TRANSFER_IN,
-            -> MasroofMoneyRowStyle.Inflow
-            TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
-            TransactionDirectionUi.NEUTRAL -> MasroofMoneyRowStyle.Neutral
-        },
+        style = style,
         leadingIcon = TransactionDirectionPresentation.icon(direction),
     )
 }
@@ -253,35 +296,21 @@ private data class FlowSummaryRow(
     val amount: Money,
 )
 
-private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
-    val rows = CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.mapNotNull { category ->
-        val amount = expenseAmount(summary, category)
-        if (amount.amount.signum() <= 0) null
-        else FlowSummaryRow(labelRes = expenseCategoryLabelRes(category), amount = amount)
-    }.toMutableList()
-    if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
-        rows += FlowSummaryRow(
-            labelRes = R.string.dashboard_self_transfer_out,
-            amount = summary.outflow.selfTransfersOut,
+private fun coreExpenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
+    CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.map { category ->
+        FlowSummaryRow(
+            labelRes = expenseCategoryLabelRes(category),
+            amount = expenseAmount(summary, category),
         )
     }
-    return rows
-}
 
-private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
-    val rows = CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.mapNotNull { category ->
-        val amount = incomeAmount(summary, category)
-        if (amount.amount.signum() <= 0) null
-        else FlowSummaryRow(labelRes = incomeCategoryLabelRes(category), amount = amount)
-    }.toMutableList()
-    if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
-        rows += FlowSummaryRow(
-            labelRes = R.string.dashboard_self_transfer_in,
-            amount = summary.inflow.selfTransfersIn,
+private fun coreIncomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
+    CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.map { category ->
+        FlowSummaryRow(
+            labelRes = incomeCategoryLabelRes(category),
+            amount = incomeAmount(summary, category),
         )
     }
-    return rows
-}
 
 private fun expenseAmount(summary: CurrentAccountSummary, category: FlowExpenseCategory): Money =
     when (category) {

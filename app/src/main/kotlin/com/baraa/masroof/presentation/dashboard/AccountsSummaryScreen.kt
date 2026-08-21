@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.OwnedAccountPeriodFlow
 import com.baraa.masroof.application.dashboard.OwnedAccountsFlowSummary
-import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
@@ -203,7 +203,7 @@ private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
             )
         }
         Text(
-            stringResource(R.string.dashboard_account_remaining_calculated_hint),
+            stringResource(R.string.dashboard_accounts_fleet_total_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
@@ -237,10 +237,10 @@ private fun AccountsSummaryAccountCard(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val position = summary?.cashPosition()
-    val remaining = position?.remaining
-    val periodInflow = position?.inflow
-    val periodOutflow = position?.outflow
+    val movement = summary?.externalMovement()
+    val remaining = movement?.remaining
+    val periodInflow = movement?.inflow
+    val periodOutflow = movement?.outflow
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow

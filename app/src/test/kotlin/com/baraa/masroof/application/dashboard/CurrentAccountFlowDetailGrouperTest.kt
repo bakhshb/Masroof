@@ -91,6 +91,33 @@ class CurrentAccountFlowDetailGrouperTest {
         )
     }
 
+    @Test
+    fun groupsSelfTransfersSeparatelyFromCoreExpenseCategories() {
+        val accountA = "account:bank_aljazira:3001"
+        val accountB = "account:bank_aljazira:3002"
+        val transactions = listOf(
+            tx(
+                id = "self",
+                type = FinancialTransactionType.SELF_TRANSFER,
+                amount = "500",
+                source = accountA,
+                dest = accountB,
+            ),
+            tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountA),
+        )
+
+        val grouping = CurrentAccountFlowDetailGrouper.group(
+            transactions = transactions,
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountA, accountB),
+            ownedAccountLast4s = setOf("3001", "3002"),
+        )
+
+        assertEquals(listOf("self"), grouping.selfTransfersOut.map { it.id })
+        assertEquals(listOf("self"), grouping.selfTransfersIn.map { it.id })
+        assertEquals(listOf("xfer-out"), ids(grouping, FlowExpenseCategory.EXTERNAL_TRANSFER_OUT))
+    }
+
     private fun ids(
         grouping: CurrentAccountFlowDetailGrouping,
         category: FlowExpenseCategory,
