@@ -12,6 +12,8 @@ data class OwnedAccountPeriodSummary(
     val bank: Bank,
     val maskedNumber: String,
     val periodNet: SignedMoneyAmount,
+    val totalInflow: Money,
+    val totalOutflow: Money,
 )
 
 object OwnedAccountPeriodSummaryCalculator {
@@ -42,6 +44,8 @@ object OwnedAccountPeriodSummaryCalculator {
                 bank = account.bank,
                 maskedNumber = account.maskedNumber,
                 periodNet = summary.netMovement,
+                totalInflow = summary.totalInflow,
+                totalOutflow = summary.totalOutflow,
             )
         }
 }

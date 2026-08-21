@@ -31,6 +31,8 @@ data class OwnedAccountUi(
     val bank: Bank,
     val maskedNumber: String,
     val periodNet: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
+    val periodInflow: com.baraa.masroof.core.money.Money? = null,
+    val periodOutflow: com.baraa.masroof.core.money.Money? = null,
 )
 
 enum class TransactionDirectionUi {

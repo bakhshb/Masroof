@@ -77,7 +77,7 @@ fun CreditCardsSection(
 }
 
 @Composable
-private fun CreditCardSummaryTile(
+fun CreditCardSummaryTile(
     row: CreditCardDashboardRow,
     salaryPeriodLabel: String?,
     zoneId: ZoneId,
