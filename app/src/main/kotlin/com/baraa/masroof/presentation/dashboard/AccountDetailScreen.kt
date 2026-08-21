@@ -12,7 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -53,13 +53,15 @@ fun AccountDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AccountDetailHeroCard(
-                remaining = account.accountRemaining,
-                periodInflow = account.periodInflow,
-                periodOutflow = account.periodOutflow,
-            )
             if (summary != null) {
+                AccountDetailHeroCard(summary = summary)
                 DashboardFlowBreakdownCard(summary = summary)
+            } else {
+                Text(
+                    stringResource(R.string.dashboard_account_detail_unavailable),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             DashboardSummaryTransactionsSection(
@@ -72,51 +74,38 @@ fun AccountDetailScreen(
 }
 
 @Composable
-private fun AccountDetailHeroCard(
-    remaining: SignedMoneyAmount?,
-    periodInflow: com.baraa.masroof.core.money.Money?,
-    periodOutflow: com.baraa.masroof.core.money.Money?,
-) {
+private fun AccountDetailHeroCard(summary: CurrentAccountSummary) {
     val extended = MasroofThemeExtras.extendedColors
-    val remainingColor = when {
-        remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        remaining.amount.signum() > 0 -> extended.inflow
-        remaining.amount.signum() < 0 -> extended.outflow
-        else -> MaterialTheme.colorScheme.onSurface
+    val net = summary.netMovement
+    val netColor = when {
+        net.amount.signum() > 0 -> extended.inflow
+        net.amount.signum() < 0 -> extended.outflow
+        else -> MaterialTheme.colorScheme.primary
     }
 
     MasroofCard(accent = MasroofCardAccent.Account) {
         Text(
-            stringResource(R.string.dashboard_account_remaining_label),
+            stringResource(R.string.dashboard_account_period_net_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            remaining?.let { formatLocalizedMoney(it) }
-                ?: stringResource(R.string.dashboard_value_unavailable),
+            formatLocalizedMoney(net),
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
-                color = remainingColor,
+                color = netColor,
             ),
             modifier = Modifier.padding(top = 8.dp),
         )
         Text(
-            stringResource(R.string.dashboard_account_remaining_calculated_hint),
+            stringResource(
+                R.string.dashboard_remaining_formula,
+                formatLocalizedMoney(summary.totalInflow),
+                formatLocalizedMoney(summary.totalOutflow),
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
-        if (periodInflow != null && periodOutflow != null) {
-            Text(
-                stringResource(
-                    R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(periodInflow),
-                    formatLocalizedMoney(periodOutflow),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
     }
 }

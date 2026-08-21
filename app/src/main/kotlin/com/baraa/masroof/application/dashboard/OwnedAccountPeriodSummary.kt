@@ -3,19 +3,19 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class OwnedAccountPeriodSummary(
-    val bank: com.baraa.masroof.domain.model.Bank,
+    val bank: Bank,
     val maskedNumber: String,
     val summary: CurrentAccountSummary,
 ) {
     val periodNet: SignedMoneyAmount get() = summary.netMovement
-    val accountRemaining: SignedMoneyAmount get() = summary.accountRemaining
-    val totalInflow: Money get() = summary.totalInflow + summary.selfTransfersIn
-    val totalOutflow: Money get() = summary.totalOutflow + summary.selfTransfersOut
+    val totalInflow: Money get() = summary.totalInflow
+    val totalOutflow: Money get() = summary.totalOutflow
 }
 
 object OwnedAccountPeriodSummaryCalculator {
@@ -27,8 +27,9 @@ object OwnedAccountPeriodSummaryCalculator {
         sarEquivalents: Map<String, Money>,
         rawSmsById: Map<String, RawSms>,
     ): List<OwnedAccountPeriodSummary> =
-        ownedAccounts.map { account ->
+        ownedAccounts.mapNotNull { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
+                ?: return@mapNotNull null
             val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
                 listOf(account.maskedNumber),
             )
