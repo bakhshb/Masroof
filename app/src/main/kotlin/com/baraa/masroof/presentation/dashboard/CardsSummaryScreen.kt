@@ -40,6 +40,7 @@ fun CardsSummaryRoute(
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onOpenAllTransactions: (TransactionListFilterState) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -66,6 +67,11 @@ fun CardsSummaryRoute(
             onNext = viewModel::goToNextPeriod,
             onCurrent = viewModel::goToCurrentPeriod,
             onOpenTransaction = onOpenTransaction,
+            onViewAllTransactions = {
+                onOpenAllTransactions(
+                    TransactionListFilterState(cardLast4s = setOf(selectedCard.last4)),
+                )
+            },
         )
     } else {
         CardsSummaryScreen(

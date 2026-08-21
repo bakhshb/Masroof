@@ -188,6 +188,7 @@
     <string name="dashboard_account_detail_unavailable">No period data for this account</string>
     <string name="dashboard_summary_transactions_title">Period transactions (%1$d)</string>
     <string name="dashboard_summary_transactions_empty">No transactions in this period</string>
+    <string name="dashboard_summary_view_all_transactions">View all transactions ›</string>
     <string name="dashboard_cards_summary_title">Cards summary</string>
     <string name="dashboard_cards_summary_screen_title">Cards summary</string>
     <string name="dashboard_cards_summary_empty">No followed cards yet</string>
@@ -301,11 +302,15 @@
     <string name="transaction_list_count">%1$d transaction(s) in this period</string>
     <string name="transaction_list_search_hint">Search by name or amount</string>
     <string name="transaction_list_filters_toggle">Filter</string>
+    <string name="transaction_list_filter_sheet_title">Filter transactions</string>
+    <string name="transaction_list_filter_apply">Apply</string>
     <string name="transaction_list_filter_type_section">Transaction type</string>
+    <string name="transaction_list_filter_account_section">Account</string>
     <string name="transaction_list_filter_card_section">Card</string>
-    <string name="transaction_list_multi_filter_hint">You can select multiple types or cards — all filters apply together</string>
+    <string name="transaction_list_multi_filter_hint">You can select multiple types, accounts, or cards — all filters apply together</string>
     <string name="transaction_list_clear_search">Clear search</string>
     <string name="transaction_list_filter_all_types">All</string>
+    <string name="transaction_list_filter_all_accounts">All accounts</string>
     <string name="transaction_list_filter_all_cards">All cards</string>
     <string name="transaction_list_filtered_count">%1$d of %2$d transactions</string>
     <string name="transaction_list_filtered_total">Displayed total: %1$s</string>
@@ -334,6 +339,7 @@
     <string name="transaction_share_search">Search</string>
     <string name="transaction_share_types">Type</string>
     <string name="transaction_share_cards">Card</string>
+    <string name="transaction_share_accounts">Account</string>
     <string name="transaction_share_count">Count</string>
     <string name="transaction_share_total">Total</string>
     <string name="transaction_reclassify_sheet_title">Choose new category</string>

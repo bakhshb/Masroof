@@ -2,10 +2,13 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,15 +40,27 @@ object DashboardSummaryTransactionFilter {
 fun DashboardSummaryTransactionsSection(
     transactions: List<TransactionPreviewUi>,
     onOpenTransaction: (String) -> Unit,
+    onViewAll: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        MasroofSectionTitle(
-            title = stringResource(R.string.dashboard_summary_transactions_title, transactions.size),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            MasroofSectionTitle(
+                title = stringResource(R.string.dashboard_summary_transactions_title, transactions.size),
+            )
+            if (onViewAll != null && transactions.isNotEmpty()) {
+                TextButton(onClick = onViewAll) {
+                    Text(stringResource(R.string.dashboard_summary_view_all_transactions))
+                }
+            }
+        }
         if (transactions.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_summary_transactions_empty),

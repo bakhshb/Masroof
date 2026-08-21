@@ -195,6 +195,7 @@
     <string name="dashboard_account_detail_unavailable">لا تتوفر بيانات الفترة لهذا الحساب</string>
     <string name="dashboard_summary_transactions_title">عمليات الفترة (%1$d)</string>
     <string name="dashboard_summary_transactions_empty">لا توجد عمليات في هذه الفترة</string>
+    <string name="dashboard_summary_view_all_transactions">عرض كل العمليات ›</string>
     <string name="dashboard_cards_summary_title">ملخص البطاقات</string>
     <string name="dashboard_cards_summary_screen_title">ملخص البطاقات</string>
     <string name="dashboard_cards_summary_empty">لا توجد بطاقات متابَعة</string>
@@ -308,11 +309,15 @@
     <string name="transaction_list_count">%1$d عملية في هذه الفترة</string>
     <string name="transaction_list_search_hint">ابحث بالاسم أو المبلغ</string>
     <string name="transaction_list_filters_toggle">تصفية</string>
+    <string name="transaction_list_filter_sheet_title">تصفية العمليات</string>
+    <string name="transaction_list_filter_apply">تطبيق</string>
     <string name="transaction_list_filter_type_section">نوع العملية</string>
+    <string name="transaction_list_filter_account_section">الحساب</string>
     <string name="transaction_list_filter_card_section">البطاقة</string>
-    <string name="transaction_list_multi_filter_hint">يمكنك اختيار أكثر من نوع أو بطاقة — تُطبَّق كل الفلاتر معاً</string>
+    <string name="transaction_list_multi_filter_hint">يمكنك اختيار أكثر من نوع أو حساب أو بطاقة — تُطبَّق كل الفلاتر معاً</string>
     <string name="transaction_list_clear_search">مسح البحث</string>
     <string name="transaction_list_filter_all_types">الكل</string>
+    <string name="transaction_list_filter_all_accounts">كل الحسابات</string>
     <string name="transaction_list_filter_all_cards">كل البطاقات</string>
     <string name="transaction_list_filtered_count">%1$d من %2$d عملية</string>
     <string name="transaction_list_filtered_total">مجموع المبالغ المعروضة: %1$s</string>
@@ -347,6 +352,7 @@
     <string name="transaction_share_search">البحث</string>
     <string name="transaction_share_types">النوع</string>
     <string name="transaction_share_cards">البطاقة</string>
+    <string name="transaction_share_accounts">الحساب</string>
     <string name="transaction_share_count">العدد</string>
     <string name="transaction_share_total">المجموع</string>
     <string name="transaction_reclassify_sheet_title">اختر التصنيف الجديد</string>

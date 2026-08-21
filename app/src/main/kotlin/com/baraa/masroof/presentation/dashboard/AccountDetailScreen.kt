@@ -28,6 +28,7 @@ fun AccountDetailScreen(
     onNext: () -> Unit,
     onCurrent: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onViewAllTransactions: () -> Unit,
 ) {
     val summary = account.periodSummary
     val accountTransactions = DashboardSummaryTransactionFilter.forAccount(
@@ -66,6 +67,7 @@ fun AccountDetailScreen(
             DashboardSummaryTransactionsSection(
                 transactions = accountTransactions,
                 onOpenTransaction = onOpenTransaction,
+                onViewAll = onViewAllTransactions,
             )
         }
     }

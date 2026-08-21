@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -44,6 +45,7 @@ fun AccountsSummaryRoute(
     onBack: () -> Unit,
     onManageAccounts: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onOpenAllTransactions: (TransactionListFilterState) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedAccountKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -68,6 +70,18 @@ fun AccountsSummaryRoute(
             onNext = viewModel::goToNextPeriod,
             onCurrent = viewModel::goToCurrentPeriod,
             onOpenTransaction = onOpenTransaction,
+            onViewAllTransactions = {
+                onOpenAllTransactions(
+                    TransactionListFilterState(
+                        accountContainerIds = setOf(
+                            FinancialContainerIdFactory.accountId(
+                                selectedAccount.bank,
+                                selectedAccount.maskedNumber,
+                            ),
+                        ),
+                    ),
+                )
+            },
         )
     } else {
         AccountsSummaryScreen(

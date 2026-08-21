@@ -23,6 +23,7 @@ fun CardDetailScreen(
     onNext: () -> Unit,
     onCurrent: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    onViewAllTransactions: () -> Unit,
 ) {
     val cardTransactions = DashboardSummaryTransactionFilter.forCard(
         transactions = state.allTransactions,
@@ -55,6 +56,7 @@ fun CardDetailScreen(
             DashboardSummaryTransactionsSection(
                 transactions = cardTransactions,
                 onOpenTransaction = onOpenTransaction,
+                onViewAll = onViewAllTransactions,
             )
         }
     }
