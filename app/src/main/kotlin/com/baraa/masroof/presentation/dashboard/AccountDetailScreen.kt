@@ -102,6 +102,12 @@ private fun AccountDetailHeroCard(
         )
         if (periodInflow != null && periodOutflow != null) {
             Text(
+                stringResource(R.string.dashboard_account_remaining_calculated_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
                 stringResource(
                     R.string.dashboard_remaining_formula,
                     formatLocalizedMoney(periodInflow),
@@ -109,7 +115,7 @@ private fun AccountDetailHeroCard(
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

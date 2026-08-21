@@ -239,9 +239,10 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun accountOutflow_includesListedCategories() {
+    fun accountOutflow_includesAllListedExpenseCategories() {
         val accountId = "account:bank_aljazira:3001"
         val cardId = "card:bank_aljazira:7271"
+        val otherAccount = "account:bank_aljazira:3002"
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(
                 tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId),
@@ -250,12 +251,29 @@ class CurrentAccountSummaryCalculatorTest {
                 tx("bill", FinancialTransactionType.BILL_PAYMENT, "40", source = accountId),
                 tx("pos", FinancialTransactionType.EXPENSE, "60", source = accountId),
                 tx("fee", FinancialTransactionType.FEE, "10", source = accountId),
+                tx(
+                    id = "self",
+                    type = FinancialTransactionType.SELF_TRANSFER,
+                    amount = "200",
+                    source = accountId,
+                    dest = otherAccount,
+                ),
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("290.00", Currency.SAR), summary.accountOutflow)
+        assertEquals(Money.of("100.00", Currency.SAR), summary.externalTransfersOut)
+        assertEquals(Money.of("50.00", Currency.SAR), summary.creditCardPayments)
+        assertEquals(Money.of("30.00", Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.of("40.00", Currency.SAR), summary.billPayments)
+        assertEquals(Money.of("60.00", Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("10.00", Currency.SAR), summary.fees)
+        assertEquals(Money.of("200.00", Currency.SAR), summary.selfTransfersOut)
+        assertEquals(
+            Money.of("490.00", Currency.SAR),
+            summary.accountOutflow,
+        )
     }
 
     @Test

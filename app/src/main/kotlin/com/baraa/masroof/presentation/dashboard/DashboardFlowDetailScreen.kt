@@ -251,19 +251,35 @@ private data class FlowSummaryRow(
     val amount: Money,
 )
 
-private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
-    CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.mapNotNull { category ->
+private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
+    val rows = CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.mapNotNull { category ->
         val amount = expenseAmount(summary, category)
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = expenseCategoryLabelRes(category), amount = amount)
+    }.toMutableList()
+    if (summary.selfTransfersOut.amount.signum() > 0) {
+        rows += FlowSummaryRow(
+            labelRes = R.string.dashboard_self_transfer_out,
+            amount = summary.selfTransfersOut,
+        )
     }
+    return rows
+}
 
-private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
-    CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.mapNotNull { category ->
+private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
+    val rows = CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.mapNotNull { category ->
         val amount = incomeAmount(summary, category)
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = incomeCategoryLabelRes(category), amount = amount)
+    }.toMutableList()
+    if (summary.selfTransfersIn.amount.signum() > 0) {
+        rows += FlowSummaryRow(
+            labelRes = R.string.dashboard_self_transfer_in,
+            amount = summary.selfTransfersIn,
+        )
     }
+    return rows
+}
 
 private fun expenseAmount(summary: CurrentAccountSummary, category: FlowExpenseCategory): Money =
     when (category) {
