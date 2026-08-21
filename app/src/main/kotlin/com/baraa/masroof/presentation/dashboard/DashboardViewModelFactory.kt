@@ -22,6 +22,7 @@ class DashboardViewModelFactory(
             overviewLoader = container.dashboardService,
             cardRegistryRepository = container.cardRegistryRepository,
             accountRegistryRepository = container.accountRegistryRepository,
+            layoutPreferencesRepository = container.dashboardLayoutPreferencesRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
             smsEvidenceLoader = TransactionSmsEvidenceLoader(

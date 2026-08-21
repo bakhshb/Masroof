@@ -4,10 +4,13 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
+import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
@@ -529,10 +532,49 @@ class DashboardViewModelTest {
             )
     }
 
+    @Test
+    fun customizeLayout_openToggleSave_persistsAndClosesSheet() = runTest {
+        val layoutRepo = FakeLayoutPreferencesRepository()
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        assertTrue(vm.uiState.value.customizeSheetOpen)
+        assertNotNull(vm.uiState.value.customizeDraft)
+
+        vm.toggleCustomizeSection(DashboardSectionId.CARDS)
+        assertFalse(
+            vm.uiState.value.customizeDraft!!.entry(DashboardSectionId.CARDS)!!.visible,
+        )
+
+        vm.saveCustomizeLayout()
+        assertFalse(vm.uiState.value.customizeSheetOpen)
+        assertNull(vm.uiState.value.customizeDraft)
+        assertFalse(vm.uiState.value.dashboardLayout.entry(DashboardSectionId.CARDS)!!.visible)
+        assertFalse(layoutRepo.saved!!.entry(DashboardSectionId.CARDS)!!.visible)
+    }
+
+    @Test
+    fun customizeLayout_dismissWithoutSave_discardsDraft() = runTest {
+        val layoutRepo = FakeLayoutPreferencesRepository()
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        vm.toggleCustomizeSection(DashboardSectionId.HERO)
+        vm.dismissCustomizeSheet()
+
+        assertFalse(vm.uiState.value.customizeSheetOpen)
+        assertNull(vm.uiState.value.customizeDraft)
+        assertTrue(vm.uiState.value.dashboardLayout.entry(DashboardSectionId.HERO)!!.visible)
+        assertNull(layoutRepo.saved)
+    }
+
     private fun viewModel(
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
         accountRegistry: com.baraa.masroof.domain.repository.AccountRegistryRepository = FakeAccountRegistry(),
+        layoutPreferencesRepository: DashboardLayoutPreferencesRepository = FakeLayoutPreferencesRepository(),
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
         rescanService: suspend () -> SmsScanResult = { SmsScanResult() },
@@ -582,6 +624,7 @@ class DashboardViewModelTest {
             overviewLoader = loader,
             cardRegistryRepository = cardRegistry,
             accountRegistryRepository = accountRegistry,
+            layoutPreferencesRepository = layoutPreferencesRepository,
             rescanService = rescanService,
             smsEvidenceLoader = smsEvidenceLoader,
             permissionStateProvider = permissionStateProvider,
@@ -654,6 +697,19 @@ class DashboardViewModelTest {
     private class FakeAppLocaleRepository : AppLocaleRepository {
         override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
         override fun setLanguageTag(languageTag: String) = Unit
+    }
+
+    private class FakeLayoutPreferencesRepository(
+        private var snapshot: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
+    ) : DashboardLayoutPreferencesRepository {
+        var saved: DashboardLayoutSnapshot? = null
+
+        override fun load(): DashboardLayoutSnapshot = snapshot
+
+        override fun save(snapshot: DashboardLayoutSnapshot) {
+            this.snapshot = snapshot
+            saved = snapshot
+        }
     }
 
     private class FakeLoader : DashboardOverviewLoader {
