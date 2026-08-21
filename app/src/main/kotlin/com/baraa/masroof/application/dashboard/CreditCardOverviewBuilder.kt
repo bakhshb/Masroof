@@ -91,13 +91,6 @@ object CreditCardOverviewBuilder {
             .toInstant()
         val calendarMonthLabel = dayMonth.format(LocalDate.now(clock).withDayOfMonth(1))
 
-        val latestOutstandingByCard = snapshotCandidates
-            .filter { it.details.outstandingBalance != null }
-            .groupBy { it.cardId }
-            .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
-
-        val cardIds = creditCardMeta.keys.toSet()
-
         val latestStatementByCard = snapshotCandidates
             .filter { it.isStatement }
             .groupBy { it.cardId }
@@ -108,9 +101,11 @@ object CreditCardOverviewBuilder {
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
 
+        val cardIds = creditCardMeta.keys.toSet()
+
         val rows = cardIds.map { cardId ->
             val ref = creditCardMeta[cardId]
-                ?: latestOutstandingByCard[cardId]?.cardRef
+                ?: latestStatementByCard[cardId]?.cardRef
                 ?: latestAvailableByCard[cardId]?.cardRef
                 ?: parseCardId(cardId)
             val cardStatementStart = latestStatementByCard[cardId]?.updatedAt ?: globalStatementStart
@@ -146,7 +141,6 @@ object CreditCardOverviewBuilder {
                 salaryPeriodSpendingNet = salaryNet,
                 statementPeriodLabel = statementLabel,
                 snapshot = buildCardSnapshot(
-                    latestOutstanding = latestOutstandingByCard[cardId],
                     latestAvailable = latestAvailableByCard[cardId],
                     latestStatement = latestStatementByCard[cardId],
                 ),
@@ -246,21 +240,22 @@ object CreditCardOverviewBuilder {
     }
 
     private fun buildCardSnapshot(
-        latestOutstanding: SnapshotCandidate?,
         latestAvailable: SnapshotCandidate?,
         latestStatement: SnapshotCandidate?,
     ): CreditCardBalanceSnapshot? {
-        if (latestAvailable == null && latestOutstanding == null) return null
+        if (latestAvailable == null && latestStatement == null) return null
 
         val updatedAt = listOfNotNull(
             latestAvailable?.updatedAt,
-            latestOutstanding?.updatedAt,
+            latestStatement?.updatedAt,
         ).maxOrNull() ?: return null
 
         return CreditCardBalanceSnapshot(
             availableBalance = latestAvailable?.details?.availableBalance,
-            dueAmount = latestOutstanding?.details?.outstandingBalance,
-            dueDate = latestStatement?.dueDate ?: latestOutstanding?.dueDate,
+            // Statement SMS only — purchase/refund "إجمالي المبلغ المستحق" is account-level
+            // and repeats across linked cards on the same credit facility.
+            dueAmount = latestStatement?.details?.outstandingBalance,
+            dueDate = latestStatement?.dueDate,
             statementIssuedAt = latestStatement?.updatedAt,
             updatedAt = updatedAt,
         )
