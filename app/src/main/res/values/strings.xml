@@ -227,7 +227,9 @@
     <string name="dashboard_flow_detail_period">فترة الراتب: %1$s</string>
     <string name="dashboard_flow_detail_breakdown_title">تفصيل البنود</string>
     <string name="dashboard_flow_detail_expense_total">إجمالي المنصرف: %1$s</string>
+    <string name="dashboard_flow_detail_expense_total_hint">مجموع الأنواع الستة أعلاه — لا يشمل التحويل بين حساباتك</string>
     <string name="dashboard_flow_detail_income_total">إجمالي الوارد: %1$s</string>
+    <string name="dashboard_flow_detail_income_total_hint">مجموع أنواع الوارد — لا يشمل التحويل بين حساباتك</string>
     <string name="dashboard_flow_detail_transactions_title">العمليات</string>
     <string name="dashboard_card_salary_remaining">المتبقي من دورة الراتب (من %1$s)</string>
     <string name="dashboard_card_salary_remaining_fallback">المتبقي من دورة الراتب</string>
