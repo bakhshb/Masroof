@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofBadge
@@ -29,19 +30,31 @@ import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
+enum class AccountFlowPresentationMode {
+    /** Fleet / home: external categories only; self-transfers shown separately. */
+    ExternalMovement,
+
+    /** Per-account: self-transfers included in وارد / منصرف totals. */
+    CashPosition,
+}
+
 @Composable
 fun CurrentAccountSection(
     summary: CurrentAccountSummary,
     accountBadge: String?,
     ownedAccountCount: Int = 1,
+    presentationMode: AccountFlowPresentationMode = AccountFlowPresentationMode.ExternalMovement,
+    showSectionHeader: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
-            title = stringResource(R.string.dashboard_current_account_section),
-            icon = com.baraa.masroof.presentation.common.MasroofIcons.externalIn,
-        )
+        if (showSectionHeader) {
+            SectionHeader(
+                title = stringResource(R.string.dashboard_current_account_section),
+                icon = com.baraa.masroof.presentation.common.MasroofIcons.externalIn,
+            )
+        }
 
         MasroofCard(accent = MasroofCardAccent.Account) {
             Row(
@@ -57,10 +70,16 @@ fun CurrentAccountSection(
                     )
                     Text(
                         stringResource(
-                            if (ownedAccountCount > 1) {
-                                R.string.dashboard_current_account_net_subtitle_multi
-                            } else {
-                                R.string.dashboard_current_account_net_subtitle
+                            when (presentationMode) {
+                                AccountFlowPresentationMode.ExternalMovement ->
+                                    if (ownedAccountCount > 1) {
+                                        R.string.dashboard_current_account_net_subtitle_multi
+                                    } else {
+                                        R.string.dashboard_current_account_net_subtitle
+                                    }
+
+                                AccountFlowPresentationMode.CashPosition ->
+                                    R.string.dashboard_account_remaining_calculated_hint
                             },
                         ),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -72,7 +91,10 @@ fun CurrentAccountSection(
                 }
             }
 
-            val movement = summary.externalMovement()
+            val movement = when (presentationMode) {
+                AccountFlowPresentationMode.ExternalMovement -> summary.externalMovement()
+                AccountFlowPresentationMode.CashPosition -> summary.cashPosition()
+            }
             val net = movement.remaining
             Text(
                 formatLocalizedMoney(net),
@@ -193,7 +215,15 @@ fun CurrentAccountSection(
                     )
                 }
                 Text(
-                    stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                    stringResource(
+                        when (presentationMode) {
+                            AccountFlowPresentationMode.ExternalMovement ->
+                                R.string.dashboard_self_transfers_neutral_hint
+
+                            AccountFlowPresentationMode.CashPosition ->
+                                R.string.dashboard_self_transfers_included_hint
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),

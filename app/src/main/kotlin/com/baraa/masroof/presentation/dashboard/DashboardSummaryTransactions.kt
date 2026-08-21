@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.application.dashboard.CurrentAccountTransactionScope
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 
 object DashboardSummaryTransactionFilter {
@@ -25,9 +26,22 @@ object DashboardSummaryTransactionFilter {
         maskedNumber: String,
     ): List<TransactionPreviewUi> {
         val containerId = FinancialContainerIdFactory.accountId(bank, maskedNumber)
+        val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(maskedNumber))
         return transactions.filter { tx ->
-            tx.sourceContainerId == containerId || tx.destinationContainerId == containerId
+            matchesAccountContainer(tx.sourceContainerId, containerId, last4s) ||
+                matchesAccountContainer(tx.destinationContainerId, containerId, last4s)
         }
+    }
+
+    private fun matchesAccountContainer(
+        containerId: String?,
+        ownedContainerId: String,
+        ownedLast4s: Set<String>,
+    ): Boolean {
+        if (containerId == null) return false
+        if (containerId == ownedContainerId) return true
+        if (!containerId.startsWith("account:")) return false
+        return containerId.substringAfterLast(':') in ownedLast4s
     }
 
     fun forCard(
