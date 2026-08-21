@@ -203,7 +203,7 @@ private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
             )
         }
         Text(
-            stringResource(R.string.dashboard_account_remaining_calculated_hint),
+            stringResource(R.string.dashboard_accounts_fleet_total_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

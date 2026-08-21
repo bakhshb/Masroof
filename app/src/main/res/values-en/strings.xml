@@ -184,6 +184,7 @@
     <string name="dashboard_account_remaining_label">Remaining in account</string>
     <string name="dashboard_account_remaining_calculated_hint">In − out (external transfers, card payments, cash, bills, POS, fees)</string>
     <string name="dashboard_accounts_remaining_total_title">Total remaining in accounts</string>
+    <string name="dashboard_accounts_fleet_total_hint">Sum of all in − all out across your accounts</string>
     <string name="dashboard_manage_accounts">Manage accounts</string>
     <string name="dashboard_accounts_count_label">%1$d accounts</string>
     <string name="dashboard_account_period_in_out">In %1$s · spent %2$s</string>

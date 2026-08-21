@@ -19,7 +19,7 @@ import java.time.Instant
  */
 class OwnedAccountsFlowSummaryTest {
   @Test
-  fun fleetTotalRemaining_sumsPerAccountCashPositionsIncludingSelfTransfers() {
+    fun fleetTotalRemaining_sumsAllInMinusAllOut() {
     val account1 = "account:bank_aljazira:3001"
     val account2 = "account:bank_aljazira:3002"
     val account3 = "account:bank_aljazira:3003"
@@ -64,7 +64,7 @@ class OwnedAccountsFlowSummaryTest {
     )
     assertEquals(
       SignedMoneyAmount.of(Money.of("3000.00", Currency.SAR)),
-      fleet.externalMovement()?.remaining,
+      fleet.externalSummary()?.remaining,
     )
   }
 
