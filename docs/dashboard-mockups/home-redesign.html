@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مصروف — نموذج شاشة الرئيسية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --text: #1a1f24;
+      --muted: #6b7280;
+      --muted-light: #9ca3af;
+      --border: #e5e7eb;
+      --primary: #0f766e;
+      --primary-soft: #ecfdf5;
+      --primary-dark: #134e4a;
+      --in: #059669;
+      --in-soft: #ecfdf5;
+      --out: #dc2626;
+      --out-soft: #fef2f2;
+      --warning: #b45309;
+      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --nav-h: 64px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+      background: linear-gradient(165deg, #dce7ec 0%, var(--bg) 35%, #eef2f5 100%);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+
+    .page-shell { max-width: 980px; margin: 0 auto; }
+
+    .page-intro {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .page-intro h1 {
+      font-size: 1.45rem;
+      margin-bottom: 8px;
+    }
+
+    .page-intro p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      max-width: 640px;
+      margin: 0 auto 16px;
+    }
+
+    .page-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .page-actions a,
+    .page-actions button {
+      font-family: inherit;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .page-actions .primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .layout {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+
+    .phone {
+      width: 390px;
+      background: #111827;
+      border-radius: 36px;
+      padding: 12px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    .phone-screen {
+      background: var(--bg);
+      border-radius: 28px;
+      overflow: hidden;
+      height: 844px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .status-bar {
+      height: 26px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .app-bar {
+      background: var(--surface);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .logo-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #14b8a6, var(--primary));
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .app-bar-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      border-radius: 10px;
+      color: var(--muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .icon-btn:hover { background: #f3f4f6; }
+
+    .icon-btn svg { width: 20px; height: 20px; }
+
+    .notif-dot {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      width: 8px;
+      height: 8px;
+      background: var(--out);
+      border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+
+    .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px calc(var(--nav-h) + 12px);
+      scrollbar-width: none;
+    }
+
+    .scroll-area::-webkit-scrollbar { display: none; }
+
+    .period-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .period-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .period-info svg { flex-shrink: 0; color: var(--primary); }
+
+    .period-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .period-value {
+      font-size: 0.86rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .customize-btn {
+      font-family: inherit;
+      border: 1px solid #99f6e4;
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .customize-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .dashboard-section {
+      margin-bottom: 12px;
+      position: relative;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .dashboard-section.hidden { display: none; }
+
+    .dashboard-section.size-sm .section-card { padding: 10px 12px; }
+    .dashboard-section.size-sm .hero-amount { font-size: 1.35rem; }
+    .dashboard-section.size-lg .section-card { padding: 18px 16px; }
+
+    .edit-handle {
+      display: none;
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--primary);
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      z-index: 2;
+    }
+
+    body.edit-mode .edit-handle { display: flex; }
+
+    body.edit-mode .dashboard-section {
+      outline: 2px dashed rgba(15, 118, 110, 0.35);
+      outline-offset: 2px;
+      border-radius: 18px;
+    }
+
+    body.edit-mode .dashboard-section.dragging {
+      opacity: 0.45;
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Hero card */
+    .hero-card { background: linear-gradient(180deg, #fff 0%, #f8fffe 100%); }
+
+    .hero-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .hero-amount {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    .hero-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .days-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: #f9fafb;
+      border-radius: 999px;
+      padding: 5px 10px;
+    }
+
+    .progress-track {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 61%;
+      background: linear-gradient(90deg, var(--primary), #14b8a6);
+      border-radius: 999px;
+    }
+
+    .hero-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.74rem;
+      color: var(--muted-light);
+      flex-wrap: wrap;
+    }
+
+    .hero-footer .dot { opacity: 0.5; }
+
+    /* Quick summary */
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .quick-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+      position: relative;
+    }
+
+    .quick-card.clickable::after {
+      content: "›";
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      color: var(--muted-light);
+      font-size: 0.9rem;
+    }
+
+    .quick-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .quick-card.clickable:hover {
+      border-color: #99f6e4;
+    }
+
+    .quick-card .label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    .quick-card .value {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .quick-card .icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 6px;
+      font-size: 0.75rem;
+    }
+
+    .quick-card .icon.in { background: var(--in-soft); color: var(--in); }
+    .quick-card .icon.out { background: var(--out-soft); color: var(--out); }
+    .quick-card .icon.neutral { background: #f3f4f6; color: var(--primary); }
+
+    .value.in { color: var(--in); }
+    .value.out { color: var(--out); }
+    .value.neutral { color: var(--primary); }
+
+    /* Section headers */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .section-header h2 {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .section-header a {
+      font-size: 0.76rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* Accounts */
+    .account-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .account-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .account-row:first-child { padding-top: 0; }
+
+    .account-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .account-icon.checking { background: #eff6ff; color: #1d4ed8; }
+    .account-icon.savings { background: #ecfdf5; color: var(--in); }
+    .account-icon.visa { background: #f5f3ff; color: #7c3aed; }
+
+    .account-info { flex: 1; min-width: 0; }
+
+    .account-name {
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .account-type {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .account-balance {
+      font-size: 0.88rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Credit cards */
+    .cards-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+
+    .cards-scroll::-webkit-scrollbar { display: none; }
+
+    .credit-card-item {
+      min-width: 268px;
+      background: linear-gradient(160deg, #ffffff 0%, #fafafa 100%);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+
+    .cc-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .cc-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cc-logo {
+      width: 36px;
+      height: 24px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .cc-logo.mastercard { background: linear-gradient(135deg, #eb001b, #f79e1b); }
+    .cc-logo.visa { background: #1a1f71; }
+    .cc-logo.mada { background: #004d40; }
+
+    .cc-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .cc-digits {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .cc-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .cc-metric {
+      background: #f9fafb;
+      border: 1px solid #f3f4f6;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .cc-metric.primary {
+      grid-column: span 2;
+      background: var(--primary-soft);
+      border-color: #99f6e4;
+    }
+
+    .cc-metric .m-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .cc-metric .m-value {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .cc-metric.primary .m-value { color: var(--in); font-size: 1.15rem; }
+    .cc-metric.out .m-value { color: var(--out); }
+    .cc-metric.balance .m-value { color: var(--text); }
+    .cc-metric.due .m-value { color: var(--warning); }
+
+    /* Transactions */
+    .tx-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .tx-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .tx-row:first-child { padding-top: 0; }
+
+    .tx-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: #f3f4f6;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+
+    .tx-body { flex: 1; min-width: 0; }
+
+    .tx-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tx-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .tx-amount-wrap { text-align: left; }
+
+    .tx-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 999px;
+      margin-bottom: 2px;
+    }
+
+    .tx-badge.in { background: var(--in-soft); color: var(--in); }
+    .tx-badge.out { background: var(--out-soft); color: var(--out); }
+
+    .tx-amount {
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    /* Bottom nav */
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      padding: 8px 6px 10px;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .nav-item.active { color: var(--primary); font-weight: 600; }
+
+    .nav-item svg { width: 22px; height: 22px; }
+
+    /* Overlay & bottom sheet */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+      z-index: 20;
+    }
+
+    .overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--surface);
+      border-radius: 22px 22px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: 30;
+      max-height: 78%;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .bottom-sheet.open { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: #d1d5db;
+      border-radius: 999px;
+      margin: 10px auto 0;
+    }
+
+    .sheet-header {
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sheet-header h3 {
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .sheet-list {
+      overflow-y: auto;
+      padding: 8px 14px;
+      flex: 1;
+    }
+
+    .sheet-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 8px;
+      background: #fafafa;
+    }
+
+    .sheet-item.dragging { opacity: 0.5; }
+
+    .sheet-drag {
+      color: var(--muted-light);
+      cursor: grab;
+      flex-shrink: 0;
+    }
+
+    .sheet-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .sheet-meta { flex: 1; min-width: 0; }
+
+    .sheet-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .sheet-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .size-select {
+      font-family: inherit;
+      font-size: 0.72rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 6px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .toggle {
+      width: 42px;
+      height: 24px;
+      border-radius: 999px;
+      background: #d1d5db;
+      border: none;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .toggle.on { background: var(--primary); }
+    .toggle.on::after { transform: translateX(-18px); }
+
+    .sheet-footer {
+      padding: 12px 14px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .save-btn {
+      width: 100%;
+      font-family: inherit;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toast {
+      position: absolute;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      background: var(--primary-dark);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 40;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .side-notes {
+      max-width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .side-notes h2 {
+      font-size: 1rem;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .side-notes ul {
+      margin-right: 18px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .side-notes li { margin-bottom: 8px; }
+
+    @media (max-width: 860px) {
+      .side-notes { max-width: 390px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-intro">
+      <h1>مصروف — نموذج شاشة الرئيسية (إعادة تصميم)</h1>
+      <p>نسخة HTML للتجربة فقط — RTL عربي، مع تخصيص وترتيب الأقسام. اضغط «تخصيص» داخل الهاتف لتجربة Bottom Sheet.</p>
+      <div class="page-actions">
+        <a href="index.html">← التصميم السابق</a>
+        <button type="button" class="primary" id="openCustomizeDemo">فتح وضع التخصيص</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="phone" id="phone">
+        <div class="phone-screen">
+          <div class="status-bar">9:41</div>
+
+          <header class="app-bar">
+            <div class="logo">
+              <span class="logo-icon">💰</span>
+              مصروف
+            </div>
+            <div class="app-bar-actions">
+              <button class="icon-btn" aria-label="الإشعارات">
+                <span class="notif-dot"></span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </button>
+              <button class="icon-btn" aria-label="الإعدادات">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="scroll-area" id="dashboard">
+            <!-- Period bar -->
+            <div class="period-bar">
+              <div class="period-info">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <div>
+                  <div class="period-label">فترة الراتب</div>
+                  <div class="period-value">27 يوليو — 26 أغسطس</div>
+                </div>
+              </div>
+              <button type="button" class="customize-btn" id="customizeBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                تخصيص
+              </button>
+            </div>
+
+            <!-- Sections (reorderable) -->
+            <div id="sectionsContainer">
+              <!-- Hero -->
+              <section class="dashboard-section size-lg" data-id="hero" data-label="بطاقة المتبقي">
+                <div class="edit-handle" draggable="true">⋮⋮</div>
+                <div class="section-card hero-card">
+                  <div class="hero-label">المتبقي حتى الراتب القادم</div>
+                  <div class="hero-amount">5,673 <span style="font-size:0.55em;font-weight:600">ر.س</span></div>
+                  <div class="hero-meta">
+                    <span class="days-chip">📅 12 يوم متبقية من أصل 31 يوم</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill"></div></div>
+                  <div class="hero-footer">
+                    <span>من إجمالي الوارد <strong style="color:var(--in)">79,283</strong> ر.س</span>
+                    <span class="dot">•</span>
+                    <span>المصروف <strong style="color:var(--out)">73,610</strong> ر.س</span>
+                    <span style="margin-right:auto">ℹ️</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Quick summary -->
+              <section class="dashboard-section size-md" data-id="quick" data-label="بطاقات الملخص السريع">
+                <div class="edit-handle" draggable="true">⋮⋮</div>
+                <div class="quick-grid">
+                  <div class="quick-card">
+                    <div class="icon neutral">◎</div>
+                    <div class="label">الصافي / المتبقي</div>
+                    <div class="value neutral">5,673</div>
+                  </div>
+                  <div class="quick-card clickable" data-link="expenses">
+                    <div class="icon out">↑</div>
+                    <div class="label">إجمالي المصروف</div>
+                    <div class="value out">73,610</div>
+                  </div>
+                  <div class="quick-card clickable" data-link="income">
+                    <div class="icon in">↓</div>
+                    <div class="label">إجمالي الوارد</div>
+                    <div class="value in">79,283</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Accounts -->
+              <section class="dashboard-section size-md" data-id="accounts" data-label="ملخص الحسابات">
+                <div class="edit-handle" draggable="true">⋮⋮</div>
+                <div class="section-header">
+                  <h2>ملخص الحسابات</h2>
+                  <a href="#">عرض الكل ›</a>
+                </div>
+                <div class="section-card">
+                  <div class="account-row">
+                    <div class="account-icon checking">🏦</div>
+                    <div class="account-info">
+                      <div class="account-name">الحساب الجاري</div>
+                      <div class="account-type">حساب شخصي · ···3001</div>
+                    </div>
+                    <div class="account-balance">12,430 ر.س</div>
+                  </div>
+                  <div class="account-row">
+                    <div class="account-icon savings">🐷</div>
+                    <div class="account-info">
+                      <div class="account-name">حساب الادخار</div>
+                      <div class="account-type">ادخار · ···8842</div>
+                    </div>
+                    <div class="account-balance">8,200 ر.س</div>
+                  </div>
+                  <div class="account-row">
+                    <div class="account-icon visa">💳</div>
+                    <div class="account-info">
+                      <div class="account-name">الفيزا</div>
+                      <div class="account-type">بطاقة مرتبطة · ···7271</div>
+                    </div>
+                    <div class="account-balance">3,150 ر.س</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Credit cards -->
+              <section class="dashboard-section size-lg" data-id="cards" data-label="ملخص البطاقات">
+                <div class="edit-handle" draggable="true">⋮⋮</div>
+                <div class="section-header">
+                  <h2>ملخص البطاقات</h2>
+                  <a href="#">عرض الكل ›</a>
+                </div>
+                <div class="cards-scroll">
+                  <article class="credit-card-item">
+                    <div class="cc-top">
+                      <div class="cc-brand">
+                        <div class="cc-logo mastercard">MC</div>
+                        <div>
+                          <div class="cc-name">Mastercard</div>
+                          <div class="cc-digits">···· 4821</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="cc-metrics">
+                      <div class="cc-metric primary">
+                        <div class="m-label">المتبقي من دورة الراتب</div>
+                        <div class="m-value">2,450 ر.س</div>
+                      </div>
+                      <div class="cc-metric out">
+                        <div class="m-label">مصروف منذ كشف الحساب</div>
+                        <div class="m-value">1,820 ر.س</div>
+                      </div>
+                      <div class="cc-metric balance">
+                        <div class="m-label">الرصيد الحالي</div>
+                        <div class="m-value">17,230 ر.س</div>
+                      </div>
+                      <div class="cc-metric due">
+                        <div class="m-label">المستحق</div>
+                        <div class="m-value">802 ر.س</div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="credit-card-item">
+                    <div class="cc-top">
+                      <div class="cc-brand">
+                        <div class="cc-logo visa">VISA</div>
+                        <div>
+                          <div class="cc-name">Visa Platinum</div>
+                          <div class="cc-digits">···· 3109</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="cc-metrics">
+                      <div class="cc-metric primary">
+                        <div class="m-label">المتبقي من دورة الراتب</div>
+                        <div class="m-value">1,890 ر.س</div>
+                      </div>
+                      <div class="cc-metric out">
+                        <div class="m-label">مصروف منذ كشف الحساب</div>
+                        <div class="m-value">640 ر.س</div>
+                      </div>
+                      <div class="cc-metric balance">
+                        <div class="m-label">الرصيد الحالي</div>
+                        <div class="m-value">9,500 ر.س</div>
+                      </div>
+                      <div class="cc-metric due">
+                        <div class="m-label">المستحق</div>
+                        <div class="m-value">640 ر.س</div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="credit-card-item">
+                    <div class="cc-top">
+                      <div class="cc-brand">
+                        <div class="cc-logo mada">mada</div>
+                        <div>
+                          <div class="cc-name">مدى</div>
+                          <div class="cc-digits">···· 8820</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="cc-metrics">
+                      <div class="cc-metric primary">
+                        <div class="m-label">المتبقي من دورة الراتب</div>
+                        <div class="m-value">—</div>
+                      </div>
+                      <div class="cc-metric out">
+                        <div class="m-label">مصروف منذ كشف الحساب</div>
+                        <div class="m-value">320 ر.س</div>
+                      </div>
+                      <div class="cc-metric balance">
+                        <div class="m-label">الرصيد الحالي</div>
+                        <div class="m-value">مرتبط بالجاري</div>
+                      </div>
+                      <div class="cc-metric due">
+                        <div class="m-label">المستحق</div>
+                        <div class="m-value">—</div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <!-- Transactions -->
+              <section class="dashboard-section size-md" data-id="transactions" data-label="آخر العمليات">
+                <div class="edit-handle" draggable="true">⋮⋮</div>
+                <div class="section-header">
+                  <h2>آخر العمليات</h2>
+                  <a href="#">عرض الكل ›</a>
+                </div>
+                <div class="section-card">
+                  <div class="tx-row">
+                    <div class="tx-icon">🏪</div>
+                    <div class="tx-body">
+                      <div class="tx-title">تحويل من Amazon SA</div>
+                      <div class="tx-sub">Amazon · اليوم 10:24 ص</div>
+                    </div>
+                    <div class="tx-amount-wrap">
+                      <span class="tx-badge in">وارد</span>
+                      <div class="tx-amount in">+12.50</div>
+                    </div>
+                  </div>
+                  <div class="tx-row">
+                    <div class="tx-icon">🛒</div>
+                    <div class="tx-body">
+                      <div class="tx-title">شراء — بنده</div>
+                      <div class="tx-sub">مدى · أمس 8:15 م</div>
+                    </div>
+                    <div class="tx-amount-wrap">
+                      <span class="tx-badge out">مصروف</span>
+                      <div class="tx-amount out">−64.00</div>
+                    </div>
+                  </div>
+                  <div class="tx-row">
+                    <div class="tx-icon">💸</div>
+                    <div class="tx-body">
+                      <div class="tx-title">تحويل خارجي — براء ف. صالح بخ</div>
+                      <div class="tx-sub">حساب جاري · 19 أغسطس</div>
+                    </div>
+                    <div class="tx-amount-wrap">
+                      <span class="tx-badge out">مصروف</span>
+                      <div class="tx-amount out">−100.00</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <nav class="bottom-nav">
+            <div class="nav-item active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z"/></svg>
+              الرئيسية
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              العمليات
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              الإحصائيات
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              المزيد
+            </div>
+          </nav>
+
+          <div class="overlay" id="overlay"></div>
+
+          <div class="bottom-sheet" id="bottomSheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-header">
+              <h3>تخصيص الرئيسية</h3>
+            </div>
+            <div class="sheet-list" id="sheetList"></div>
+            <div class="sheet-footer">
+              <button type="button" class="save-btn" id="saveBtn">حفظ التغييرات</button>
+            </div>
+          </div>
+
+          <div class="toast" id="toast">تم حفظ التخصيص</div>
+        </div>
+      </div>
+
+      <aside class="side-notes">
+        <h2>ملاحظات النموذج</h2>
+        <ul>
+          <li>الترتيب: شريط علوي → فترة الراتب → المتبقي → ملخص سريع → حسابات → بطاقات → عمليات.</li>
+          <li>بطاقتا المصروف والوارد قابلة للضغط (تظهر رسالة تجريبية).</li>
+          <li>ملخص البطاقات يبرز: المتبقي (أخضر) → مصروف الكشف (أحمر) → الرصيد → المستحق.</li>
+          <li>زر «تخصيص» يفتح Bottom Sheet: إظهار/إخفاء، حجم، وسحب لإعادة الترتيب.</li>
+          <li>لا يوجد قسم «حركة الأموال» مستقل في هذه النسخة.</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const SECTIONS = [
+      { id: "hero", label: "بطاقة المتبقي", icon: "💰", visible: true, size: "lg" },
+      { id: "quick", label: "بطاقات الملخص السريع", icon: "📊", visible: true, size: "md", children: [
+        { id: "quick-expense", label: "إجمالي المصروف", icon: "↑", visible: true, size: "sm" },
+        { id: "quick-income", label: "إجمالي الوارد", icon: "↓", visible: true, size: "sm" }
+      ]},
+      { id: "accounts", label: "ملخص الحسابات", icon: "🏦", visible: true, size: "md" },
+      { id: "cards", label: "ملخص البطاقات", icon: "💳", visible: true, size: "lg" },
+      { id: "transactions", label: "آخر العمليات", icon: "🕐", visible: true, size: "md" }
+    ];
+
+    let config = JSON.parse(JSON.stringify(SECTIONS));
+    let editMode = false;
+    let dragSrc = null;
+
+    const body = document.body;
+    const customizeBtn = document.getElementById("customizeBtn");
+    const overlay = document.getElementById("overlay");
+    const bottomSheet = document.getElementById("bottomSheet");
+    const sheetList = document.getElementById("sheetList");
+    const saveBtn = document.getElementById("saveBtn");
+    const toast = document.getElementById("toast");
+    const sectionsContainer = document.getElementById("sectionsContainer");
+    const openCustomizeDemo = document.getElementById("openCustomizeDemo");
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function openCustomize() {
+      editMode = true;
+      body.classList.add("edit-mode");
+      customizeBtn.classList.add("active");
+      overlay.classList.add("visible");
+      bottomSheet.classList.add("open");
+      renderSheetList();
+    }
+
+    function closeCustomize() {
+      editMode = false;
+      body.classList.remove("edit-mode");
+      customizeBtn.classList.remove("active");
+      overlay.classList.remove("visible");
+      bottomSheet.classList.remove("open");
+    }
+
+    function applyConfig() {
+      config.forEach(item => {
+        const el = sectionsContainer.querySelector(`[data-id="${item.id}"]`);
+        if (!el) return;
+        el.classList.toggle("hidden", !item.visible);
+        el.classList.remove("size-sm", "size-md", "size-lg");
+        el.classList.add(`size-${item.size}`);
+        sectionsContainer.appendChild(el);
+
+        if (item.id === "quick" && item.children) {
+          const cards = el.querySelectorAll(".quick-card");
+          item.children.forEach((child, idx) => {
+            if (cards[idx]) cards[idx].style.display = child.visible ? "" : "none";
+          });
+        }
+      });
+    }
+
+    function renderSheetList() {
+      sheetList.innerHTML = "";
+      config.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "sheet-item";
+        row.dataset.index = index;
+        row.innerHTML = `
+          <span class="sheet-drag" draggable="true">⋮⋮</span>
+          <div class="sheet-icon">${item.icon}</div>
+          <div class="sheet-meta">
+            <div class="sheet-title">${item.label}</div>
+            <div class="sheet-controls">
+              <select class="size-select" data-index="${index}">
+                <option value="sm" ${item.size === "sm" ? "selected" : ""}>صغير</option>
+                <option value="md" ${item.size === "md" ? "selected" : ""}>متوسط</option>
+                <option value="lg" ${item.size === "lg" ? "selected" : ""}>كبير</option>
+              </select>
+            </div>
+            ${item.children ? item.children.map((c, ci) => `
+              <div class="sheet-controls" style="margin-top:4px;padding-right:8px;border-right:2px solid #e5e7eb">
+                <span style="font-size:0.72rem;color:#6b7280;min-width:90px">${c.label}</span>
+                <button type="button" class="toggle ${c.visible ? "on" : ""}" data-child="${ci}" data-parent="${index}" aria-label="تبديل ${c.label}"></button>
+              </div>
+            `).join("") : ""}
+          </div>
+          <button type="button" class="toggle ${item.visible ? "on" : ""}" data-index="${index}" aria-label="تبديل ${item.label}"></button>
+        `;
+        sheetList.appendChild(row);
+      });
+
+      sheetList.querySelectorAll(".toggle").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const parentIdx = btn.dataset.parent;
+          const childIdx = btn.dataset.child;
+          if (parentIdx !== undefined && childIdx !== undefined) {
+            config[parentIdx].children[childIdx].visible = !config[parentIdx].children[childIdx].visible;
+          } else {
+            config[btn.dataset.index].visible = !config[btn.dataset.index].visible;
+          }
+          renderSheetList();
+          applyConfig();
+        });
+      });
+
+      sheetList.querySelectorAll(".size-select").forEach(sel => {
+        sel.addEventListener("change", () => {
+          config[sel.dataset.index].size = sel.value;
+          applyConfig();
+        });
+      });
+
+      sheetList.querySelectorAll(".sheet-drag").forEach(handle => {
+        handle.addEventListener("dragstart", e => {
+          dragSrc = handle.closest(".sheet-item");
+          dragSrc.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+        });
+        handle.addEventListener("dragend", () => {
+          if (dragSrc) dragSrc.classList.remove("dragging");
+          dragSrc = null;
+        });
+      });
+
+      sheetList.querySelectorAll(".sheet-item").forEach(item => {
+        item.addEventListener("dragover", e => {
+          e.preventDefault();
+          const dragging = sheetList.querySelector(".sheet-item.dragging");
+          if (!dragging || dragging === item) return;
+          const rect = item.getBoundingClientRect();
+          const next = (e.clientY - rect.top) / rect.height > 0.5;
+          sheetList.insertBefore(dragging, next ? item.nextSibling : item);
+        });
+        item.addEventListener("drop", e => {
+          e.preventDefault();
+          const order = [...sheetList.querySelectorAll(".sheet-item")].map(el => +el.dataset.index);
+          config = order.map(i => config[i]);
+          renderSheetList();
+          applyConfig();
+        });
+      });
+    }
+
+    // Dashboard section drag in edit mode
+    sectionsContainer.querySelectorAll(".edit-handle").forEach(handle => {
+      handle.addEventListener("dragstart", e => {
+        if (!editMode) { e.preventDefault(); return; }
+        dragSrc = handle.closest(".dashboard-section");
+        dragSrc.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+      handle.addEventListener("dragend", () => {
+        if (dragSrc) dragSrc.classList.remove("dragging");
+        dragSrc = null;
+        syncConfigFromDom();
+      });
+    });
+
+    sectionsContainer.addEventListener("dragover", e => {
+      if (!editMode) return;
+      e.preventDefault();
+      const dragging = sectionsContainer.querySelector(".dashboard-section.dragging");
+      const target = e.target.closest(".dashboard-section");
+      if (!dragging || !target || dragging === target) return;
+      const rect = target.getBoundingClientRect();
+      const next = (e.clientY - rect.top) / rect.height > 0.5;
+      sectionsContainer.insertBefore(dragging, next ? target.nextSibling : target);
+    });
+
+    function syncConfigFromDom() {
+      const order = [...sectionsContainer.querySelectorAll(".dashboard-section")].map(el => el.dataset.id);
+      config.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    }
+
+    customizeBtn.addEventListener("click", openCustomize);
+    openCustomizeDemo.addEventListener("click", openCustomize);
+    overlay.addEventListener("click", closeCustomize);
+
+    saveBtn.addEventListener("click", () => {
+      syncConfigFromDom();
+      applyConfig();
+      closeCustomize();
+      showToast("تم حفظ التغييرات");
+    });
+
+    document.querySelectorAll(".quick-card.clickable").forEach(card => {
+      card.addEventListener("click", () => {
+        const type = card.dataset.link;
+        showToast(type === "expenses" ? "→ صفحة تفاصيل المصروف" : "→ صفحة تفاصيل الوارد");
+      });
+    });
+
+    applyConfig();
+  </script>
+</body>
+</html>
