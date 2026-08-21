@@ -34,11 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.flowInflow
-import com.baraa.masroof.application.dashboard.flowOutflow
-import com.baraa.masroof.application.dashboard.flowRemaining
+import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -59,7 +57,8 @@ fun DashboardHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
+    val movement = summary.externalMovement()
+    val remaining = movement.remaining
     val remainingColor = when {
         remaining.amount.signum() > 0 -> extended.inflow
         remaining.amount.signum() < 0 -> extended.outflow
@@ -135,7 +134,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_income,
-                    formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                    formatLocalizedMoney(movement.inflow),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -144,7 +143,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_expense,
-                    formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                    formatLocalizedMoney(movement.outflow),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -185,7 +184,8 @@ fun DashboardQuickSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
+    val movement = summary.externalMovement()
+    val remaining = movement.remaining
 
     val cardPadding = quickCardPadding(size)
 
@@ -210,7 +210,7 @@ fun DashboardQuickSummaryRow(
         if (showExpense) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
-                value = formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                value = formatLocalizedMoney(movement.outflow),
                 valueColor = extended.outflow,
                 icon = MasroofIcons.netSpending,
                 iconBackground = extended.outflowSoft,
@@ -224,7 +224,7 @@ fun DashboardQuickSummaryRow(
         if (showIncome) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
-                value = formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                value = formatLocalizedMoney(movement.inflow),
                 valueColor = extended.inflow,
                 icon = MasroofIcons.income,
                 iconBackground = extended.inflowSoft,
@@ -349,9 +349,10 @@ fun DashboardAccountsSection(
 private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)
-    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)
-    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
+    val position = summary?.cashPosition()
+    val periodInflow = position?.inflow
+    val periodOutflow = position?.outflow
+    val remaining = position?.remaining
     val iconOptions = listOf(
         Triple(MasroofIcons.moneyMovement, extended.accountSoft, extended.account),
         Triple(MasroofIcons.savings, extended.inflowSoft, extended.inflow),

@@ -75,16 +75,16 @@ class AccountFlowValueObjectsTest {
         assertEquals(Money.of("550.00", currency), aggregate.outflow.total)
         assertEquals(
             SignedMoneyAmount.of(Money.of("750.00", currency)),
-            aggregate.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET),
+            aggregate.externalMovement().remaining,
         )
         assertEquals(
             SignedMoneyAmount.of(Money.of("750.00", currency)),
-            aggregate.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+            aggregate.cashPosition().remaining,
         )
     }
 
     @Test
-    fun currentAccountSummary_aggregateNet_excludesSelfTransfersFromRemaining() {
+    fun cashPosition_and_externalMovement_differWhenSelfTransfersPresent() {
         val summary = CurrentAccountSummary.of(
             currency = Currency.SAR,
             salary = Money.of("1000", Currency.SAR),
@@ -101,11 +101,11 @@ class AccountFlowValueObjectsTest {
         )
         assertEquals(
             SignedMoneyAmount.of(Money.of("500.00", Currency.SAR)),
-            summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET),
+            summary.externalMovement().remaining,
         )
         assertEquals(
             SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+            summary.cashPosition().remaining,
         )
     }
 }

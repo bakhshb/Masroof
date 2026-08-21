@@ -29,11 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
-import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.flowInflow
-import com.baraa.masroof.application.dashboard.flowOutflow
-import com.baraa.masroof.application.dashboard.flowRemaining
+import com.baraa.masroof.application.dashboard.OwnedAccountPeriodFlow
+import com.baraa.masroof.application.dashboard.OwnedAccountsFlowSummary
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
@@ -125,7 +123,7 @@ fun AccountsSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AccountsSummaryHeroCard(aggregateSummary = state.currentAccount)
+            AccountsSummaryHeroCard(ownedAccounts = state.ownedAccounts)
 
             AccountsSummaryHeader(
                 accountCount = state.ownedAccounts.size,
@@ -151,11 +149,22 @@ fun AccountsSummaryScreen(
 }
 
 @Composable
-private fun AccountsSummaryHeroCard(aggregateSummary: CurrentAccountSummary?) {
+private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
     val extended = MasroofThemeExtras.extendedColors
-    val totalRemaining = aggregateSummary?.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
-    val totalInflow = aggregateSummary?.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)
-    val totalOutflow = aggregateSummary?.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)
+    val fleet = OwnedAccountsFlowSummary(
+        accounts = ownedAccounts.mapNotNull { account ->
+            account.periodSummary?.let { summary ->
+                OwnedAccountPeriodFlow(
+                    bank = account.bank,
+                    maskedNumber = account.maskedNumber,
+                    summary = summary,
+                )
+            }
+        },
+    )
+    val totalRemaining = fleet.totalRemaining
+    val totalInflow = fleet.totalInflow
+    val totalOutflow = fleet.totalOutflow
     val remainingColor = when {
         totalRemaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         totalRemaining.amount.signum() > 0 -> extended.inflow
@@ -228,9 +237,10 @@ private fun AccountsSummaryAccountCard(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
-    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)
-    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)
+    val position = summary?.cashPosition()
+    val remaining = position?.remaining
+    val periodInflow = position?.inflow
+    val periodOutflow = position?.outflow
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow

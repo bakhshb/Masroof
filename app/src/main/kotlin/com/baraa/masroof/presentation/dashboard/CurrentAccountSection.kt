@@ -17,10 +17,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.flowInflow
-import com.baraa.masroof.application.dashboard.flowOutflow
+import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofBadge
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -74,7 +72,8 @@ fun CurrentAccountSection(
                 }
             }
 
-            val net = summary.netMovement
+            val movement = summary.externalMovement()
+            val net = movement.remaining
             Text(
                 formatLocalizedMoney(net),
                 style = MaterialTheme.typography.headlineMedium.copy(
@@ -90,8 +89,8 @@ fun CurrentAccountSection(
             Text(
                 stringResource(
                     R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
-                    formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                    formatLocalizedMoney(movement.inflow),
+                    formatLocalizedMoney(movement.outflow),
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -124,7 +123,7 @@ fun CurrentAccountSection(
             }
             TotalRow(
                 label = stringResource(R.string.dashboard_total_inflow),
-                amount = summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET),
+                amount = movement.inflow,
             )
 
             Spacer(Modifier.height(8.dp))
@@ -167,7 +166,7 @@ fun CurrentAccountSection(
             }
             TotalRow(
                 label = stringResource(R.string.dashboard_total_spent),
-                amount = summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET),
+                amount = movement.outflow,
                 amountColor = extended.outflow,
             )
 
