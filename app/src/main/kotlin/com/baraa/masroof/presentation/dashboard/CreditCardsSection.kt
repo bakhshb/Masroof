@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -77,6 +79,82 @@ fun CreditCardsSection(
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
                     modifier = Modifier.width(268.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CreditCardCompactListRow(
+    row: CreditCardDashboardRow,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val extended = MasroofThemeExtras.extendedColors
+    val statementLabel = if (row.statementPeriodLabel != null) {
+        stringResource(
+            R.string.dashboard_credit_card_statement_purchases_total,
+            row.statementPeriodLabel,
+        )
+    } else {
+        stringResource(R.string.dashboard_credit_card_statement_purchases_total_fallback)
+    }
+    val spendingColor = spendingColor(row.statementSpendingNet)
+
+    MasroofCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CreditCardBrandBadge(last4 = row.last4)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(
+                        R.string.dashboard_credit_card_last4,
+                        formatCardLast4(row.last4),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    statementLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                Text(
+                    formatLocalizedMoney(row.statementSpendingNet),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = spendingColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Icon(
+                    imageVector = MasroofIcons.periodNext,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    stringResource(R.string.dashboard_credit_card_open_details),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = extended.account,
                 )
             }
         }
