@@ -82,19 +82,15 @@ fun DashboardFlowDetailScreen(
             when (mode) {
                 DashboardFlowDetailMode.Expense -> {
                     FlowDetailExpenseSummarySection(summary = summary)
-                    FlowDetailExpenseTransactionSections(
-                        summary = summary,
-                        grouping = grouping,
-                        previewsById = previewsById,
+                    FlowDetailTransactionsSection(
+                        transactions = flowExpenseTransactions(grouping, previewsById),
                         onOpenTransaction = onOpenTransaction,
                     )
                 }
                 DashboardFlowDetailMode.Income -> {
                     FlowDetailIncomeSummarySection(summary = summary)
-                    FlowDetailIncomeTransactionSections(
-                        summary = summary,
-                        grouping = grouping,
-                        previewsById = previewsById,
+                    FlowDetailTransactionsSection(
+                        transactions = flowIncomeTransactions(grouping, previewsById),
                         onOpenTransaction = onOpenTransaction,
                     )
                 }
@@ -159,55 +155,16 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
 }
 
 @Composable
-private fun FlowDetailExpenseTransactionSections(
-    summary: CurrentAccountSummary,
-    grouping: CurrentAccountFlowDetailGrouping,
-    previewsById: Map<String, TransactionPreviewUi>,
-    onOpenTransaction: (String) -> Unit,
-) {
-    CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.forEach { category ->
-        val amount = expenseAmount(summary, category)
-        if (amount.amount.signum() <= 0) return@forEach
-        val rows = grouping.expense[category].orEmpty()
-            .mapNotNull { previewsById[it.id] }
-        if (rows.isEmpty()) return@forEach
-        FlowDetailCategoryTransactionsSection(
-            title = stringResource(expenseCategoryLabelRes(category)),
-            transactions = rows,
-            onOpenTransaction = onOpenTransaction,
-        )
-    }
-}
-
-@Composable
-private fun FlowDetailIncomeTransactionSections(
-    summary: CurrentAccountSummary,
-    grouping: CurrentAccountFlowDetailGrouping,
-    previewsById: Map<String, TransactionPreviewUi>,
-    onOpenTransaction: (String) -> Unit,
-) {
-    CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.forEach { category ->
-        val amount = incomeAmount(summary, category)
-        if (amount.amount.signum() <= 0) return@forEach
-        val rows = grouping.income[category].orEmpty()
-            .mapNotNull { previewsById[it.id] }
-        if (rows.isEmpty()) return@forEach
-        FlowDetailCategoryTransactionsSection(
-            title = stringResource(incomeCategoryLabelRes(category)),
-            transactions = rows,
-            onOpenTransaction = onOpenTransaction,
-        )
-    }
-}
-
-@Composable
-private fun FlowDetailCategoryTransactionsSection(
-    title: String,
+private fun FlowDetailTransactionsSection(
     transactions: List<TransactionPreviewUi>,
     onOpenTransaction: (String) -> Unit,
 ) {
+    if (transactions.isEmpty()) return
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MasroofSectionTitle(title = title)
+        MasroofSectionTitle(
+            title = stringResource(R.string.dashboard_flow_detail_transactions_title),
+        )
         transactions.forEach { row ->
             DashboardRecentTransactionRow(
                 row = row,
@@ -216,6 +173,30 @@ private fun FlowDetailCategoryTransactionsSection(
         }
     }
 }
+
+private fun flowExpenseTransactions(
+    grouping: CurrentAccountFlowDetailGrouping,
+    previewsById: Map<String, TransactionPreviewUi>,
+): List<TransactionPreviewUi> =
+    grouping.expense.values
+        .flatten()
+        .mapNotNull { previewsById[it.id] }
+        .sortedByDateDesc()
+
+private fun flowIncomeTransactions(
+    grouping: CurrentAccountFlowDetailGrouping,
+    previewsById: Map<String, TransactionPreviewUi>,
+): List<TransactionPreviewUi> =
+    grouping.income.values
+        .flatten()
+        .mapNotNull { previewsById[it.id] }
+        .sortedByDateDesc()
+
+private fun List<TransactionPreviewUi>.sortedByDateDesc(): List<TransactionPreviewUi> =
+    sortedWith(
+        compareByDescending<TransactionPreviewUi> { it.localDate }
+            .thenByDescending { it.id },
+    )
 
 @Composable
 fun DashboardFlowBreakdownCard(
