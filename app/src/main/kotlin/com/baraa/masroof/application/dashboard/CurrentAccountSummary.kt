@@ -16,37 +16,13 @@ data class CurrentAccountSummary(
 ) {
     val currency: Currency get() = inflow.currency
 
-    val salary: Money get() = inflow.salary
-    val otherIncome: Money get() = inflow.otherIncome
-    val externalTransfersIn: Money get() = inflow.externalTransfersIn
-    val selfTransfersIn: Money get() = inflow.selfTransfersIn
-
-    val creditCardPayments: Money get() = outflow.creditCardPayments
-    val billPayments: Money get() = outflow.billPayments
-    val externalTransfersOut: Money get() = outflow.externalTransfersOut
-    val cashWithdrawals: Money get() = outflow.cashWithdrawals
-    val posPurchases: Money get() = outflow.posPurchases
-    val fees: Money get() = outflow.fees
-    val selfTransfersOut: Money get() = outflow.selfTransfersOut
-
-    val totalInflow: Money get() = inflow.coreTotal
-    val totalOutflow: Money get() = outflow.coreTotal
-    val accountInflow: Money get() = inflow.total
-    val accountOutflow: Money get() = outflow.total
-
     val netMovement: SignedMoneyAmount
         get() {
-            val net = totalInflow.amount
-                .subtract(totalOutflow.amount)
+            val net = inflow.coreTotal.amount
+                .subtract(outflow.coreTotal.amount)
                 .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
             return SignedMoneyAmount(net, currency)
         }
-
-    val accountRemaining: SignedMoneyAmount
-        get() = SignedMoneyAmount.difference(accountInflow, accountOutflow)
-
-    val accountSpendingGross: Money
-        get() = billPayments + posPurchases + fees
 
     init {
         require(inflow.currency == outflow.currency)

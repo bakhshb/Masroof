@@ -12,12 +12,7 @@ data class OwnedAccountPeriodSummary(
     val bank: Bank,
     val maskedNumber: String,
     val summary: CurrentAccountSummary,
-) {
-    val periodNet: SignedMoneyAmount get() = summary.netMovement
-    val accountInflow: Money get() = summary.accountInflow
-    val accountOutflow: Money get() = summary.accountOutflow
-    val accountRemaining: SignedMoneyAmount get() = summary.accountRemaining
-}
+)
 
 object OwnedAccountPeriodSummaryCalculator {
     fun summarize(

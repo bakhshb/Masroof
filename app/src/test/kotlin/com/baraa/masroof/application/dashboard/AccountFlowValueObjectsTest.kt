@@ -95,8 +95,6 @@ class AccountFlowValueObjectsTest {
             fees = Money.zero(Currency.SAR),
             selfTransfersOut = Money.of("200", Currency.SAR),
         )
-        assertEquals(summary.inflow.total, summary.accountInflow)
-        assertEquals(summary.outflow.total, summary.accountOutflow)
         assertEquals(
             SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
             summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),

@@ -260,7 +260,7 @@ private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummary
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = expenseCategoryLabelRes(category), amount = amount)
     }.toMutableList()
-    if (summary.selfTransfersOut.amount.signum() > 0) {
+    if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
         rows += FlowSummaryRow(
             labelRes = R.string.dashboard_self_transfer_out,
             amount = summary.outflow.selfTransfersOut,
@@ -275,7 +275,7 @@ private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryR
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = incomeCategoryLabelRes(category), amount = amount)
     }.toMutableList()
-    if (summary.selfTransfersIn.amount.signum() > 0) {
+    if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
         rows += FlowSummaryRow(
             labelRes = R.string.dashboard_self_transfer_in,
             amount = summary.inflow.selfTransfersIn,

@@ -183,7 +183,7 @@ object CurrentAccountSummaryCalculator {
 
         return SpendingSplitSummary(
             currency = primaryCurrency,
-            totalSpending = currentAccount.totalOutflow,
+            totalSpending = currentAccount.outflow.coreTotal,
             creditCardPurchases = SignedMoneyAmount.difference(cardGross, cardRefunds),
         )
     }

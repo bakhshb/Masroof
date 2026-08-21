@@ -74,19 +74,19 @@ class CurrentAccountFlowDetailGrouperTest {
         )
 
         assertEquals(
-            summary.externalTransfersOut,
+            summary.outflow.externalTransfersOut,
             sumGrouped(grouping, FlowExpenseCategory.EXTERNAL_TRANSFER_OUT),
         )
         assertEquals(
-            summary.creditCardPayments,
+            summary.outflow.creditCardPayments,
             sumGrouped(grouping, FlowExpenseCategory.CREDIT_CARD_PAYMENT),
         )
         assertEquals(
-            summary.cashWithdrawals,
+            summary.outflow.cashWithdrawals,
             sumGrouped(grouping, FlowExpenseCategory.CASH_WITHDRAWAL),
         )
         assertEquals(
-            summary.posPurchases,
+            summary.outflow.posPurchases,
             sumGrouped(grouping, FlowExpenseCategory.POS_PURCHASE),
         )
     }

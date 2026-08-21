@@ -34,13 +34,13 @@ class CurrentAccountSummaryCalculatorTest {
             parsedRecords = emptyList(),
         )
 
-        assertEquals(Money.of("15000.00", Currency.SAR), summary.salary)
-        assertEquals(Money.zero(Currency.SAR), summary.otherIncome)
-        assertEquals(Money.of("200.00", Currency.SAR), summary.externalTransfersIn)
-        assertEquals(Money.of("500.00", Currency.SAR), summary.creditCardPayments)
-        assertEquals(Money.of("100.00", Currency.SAR), summary.externalTransfersOut)
-        assertEquals(Money.of("50.00", Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.of("90.00", Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("15000.00", Currency.SAR), summary.inflow.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.otherIncome)
+        assertEquals(Money.of("200.00", Currency.SAR), summary.inflow.externalTransfersIn)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.creditCardPayments)
+        assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.externalTransfersOut)
+        assertEquals(Money.of("50.00", Currency.SAR), summary.outflow.cashWithdrawals)
+        assertEquals(Money.of("90.00", Currency.SAR), summary.outflow.posPurchases)
         assertEquals(
             SignedMoneyAmount.of(Money.of("14460.00", Currency.SAR)),
             summary.netMovement,
@@ -74,8 +74,8 @@ class CurrentAccountSummaryCalculatorTest {
             ),
         )
 
-        assertEquals(Money.of("3191.68", Currency.SAR), summary.salary)
-        assertEquals(Money.zero(Currency.SAR), summary.externalTransfersIn)
+        assertEquals(Money.of("3191.68", Currency.SAR), summary.inflow.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.externalTransfersIn)
     }
 
     @Test
@@ -96,9 +96,9 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("210.00", Currency.SAR), summary.billPayments)
-        assertEquals(Money.zero(Currency.SAR), summary.posPurchases)
-        assertEquals(Money.zero(Currency.SAR), summary.fees)
+        assertEquals(Money.of("210.00", Currency.SAR), summary.outflow.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.posPurchases)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
     }
 
     @Test
@@ -134,8 +134,8 @@ class CurrentAccountSummaryCalculatorTest {
                 ),
             ),
         )
-        assertEquals(Money.of("120.00", Currency.SAR), summary.billPayments)
-        assertEquals(Money.zero(Currency.SAR), summary.fees)
+        assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
     }
 
     @Test
@@ -148,8 +148,8 @@ class CurrentAccountSummaryCalculatorTest {
                 parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT),
             ),
         )
-        assertEquals(Money.of("210.00", Currency.SAR), summary.billPayments)
-        assertEquals(Money.zero(Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("210.00", Currency.SAR), summary.outflow.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.posPurchases)
     }
 
     @Test
@@ -169,8 +169,8 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountLast4s = setOf("3478"),
             rawSmsById = emptyMap(),
         )
-        assertEquals(Money.zero(Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.zero(Currency.SAR), summary.accountOutflow)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.total)
     }
 
     @Test
@@ -196,8 +196,8 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(accountB),
             ownedAccountLast4s = setOf("3002"),
         )
-        assertEquals(Money.zero(Currency.SAR), summaryA.cashWithdrawals)
-        assertEquals(Money.zero(Currency.SAR), summaryB.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summaryA.outflow.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summaryB.outflow.cashWithdrawals)
     }
 
     @Test
@@ -230,11 +230,11 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(accountA),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("1000.00", Currency.SAR), summary.accountInflow)
-        assertEquals(Money.of("700.00", Currency.SAR), summary.accountOutflow)
+        assertEquals(Money.of("1000.00", Currency.SAR), summary.inflow.total)
+        assertEquals(Money.of("700.00", Currency.SAR), summary.outflow.total)
         assertEquals(
             SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.accountRemaining,
+            summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
         )
     }
 
@@ -263,16 +263,16 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(accountId),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("100.00", Currency.SAR), summary.externalTransfersOut)
-        assertEquals(Money.of("50.00", Currency.SAR), summary.creditCardPayments)
-        assertEquals(Money.of("30.00", Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.of("40.00", Currency.SAR), summary.billPayments)
-        assertEquals(Money.of("60.00", Currency.SAR), summary.posPurchases)
-        assertEquals(Money.of("10.00", Currency.SAR), summary.fees)
-        assertEquals(Money.of("200.00", Currency.SAR), summary.selfTransfersOut)
+        assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.externalTransfersOut)
+        assertEquals(Money.of("50.00", Currency.SAR), summary.outflow.creditCardPayments)
+        assertEquals(Money.of("30.00", Currency.SAR), summary.outflow.cashWithdrawals)
+        assertEquals(Money.of("40.00", Currency.SAR), summary.outflow.billPayments)
+        assertEquals(Money.of("60.00", Currency.SAR), summary.outflow.posPurchases)
+        assertEquals(Money.of("10.00", Currency.SAR), summary.outflow.fees)
+        assertEquals(Money.of("200.00", Currency.SAR), summary.outflow.selfTransfersOut)
         assertEquals(
             Money.of("490.00", Currency.SAR),
-            summary.accountOutflow,
+            summary.outflow.total,
         )
     }
 
@@ -338,10 +338,10 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountLast4s = setOf("3001"),
             rawSmsById = rawSmsById,
         )
-        assertEquals(Money.of("802.62", Currency.SAR), summary.creditCardPayments)
-        assertEquals(Money.of("500.00", Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.of("210.00", Currency.SAR), summary.billPayments)
-        assertEquals(Money.zero(Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("802.62", Currency.SAR), summary.outflow.creditCardPayments)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.cashWithdrawals)
+        assertEquals(Money.of("210.00", Currency.SAR), summary.outflow.billPayments)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.posPurchases)
     }
 
     @Test
@@ -357,7 +357,7 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("90.00", Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("90.00", Currency.SAR), summary.outflow.posPurchases)
     }
 
     @Test
@@ -378,8 +378,8 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(ownedA, ownedB),
             ownedAccountLast4s = setOf("3001", "3002"),
         )
-        assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersIn)
-        assertEquals(Money.of("500.00", Currency.SAR), summary.selfTransfersOut)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.inflow.selfTransfersIn)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.selfTransfersOut)
         assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.netMovement)
     }
 

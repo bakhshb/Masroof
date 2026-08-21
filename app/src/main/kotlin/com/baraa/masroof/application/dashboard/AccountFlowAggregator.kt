@@ -40,5 +40,6 @@ fun CurrentAccountSummary.flowOutflow(mode: AccountFlowTotalsMode): com.baraa.ma
 fun CurrentAccountSummary.flowRemaining(mode: AccountFlowTotalsMode): SignedMoneyAmount =
     when (mode) {
         AccountFlowTotalsMode.AGGREGATE_NET -> netMovement
-        AccountFlowTotalsMode.PER_ACCOUNT_REMAINING -> accountRemaining
+        AccountFlowTotalsMode.PER_ACCOUNT_REMAINING ->
+            SignedMoneyAmount.difference(inflow.total, outflow.total)
     }
