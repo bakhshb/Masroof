@@ -8,16 +8,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AccountDetailScreen(
@@ -53,15 +57,14 @@ fun AccountDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            AccountDetailHeroCard(
+                remaining = account.remainingBalance,
+                updatedAt = account.remainingBalanceUpdatedAt,
+                periodInflow = account.periodInflow,
+                periodOutflow = account.periodOutflow,
+            )
             if (summary != null) {
-                AccountDetailHeroCard(summary = summary)
                 DashboardFlowBreakdownCard(summary = summary)
-            } else {
-                Text(
-                    stringResource(R.string.dashboard_account_detail_unavailable),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             DashboardSummaryTransactionsSection(
@@ -74,38 +77,65 @@ fun AccountDetailScreen(
 }
 
 @Composable
-private fun AccountDetailHeroCard(summary: CurrentAccountSummary) {
+private fun AccountDetailHeroCard(
+    remaining: SignedMoneyAmount?,
+    updatedAt: Instant?,
+    periodInflow: com.baraa.masroof.core.money.Money?,
+    periodOutflow: com.baraa.masroof.core.money.Money?,
+) {
     val extended = MasroofThemeExtras.extendedColors
-    val net = summary.netMovement
-    val netColor = when {
-        net.amount.signum() > 0 -> extended.inflow
-        net.amount.signum() < 0 -> extended.outflow
-        else -> MaterialTheme.colorScheme.primary
+    val remainingColor = when {
+        remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        remaining.amount.signum() > 0 -> extended.inflow
+        remaining.amount.signum() < 0 -> extended.outflow
+        else -> MaterialTheme.colorScheme.onSurface
     }
+    val locale = LocalConfiguration.current.locales[0]
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
     MasroofCard(accent = MasroofCardAccent.Account) {
         Text(
-            stringResource(R.string.dashboard_account_period_net_label),
+            stringResource(R.string.dashboard_account_remaining_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            formatLocalizedMoney(net),
+            remaining?.let { formatLocalizedMoney(it) }
+                ?: stringResource(R.string.dashboard_value_unavailable),
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
-                color = netColor,
+                color = remainingColor,
             ),
             modifier = Modifier.padding(top = 8.dp),
         )
         Text(
-            stringResource(
-                R.string.dashboard_remaining_formula,
-                formatLocalizedMoney(summary.totalInflow),
-                formatLocalizedMoney(summary.totalOutflow),
-            ),
+            stringResource(R.string.dashboard_account_remaining_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 4.dp),
         )
+        if (periodInflow != null && periodOutflow != null) {
+            Text(
+                stringResource(
+                    R.string.dashboard_account_period_in_out,
+                    formatLocalizedMoney(periodInflow),
+                    formatLocalizedMoney(periodOutflow),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        updatedAt?.let { at ->
+            Text(
+                stringResource(
+                    R.string.dashboard_account_remaining_updated,
+                    dateTimeFormatter.format(at.atZone(ZoneId.systemDefault())),
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
 }

@@ -383,22 +383,36 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (account.periodInflow != null && account.periodOutflow != null) {
+                Text(
+                    stringResource(
+                        R.string.dashboard_account_period_in_out,
+                        formatLocalizedMoney(account.periodInflow),
+                        formatLocalizedMoney(account.periodOutflow),
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
             Text(
-                account.bank.id,
+                stringResource(R.string.dashboard_account_remaining_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                account.remainingBalance?.let { formatLocalizedMoney(it) }
+                    ?: stringResource(R.string.dashboard_value_unavailable),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = account.remainingBalance?.let { remaining ->
+                    when {
+                        remaining.amount.signum() > 0 -> extended.inflow
+                        remaining.amount.signum() < 0 -> extended.outflow
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                } ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Text(
-            account.periodNet?.let { formatLocalizedMoney(it) } ?: stringResource(R.string.dashboard_value_unavailable),
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = account.periodNet?.let { net ->
-                when {
-                    net.amount.signum() > 0 -> extended.inflow
-                    net.amount.signum() < 0 -> extended.outflow
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
-            } ?: MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

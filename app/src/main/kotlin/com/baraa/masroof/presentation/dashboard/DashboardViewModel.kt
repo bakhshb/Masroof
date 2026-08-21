@@ -527,6 +527,8 @@ class DashboardViewModel(
         return registryAccounts.map { account ->
             val summary = netsByKey["${account.bank.id}:${account.maskedNumber}"]
             account.copy(
+                remainingBalance = summary?.remainingBalance,
+                remainingBalanceUpdatedAt = summary?.remainingBalanceUpdatedAt,
                 periodNet = summary?.periodNet,
                 periodInflow = summary?.totalInflow,
                 periodOutflow = summary?.totalOutflow,

@@ -188,6 +188,10 @@
     <string name="dashboard_accounts_summary_screen_title">ملخص الحسابات</string>
     <string name="dashboard_accounts_summary_empty">لا توجد حسابات مضافة</string>
     <string name="dashboard_accounts_aggregate_net_title">صافي حركة الحسابات</string>
+    <string name="dashboard_account_remaining_label">المتبقي في الحساب</string>
+    <string name="dashboard_account_remaining_hint">من آخر رسالة بنك</string>
+    <string name="dashboard_accounts_remaining_total_title">إجمالي المتبقي في الحسابات</string>
+    <string name="dashboard_account_remaining_updated">محدّث: %1$s</string>
     <string name="dashboard_manage_accounts">إدارة الحسابات</string>
     <string name="dashboard_accounts_count_label">%1$d حساب</string>
     <string name="dashboard_account_period_in_out">وارد %1$s · منصرف %2$s</string>

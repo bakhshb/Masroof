@@ -181,6 +181,10 @@
     <string name="dashboard_accounts_summary_screen_title">Accounts summary</string>
     <string name="dashboard_accounts_summary_empty">No accounts added yet</string>
     <string name="dashboard_accounts_aggregate_net_title">Net account movement</string>
+    <string name="dashboard_account_remaining_label">Remaining in account</string>
+    <string name="dashboard_account_remaining_hint">From latest bank SMS</string>
+    <string name="dashboard_accounts_remaining_total_title">Total remaining in accounts</string>
+    <string name="dashboard_account_remaining_updated">Updated: %1$s</string>
     <string name="dashboard_manage_accounts">Manage accounts</string>
     <string name="dashboard_accounts_count_label">%1$d accounts</string>
     <string name="dashboard_account_period_in_out">In %1$s · spent %2$s</string>
