@@ -70,6 +70,30 @@ class TransactionAssemblerTest {
     }
 
     @Test
+    fun purchase_madaDebitWithAccount_usesAccountSourceId() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.PURCHASE,
+                amount = money("120.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "2210"),
+                channel = PurchaseChannel.POS,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+        ) as TransactionAssembler.Outcome.Assembled
+
+        assertEquals(FinancialTransactionType.EXPENSE, outcome.transaction.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            outcome.transaction.sourceContainerId,
+        )
+        assertNull(outcome.transaction.destinationContainerId)
+    }
+
+    @Test
     fun cardPayment_creditCardPayment_withoutInventingCardType() {
         val outcome = TransactionAssembler.assembleSingle(
             event = event(

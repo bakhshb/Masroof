@@ -359,7 +359,8 @@ object TransactionAssembler {
 
         val (sourceId, destId) = when (event.messageFamily) {
             MessageFamily.PURCHASE ->
-                (durableCardId ?: durableSourceAccountId) to null
+                // Mada/debit purchases debit the current account; credit-card-only SMS has no account ref.
+                (durableSourceAccountId ?: durableCardId) to null
 
             MessageFamily.CARD_PAYMENT ->
                 durableSourceAccountId to durableCardId

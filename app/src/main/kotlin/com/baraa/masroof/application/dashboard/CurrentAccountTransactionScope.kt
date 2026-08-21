@@ -11,6 +11,7 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 internal data class CurrentAccountTransactionScope(
     val ownedContainerIds: Set<String>,
     val ownedAccountLast4s: Set<String>,
+    val mode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
 ) {
     fun involvesOwnedSource(
         tx: FinancialTransaction,
@@ -18,11 +19,21 @@ internal data class CurrentAccountTransactionScope(
         rawSmsById: Map<String, RawSms>,
     ): Boolean {
         if (ownedContainerIds.isEmpty()) return true
-        val sourceId = resolveSourceContainerId(tx, parsedRecordsById, rawSmsById)
-        if (sourceId == null) {
-            return ownedContainerIds.isEmpty() && tx.type in TRUSTED_OWNED_SOURCE_TYPES
+
+        resolveOwnedAccountSourceId(tx, parsedRecordsById, rawSmsById)?.let { accountId ->
+            return matchesOwnedContainer(accountId)
         }
-        return matchesOwnedContainer(sourceId)
+
+        val sourceId = tx.sourceContainerId
+        if (sourceId != null) {
+            if (isCreditCardContainer(sourceId)) return false
+            return matchesOwnedContainer(sourceId)
+        }
+
+        return when (mode) {
+            AccountFlowScopeMode.Fleet -> tx.type in TRUSTED_OWNED_SOURCE_TYPES
+            AccountFlowScopeMode.SingleAccount -> false
+        }
     }
 
     fun involvesOwnedDestination(
@@ -31,12 +42,45 @@ internal data class CurrentAccountTransactionScope(
         rawSmsById: Map<String, RawSms>,
     ): Boolean {
         if (ownedContainerIds.isEmpty()) return true
-        val destId = resolveDestinationContainerId(tx, parsedRecordsById, rawSmsById)
-        if (destId == null) {
-            return ownedContainerIds.isEmpty() && tx.type in TRUSTED_OWNED_DESTINATION_TYPES
+
+        resolveOwnedDestinationAccountId(tx, parsedRecordsById, rawSmsById)?.let { accountId ->
+            return matchesOwnedContainer(accountId)
         }
-        return matchesOwnedContainer(destId)
+
+        val destId = tx.destinationContainerId
+        if (destId != null) {
+            if (isCreditCardContainer(destId)) return false
+            return matchesOwnedContainer(destId)
+        }
+
+        return when (mode) {
+            AccountFlowScopeMode.Fleet -> tx.type in TRUSTED_OWNED_DESTINATION_TYPES
+            AccountFlowScopeMode.SingleAccount -> false
+        }
     }
+
+    /** Account debited for this expense, from linked SMS/events (ignores card-only [sourceContainerId]). */
+    fun resolveOwnedAccountSourceId(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
+    ): String? {
+        for (record in linkedRecords(tx, parsedRecordsById)) {
+            record.event.sourceAccountRef
+                ?.let(FinancialContainerIdFactory::accountId)
+                ?.let { return it }
+            accountIdFromSmsBody(record, rawSmsById)?.let { return it }
+        }
+        return null
+    }
+
+    fun isCreditCardSourcedExpenseWithoutOwnedAccount(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
+    ): Boolean =
+        isCreditCardContainer(tx.sourceContainerId) &&
+            resolveOwnedAccountSourceId(tx, parsedRecordsById, rawSmsById) == null
 
     fun isBillPayment(
         tx: FinancialTransaction,
@@ -76,34 +120,11 @@ internal data class CurrentAccountTransactionScope(
         }
     }
 
-    private fun matchesOwnedContainer(containerId: String): Boolean {
-        if (containerId in ownedContainerIds) return true
-        if (!containerId.startsWith("account:")) return false
-        val last4 = containerId.substringAfterLast(':')
-        return last4 in ownedAccountLast4s
-    }
-
-    private fun resolveSourceContainerId(
+    private fun resolveOwnedDestinationAccountId(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
     ): String? {
-        tx.sourceContainerId?.let { return it }
-        for (record in linkedRecords(tx, parsedRecordsById)) {
-            record.event.sourceAccountRef
-                ?.let(FinancialContainerIdFactory::accountId)
-                ?.let { return it }
-            accountIdFromSmsBody(record, rawSmsById)?.let { return it }
-        }
-        return null
-    }
-
-    private fun resolveDestinationContainerId(
-        tx: FinancialTransaction,
-        parsedRecordsById: Map<String, ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
-    ): String? {
-        tx.destinationContainerId?.let { return it }
         for (record in linkedRecords(tx, parsedRecordsById)) {
             record.event.destinationAccountRef
                 ?.let(FinancialContainerIdFactory::accountId)
@@ -111,6 +132,13 @@ internal data class CurrentAccountTransactionScope(
             accountIdFromDestinationSmsBody(record, rawSmsById)?.let { return it }
         }
         return null
+    }
+
+    private fun matchesOwnedContainer(containerId: String): Boolean {
+        if (containerId in ownedContainerIds) return true
+        if (!containerId.startsWith("account:")) return false
+        val last4 = containerId.substringAfterLast(':')
+        return last4 in ownedAccountLast4s
     }
 
     private fun accountIdFromSmsBody(
@@ -202,5 +230,8 @@ internal data class CurrentAccountTransactionScope(
                     }
                 }
                 .toSet()
+
+        private fun isCreditCardContainer(containerId: String?): Boolean =
+            containerId?.startsWith("card:") == true
     }
 }

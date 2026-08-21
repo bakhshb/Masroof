@@ -63,12 +63,14 @@ object CurrentAccountFlowDetailGrouper {
         ownedAccountContainerIds: Set<String> = emptySet(),
         ownedAccountLast4s: Set<String> = emptySet(),
         rawSmsById: Map<String, RawSms> = emptyMap(),
+        scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
     ): CurrentAccountFlowDetailGrouping {
         val billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords)
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
+            mode = scopeMode,
         )
         val expense = FlowExpenseCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }
         val income = FlowIncomeCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }
@@ -117,7 +119,14 @@ object CurrentAccountFlowDetailGrouper {
                 }
 
                 FinancialTransactionType.EXPENSE -> {
-                    if (isCreditCardContainer(tx.sourceContainerId)) continue
+                    if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(
+                            tx,
+                            parsedRecordsById,
+                            rawSmsById,
+                        )
+                    ) {
+                        continue
+                    }
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     when {
                         scope.isCreditCardPayment(tx, parsedRecordsById, rawSmsById) ->
@@ -134,7 +143,14 @@ object CurrentAccountFlowDetailGrouper {
                 }
 
                 FinancialTransactionType.FEE -> {
-                    if (isCreditCardContainer(tx.sourceContainerId)) continue
+                    if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(
+                            tx,
+                            parsedRecordsById,
+                            rawSmsById,
+                        )
+                    ) {
+                        continue
+                    }
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
                     if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
                         expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
