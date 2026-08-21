@@ -69,6 +69,33 @@ class OwnedAccountsFlowSummaryTest {
   }
 
   @Test
+  fun externalMovement_excludesSelfTransferFromAccountRemaining_likeV019() {
+    val summary = CurrentAccountSummary.of(
+      currency = Currency.SAR,
+      salary = Money.of("31731.68", Currency.SAR),
+      otherIncome = Money.zero(Currency.SAR),
+      externalTransfersIn = Money.of("34293.00", Currency.SAR),
+      selfTransfersIn = Money.zero(Currency.SAR),
+      creditCardPayments = Money.zero(Currency.SAR),
+      billPayments = Money.of("2345.52", Currency.SAR),
+      externalTransfersOut = Money.of("5304.00", Currency.SAR),
+      cashWithdrawals = Money.zero(Currency.SAR),
+      posPurchases = Money.zero(Currency.SAR),
+      fees = Money.of("3036.11", Currency.SAR),
+      selfTransfersOut = Money.of("76078.00", Currency.SAR),
+    )
+
+    assertEquals(
+      SignedMoneyAmount.of(Money.of("55339.05", Currency.SAR)),
+      summary.externalMovement().remaining,
+    )
+    assertEquals(
+      SignedMoneyAmount.difference(summary.inflow.total, summary.outflow.total),
+      summary.cashPosition().remaining,
+    )
+  }
+
+  @Test
   fun cashPosition_includesSelfTransfers_externalMovement_excludesThem() {
     val summary = CurrentAccountSummary.of(
       currency = Currency.SAR,

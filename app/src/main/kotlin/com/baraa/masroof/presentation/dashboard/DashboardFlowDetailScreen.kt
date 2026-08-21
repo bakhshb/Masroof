@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
@@ -45,17 +45,17 @@ fun DashboardFlowDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val position = summary.cashPosition()
+    val movement = summary.externalMovement()
     val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
-            total = position.outflow,
+            total = movement.outflow,
             totalColor = extended.outflow,
             totalLabelRes = R.string.dashboard_flow_detail_expense_total,
         )
         DashboardFlowDetailMode.Income -> FlowDetailPresentation(
             titleRes = R.string.dashboard_income_details_title,
-            total = position.inflow,
+            total = movement.inflow,
             totalColor = extended.inflow,
             totalLabelRes = R.string.dashboard_flow_detail_income_total,
         )
@@ -151,10 +151,21 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
+            Text(
+                stringResource(R.string.dashboard_self_transfers),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             FlowDetailSummaryRow(
                 label = stringResource(R.string.dashboard_self_transfer_out),
                 amount = summary.outflow.selfTransfersOut,
-                direction = TransactionDirectionUi.OUTWARD,
+                direction = TransactionDirectionUi.NEUTRAL,
+            )
+            Text(
+                stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -171,10 +182,21 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
+            Text(
+                stringResource(R.string.dashboard_self_transfers),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             FlowDetailSummaryRow(
                 label = stringResource(R.string.dashboard_self_transfer_in),
                 amount = summary.inflow.selfTransfersIn,
-                direction = TransactionDirectionUi.TRANSFER_IN,
+                direction = TransactionDirectionUi.NEUTRAL,
+            )
+            Text(
+                stringResource(R.string.dashboard_self_transfers_neutral_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

@@ -35,8 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.cashPosition
-import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -186,7 +184,6 @@ fun DashboardQuickSummaryRow(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val movement = summary.externalMovement()
-    val position = summary.cashPosition()
     val remaining = movement.remaining
 
     val cardPadding = quickCardPadding(size)
@@ -212,7 +209,7 @@ fun DashboardQuickSummaryRow(
         if (showExpense) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
-                value = formatLocalizedMoney(position.outflow),
+                value = formatLocalizedMoney(movement.outflow),
                 valueColor = extended.outflow,
                 icon = MasroofIcons.netSpending,
                 iconBackground = extended.outflowSoft,
@@ -226,7 +223,7 @@ fun DashboardQuickSummaryRow(
         if (showIncome) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
-                value = formatLocalizedMoney(position.inflow),
+                value = formatLocalizedMoney(movement.inflow),
                 valueColor = extended.inflow,
                 icon = MasroofIcons.income,
                 iconBackground = extended.inflowSoft,
@@ -351,10 +348,10 @@ fun DashboardAccountsSection(
 private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val position = summary?.cashPosition()
-    val periodInflow = position?.inflow
-    val periodOutflow = position?.outflow
-    val remaining = position?.remaining
+    val movement = summary?.externalMovement()
+    val periodInflow = movement?.inflow
+    val periodOutflow = movement?.outflow
+    val remaining = movement?.remaining
     val iconOptions = listOf(
         Triple(MasroofIcons.moneyMovement, extended.accountSoft, extended.account),
         Triple(MasroofIcons.savings, extended.inflowSoft, extended.inflow),

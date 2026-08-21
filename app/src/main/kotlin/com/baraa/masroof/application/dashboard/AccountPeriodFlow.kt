@@ -8,9 +8,10 @@ import java.math.RoundingMode
 /**
  * Display totals for a current-account period summary.
  *
- * Two views exist and must not be mixed in the UI:
- * - [CurrentAccountSummary.cashPosition] — per-account remaining; includes self-transfers.
- * - [CurrentAccountSummary.externalMovement] — fleet external flow; excludes self-transfers.
+ * UI should use [CurrentAccountSummary.externalMovement] everywhere (v0.2.19 behaviour):
+ * core inflow/outflow only; self-transfers shown separately and excluded from الباقي.
+ *
+ * [CurrentAccountSummary.cashPosition] includes self-transfers and is kept for tests only.
  */
 data class AccountFlowTotals(
     val inflow: Money,
@@ -27,14 +28,13 @@ data class OwnedAccountPeriodFlow(
     val maskedNumber: String,
     val summary: CurrentAccountSummary,
 ) {
-    fun cashPosition(): AccountFlowTotals = summary.cashPosition()
+    fun externalMovement(): AccountFlowTotals = summary.externalMovement()
 }
 
 /**
  * Fleet view across owned accounts for the salary period.
  *
- * [totalRemaining] is the sum of each account's [AccountFlowTotals.remaining] from
- * [OwnedAccountPeriodFlow.cashPosition] (self-transfers included per account).
+ * Totals use [externalMovement] — self-transfers between owned accounts are neutral.
  */
 data class OwnedAccountsFlowSummary(
     val accounts: List<OwnedAccountPeriodFlow>,
@@ -43,30 +43,13 @@ data class OwnedAccountsFlowSummary(
         get() = accounts.firstOrNull()?.summary?.currency
 
     val totalRemaining: SignedMoneyAmount?
-        get() {
-            val currency = currency ?: return null
-            return accounts
-                .map { it.cashPosition().remaining }
-                .fold(SignedMoneyAmount.zero(currency), SignedMoneyAmount::plus)
-        }
+        get() = externalMovement()?.remaining
 
-    /** Sum of per-account cash-position inflows (includes self-transfers received). */
     val totalInflow: Money?
-        get() {
-            val currency = currency ?: return null
-            return accounts
-                .map { it.cashPosition().inflow }
-                .fold(Money.zero(currency), Money::plus)
-        }
+        get() = externalMovement()?.inflow
 
-    /** Sum of per-account cash-position outflows (includes self-transfers sent). */
     val totalOutflow: Money?
-        get() {
-            val currency = currency ?: return null
-            return accounts
-                .map { it.cashPosition().outflow }
-                .fold(Money.zero(currency), Money::plus)
-        }
+        get() = externalMovement()?.outflow
 
     /** Combined external movement across all owned accounts (self-transfers excluded). */
     fun externalMovement(): AccountFlowTotals? {
