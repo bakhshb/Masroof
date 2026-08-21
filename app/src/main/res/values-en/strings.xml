@@ -285,6 +285,10 @@
     <string name="dashboard_credit_card_statement_spending_fallback">Spent since last statement</string>
     <string name="dashboard_credit_card_salary_spending">Salary period spending (from %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">Salary period spending</string>
+    <string name="dashboard_credit_card_salary_purchases_total">Total purchases (from %1$s)</string>
+    <string name="dashboard_credit_card_salary_purchases_total_fallback">Total purchases in period</string>
+    <string name="dashboard_credit_card_statement_purchases_total">Total purchases since statement %1$s</string>
+    <string name="dashboard_credit_card_statement_purchases_total_fallback">Total purchases since statement</string>
     <string name="dashboard_credit_card_available">Available card balance</string>
     <string name="dashboard_credit_card_card_due">Amount due</string>
     <string name="dashboard_credit_card_due_date">Due date: %1$s</string>

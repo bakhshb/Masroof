@@ -292,6 +292,10 @@
     <string name="dashboard_credit_card_statement_spending_fallback">منصرف منذ آخر كشف</string>
     <string name="dashboard_credit_card_salary_spending">منصرف فترة الراتب (من %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">منصرف فترة الراتب</string>
+    <string name="dashboard_credit_card_salary_purchases_total">إجمالي المشتريات (من %1$s)</string>
+    <string name="dashboard_credit_card_salary_purchases_total_fallback">إجمالي المشتريات في الفترة</string>
+    <string name="dashboard_credit_card_statement_purchases_total">إجمالي المشتريات منذ كشف %1$s</string>
+    <string name="dashboard_credit_card_statement_purchases_total_fallback">إجمالي المشتريات منذ كشف الحساب</string>
     <string name="dashboard_credit_card_available">الرصيد المتاح للبطاقة</string>
     <string name="dashboard_credit_card_card_due">المبلغ المستحق</string>
     <string name="dashboard_credit_card_due_date">تاريخ الاستحقاق: %1$s</string>
