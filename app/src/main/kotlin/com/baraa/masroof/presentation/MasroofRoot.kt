@@ -150,6 +150,7 @@ fun MasroofRoot(
                     pendingSettingsDestination = SettingsDestination.MyAccounts
                     homeDestination = HomeDestination.Settings
                 },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
             )
             HomeDestination.CardsSummary -> CardsSummaryRoute(
                 viewModel = dashboardViewModel,
@@ -158,6 +159,7 @@ fun MasroofRoot(
                     pendingSettingsDestination = SettingsDestination.MyCards
                     homeDestination = HomeDestination.Settings
                 },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
             )
             HomeDestination.NotificationCenter -> NotificationCenterRoute(
                 viewModel = notificationCenterViewModel,

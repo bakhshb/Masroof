@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -39,18 +43,47 @@ fun AccountsSummaryRoute(
     viewModel: DashboardViewModel,
     onBack: () -> Unit,
     onManageAccounts: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
-    BackHandler(onBack = onBack)
-    AccountsSummaryScreen(
-        state = state,
-        onBack = onBack,
-        onPrevious = viewModel::goToPreviousPeriod,
-        onNext = viewModel::goToNextPeriod,
-        onCurrent = viewModel::goToCurrentPeriod,
-        onManageAccounts = onManageAccounts,
-    )
+    var selectedAccountKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedAccount = selectedAccountKey?.let { key ->
+        state.ownedAccounts.find { ownedAccountKey(it) == key }
+    }
+
+    BackHandler {
+        if (selectedAccount != null) {
+            selectedAccountKey = null
+        } else {
+            onBack()
+        }
+    }
+
+    if (selectedAccount != null) {
+        AccountDetailScreen(
+            account = selectedAccount,
+            state = state,
+            onBack = { selectedAccountKey = null },
+            onPrevious = viewModel::goToPreviousPeriod,
+            onNext = viewModel::goToNextPeriod,
+            onCurrent = viewModel::goToCurrentPeriod,
+            onOpenTransaction = onOpenTransaction,
+        )
+    } else {
+        AccountsSummaryScreen(
+            state = state,
+            onBack = onBack,
+            onPrevious = viewModel::goToPreviousPeriod,
+            onNext = viewModel::goToNextPeriod,
+            onCurrent = viewModel::goToCurrentPeriod,
+            onManageAccounts = onManageAccounts,
+            onOpenAccount = { account -> selectedAccountKey = ownedAccountKey(account) },
+        )
+    }
 }
+
+private fun ownedAccountKey(account: OwnedAccountUi): String =
+    "${account.bank.id}:${account.maskedNumber}"
 
 @Composable
 fun AccountsSummaryScreen(
@@ -60,6 +93,7 @@ fun AccountsSummaryScreen(
     onNext: () -> Unit,
     onCurrent: () -> Unit,
     onManageAccounts: () -> Unit,
+    onOpenAccount: (OwnedAccountUi) -> Unit,
 ) {
     DashboardSummaryScaffold(
         title = stringResource(R.string.dashboard_accounts_summary_screen_title),
@@ -90,7 +124,10 @@ fun AccountsSummaryScreen(
                 )
             } else {
                 state.ownedAccounts.forEach { account ->
-                    AccountsSummaryAccountCard(account = account)
+                    AccountsSummaryAccountCard(
+                        account = account,
+                        onClick = { onOpenAccount(account) },
+                    )
                 }
             }
         }
@@ -154,7 +191,10 @@ private fun AccountsSummaryHeader(
 }
 
 @Composable
-private fun AccountsSummaryAccountCard(account: OwnedAccountUi) {
+private fun AccountsSummaryAccountCard(
+    account: OwnedAccountUi,
+    onClick: () -> Unit,
+) {
     val extended = MasroofThemeExtras.extendedColors
     val net = account.periodNet
     val netColor = when {
@@ -164,7 +204,7 @@ private fun AccountsSummaryAccountCard(account: OwnedAccountUi) {
         else -> MaterialTheme.colorScheme.onSurface
     }
 
-    MasroofCard {
+    MasroofCard(modifier = Modifier.clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

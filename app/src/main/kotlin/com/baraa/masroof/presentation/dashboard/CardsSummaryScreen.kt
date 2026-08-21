@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -19,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -34,18 +39,49 @@ fun CardsSummaryRoute(
     viewModel: DashboardViewModel,
     onBack: () -> Unit,
     onManageCards: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
-    BackHandler(onBack = onBack)
-    CardsSummaryScreen(
-        state = state,
-        onBack = onBack,
-        onPrevious = viewModel::goToPreviousPeriod,
-        onNext = viewModel::goToNextPeriod,
-        onCurrent = viewModel::goToCurrentPeriod,
-        onManageCards = onManageCards,
-    )
+    var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val followedOverview = followedCreditCardsOverview(state)
+    val selectedCard = selectedCardKey?.let { key ->
+        followedOverview?.cards?.find { ownedCardKey(it) == key }
+    }
+
+    BackHandler {
+        if (selectedCard != null) {
+            selectedCardKey = null
+        } else {
+            onBack()
+        }
+    }
+
+    if (selectedCard != null) {
+        CardDetailScreen(
+            row = selectedCard,
+            salaryPeriodLabel = followedOverview?.salaryPeriodLabel,
+            state = state,
+            onBack = { selectedCardKey = null },
+            onPrevious = viewModel::goToPreviousPeriod,
+            onNext = viewModel::goToNextPeriod,
+            onCurrent = viewModel::goToCurrentPeriod,
+            onOpenTransaction = onOpenTransaction,
+        )
+    } else {
+        CardsSummaryScreen(
+            state = state,
+            onBack = onBack,
+            onPrevious = viewModel::goToPreviousPeriod,
+            onNext = viewModel::goToNextPeriod,
+            onCurrent = viewModel::goToCurrentPeriod,
+            onManageCards = onManageCards,
+            onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+        )
+    }
 }
+
+private fun ownedCardKey(row: CreditCardDashboardRow): String =
+    "${row.bank.id}:${row.last4}"
 
 @Composable
 fun CardsSummaryScreen(
@@ -55,6 +91,7 @@ fun CardsSummaryScreen(
     onNext: () -> Unit,
     onCurrent: () -> Unit,
     onManageCards: () -> Unit,
+    onOpenCard: (CreditCardDashboardRow) -> Unit,
 ) {
     val followedOverview = followedCreditCardsOverview(state)
 
@@ -92,7 +129,9 @@ fun CardsSummaryScreen(
                         row = row,
                         salaryPeriodLabel = followedOverview?.salaryPeriodLabel,
                         zoneId = ZoneId.systemDefault(),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenCard(row) },
                     )
                 }
             }

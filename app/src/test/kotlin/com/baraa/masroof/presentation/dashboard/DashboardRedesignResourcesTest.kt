@@ -34,6 +34,14 @@ class DashboardRedesignResourcesTest {
         assertEquals("Manage cards", context.getString(R.string.dashboard_manage_cards))
         assertEquals("3 accounts", context.getString(R.string.dashboard_accounts_count_label, 3))
         assertEquals("2 cards", context.getString(R.string.dashboard_cards_count_label, 2))
+        assertEquals(
+            "Period transactions (4)",
+            context.getString(R.string.dashboard_summary_transactions_title, 4),
+        )
+        assertEquals(
+            "No period data for this account",
+            context.getString(R.string.dashboard_account_detail_unavailable),
+        )
     }
 
     @Config(qualifiers = "ar")
