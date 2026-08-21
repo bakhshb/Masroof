@@ -196,6 +196,9 @@
     <string name="dashboard_income_details_title">تفاصيل الوارد</string>
     <string name="dashboard_flow_detail_back">رجوع</string>
     <string name="dashboard_flow_detail_total">الإجمالي</string>
+    <string name="dashboard_flow_detail_period">فترة الراتب: %1$s</string>
+    <string name="dashboard_flow_detail_expense_total">إجمالي المنصرف: %1$s</string>
+    <string name="dashboard_flow_detail_income_total">إجمالي الوارد: %1$s</string>
     <string name="dashboard_card_salary_remaining">المتبقي من دورة الراتب (من %1$s)</string>
     <string name="dashboard_card_salary_remaining_fallback">المتبقي من دورة الراتب</string>
     <string name="dashboard_credit_card_current_balance">الرصيد الحالي</string>

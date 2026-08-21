@@ -189,6 +189,9 @@
     <string name="dashboard_income_details_title">Income details</string>
     <string name="dashboard_flow_detail_back">Back</string>
     <string name="dashboard_flow_detail_total">Total</string>
+    <string name="dashboard_flow_detail_period">Salary period: %1$s</string>
+    <string name="dashboard_flow_detail_expense_total">Total spent: %1$s</string>
+    <string name="dashboard_flow_detail_income_total">Total income: %1$s</string>
     <string name="dashboard_card_salary_remaining">Remaining in salary cycle (from %1$s)</string>
     <string name="dashboard_card_salary_remaining_fallback">Remaining in salary cycle</string>
     <string name="dashboard_credit_card_current_balance">Current balance</string>

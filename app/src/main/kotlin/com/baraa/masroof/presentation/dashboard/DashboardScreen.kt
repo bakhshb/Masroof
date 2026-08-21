@@ -105,7 +105,7 @@ private fun DashboardScreen(
         DashboardFlowDetailScreen(
             mode = flowDetailMode!!,
             summary = state.currentAccount,
-            periodLabel = state.periodLabel,
+            periodRangeLabel = periodRangeLabel,
             onBack = { flowDetailMode = null },
         )
         return
