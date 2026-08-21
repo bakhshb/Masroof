@@ -55,8 +55,8 @@ fun DashboardRoute(
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenAccountsSettings: () -> Unit = onOpenSettings,
-    onOpenCardsSettings: () -> Unit = onOpenSettings,
+    onOpenAccountsSummary: () -> Unit = onOpenSettings,
+    onOpenCardsSummary: () -> Unit = onOpenSettings,
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -76,8 +76,8 @@ fun DashboardRoute(
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
-        onOpenAccountsSettings = onOpenAccountsSettings,
-        onOpenCardsSettings = onOpenCardsSettings,
+        onOpenAccountsSummary = onOpenAccountsSummary,
+        onOpenCardsSummary = onOpenCardsSummary,
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
@@ -106,8 +106,8 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenAccountsSettings: () -> Unit,
-    onOpenCardsSettings: () -> Unit,
+    onOpenAccountsSummary: () -> Unit,
+    onOpenCardsSummary: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
@@ -242,8 +242,8 @@ private fun DashboardScreen(
                                 onOpenExpenseDetails = { flowDetailMode = DashboardFlowDetailMode.Expense },
                                 onOpenIncomeDetails = { flowDetailMode = DashboardFlowDetailMode.Income },
                                 onOpenSettings = onOpenSettings,
-                                onOpenAccountsSettings = onOpenAccountsSettings,
-                                onOpenCardsSettings = onOpenCardsSettings,
+                                onOpenAccountsSummary = onOpenAccountsSummary,
+                                onOpenCardsSummary = onOpenCardsSummary,
                                 onOpenAllTransactions = onOpenAllTransactions,
                                 onOpenTransaction = onOpenTransaction,
                                 onRescan = onRescan,
@@ -274,8 +274,8 @@ private fun DashboardCustomizableSections(
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenAccountsSettings: () -> Unit,
-    onOpenCardsSettings: () -> Unit,
+    onOpenAccountsSummary: () -> Unit,
+    onOpenCardsSummary: () -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onRescan: () -> Unit,
@@ -311,7 +311,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
-                        onViewAll = onOpenAccountsSettings,
+                        onViewAll = onOpenAccountsSummary,
                     )
                 }
 
@@ -323,7 +323,7 @@ private fun DashboardCustomizableSections(
                             CreditCardsSection(
                                 overview = followedOverview,
                                 zoneId = ZoneId.systemDefault(),
-                                onViewAll = onOpenCardsSettings,
+                                onViewAll = onOpenCardsSummary,
                             )
                         }
                     }

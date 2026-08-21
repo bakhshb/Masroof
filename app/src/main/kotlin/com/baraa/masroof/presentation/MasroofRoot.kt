@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import com.baraa.masroof.application.notification.NotificationAction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
+import com.baraa.masroof.presentation.dashboard.AccountsSummaryRoute
+import com.baraa.masroof.presentation.dashboard.CardsSummaryRoute
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
@@ -34,6 +36,8 @@ import com.baraa.masroof.presentation.settings.SettingsViewModel
 
 private enum class HomeDestination {
     Dashboard,
+    AccountsSummary,
+    CardsSummary,
     NotificationCenter,
     Review,
     AllTransactions,
@@ -83,6 +87,12 @@ fun MasroofRoot(
                 homeDestination == HomeDestination.AllTransactions ->
                     homeDestination = HomeDestination.Dashboard
 
+                homeDestination == HomeDestination.AccountsSummary ->
+                    homeDestination = HomeDestination.Dashboard
+
+                homeDestination == HomeDestination.CardsSummary ->
+                    homeDestination = HomeDestination.Dashboard
+
                 homeDestination == HomeDestination.NotificationCenter ->
                     homeDestination = HomeDestination.Dashboard
 
@@ -128,16 +138,26 @@ fun MasroofRoot(
                 onOpenAllTransactions = { homeDestination = HomeDestination.AllTransactions },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
-                onOpenAccountsSettings = {
+                onOpenAccountsSummary = { homeDestination = HomeDestination.AccountsSummary },
+                onOpenCardsSummary = { homeDestination = HomeDestination.CardsSummary },
+                onRequestSmsPermission = onRequestPermissions,
+                onOpenAppSettings = onOpenAppSettings,
+            )
+            HomeDestination.AccountsSummary -> AccountsSummaryRoute(
+                viewModel = dashboardViewModel,
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onManageAccounts = {
                     pendingSettingsDestination = SettingsDestination.MyAccounts
                     homeDestination = HomeDestination.Settings
                 },
-                onOpenCardsSettings = {
+            )
+            HomeDestination.CardsSummary -> CardsSummaryRoute(
+                viewModel = dashboardViewModel,
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onManageCards = {
                     pendingSettingsDestination = SettingsDestination.MyCards
                     homeDestination = HomeDestination.Settings
                 },
-                onRequestSmsPermission = onRequestPermissions,
-                onOpenAppSettings = onOpenAppSettings,
             )
             HomeDestination.NotificationCenter -> NotificationCenterRoute(
                 viewModel = notificationCenterViewModel,
