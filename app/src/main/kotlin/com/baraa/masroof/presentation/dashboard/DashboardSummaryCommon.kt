@@ -16,8 +16,6 @@ import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofPeriodPill
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import java.time.LocalDate
-import java.time.ZoneId
 
 @Composable
 fun DashboardSummaryScaffold(
@@ -33,7 +31,6 @@ fun DashboardSummaryScaffold(
     val periodRangeLabel = state.period?.let {
         FinancialPeriodUiFormatter.formatRange(context, it)
     } ?: state.periodLabel
-    val today = LocalDate.now(ZoneId.systemDefault())
 
     MasroofSecondaryScaffold(
         title = title,
