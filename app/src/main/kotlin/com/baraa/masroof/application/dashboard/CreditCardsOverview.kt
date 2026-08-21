@@ -42,3 +42,21 @@ data class CreditCardsOverview(
     val hasContent: Boolean
         get() = cards.isNotEmpty() || aggregateDueAmount != null
 }
+
+/**
+ * Latest statement due among [cards] — one value for linked cards on the same credit facility.
+ * Ignores purchase/refund SMS outstanding balances.
+ */
+fun resolveLatestStatementDue(cards: List<CreditCardDashboardRow>): StatementDueSnapshot? =
+    cards.mapNotNull { row ->
+        val snap = row.snapshot ?: return@mapNotNull null
+        val amount = snap.dueAmount ?: return@mapNotNull null
+        val issuedAt = snap.statementIssuedAt ?: return@mapNotNull null
+        StatementDueSnapshot(amount = amount, updatedAt = issuedAt, dueDate = snap.dueDate)
+    }.maxByOrNull { it.updatedAt }
+
+data class StatementDueSnapshot(
+    val amount: Money,
+    val updatedAt: Instant,
+    val dueDate: LocalDate?,
+)

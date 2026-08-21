@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -297,10 +298,14 @@ private fun formatSnapshotTime(
 
 fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview {
     val filteredCards = cards.filter { it.last4 in ownedLast4s }
+    val statementDue = resolveLatestStatementDue(filteredCards)
     return copy(
         cards = filteredCards,
         aggregatePeriodSpendingNet = sumFollowedSpending(filteredCards) { it.salaryPeriodSpendingNet },
         aggregateStatementSpendingNet = sumFollowedSpending(filteredCards) { it.statementSpendingNet },
+        aggregateDueAmount = statementDue?.amount,
+        aggregateDueUpdatedAt = statementDue?.updatedAt,
+        aggregateDueDate = statementDue?.dueDate,
     )
 }
 

@@ -156,12 +156,13 @@ object CreditCardOverviewBuilder {
         val aggregateStatementLabel = latestStatement?.updatedAt?.let {
             dayMonth.format(it.atZone(zoneId).toLocalDate())
         } ?: dayMonth.format(globalStatementStart.atZone(zoneId).toLocalDate())
+        val statementDue = resolveLatestStatementDue(rows)
 
         return CreditCardsOverview(
             cards = rows,
-            aggregateDueAmount = latestStatement?.details?.outstandingBalance,
-            aggregateDueUpdatedAt = latestStatement?.updatedAt,
-            aggregateDueDate = latestStatement?.dueDate,
+            aggregateDueAmount = statementDue?.amount,
+            aggregateDueUpdatedAt = statementDue?.updatedAt,
+            aggregateDueDate = statementDue?.dueDate,
             aggregatePeriodSpendingNet = aggregatePeriodSpending,
             aggregateStatementSpendingNet = aggregateStatementSpending,
             aggregateStatementPeriodLabel = aggregateStatementLabel,
