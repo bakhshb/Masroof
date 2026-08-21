@@ -83,8 +83,8 @@ fun DashboardFlowDetailScreen(
                     color = MaterialTheme.colorScheme.outline,
                 )
                 when (mode) {
-                    DashboardFlowDetailMode.Income -> IncomeBreakdown(summary)
-                    DashboardFlowDetailMode.Expense -> ExpenseBreakdown(summary)
+                    DashboardFlowDetailMode.Income -> DashboardIncomeBreakdown(summary)
+                    DashboardFlowDetailMode.Expense -> DashboardExpenseBreakdown(summary)
                 }
             }
         }
@@ -122,8 +122,51 @@ private fun FlowDetailHeroCard(
 }
 
 @Composable
-private fun IncomeBreakdown(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+fun DashboardFlowBreakdownCard(
+    summary: CurrentAccountSummary,
+    modifier: Modifier = Modifier,
+) {
+    MasroofCard(modifier = modifier) {
+        Text(
+            stringResource(R.string.dashboard_flow_detail_breakdown_title),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 10.dp),
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Text(
+            stringResource(R.string.dashboard_income_details_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DashboardIncomeBreakdown(
+            summary = summary,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 10.dp),
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Text(
+            stringResource(R.string.dashboard_expense_details_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DashboardExpenseBreakdown(
+            summary = summary,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun DashboardIncomeBreakdown(
+    summary: CurrentAccountSummary,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FlowDetailRow(
             label = stringResource(R.string.dashboard_salary),
             amount = summary.salary,
@@ -145,8 +188,11 @@ private fun IncomeBreakdown(summary: CurrentAccountSummary) {
 }
 
 @Composable
-private fun ExpenseBreakdown(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun DashboardExpenseBreakdown(
+    summary: CurrentAccountSummary,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FlowDetailRow(
             label = stringResource(R.string.dashboard_external_out_short),
             amount = summary.externalTransfersOut,

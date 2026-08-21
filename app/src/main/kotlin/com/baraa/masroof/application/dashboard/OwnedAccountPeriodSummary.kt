@@ -11,10 +11,12 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 data class OwnedAccountPeriodSummary(
     val bank: Bank,
     val maskedNumber: String,
-    val periodNet: SignedMoneyAmount,
-    val totalInflow: Money,
-    val totalOutflow: Money,
-)
+    val summary: CurrentAccountSummary,
+) {
+    val periodNet: SignedMoneyAmount get() = summary.netMovement
+    val totalInflow: Money get() = summary.totalInflow
+    val totalOutflow: Money get() = summary.totalOutflow
+}
 
 object OwnedAccountPeriodSummaryCalculator {
     fun summarize(
@@ -43,9 +45,7 @@ object OwnedAccountPeriodSummaryCalculator {
             OwnedAccountPeriodSummary(
                 bank = account.bank,
                 maskedNumber = account.maskedNumber,
-                periodNet = summary.netMovement,
-                totalInflow = summary.totalInflow,
-                totalOutflow = summary.totalOutflow,
+                summary = summary,
             )
         }
 }

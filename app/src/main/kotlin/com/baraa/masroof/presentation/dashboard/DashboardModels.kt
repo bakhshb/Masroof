@@ -33,6 +33,7 @@ data class OwnedAccountUi(
     val periodNet: com.baraa.masroof.application.dashboard.SignedMoneyAmount? = null,
     val periodInflow: com.baraa.masroof.core.money.Money? = null,
     val periodOutflow: com.baraa.masroof.core.money.Money? = null,
+    val periodSummary: CurrentAccountSummary? = null,
 )
 
 enum class TransactionDirectionUi {
@@ -60,6 +61,8 @@ data class TransactionPreviewUi(
     val typeLabelResHint: FinancialTransactionType,
     val direction: TransactionDirectionUi,
     val cardLast4: String?,
+    val sourceContainerId: String? = null,
+    val destinationContainerId: String? = null,
     /** Lowercase merchant/counterparty text for in-memory search. */
     val searchText: String,
     val sarEquivalent: Money? = null,

@@ -495,6 +495,8 @@ class DashboardViewModel(
                 sourceContainerId = tx.sourceContainerId,
                 destinationContainerId = tx.destinationContainerId,
             ),
+            sourceContainerId = tx.sourceContainerId,
+            destinationContainerId = tx.destinationContainerId,
             searchText = searchText,
             sarEquivalent = sarEquivalent,
             appliedExchangeRate = tx.appliedExchangeRate,
@@ -525,6 +527,7 @@ class DashboardViewModel(
                 periodNet = summary?.periodNet,
                 periodInflow = summary?.totalInflow,
                 periodOutflow = summary?.totalOutflow,
+                periodSummary = summary?.summary,
             )
         }
     }
