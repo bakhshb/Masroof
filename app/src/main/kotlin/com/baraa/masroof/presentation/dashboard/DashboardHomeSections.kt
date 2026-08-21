@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -185,6 +186,7 @@ fun DashboardQuickSummaryRow(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val movement = summary.externalMovement()
+    val position = summary.cashPosition()
     val remaining = movement.remaining
 
     val cardPadding = quickCardPadding(size)
@@ -210,7 +212,7 @@ fun DashboardQuickSummaryRow(
         if (showExpense) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
-                value = formatLocalizedMoney(movement.outflow),
+                value = formatLocalizedMoney(position.outflow),
                 valueColor = extended.outflow,
                 icon = MasroofIcons.netSpending,
                 iconBackground = extended.outflowSoft,
@@ -224,7 +226,7 @@ fun DashboardQuickSummaryRow(
         if (showIncome) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
-                value = formatLocalizedMoney(movement.inflow),
+                value = formatLocalizedMoney(position.inflow),
                 valueColor = extended.inflow,
                 icon = MasroofIcons.income,
                 iconBackground = extended.inflowSoft,

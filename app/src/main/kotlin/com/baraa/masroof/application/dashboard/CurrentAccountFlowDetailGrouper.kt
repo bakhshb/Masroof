@@ -26,6 +26,8 @@ enum class FlowIncomeCategory {
 data class CurrentAccountFlowDetailGrouping(
     val expense: Map<FlowExpenseCategory, List<FinancialTransaction>>,
     val income: Map<FlowIncomeCategory, List<FinancialTransaction>>,
+    val selfTransfersOut: List<FinancialTransaction> = emptyList(),
+    val selfTransfersIn: List<FinancialTransaction> = emptyList(),
 ) {
     companion object {
         val EXPENSE_DISPLAY_ORDER = listOf(
@@ -46,6 +48,8 @@ data class CurrentAccountFlowDetailGrouping(
         fun empty(): CurrentAccountFlowDetailGrouping = CurrentAccountFlowDetailGrouping(
             expense = FlowExpenseCategory.entries.associateWith { emptyList() },
             income = FlowIncomeCategory.entries.associateWith { emptyList() },
+            selfTransfersOut = emptyList(),
+            selfTransfersIn = emptyList(),
         )
     }
 }
@@ -68,6 +72,8 @@ object CurrentAccountFlowDetailGrouper {
         )
         val expense = FlowExpenseCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }
         val income = FlowIncomeCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }
+        val selfTransfersOut = mutableListOf<FinancialTransaction>()
+        val selfTransfersIn = mutableListOf<FinancialTransaction>()
 
         for (tx in transactions) {
             if (effectiveAmount(tx, primaryCurrency, sarEquivalents) == null) continue
@@ -137,7 +143,15 @@ object CurrentAccountFlowDetailGrouper {
                     }
                 }
 
-                FinancialTransactionType.SELF_TRANSFER,
+                FinancialTransactionType.SELF_TRANSFER -> {
+                    if (scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                        selfTransfersOut.add(tx)
+                    }
+                    if (scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
+                        selfTransfersIn.add(tx)
+                    }
+                }
+
                 FinancialTransactionType.REFUND,
                 FinancialTransactionType.ADJUSTMENT,
                 FinancialTransactionType.UNKNOWN,
@@ -148,6 +162,8 @@ object CurrentAccountFlowDetailGrouper {
         return CurrentAccountFlowDetailGrouping(
             expense = expense.mapValues { (_, rows) -> rows.toList() },
             income = income.mapValues { (_, rows) -> rows.toList() },
+            selfTransfersOut = selfTransfersOut.toList(),
+            selfTransfersIn = selfTransfersIn.toList(),
         )
     }
 

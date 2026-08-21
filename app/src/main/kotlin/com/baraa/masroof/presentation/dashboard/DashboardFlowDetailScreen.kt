@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.externalMovement
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
@@ -46,17 +45,17 @@ fun DashboardFlowDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val movement = summary.externalMovement()
+    val position = summary.cashPosition()
     val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
-            total = movement.outflow,
+            total = position.outflow,
             totalColor = extended.outflow,
             totalLabelRes = R.string.dashboard_flow_detail_expense_total,
         )
         DashboardFlowDetailMode.Income -> FlowDetailPresentation(
             titleRes = R.string.dashboard_income_details_title,
-            total = movement.inflow,
+            total = position.inflow,
             totalColor = extended.inflow,
             totalLabelRes = R.string.dashboard_flow_detail_income_total,
         )
@@ -152,21 +151,10 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Text(
-                stringResource(R.string.dashboard_self_transfers),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             FlowDetailSummaryRow(
                 label = stringResource(R.string.dashboard_self_transfer_out),
                 amount = summary.outflow.selfTransfersOut,
-                direction = TransactionDirectionUi.NEUTRAL,
-            )
-            Text(
-                stringResource(R.string.dashboard_self_transfers_neutral_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                direction = TransactionDirectionUi.OUTWARD,
             )
         }
     }
@@ -183,21 +171,10 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Text(
-                stringResource(R.string.dashboard_self_transfers),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             FlowDetailSummaryRow(
                 label = stringResource(R.string.dashboard_self_transfer_in),
                 amount = summary.inflow.selfTransfersIn,
-                direction = TransactionDirectionUi.NEUTRAL,
-            )
-            Text(
-                stringResource(R.string.dashboard_self_transfers_neutral_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                direction = TransactionDirectionUi.TRANSFER_IN,
             )
         }
     }
@@ -227,8 +204,7 @@ private fun flowExpenseTransactions(
     grouping: CurrentAccountFlowDetailGrouping,
     previewsById: Map<String, TransactionPreviewUi>,
 ): List<TransactionPreviewUi> =
-    grouping.expense.values
-        .flatten()
+    (grouping.expense.values.flatten() + grouping.selfTransfersOut)
         .mapNotNull { previewsById[it.id] }
         .sortedByDateDesc()
 
@@ -236,8 +212,7 @@ private fun flowIncomeTransactions(
     grouping: CurrentAccountFlowDetailGrouping,
     previewsById: Map<String, TransactionPreviewUi>,
 ): List<TransactionPreviewUi> =
-    grouping.income.values
-        .flatten()
+    (grouping.income.values.flatten() + grouping.selfTransfersIn)
         .mapNotNull { previewsById[it.id] }
         .sortedByDateDesc()
 
