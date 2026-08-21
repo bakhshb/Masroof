@@ -2,7 +2,6 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,7 +11,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
+import com.baraa.masroof.application.dashboard.flowRemaining
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -54,9 +56,7 @@ fun AccountDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             AccountDetailHeroCard(
-                remaining = account.accountRemaining,
-                periodInflow = account.periodInflow,
-                periodOutflow = account.periodOutflow,
+                summary = account.periodSummary,
             )
             if (summary != null) {
                 DashboardFlowBreakdownCard(summary = summary)
@@ -73,11 +73,12 @@ fun AccountDetailScreen(
 
 @Composable
 private fun AccountDetailHeroCard(
-    remaining: SignedMoneyAmount?,
-    periodInflow: com.baraa.masroof.core.money.Money?,
-    periodOutflow: com.baraa.masroof.core.money.Money?,
+    summary: com.baraa.masroof.application.dashboard.CurrentAccountSummary?,
 ) {
     val extended = MasroofThemeExtras.extendedColors
+    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow
@@ -100,13 +101,13 @@ private fun AccountDetailHeroCard(
             ),
             modifier = Modifier.padding(top = 8.dp),
         )
-        Text(
-            stringResource(R.string.dashboard_account_remaining_calculated_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
         if (periodInflow != null && periodOutflow != null) {
+            Text(
+                stringResource(R.string.dashboard_account_remaining_calculated_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             Text(
                 stringResource(
                     R.string.dashboard_remaining_formula,
@@ -115,7 +116,7 @@ private fun AccountDetailHeroCard(
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

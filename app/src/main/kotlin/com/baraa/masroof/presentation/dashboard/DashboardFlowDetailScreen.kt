@@ -16,7 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
 import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
@@ -47,13 +50,13 @@ fun DashboardFlowDetailScreen(
     val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
-            total = summary.totalOutflow,
+            total = summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET),
             totalColor = extended.outflow,
             totalLabelRes = R.string.dashboard_flow_detail_expense_total,
         )
         DashboardFlowDetailMode.Income -> FlowDetailPresentation(
             titleRes = R.string.dashboard_income_details_title,
-            total = summary.totalInflow,
+            total = summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET),
             totalColor = extended.inflow,
             totalLabelRes = R.string.dashboard_flow_detail_income_total,
         )
@@ -251,35 +254,51 @@ private data class FlowSummaryRow(
     val amount: Money,
 )
 
-private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
-    CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.mapNotNull { category ->
+private fun expenseSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
+    val rows = CurrentAccountFlowDetailGrouping.EXPENSE_DISPLAY_ORDER.mapNotNull { category ->
         val amount = expenseAmount(summary, category)
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = expenseCategoryLabelRes(category), amount = amount)
+    }.toMutableList()
+    if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
+        rows += FlowSummaryRow(
+            labelRes = R.string.dashboard_self_transfer_out,
+            amount = summary.outflow.selfTransfersOut,
+        )
     }
+    return rows
+}
 
-private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> =
-    CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.mapNotNull { category ->
+private fun incomeSummaryRows(summary: CurrentAccountSummary): List<FlowSummaryRow> {
+    val rows = CurrentAccountFlowDetailGrouping.INCOME_DISPLAY_ORDER.mapNotNull { category ->
         val amount = incomeAmount(summary, category)
         if (amount.amount.signum() <= 0) null
         else FlowSummaryRow(labelRes = incomeCategoryLabelRes(category), amount = amount)
+    }.toMutableList()
+    if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
+        rows += FlowSummaryRow(
+            labelRes = R.string.dashboard_self_transfer_in,
+            amount = summary.inflow.selfTransfersIn,
+        )
     }
+    return rows
+}
 
 private fun expenseAmount(summary: CurrentAccountSummary, category: FlowExpenseCategory): Money =
     when (category) {
-        FlowExpenseCategory.EXTERNAL_TRANSFER_OUT -> summary.externalTransfersOut
-        FlowExpenseCategory.CREDIT_CARD_PAYMENT -> summary.creditCardPayments
-        FlowExpenseCategory.CASH_WITHDRAWAL -> summary.cashWithdrawals
-        FlowExpenseCategory.BILL_PAYMENT -> summary.billPayments
-        FlowExpenseCategory.POS_PURCHASE -> summary.posPurchases
-        FlowExpenseCategory.FEE -> summary.fees
+        FlowExpenseCategory.EXTERNAL_TRANSFER_OUT -> summary.outflow.externalTransfersOut
+        FlowExpenseCategory.CREDIT_CARD_PAYMENT -> summary.outflow.creditCardPayments
+        FlowExpenseCategory.CASH_WITHDRAWAL -> summary.outflow.cashWithdrawals
+        FlowExpenseCategory.BILL_PAYMENT -> summary.outflow.billPayments
+        FlowExpenseCategory.POS_PURCHASE -> summary.outflow.posPurchases
+        FlowExpenseCategory.FEE -> summary.outflow.fees
     }
 
 private fun incomeAmount(summary: CurrentAccountSummary, category: FlowIncomeCategory): Money =
     when (category) {
-        FlowIncomeCategory.SALARY -> summary.salary
-        FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> summary.externalTransfersIn
-        FlowIncomeCategory.OTHER_INCOME -> summary.otherIncome
+        FlowIncomeCategory.SALARY -> summary.inflow.salary
+        FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> summary.inflow.externalTransfersIn
+        FlowIncomeCategory.OTHER_INCOME -> summary.inflow.otherIncome
     }
 
 private fun expenseCategoryLabelRes(category: FlowExpenseCategory): Int =

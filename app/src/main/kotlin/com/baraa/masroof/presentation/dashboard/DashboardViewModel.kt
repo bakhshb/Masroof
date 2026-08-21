@@ -526,13 +526,7 @@ class DashboardViewModel(
         val netsByKey = periodSummaries.associateBy { "${it.bank.id}:${it.maskedNumber}" }
         return registryAccounts.map { account ->
             val summary = netsByKey["${account.bank.id}:${account.maskedNumber}"]
-            account.copy(
-                accountRemaining = summary?.accountRemaining,
-                periodNet = summary?.periodNet,
-                periodInflow = summary?.totalInflow,
-                periodOutflow = summary?.totalOutflow,
-                periodSummary = summary?.summary,
-            )
+            account.copy(periodSummary = summary?.summary)
         }
     }
 

@@ -34,7 +34,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
+import com.baraa.masroof.application.dashboard.flowRemaining
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -55,7 +59,7 @@ fun DashboardHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = summary.netMovement
+    val remaining = summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
     val remainingColor = when {
         remaining.amount.signum() > 0 -> extended.inflow
         remaining.amount.signum() < 0 -> extended.outflow
@@ -131,7 +135,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_income,
-                    formatLocalizedMoney(summary.totalInflow),
+                    formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -140,7 +144,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_expense,
-                    formatLocalizedMoney(summary.totalOutflow),
+                    formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -181,7 +185,7 @@ fun DashboardQuickSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = summary.netMovement
+    val remaining = summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
 
     val cardPadding = quickCardPadding(size)
 
@@ -206,7 +210,7 @@ fun DashboardQuickSummaryRow(
         if (showExpense) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
-                value = formatLocalizedMoney(summary.totalOutflow),
+                value = formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
                 valueColor = extended.outflow,
                 icon = MasroofIcons.netSpending,
                 iconBackground = extended.outflowSoft,
@@ -220,7 +224,7 @@ fun DashboardQuickSummaryRow(
         if (showIncome) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
-                value = formatLocalizedMoney(summary.totalInflow),
+                value = formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
                 valueColor = extended.inflow,
                 icon = MasroofIcons.income,
                 iconBackground = extended.inflowSoft,
@@ -344,6 +348,10 @@ fun DashboardAccountsSection(
 @Composable
 private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     val extended = MasroofThemeExtras.extendedColors
+    val summary = account.periodSummary
+    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
     val iconOptions = listOf(
         Triple(MasroofIcons.moneyMovement, extended.accountSoft, extended.account),
         Triple(MasroofIcons.savings, extended.inflowSoft, extended.inflow),
@@ -383,12 +391,12 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (account.periodInflow != null && account.periodOutflow != null) {
+            if (periodInflow != null && periodOutflow != null) {
                 Text(
                     stringResource(
                         R.string.dashboard_account_period_in_out,
-                        formatLocalizedMoney(account.periodInflow),
-                        formatLocalizedMoney(account.periodOutflow),
+                        formatLocalizedMoney(periodInflow),
+                        formatLocalizedMoney(periodOutflow),
                     ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -402,13 +410,13 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                account.accountRemaining?.let { formatLocalizedMoney(it) }
+                remaining?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = account.accountRemaining?.let { remaining ->
+                color = remaining?.let { value ->
                     when {
-                        remaining.amount.signum() > 0 -> extended.inflow
-                        remaining.amount.signum() < 0 -> extended.outflow
+                        value.amount.signum() > 0 -> extended.inflow
+                        value.amount.signum() < 0 -> extended.outflow
                         else -> MaterialTheme.colorScheme.onSurface
                     }
                 } ?: MaterialTheme.colorScheme.onSurfaceVariant,

@@ -121,7 +121,7 @@ object CurrentAccountSummaryCalculator {
             }
         }
 
-        return CurrentAccountSummary(
+        return CurrentAccountSummary.of(
             currency = primaryCurrency,
             salary = salary,
             otherIncome = otherIncome,
@@ -183,7 +183,7 @@ object CurrentAccountSummaryCalculator {
 
         return SpendingSplitSummary(
             currency = primaryCurrency,
-            totalSpending = currentAccount.totalOutflow,
+            totalSpending = currentAccount.outflow.coreTotal,
             creditCardPurchases = SignedMoneyAmount.difference(cardGross, cardRefunds),
         )
     }

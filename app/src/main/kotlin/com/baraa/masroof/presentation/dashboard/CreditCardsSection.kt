@@ -1,18 +1,23 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
@@ -72,6 +79,82 @@ fun CreditCardsSection(
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
                     modifier = Modifier.width(268.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CreditCardCompactListRow(
+    row: CreditCardDashboardRow,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val extended = MasroofThemeExtras.extendedColors
+    val statementLabel = if (row.statementPeriodLabel != null) {
+        stringResource(
+            R.string.dashboard_credit_card_statement_purchases_total,
+            row.statementPeriodLabel,
+        )
+    } else {
+        stringResource(R.string.dashboard_credit_card_statement_purchases_total_fallback)
+    }
+    val spendingColor = spendingColor(row.statementSpendingNet)
+
+    MasroofCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CreditCardBrandBadge(last4 = row.last4)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(
+                        R.string.dashboard_credit_card_last4,
+                        formatCardLast4(row.last4),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    statementLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                Text(
+                    formatLocalizedMoney(row.statementSpendingNet),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = spendingColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Icon(
+                    imageVector = MasroofIcons.periodNext,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    stringResource(R.string.dashboard_credit_card_open_details),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = extended.account,
                 )
             }
         }
@@ -175,13 +258,17 @@ fun CreditCardSummaryTile(
                         label = salaryPeriodLabelText,
                         value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
                         valueColor = spendingColor(row.salaryPeriodSpendingNet),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(creditCardMetricTileHeight),
                     )
                     CreditCardMetricTile(
                         label = statementLabelText,
                         value = formatLocalizedMoney(row.statementSpendingNet),
                         valueColor = spendingColor(row.statementSpendingNet),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(creditCardMetricTileHeight),
                     )
                 }
 
@@ -195,14 +282,18 @@ fun CreditCardSummaryTile(
                             value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
                                 ?: stringResource(R.string.dashboard_value_unavailable),
                             valueColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(creditCardMetricTileHeight),
                         )
                         CreditCardMetricTile(
                             label = stringResource(R.string.dashboard_credit_card_card_due),
                             value = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
                                 ?: stringResource(R.string.dashboard_value_unavailable),
                             valueColor = extended.liability,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(creditCardMetricTileHeight),
                         )
                     }
                 }
@@ -257,6 +348,8 @@ private fun CreditCardBrandBadge(last4: String) {
     }
 }
 
+private val creditCardMetricTileHeight = 76.dp
+
 @Composable
 private fun CreditCardMetricTile(
     label: String,
@@ -266,7 +359,9 @@ private fun CreditCardMetricTile(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight(),
         shape = RoundedCornerShape(12.dp),
         color = extended.miniBackground,
         border = androidx.compose.foundation.BorderStroke(
@@ -274,17 +369,30 @@ private fun CreditCardMetricTile(
             extended.cardBorder,
         ),
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                ),
                 color = valueColor,
-                modifier = Modifier.padding(top = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

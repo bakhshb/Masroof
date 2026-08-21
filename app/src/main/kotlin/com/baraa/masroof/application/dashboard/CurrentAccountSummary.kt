@@ -2,68 +2,75 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import java.math.BigDecimal
 import java.math.RoundingMode
 
 /**
  * Cash movement on owned current-account containers for a salary period.
  *
- * Credit-card purchases are excluded — they are tracked as liability on the card section.
- * Self-transfers between owned accounts are neutral for [netMovement] across all accounts,
- * but included in [accountRemaining] for a single account view.
+ * Inflow and outflow categories are defined by [AccountInflow] and [AccountOutflow].
+ * Credit-card purchases on the card itself are excluded — they are tracked on the card section.
  */
 data class CurrentAccountSummary(
-    val currency: Currency,
-    val salary: Money,
-    val otherIncome: Money,
-    val externalTransfersIn: Money,
-    val selfTransfersIn: Money,
-    val selfTransfersOut: Money,
-    val creditCardPayments: Money,
-    val billPayments: Money,
-    val externalTransfersOut: Money,
-    val cashWithdrawals: Money,
-    val posPurchases: Money,
-    val fees: Money,
+    val inflow: AccountInflow,
+    val outflow: AccountOutflow,
 ) {
-    val totalInflow: Money
-        get() = salary + otherIncome + externalTransfersIn
-
-    val totalOutflow: Money
-        get() = creditCardPayments + billPayments + externalTransfersOut + cashWithdrawals + posPurchases + fees
+    val currency: Currency get() = inflow.currency
 
     val netMovement: SignedMoneyAmount
         get() {
-            val net = totalInflow.amount
-                .subtract(totalOutflow.amount)
+            val net = inflow.coreTotal.amount
+                .subtract(outflow.coreTotal.amount)
                 .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
             return SignedMoneyAmount(net, currency)
         }
 
-    /** In − out for one account in the period, including self-transfers. */
-    val accountRemaining: SignedMoneyAmount
-        get() = SignedMoneyAmount.difference(
-            totalInflow + selfTransfersIn,
-            totalOutflow + selfTransfersOut,
-        )
-
-    val accountSpendingGross: Money
-        get() = billPayments + posPurchases + fees
-
     init {
-        listOf(
-            salary,
-            otherIncome,
-            externalTransfersIn,
-            selfTransfersIn,
-            selfTransfersOut,
-            creditCardPayments,
-            billPayments,
-            externalTransfersOut,
-            cashWithdrawals,
-            posPurchases,
-            fees,
-        ).forEach { require(it.currency == currency) }
+        require(inflow.currency == outflow.currency)
+    }
+
+    companion object {
+        fun of(
+            currency: Currency,
+            salary: Money,
+            otherIncome: Money,
+            externalTransfersIn: Money,
+            selfTransfersIn: Money,
+            creditCardPayments: Money,
+            billPayments: Money,
+            externalTransfersOut: Money,
+            cashWithdrawals: Money,
+            posPurchases: Money,
+            fees: Money,
+            selfTransfersOut: Money,
+        ): CurrentAccountSummary =
+            CurrentAccountSummary(
+                inflow = AccountInflow(
+                    currency = currency,
+                    salary = salary,
+                    otherIncome = otherIncome,
+                    externalTransfersIn = externalTransfersIn,
+                    selfTransfersIn = selfTransfersIn,
+                ),
+                outflow = AccountOutflow(
+                    currency = currency,
+                    externalTransfersOut = externalTransfersOut,
+                    creditCardPayments = creditCardPayments,
+                    cashWithdrawals = cashWithdrawals,
+                    billPayments = billPayments,
+                    posPurchases = posPurchases,
+                    fees = fees,
+                    selfTransfersOut = selfTransfersOut,
+                ),
+            )
+
+        fun zero(currency: Currency): CurrentAccountSummary =
+            CurrentAccountSummary(
+                inflow = AccountInflow.zero(currency),
+                outflow = AccountOutflow.zero(currency),
+            )
+
+        fun aggregate(summaries: Collection<CurrentAccountSummary>): CurrentAccountSummary =
+            AccountFlowAggregator.aggregate(summaries)
     }
 }
 

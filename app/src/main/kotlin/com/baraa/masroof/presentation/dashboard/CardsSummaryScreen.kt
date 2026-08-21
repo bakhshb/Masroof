@@ -1,7 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,12 +24,13 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.theme.MasroofExtendedColors
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -130,13 +130,9 @@ fun CardsSummaryScreen(
                 )
             } else {
                 cards.forEach { row ->
-                    CreditCardSummaryTile(
+                    CreditCardCompactListRow(
                         row = row,
-                        salaryPeriodLabel = followedOverview?.salaryPeriodLabel,
-                        zoneId = ZoneId.systemDefault(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenCard(row) },
+                        onClick = { onOpenCard(row) },
                     )
                 }
             }
@@ -149,11 +145,9 @@ private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
     val extended = MasroofThemeExtras.extendedColors
     val aggregateDue = overview.aggregateDueAmount
     val periodSpending = overview.aggregatePeriodSpendingNet
-    val periodSpendingColor = when {
-        periodSpending.amount.signum() > 0 -> extended.outflow
-        periodSpending.amount.signum() < 0 -> extended.inflow
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+    val statementSpending = overview.aggregateStatementSpendingNet
+    val periodSpendingColor = spendingAmountColor(periodSpending, extended)
+    val statementSpendingColor = spendingAmountColor(statementSpending, extended)
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
 
@@ -191,6 +185,28 @@ private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
             style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.Bold,
                 color = periodSpendingColor,
+            ),
+            modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Text(
+            if (overview.aggregateStatementPeriodLabel != null) {
+                stringResource(
+                    R.string.dashboard_credit_cards_aggregate_statement_spending,
+                    overview.aggregateStatementPeriodLabel,
+                )
+            } else {
+                stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        Text(
+            formatLocalizedMoney(statementSpending),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = statementSpendingColor,
             ),
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -233,3 +249,14 @@ private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOve
     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
     return overview.followedOnly(ownedLast4s)
 }
+
+@Composable
+private fun spendingAmountColor(
+    amount: SignedMoneyAmount,
+    extended: MasroofExtendedColors,
+): androidx.compose.ui.graphics.Color =
+    when {
+        amount.amount.signum() > 0 -> extended.outflow
+        amount.amount.signum() < 0 -> extended.inflow
+        else -> MaterialTheme.colorScheme.onSurface
+    }

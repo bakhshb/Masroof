@@ -17,7 +17,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.AccountFlowTotalsMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
+import com.baraa.masroof.application.dashboard.flowInflow
+import com.baraa.masroof.application.dashboard.flowOutflow
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofBadge
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -87,8 +90,8 @@ fun CurrentAccountSection(
             Text(
                 stringResource(
                     R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(summary.totalInflow),
-                    formatLocalizedMoney(summary.totalOutflow),
+                    formatLocalizedMoney(summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)),
+                    formatLocalizedMoney(summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)),
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -103,25 +106,25 @@ fun CurrentAccountSection(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                 FlowRow(
                     label = stringResource(R.string.dashboard_salary),
-                    amount = summary.salary,
+                    amount = summary.inflow.salary,
                     direction = TransactionDirectionUi.INCOME,
                 )
                 FlowRow(
                     label = stringResource(R.string.dashboard_external_in_short),
-                    amount = summary.externalTransfersIn,
+                    amount = summary.inflow.externalTransfersIn,
                     direction = TransactionDirectionUi.TRANSFER_IN,
                 )
-                if (summary.otherIncome.amount.signum() > 0) {
+                if (summary.inflow.otherIncome.amount.signum() > 0) {
                     FlowRow(
                         label = stringResource(R.string.dashboard_other_income),
-                        amount = summary.otherIncome,
+                        amount = summary.inflow.otherIncome,
                         direction = TransactionDirectionUi.INCOME,
                     )
                 }
             }
             TotalRow(
                 label = stringResource(R.string.dashboard_total_inflow),
-                amount = summary.totalInflow,
+                amount = summary.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET),
             )
 
             Spacer(Modifier.height(8.dp))
@@ -133,44 +136,44 @@ fun CurrentAccountSection(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_external_out_short),
-                    amount = summary.externalTransfersOut,
+                    amount = summary.outflow.externalTransfersOut,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_credit_card_payment),
-                    amount = summary.creditCardPayments,
+                    amount = summary.outflow.creditCardPayments,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_cash_withdrawals),
-                    amount = summary.cashWithdrawals,
+                    amount = summary.outflow.cashWithdrawals,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_bill_payments),
-                    amount = summary.billPayments,
+                    amount = summary.outflow.billPayments,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_pos_purchases_short),
-                    amount = summary.posPurchases,
+                    amount = summary.outflow.posPurchases,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
                 DirectionMoneyRow(
                     label = stringResource(R.string.dashboard_fees_short),
-                    amount = summary.fees,
+                    amount = summary.outflow.fees,
                     direction = TransactionDirectionUi.OUTWARD,
                 )
             }
             TotalRow(
                 label = stringResource(R.string.dashboard_total_spent),
-                amount = summary.totalOutflow,
+                amount = summary.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET),
                 amountColor = extended.outflow,
             )
 
             if (
-                summary.selfTransfersIn.amount.signum() > 0 ||
-                summary.selfTransfersOut.amount.signum() > 0
+                summary.inflow.selfTransfersIn.amount.signum() > 0 ||
+                summary.outflow.selfTransfersOut.amount.signum() > 0
             ) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Text(
@@ -181,12 +184,12 @@ fun CurrentAccountSection(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                     FlowRow(
                         label = stringResource(R.string.dashboard_self_transfer_in),
-                        amount = summary.selfTransfersIn,
+                        amount = summary.inflow.selfTransfersIn,
                         direction = TransactionDirectionUi.NEUTRAL,
                     )
                     FlowRow(
                         label = stringResource(R.string.dashboard_self_transfer_out),
-                        amount = summary.selfTransfersOut,
+                        amount = summary.outflow.selfTransfersOut,
                         direction = TransactionDirectionUi.NEUTRAL,
                     )
                 }
