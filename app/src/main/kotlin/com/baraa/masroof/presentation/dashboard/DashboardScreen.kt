@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
+import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.LongPullToRefreshBox
@@ -73,9 +78,18 @@ fun DashboardRoute(
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
+        onOpenCustomize = viewModel::openCustomizeSheet,
+        onDismissCustomize = viewModel::dismissCustomizeSheet,
+        onSaveCustomize = viewModel::saveCustomizeLayout,
+        onToggleCustomizeSection = viewModel::toggleCustomizeSection,
+        onSetCustomizeSectionSize = viewModel::setCustomizeSectionSize,
+        onMoveCustomizeSection = viewModel::moveCustomizeSection,
+        onToggleCustomizeQuickExpense = viewModel::toggleCustomizeQuickExpense,
+        onToggleCustomizeQuickIncome = viewModel::toggleCustomizeQuickIncome,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DashboardScreen(
     state: DashboardUiState,
@@ -92,6 +106,14 @@ private fun DashboardScreen(
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
+    onOpenCustomize: () -> Unit,
+    onDismissCustomize: () -> Unit,
+    onSaveCustomize: () -> Unit,
+    onToggleCustomizeSection: (DashboardSectionId) -> Unit,
+    onSetCustomizeSectionSize: (DashboardSectionId, com.baraa.masroof.application.dashboard.DashboardSectionSize) -> Unit,
+    onMoveCustomizeSection: (DashboardSectionId, Int) -> Unit,
+    onToggleCustomizeQuickExpense: () -> Unit,
+    onToggleCustomizeQuickIncome: () -> Unit,
 ) {
     var flowDetailMode by rememberSaveable { mutableStateOf<DashboardFlowDetailMode?>(null) }
     val context = LocalContext.current
@@ -100,6 +122,7 @@ private fun DashboardScreen(
     } ?: state.periodLabel
     val today = LocalDate.now(ZoneId.systemDefault())
     val isPullRefreshing = (state.loading && state.summary != null) || state.rescanning
+    val activeLayout = state.customizeDraft ?: state.dashboardLayout
 
     if (flowDetailMode != null && state.currentAccount != null) {
         DashboardFlowDetailScreen(
@@ -109,6 +132,19 @@ private fun DashboardScreen(
             onBack = { flowDetailMode = null },
         )
         return
+    }
+
+    if (state.customizeSheetOpen && state.customizeDraft != null) {
+        DashboardCustomizeBottomSheet(
+            draft = state.customizeDraft,
+            onDismiss = onDismissCustomize,
+            onSave = onSaveCustomize,
+            onToggleSection = onToggleCustomizeSection,
+            onSetSectionSize = onSetCustomizeSectionSize,
+            onMoveSection = onMoveCustomizeSection,
+            onToggleQuickExpense = onToggleCustomizeQuickExpense,
+            onToggleQuickIncome = onToggleCustomizeQuickIncome,
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -138,7 +174,7 @@ private fun DashboardScreen(
                     onNext = onNext,
                     previousContentDescription = stringResource(R.string.dashboard_period_previous),
                     nextContentDescription = stringResource(R.string.dashboard_period_next),
-                    onCustomize = { /* customization coming soon */ },
+                    onCustomize = onOpenCustomize,
                     customizeLabel = stringResource(R.string.dashboard_customize),
                 )
 
@@ -192,80 +228,19 @@ private fun DashboardScreen(
                         val summary = state.summary
                         val currentAccount = state.currentAccount
                         if (summary != null && currentAccount != null) {
-                            DashboardHeroCard(
-                                summary = currentAccount,
-                                period = state.period,
-                                isCurrentPeriod = state.isCurrentPeriod,
+                            DashboardCustomizableSections(
+                                state = state,
+                                summary = summary,
+                                layout = activeLayout,
                                 today = today,
-                            )
-
-                            DashboardQuickSummaryRow(
-                                summary = currentAccount,
+                                editing = state.customizeSheetOpen,
                                 onOpenExpenseDetails = { flowDetailMode = DashboardFlowDetailMode.Expense },
                                 onOpenIncomeDetails = { flowDetailMode = DashboardFlowDetailMode.Income },
+                                onOpenSettings = onOpenSettings,
+                                onOpenAllTransactions = onOpenAllTransactions,
+                                onOpenTransaction = onOpenTransaction,
+                                onRescan = onRescan,
                             )
-
-                            DashboardAccountsSection(
-                                accounts = state.ownedAccounts,
-                                onViewAll = onOpenSettings,
-                            )
-
-                            state.creditCards?.let { creditCards ->
-                                val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-                                val followedOverview = creditCards.followedOnly(ownedLast4s)
-                                if (followedOverview.hasContent) {
-                                    CreditCardsSection(
-                                        overview = followedOverview,
-                                        zoneId = ZoneId.systemDefault(),
-                                        onViewAll = onOpenSettings,
-                                    )
-                                }
-                            }
-
-                            SectionHeader(
-                                title = stringResource(R.string.dashboard_recent_title),
-                                icon = MasroofIcons.recentTransactions,
-                                onViewAll = onOpenAllTransactions,
-                                viewAllLabel = stringResource(R.string.dashboard_view_all),
-                            )
-
-                            state.unknownCards.firstOrNull()?.let { firstUnknown ->
-                                UnregisteredCardsNotice(
-                                    firstLast4 = firstUnknown.last4,
-                                    extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
-                                    onOpenSettings = onOpenSettings,
-                                )
-                            }
-
-                            if (summary.transactionCount == 0) {
-                                Text(stringResource(R.string.dashboard_empty_period))
-                                Spacer(Modifier.height(8.dp))
-                                IconTextButton(
-                                    onClick = onRescan,
-                                    enabled = !state.rescanning,
-                                    icon = MasroofIcons.rescan,
-                                    text = if (state.rescanning) {
-                                        stringResource(R.string.dashboard_rescanning)
-                                    } else {
-                                        stringResource(R.string.dashboard_rescan_sms)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                state.rescanStatus?.let { status ->
-                                    Text(
-                                        rescanStatusMessage(status),
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            } else {
-                                state.recentTransactions.forEach { row ->
-                                    DashboardRecentTransactionRow(
-                                        row = row,
-                                        onClick = { onOpenTransaction(row.id) },
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                }
-                            }
 
                             if (summary.excludedOtherCurrencyCount > 0) {
                                 ForeignCurrencyNotice(excludedCount = summary.excludedOtherCurrencyCount)
@@ -274,6 +249,120 @@ private fun DashboardScreen(
                             if (state.error != null) {
                                 DashboardErrorContent(onRetry = onRetry)
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardCustomizableSections(
+    state: DashboardUiState,
+    summary: MonthlyFinancialSummary,
+    layout: DashboardLayoutSnapshot,
+    today: LocalDate,
+    editing: Boolean,
+    onOpenExpenseDetails: () -> Unit,
+    onOpenIncomeDetails: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenAllTransactions: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
+    onRescan: () -> Unit,
+) {
+    val currentAccount = state.currentAccount ?: return
+
+    layout.orderedVisibleSections().forEach { entry ->
+        Column(
+            modifier = Modifier.dashboardSectionFrame(entry.size, editing),
+        ) {
+            when (entry.id) {
+                DashboardSectionId.HERO -> {
+                    DashboardHeroCard(
+                        summary = currentAccount,
+                        period = state.period,
+                        isCurrentPeriod = state.isCurrentPeriod,
+                        today = today,
+                        size = entry.size,
+                    )
+                }
+
+                DashboardSectionId.QUICK -> {
+                    DashboardQuickSummaryRow(
+                        summary = currentAccount,
+                        onOpenExpenseDetails = onOpenExpenseDetails,
+                        onOpenIncomeDetails = onOpenIncomeDetails,
+                        showExpense = layout.quickExpenseVisible,
+                        showIncome = layout.quickIncomeVisible,
+                        size = entry.size,
+                    )
+                }
+
+                DashboardSectionId.ACCOUNTS -> {
+                    DashboardAccountsSection(
+                        accounts = state.ownedAccounts,
+                        onViewAll = onOpenSettings,
+                    )
+                }
+
+                DashboardSectionId.CARDS -> {
+                    state.creditCards?.let { creditCards ->
+                        val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
+                        val followedOverview = creditCards.followedOnly(ownedLast4s)
+                        if (followedOverview.hasContent) {
+                            CreditCardsSection(
+                                overview = followedOverview,
+                                zoneId = ZoneId.systemDefault(),
+                                onViewAll = onOpenSettings,
+                            )
+                        }
+                    }
+                }
+
+                DashboardSectionId.TRANSACTIONS -> {
+                    SectionHeader(
+                        title = stringResource(R.string.dashboard_recent_title),
+                        icon = MasroofIcons.recentTransactions,
+                        onViewAll = onOpenAllTransactions,
+                        viewAllLabel = stringResource(R.string.dashboard_view_all),
+                    )
+
+                    state.unknownCards.firstOrNull()?.let { firstUnknown ->
+                        UnregisteredCardsNotice(
+                            firstLast4 = firstUnknown.last4,
+                            extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
+                            onOpenSettings = onOpenSettings,
+                        )
+                    }
+
+                    if (summary.transactionCount == 0) {
+                        Text(stringResource(R.string.dashboard_empty_period))
+                        Spacer(Modifier.height(8.dp))
+                        IconTextButton(
+                            onClick = onRescan,
+                            enabled = !state.rescanning,
+                            icon = MasroofIcons.rescan,
+                            text = if (state.rescanning) {
+                                stringResource(R.string.dashboard_rescanning)
+                            } else {
+                                stringResource(R.string.dashboard_rescan_sms)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        state.rescanStatus?.let { status ->
+                            Text(
+                                rescanStatusMessage(status),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    } else {
+                        state.recentTransactions.forEach { row ->
+                            DashboardRecentTransactionRow(
+                                row = row,
+                                onClick = { onOpenTransaction(row.id) },
+                            )
+                            Spacer(Modifier.height(4.dp))
                         }
                     }
                 }

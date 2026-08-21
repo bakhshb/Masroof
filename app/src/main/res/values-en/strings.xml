@@ -181,6 +181,16 @@
     <string name="dashboard_cards_summary_title">Cards summary</string>
     <string name="dashboard_view_all">View all ›</string>
     <string name="dashboard_customize">Customize</string>
+    <string name="dashboard_customize_sheet_title">Customize home screen</string>
+    <string name="dashboard_customize_save">Save layout</string>
+    <string name="dashboard_customize_section_hero">Hero card</string>
+    <string name="dashboard_customize_section_quick">Quick cards</string>
+    <string name="dashboard_customize_section_accounts">Accounts summary</string>
+    <string name="dashboard_customize_section_cards">Cards summary</string>
+    <string name="dashboard_customize_section_transactions">Recent transactions</string>
+    <string name="dashboard_customize_size_small">Small</string>
+    <string name="dashboard_customize_size_medium">Medium</string>
+    <string name="dashboard_customize_size_large">Large</string>
     <string name="dashboard_salary_period_short">Salary period</string>
     <string name="dashboard_period_previous">Previous period</string>
     <string name="dashboard_period_next">Next period</string>

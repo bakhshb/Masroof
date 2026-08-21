@@ -5,7 +5,11 @@ import androidx.lifecycle.ViewModel
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
+import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
+import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.ForeignPurchaseSarConverter
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.transaction.ReclassificationResult
@@ -41,6 +45,7 @@ class DashboardViewModel(
     private val overviewLoader: DashboardOverviewLoader,
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
+    private val layoutPreferencesRepository: DashboardLayoutPreferencesRepository,
     private val rescanService: suspend () -> SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
     private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
@@ -70,6 +75,93 @@ class DashboardViewModel(
 
     companion object {
         const val RECENT_TRANSACTION_LIMIT: Int = 5
+    }
+
+    init {
+        val savedLayout = layoutPreferencesRepository.load()
+        _uiState.update { it.copy(dashboardLayout = savedLayout) }
+    }
+
+    fun openCustomizeSheet() {
+        _uiState.update {
+            it.copy(
+                customizeSheetOpen = true,
+                customizeDraft = it.dashboardLayout,
+            )
+        }
+    }
+
+    fun dismissCustomizeSheet() {
+        _uiState.update {
+            it.copy(
+                customizeSheetOpen = false,
+                customizeDraft = null,
+            )
+        }
+    }
+
+    fun saveCustomizeLayout() {
+        val draft = _uiState.value.customizeDraft ?: return
+        layoutPreferencesRepository.save(draft)
+        _uiState.update {
+            it.copy(
+                dashboardLayout = draft,
+                customizeSheetOpen = false,
+                customizeDraft = null,
+            )
+        }
+    }
+
+    fun toggleCustomizeSection(id: DashboardSectionId) {
+        mutateCustomizeDraft { snapshot ->
+            snapshot.copy(
+                sections = snapshot.sections.map { entry ->
+                    if (entry.id == id) entry.copy(visible = !entry.visible) else entry
+                },
+            )
+        }
+    }
+
+    fun setCustomizeSectionSize(id: DashboardSectionId, size: DashboardSectionSize) {
+        mutateCustomizeDraft { snapshot ->
+            snapshot.copy(
+                sections = snapshot.sections.map { entry ->
+                    if (entry.id == id) entry.copy(size = size) else entry
+                },
+            )
+        }
+    }
+
+    fun moveCustomizeSection(id: DashboardSectionId, direction: Int) {
+        mutateCustomizeDraft { snapshot ->
+            val sections = snapshot.sections.toMutableList()
+            val index = sections.indexOfFirst { it.id == id }
+            if (index < 0) return@mutateCustomizeDraft snapshot
+            val target = (index + direction).coerceIn(0, sections.lastIndex)
+            if (target == index) return@mutateCustomizeDraft snapshot
+            val item = sections.removeAt(index)
+            sections.add(target, item)
+            snapshot.copy(sections = sections)
+        }
+    }
+
+    fun toggleCustomizeQuickExpense() {
+        mutateCustomizeDraft { snapshot ->
+            snapshot.copy(quickExpenseVisible = !snapshot.quickExpenseVisible)
+        }
+    }
+
+    fun toggleCustomizeQuickIncome() {
+        mutateCustomizeDraft { snapshot ->
+            snapshot.copy(quickIncomeVisible = !snapshot.quickIncomeVisible)
+        }
+    }
+
+    private fun mutateCustomizeDraft(transform: (DashboardLayoutSnapshot) -> DashboardLayoutSnapshot) {
+        _uiState.update { current ->
+            val base = current.customizeDraft ?: current.dashboardLayout
+            current.copy(customizeDraft = transform(base))
+        }
     }
 
     fun refresh() {

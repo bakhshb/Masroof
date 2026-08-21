@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
+import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
@@ -27,6 +28,7 @@ import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.data.preferences.SharedPrefsDashboardLayoutPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
 import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
@@ -139,6 +141,14 @@ class AppContainer(
         SharedPrefsThemePreferencesRepository(
             appContext.getSharedPreferences(
                 SharedPrefsThemePreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
+    val dashboardLayoutPreferencesRepository: DashboardLayoutPreferencesRepository =
+        SharedPrefsDashboardLayoutPreferencesRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsDashboardLayoutPreferencesRepository.PREFS_NAME,
                 Context.MODE_PRIVATE,
             ),
         )

@@ -49,6 +49,7 @@ fun DashboardHeroCard(
     period: FinancialPeriod?,
     isCurrentPeriod: Boolean,
     today: LocalDate,
+    size: com.baraa.masroof.application.dashboard.DashboardSectionSize = com.baraa.masroof.application.dashboard.DashboardSectionSize.MEDIUM,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -70,6 +71,7 @@ fun DashboardHeroCard(
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = remainingColor,
+                fontSize = MaterialTheme.typography.headlineMedium.fontSize * heroAmountStyleScale(size),
             ),
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -171,10 +173,15 @@ fun DashboardQuickSummaryRow(
     summary: CurrentAccountSummary,
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
+    showExpense: Boolean = true,
+    showIncome: Boolean = true,
+    size: com.baraa.masroof.application.dashboard.DashboardSectionSize = com.baraa.masroof.application.dashboard.DashboardSectionSize.MEDIUM,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val remaining = summary.netMovement
+
+    val cardPadding = quickCardPadding(size)
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -191,30 +198,37 @@ fun DashboardQuickSummaryRow(
             icon = MasroofIcons.appLogo,
             iconBackground = MaterialTheme.colorScheme.surfaceVariant,
             iconTint = MaterialTheme.colorScheme.primary,
+            contentPadding = cardPadding,
             modifier = Modifier.weight(1f),
         )
-        DashboardQuickCard(
-            label = stringResource(R.string.dashboard_quick_total_expense),
-            value = formatLocalizedMoney(summary.totalOutflow),
-            valueColor = extended.outflow,
-            icon = MasroofIcons.netSpending,
-            iconBackground = extended.outflowSoft,
-            iconTint = extended.outflow,
-            clickable = true,
-            onClick = onOpenExpenseDetails,
-            modifier = Modifier.weight(1f),
-        )
-        DashboardQuickCard(
-            label = stringResource(R.string.dashboard_quick_total_income),
-            value = formatLocalizedMoney(summary.totalInflow),
-            valueColor = extended.inflow,
-            icon = MasroofIcons.income,
-            iconBackground = extended.inflowSoft,
-            iconTint = extended.inflow,
-            clickable = true,
-            onClick = onOpenIncomeDetails,
-            modifier = Modifier.weight(1f),
-        )
+        if (showExpense) {
+            DashboardQuickCard(
+                label = stringResource(R.string.dashboard_quick_total_expense),
+                value = formatLocalizedMoney(summary.totalOutflow),
+                valueColor = extended.outflow,
+                icon = MasroofIcons.netSpending,
+                iconBackground = extended.outflowSoft,
+                iconTint = extended.outflow,
+                clickable = true,
+                onClick = onOpenExpenseDetails,
+                contentPadding = cardPadding,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (showIncome) {
+            DashboardQuickCard(
+                label = stringResource(R.string.dashboard_quick_total_income),
+                value = formatLocalizedMoney(summary.totalInflow),
+                valueColor = extended.inflow,
+                icon = MasroofIcons.income,
+                iconBackground = extended.inflowSoft,
+                iconTint = extended.inflow,
+                clickable = true,
+                onClick = onOpenIncomeDetails,
+                contentPadding = cardPadding,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -226,6 +240,7 @@ private fun DashboardQuickCard(
     icon: ImageVector,
     iconBackground: Color,
     iconTint: Color,
+    contentPadding: androidx.compose.ui.unit.Dp = 10.dp,
     modifier: Modifier = Modifier,
     clickable: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -240,7 +255,7 @@ private fun DashboardQuickCard(
         shadowElevation = 2.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = contentPadding, vertical = contentPadding + 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (clickable) {

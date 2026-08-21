@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
@@ -89,6 +90,9 @@ data class DashboardUiState(
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),
     val smsPermissionGranted: Boolean = true,
+    val dashboardLayout: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
+    val customizeSheetOpen: Boolean = false,
+    val customizeDraft: DashboardLayoutSnapshot? = null,
 )
 
 enum class DashboardError {

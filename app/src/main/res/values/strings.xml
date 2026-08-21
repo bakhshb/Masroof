@@ -188,6 +188,16 @@
     <string name="dashboard_cards_summary_title">ملخص البطاقات</string>
     <string name="dashboard_view_all">عرض الكل ›</string>
     <string name="dashboard_customize">تخصيص</string>
+    <string name="dashboard_customize_sheet_title">تخصيص الشاشة الرئيسية</string>
+    <string name="dashboard_customize_save">حفظ التخصيص</string>
+    <string name="dashboard_customize_section_hero">البطاقة الرئيسية</string>
+    <string name="dashboard_customize_section_quick">البطاقات السريعة</string>
+    <string name="dashboard_customize_section_accounts">ملخص الحسابات</string>
+    <string name="dashboard_customize_section_cards">ملخص البطاقات</string>
+    <string name="dashboard_customize_section_transactions">العمليات الأخيرة</string>
+    <string name="dashboard_customize_size_small">صغير</string>
+    <string name="dashboard_customize_size_medium">متوسط</string>
+    <string name="dashboard_customize_size_large">كبير</string>
     <string name="dashboard_salary_period_short">فترة الراتب</string>
     <string name="dashboard_period_previous">الفترة السابقة</string>
     <string name="dashboard_period_next">الفترة التالية</string>
