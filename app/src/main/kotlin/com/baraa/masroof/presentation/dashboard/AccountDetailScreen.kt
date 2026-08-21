@@ -76,9 +76,9 @@ private fun AccountDetailHeroCard(
     summary: com.baraa.masroof.application.dashboard.CurrentAccountSummary?,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
-    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
-    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
+    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)
+    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow

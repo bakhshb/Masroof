@@ -201,7 +201,7 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun accountRemaining_inflowMinusOutflowIncludingSelfTransfers() {
+    fun accountRemaining_excludesSelfTransfersFromInflowAndOutflow() {
         val accountA = "account:bank_aljazira:3001"
         val accountB = "account:bank_aljazira:3002"
         val summary = CurrentAccountSummaryCalculator.summarize(
@@ -230,11 +230,12 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(accountA),
             ownedAccountLast4s = setOf("3001"),
         )
-        assertEquals(Money.of("1000.00", Currency.SAR), summary.inflow.total)
-        assertEquals(Money.of("700.00", Currency.SAR), summary.outflow.total)
+        assertEquals(Money.of("1000.00", Currency.SAR), summary.inflow.coreTotal)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.coreTotal)
+        assertEquals(Money.of("200.00", Currency.SAR), summary.outflow.selfTransfersOut)
         assertEquals(
-            SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+            SignedMoneyAmount.of(Money.of("500.00", Currency.SAR)),
+            summary.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET),
         )
     }
 

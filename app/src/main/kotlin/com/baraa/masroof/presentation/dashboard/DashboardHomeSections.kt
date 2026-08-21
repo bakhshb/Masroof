@@ -349,9 +349,9 @@ fun DashboardAccountsSection(
 private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
-    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
-    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING)
+    val periodInflow = summary?.flowInflow(AccountFlowTotalsMode.AGGREGATE_NET)
+    val periodOutflow = summary?.flowOutflow(AccountFlowTotalsMode.AGGREGATE_NET)
+    val remaining = summary?.flowRemaining(AccountFlowTotalsMode.AGGREGATE_NET)
     val iconOptions = listOf(
         Triple(MasroofIcons.moneyMovement, extended.accountSoft, extended.account),
         Triple(MasroofIcons.savings, extended.inflowSoft, extended.inflow),

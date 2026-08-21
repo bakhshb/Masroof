@@ -18,10 +18,13 @@ object AccountFlowAggregator {
 }
 
 enum class AccountFlowTotalsMode {
-    /** Salary + external in/out only — self-transfers between owned accounts excluded. */
+    /**
+     * Salary + external in/out only — self-transfers between owned accounts excluded.
+     * Used for home, accounts summary, and per-account remaining display.
+     */
     AGGREGATE_NET,
 
-    /** Includes self-transfers — used for a single owned account remaining view. */
+    /** Includes self-transfers in inflow/outflow totals (cash-position view). */
     PER_ACCOUNT_REMAINING,
 }
 
