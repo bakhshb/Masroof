@@ -155,24 +155,6 @@ class DashboardService(
             sarEquivalents = cardSarEquivalents,
             displayLocale = displayLocale,
         )
-        val remainingSnapshots = CurrentAccountBalanceBuilder.latestSnapshots(
-            ownedAccounts = ownedAccounts,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-        )
-        val remainingRollStart = remainingSnapshots.values.minOfOrNull { it.updatedAt }
-        val remainingRollEndExclusive = LocalDate.now(clock)
-            .plusDays(1)
-            .atStartOfDay(zoneId)
-            .toInstant()
-        val remainingRollForwardTransactions = if (remainingRollStart != null) {
-            financialTransactionRepository.listOccurredBetween(
-                startInclusive = remainingRollStart,
-                endExclusive = remainingRollEndExclusive,
-            )
-        } else {
-            emptyList()
-        }
         val ownedAccountPeriodSummaries = OwnedAccountPeriodSummaryCalculator.summarize(
             ownedAccounts = ownedAccounts,
             transactions = syncedTransactions,
@@ -180,7 +162,6 @@ class DashboardService(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             rawSmsById = rawSmsById,
-            remainingRollForwardTransactions = remainingRollForwardTransactions,
         )
         val flowDetailGrouping = CurrentAccountFlowDetailGrouper.group(
             transactions = syncedTransactions,

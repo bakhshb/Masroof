@@ -402,10 +402,10 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                account.remainingBalance?.let { formatLocalizedMoney(it) }
+                account.accountRemaining?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = account.remainingBalance?.let { remaining ->
+                color = account.accountRemaining?.let { remaining ->
                     when {
                         remaining.amount.signum() > 0 -> extended.inflow
                         remaining.amount.signum() < 0 -> extended.outflow

@@ -149,7 +149,7 @@ fun AccountsSummaryScreen(
 @Composable
 private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
     val extended = MasroofThemeExtras.extendedColors
-    val remainings = accounts.mapNotNull { it.remainingBalance }
+    val remainings = accounts.mapNotNull { it.accountRemaining }
     val totalRemaining = remainings.reduceOrNull { acc, value ->
         SignedMoneyAmount(
             acc.amount.add(value.amount),
@@ -170,8 +170,8 @@ private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            if (remainings.size == accounts.size && totalRemaining != null) {
-                formatLocalizedMoney(totalRemaining)
+            if (remainings.isNotEmpty()) {
+                formatLocalizedMoney(totalRemaining!!)
             } else {
                 stringResource(R.string.dashboard_value_unavailable)
             },
@@ -182,7 +182,7 @@ private fun AccountsSummaryHeroCard(accounts: List<OwnedAccountUi>) {
             modifier = Modifier.padding(top = 8.dp),
         )
         Text(
-            stringResource(R.string.dashboard_account_remaining_hint),
+            stringResource(R.string.dashboard_account_remaining_calculated_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
@@ -215,7 +215,7 @@ private fun AccountsSummaryAccountCard(
     onClick: () -> Unit,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val remaining = account.remainingBalance
+    val remaining = account.accountRemaining
     val remainingColor = when {
         remaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         remaining.amount.signum() > 0 -> extended.inflow
@@ -254,7 +254,7 @@ private fun AccountsSummaryAccountCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    stringResource(R.string.dashboard_account_remaining_hint),
+                    stringResource(R.string.dashboard_account_remaining_calculated_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

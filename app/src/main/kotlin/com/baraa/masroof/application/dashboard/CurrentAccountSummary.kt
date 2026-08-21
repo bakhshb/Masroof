@@ -9,7 +9,8 @@ import java.math.RoundingMode
  * Cash movement on owned current-account containers for a salary period.
  *
  * Credit-card purchases are excluded — they are tracked as liability on the card section.
- * Self-transfers between owned accounts are neutral and do not affect [netMovement].
+ * Self-transfers between owned accounts are neutral for [netMovement] across all accounts,
+ * but included in [accountRemaining] for a single account view.
  */
 data class CurrentAccountSummary(
     val currency: Currency,
@@ -38,6 +39,13 @@ data class CurrentAccountSummary(
                 .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
             return SignedMoneyAmount(net, currency)
         }
+
+    /** In − out for one account in the period, including self-transfers. */
+    val accountRemaining: SignedMoneyAmount
+        get() = SignedMoneyAmount.difference(
+            totalInflow + selfTransfersIn,
+            totalOutflow + selfTransfersOut,
+        )
 
     val accountSpendingGross: Money
         get() = billPayments + posPurchases + fees

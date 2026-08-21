@@ -153,7 +153,7 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun cashWithdrawalWithNullSourceContainer_countsWhenTyped() {
+    fun cashWithdrawalWithNullSourceContainer_ignoredWhenScopedToSingleAccount() {
         val owned = "account:bank_aljazira:3478"
         val cashWithdrawal = tx(
             id = "cash-withdrawal",
@@ -169,8 +169,48 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountLast4s = setOf("3478"),
             rawSmsById = emptyMap(),
         )
-        assertEquals(Money.of("2200.00", Currency.SAR), summary.cashWithdrawals)
-        assertEquals(Money.of("2200.00", Currency.SAR), summary.totalOutflow)
+        assertEquals(Money.zero(Currency.SAR), summary.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), summary.totalOutflow)
+    }
+
+    @Test
+    fun accountRemaining_calculatedFromInAndOutIncludingSelfTransfers() {
+        val accountA = "account:bank_aljazira:3001"
+        val accountB = "account:bank_aljazira:3002"
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(
+                tx(
+                    id = "transfer-in",
+                    type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                    amount = "1000",
+                    dest = accountA,
+                ),
+                tx(
+                    id = "purchase",
+                    type = FinancialTransactionType.EXPENSE,
+                    amount = "500",
+                    source = accountA,
+                ),
+                tx(
+                    id = "self-out",
+                    type = FinancialTransactionType.SELF_TRANSFER,
+                    amount = "200",
+                    source = accountA,
+                    dest = accountB,
+                ),
+            ),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountA),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.of("1000.00", Currency.SAR), summary.externalTransfersIn)
+        assertEquals(Money.of("500.00", Currency.SAR), summary.posPurchases)
+        assertEquals(Money.of("200.00", Currency.SAR), summary.selfTransfersOut)
+        assertEquals(Money.zero(Currency.SAR), summary.selfTransfersIn)
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
+            summary.accountRemaining,
+        )
     }
 
     @Test
