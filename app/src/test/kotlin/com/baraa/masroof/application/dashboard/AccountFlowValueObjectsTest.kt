@@ -75,12 +75,16 @@ class AccountFlowValueObjectsTest {
         assertEquals(Money.of("550.00", currency), aggregate.outflow.total)
         assertEquals(
             SignedMoneyAmount.of(Money.of("750.00", currency)),
-            aggregate.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+            aggregate.externalMovement().remaining,
+        )
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("750.00", currency)),
+            aggregate.cashPosition().remaining,
         )
     }
 
     @Test
-    fun currentAccountSummary_accountRemaining_matchesInflowMinusOutflow() {
+    fun cashPosition_and_externalMovement_differWhenSelfTransfersPresent() {
         val summary = CurrentAccountSummary.of(
             currency = Currency.SAR,
             salary = Money.of("1000", Currency.SAR),
@@ -96,8 +100,12 @@ class AccountFlowValueObjectsTest {
             selfTransfersOut = Money.of("200", Currency.SAR),
         )
         assertEquals(
+            SignedMoneyAmount.of(Money.of("500.00", Currency.SAR)),
+            summary.externalMovement().remaining,
+        )
+        assertEquals(
             SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.flowRemaining(AccountFlowTotalsMode.PER_ACCOUNT_REMAINING),
+            summary.cashPosition().remaining,
         )
     }
 }
