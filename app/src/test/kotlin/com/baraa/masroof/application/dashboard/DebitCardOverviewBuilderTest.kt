@@ -20,6 +20,7 @@ import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -85,7 +86,7 @@ class DebitCardOverviewBuilderTest {
             lastSeenRawSmsId = "sms",
         )
 
-        val (spending, _) = DebitCardOverviewBuilder.buildSpendingByCardKey(
+        val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
             salaryPeriod = salaryPeriod,
             debitCards = listOf(debit),
             transactions = listOf(pos, cash),
@@ -98,7 +99,138 @@ class DebitCardOverviewBuilderTest {
             zoneId = zoneId,
         )
 
-        assertEquals(BigDecimal("320.00"), spending["BANK_ALJAZIRA:2210"]?.amount)
+        assertEquals(BigDecimal("320.00"), result.spendingByCardKey["BANK_ALJAZIRA:2210"]?.amount)
+        assertEquals(setOf("pos-mada", "cash-mada"), result.transactionDebitSpendInvolvement.keys)
+    }
+
+    @Test
+    fun madaRefund_reducesSalaryPeriodSpending() {
+        val owned = "account:bank_aljazira:3001"
+        val cardId = "card:bank_aljazira:2210"
+        val pos = tx(
+            id = "pos-mada",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "120.00",
+            source = cardId,
+            linked = listOf("evt-pos"),
+        )
+        val refund = tx(
+            id = "refund-mada",
+            type = FinancialTransactionType.REFUND,
+            amount = "20.00",
+            source = null,
+            destination = cardId,
+            linked = listOf("evt-refund"),
+        )
+        val parsedRecords = listOf(
+            parsedRecord(
+                id = "evt-pos",
+                family = MessageFamily.PURCHASE,
+                sourceLast4 = "3001",
+                cardLast4 = "2210",
+                rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210",
+            ),
+            parsedRecord(
+                id = "evt-refund",
+                family = MessageFamily.REFUND,
+                sourceLast4 = "3001",
+                cardLast4 = "2210",
+                rawBody = "استرداد\nبطاقة مدى: 2210",
+            ),
+        )
+        val rawSmsById = parsedRecords.associate { record ->
+            record.event.rawSmsId to RawSms(
+                id = record.event.rawSmsId,
+                sender = "AlJazira",
+                body = record.event.counterparty.orEmpty(),
+                receivedAt = Instant.parse("2026-08-05T11:05:00Z"),
+                deviceMessageId = record.event.id,
+                bodyHash = record.event.id,
+            )
+        }
+        val debit = CardRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "2210",
+            ownership = OwnershipStatus.OWNED,
+            cardType = CardType.DEBIT,
+            linkedAccountBankId = Bank.BANK_ALJAZIRA.id,
+            linkedAccountMaskedNumber = "3001",
+            firstSeenRawSmsId = "sms",
+            lastSeenRawSmsId = "sms",
+        )
+
+        val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
+            salaryPeriod = salaryPeriod,
+            debitCards = listOf(debit),
+            transactions = listOf(pos, refund),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            zoneId = zoneId,
+        )
+
+        assertEquals(BigDecimal("100.00"), result.spendingByCardKey["BANK_ALJAZIRA:2210"]?.amount)
+        assertEquals(setOf("pos-mada", "refund-mada"), result.transactionDebitSpendInvolvement.keys)
+    }
+
+    @Test
+    fun billPaymentOnLinkedAccount_isExcludedFromMadaSpending() {
+        val owned = "account:bank_aljazira:3001"
+        val billPayment = tx(
+            id = "bill-mada",
+            type = FinancialTransactionType.BILL_PAYMENT,
+            amount = "90.00",
+            source = owned,
+            linked = listOf("evt-bill"),
+        )
+        val parsedRecords = listOf(
+            parsedRecord(
+                id = "evt-bill",
+                family = MessageFamily.BILL_PAYMENT,
+                sourceLast4 = "3001",
+                cardLast4 = "2210",
+                rawBody = "سداد فاتورة\nبطاقة مدى: 2210",
+            ),
+        )
+        val rawSmsById = parsedRecords.associate { record ->
+            record.event.rawSmsId to RawSms(
+                id = record.event.rawSmsId,
+                sender = "AlJazira",
+                body = record.event.counterparty.orEmpty(),
+                receivedAt = Instant.parse("2026-08-05T11:05:00Z"),
+                deviceMessageId = record.event.id,
+                bodyHash = record.event.id,
+            )
+        }
+        val debit = CardRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "2210",
+            ownership = OwnershipStatus.OWNED,
+            cardType = CardType.DEBIT,
+            linkedAccountBankId = Bank.BANK_ALJAZIRA.id,
+            linkedAccountMaskedNumber = "3001",
+            firstSeenRawSmsId = "sms",
+            lastSeenRawSmsId = "sms",
+        )
+
+        val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
+            salaryPeriod = salaryPeriod,
+            debitCards = listOf(debit),
+            transactions = listOf(billPayment),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            zoneId = zoneId,
+        )
+
+        assertEquals(BigDecimal("0.00"), result.spendingByCardKey["BANK_ALJAZIRA:2210"]?.amount)
+        assertTrue(result.transactionDebitSpendInvolvement.isEmpty())
     }
 
     private fun tx(
@@ -107,6 +239,7 @@ class DebitCardOverviewBuilderTest {
         amount: String,
         source: String?,
         linked: List<String>,
+        destination: String? = null,
     ): FinancialTransaction =
         FinancialTransaction(
             id = id,
@@ -114,7 +247,7 @@ class DebitCardOverviewBuilderTest {
             amount = Money.of(amount, Currency.SAR),
             occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
             sourceContainerId = source,
-            destinationContainerId = null,
+            destinationContainerId = destination,
             linkedParsedEventIds = linked,
             merchant = null,
             counterparty = null,

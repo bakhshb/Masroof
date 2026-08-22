@@ -3,7 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -16,8 +15,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+data class DebitCardSpendBuildResult(
+    val spendingByCardKey: Map<String, SignedMoneyAmount>,
+    val salaryPeriodLabel: String?,
+    /** Transaction id → card keys that count this tx toward Mada salary-period spending. */
+    val transactionDebitSpendInvolvement: Map<String, Set<String>>,
+)
+
 /**
- * Attributes POS purchases and cash withdrawals to owned debit (Mada) cards via parsed card refs.
+ * Attributes POS purchases, cash withdrawals, and refunds to owned debit (Mada) cards via parsed card refs.
  */
 object DebitCardOverviewBuilder {
     fun buildSpendingByCardKey(
@@ -32,11 +38,17 @@ object DebitCardOverviewBuilder {
         ownedAccountLast4s: Set<String>,
         zoneId: ZoneId,
         displayLocale: Locale = Locale.forLanguageTag(AppLocale.TAG_AR),
-    ): Pair<Map<String, SignedMoneyAmount>, String?> {
+    ): DebitCardSpendBuildResult {
         val ownedDebit = debitCards.filter {
             it.cardType == CardType.DEBIT && it.ownership == OwnershipStatus.OWNED
         }
-        if (ownedDebit.isEmpty()) return emptyMap<String, SignedMoneyAmount>() to null
+        if (ownedDebit.isEmpty()) {
+            return DebitCardSpendBuildResult(
+                spendingByCardKey = emptyMap(),
+                salaryPeriodLabel = null,
+                transactionDebitSpendInvolvement = emptyMap(),
+            )
+        }
 
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
@@ -49,51 +61,49 @@ object DebitCardOverviewBuilder {
             sarEquivalents = sarEquivalents,
             rawSmsById = rawSmsById,
         )
+        val debitSpendInvolvement = mutableMapOf<String, MutableSet<String>>()
 
         val spending = ownedDebit.associate { entry ->
             val cardKey = CardTransactionInvolvementResolver.cardKey(entry.bank.id, entry.last4)
-            val linkedContainerId = entry.linkedAccount?.let { account ->
-                FinancialContainerIdFactory.accountId(account)
-            }
-            val linkedLast4s = entry.linkedAccountMaskedNumber?.let { masked ->
-                CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(masked))
-            }.orEmpty()
-            val scope = when {
-                linkedContainerId != null ->
-                    CurrentAccountTransactionScope(
-                        ownedContainerIds = setOf(linkedContainerId),
-                        ownedAccountLast4s = linkedLast4s,
-                        mode = AccountFlowScopeMode.SingleAccount,
-                    )
-                else ->
-                    CurrentAccountTransactionScope(
-                        ownedContainerIds = ownedAccountContainerIds,
-                        ownedAccountLast4s = ownedAccountLast4s,
-                        mode = AccountFlowScopeMode.Fleet,
-                    )
-            }
+            val scope = DebitCardSpendClassifier.scopeFor(
+                entry = entry,
+                ownedAccountContainerIds = ownedAccountContainerIds,
+                ownedAccountLast4s = ownedAccountLast4s,
+            )
 
-            var total = Money.zero(primaryCurrency)
+            var gross = Money.zero(primaryCurrency)
+            var refund = Money.zero(primaryCurrency)
             for (tx in transactions) {
                 if (tx.occurredAt.isBefore(salaryPeriodStart)) continue
-                if (!CardTransactionInvolvementResolver.matchesCard(tx.id, entry.bank.id, entry.last4, cardInvolvement)) {
-                    continue
-                }
                 val amount = TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents)
                     ?: continue
-                val isDebitSpend = AccountFlowClassifier.classify(tx, scope, context).any { assignment ->
-                    assignment is FlowAssignment.Expense &&
-                        (
-                            assignment.category == FlowExpenseCategory.POS_PURCHASE ||
-                                assignment.category == FlowExpenseCategory.CASH_WITHDRAWAL
-                            )
-                }
-                if (isDebitSpend) {
-                    total += amount
+                when (
+                    DebitCardSpendClassifier.effectFor(
+                        tx = tx,
+                        bankId = entry.bank.id,
+                        last4 = entry.last4,
+                        scope = scope,
+                        context = context,
+                        cardInvolvement = cardInvolvement,
+                    )
+                ) {
+                    null -> Unit
+                    DebitCardSpendClassifier.Effect.Expense -> {
+                        gross += amount
+                        debitSpendInvolvement.getOrPut(tx.id) { mutableSetOf() }.add(cardKey)
+                    }
+                    DebitCardSpendClassifier.Effect.Refund -> {
+                        refund += amount
+                        debitSpendInvolvement.getOrPut(tx.id) { mutableSetOf() }.add(cardKey)
+                    }
                 }
             }
-            cardKey to SignedMoneyAmount.of(total)
+            cardKey to SignedMoneyAmount.difference(gross, refund)
         }
-        return spending to salaryPeriodLabel
+        return DebitCardSpendBuildResult(
+            spendingByCardKey = spending,
+            salaryPeriodLabel = salaryPeriodLabel,
+            transactionDebitSpendInvolvement = debitSpendInvolvement.mapValues { it.value.toSet() },
+        )
     }
 }

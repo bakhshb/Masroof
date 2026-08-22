@@ -35,7 +35,7 @@ object CardTransactionInvolvementResolver {
     fun resolvePrimaryCardKey(
         transaction: FinancialTransaction,
         index: Map<String, Set<String>>,
-    ): String? = index[transaction.id]?.firstOrNull()
+    ): String? = index[transaction.id]?.minOrNull()
 
     fun matchesCard(
         transactionId: String,

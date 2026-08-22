@@ -85,6 +85,28 @@ class DashboardSummaryTransactionFilterTest {
     }
 
     @Test
+    fun forDebitCard_matchesDebitSpendInvolvementOnly() {
+        val cardKey = CardTransactionInvolvementResolver.cardKey(Bank.BANK_ALJAZIRA.id, "2210")
+        val transactions = listOf(
+            preview(id = "pos", cardLast4 = "2210"),
+            preview(id = "bill", cardLast4 = "2210"),
+        )
+        val involvement = mapOf(
+            "pos" to setOf(cardKey),
+            "bill" to emptySet(),
+        )
+
+        val filtered = DashboardSummaryTransactionFilter.forDebitCard(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "2210",
+            debitSpendInvolvementByTransactionId = involvement,
+        )
+
+        assertEquals(listOf("pos"), filtered.map { it.id })
+    }
+
+    @Test
     fun forCard_matchesCardLast4() {
         val transactions = listOf(
             preview(id = "1", cardLast4 = "4821"),

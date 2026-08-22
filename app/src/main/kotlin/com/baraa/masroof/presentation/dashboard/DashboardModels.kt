@@ -104,6 +104,7 @@ data class DashboardUiState(
     val flowDetailGrouping: com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping? = null,
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),
+    val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
     val smsPermissionGranted: Boolean = true,
     val dashboardLayout: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
     val customizeSheetOpen: Boolean = false,

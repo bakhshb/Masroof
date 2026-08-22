@@ -53,6 +53,18 @@ object DashboardSummaryTransactionFilter {
         return containerId.substringAfterLast(':') in ownedLast4s
     }
 
+    fun forDebitCard(
+        transactions: List<TransactionPreviewUi>,
+        bank: Bank,
+        last4: String,
+        debitSpendInvolvementByTransactionId: Map<String, Set<String>>,
+    ): List<TransactionPreviewUi> {
+        val cardKey = CardTransactionInvolvementResolver.cardKey(bank.id, last4)
+        return transactions.filter { tx ->
+            cardKey in debitSpendInvolvementByTransactionId[tx.id].orEmpty()
+        }
+    }
+
     fun forCard(
         transactions: List<TransactionPreviewUi>,
         bank: Bank,

@@ -20,11 +20,11 @@ fun DebitCardDetailScreen(
     onOpenTransaction: (String) -> Unit,
     onViewAllTransactions: () -> Unit,
 ) {
-    val cardTransactions = DashboardSummaryTransactionFilter.forCard(
+    val cardTransactions = DashboardSummaryTransactionFilter.forDebitCard(
         transactions = state.allTransactions,
         bank = debit.bank,
         last4 = debit.last4,
-        cardInvolvementByTransactionId = state.transactionCardInvolvement,
+        debitSpendInvolvementByTransactionId = state.transactionDebitSpendInvolvement,
     )
     val title = stringResource(
         R.string.dashboard_credit_card_last4,

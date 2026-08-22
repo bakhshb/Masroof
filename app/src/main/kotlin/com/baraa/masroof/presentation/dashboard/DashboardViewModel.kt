@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -430,6 +431,9 @@ class DashboardViewModel(
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
                         flowDetailGrouping = null,
+                        transactionAccountInvolvement = emptyMap(),
+                        transactionCardInvolvement = emptyMap(),
+                        transactionDebitSpendInvolvement = emptyMap(),
                     )
                 }
             }
@@ -467,6 +471,7 @@ class DashboardViewModel(
                         flowDetailGrouping = overview.flowDetailGrouping,
                         transactionAccountInvolvement = overview.transactionAccountInvolvement,
                         transactionCardInvolvement = overview.transactionCardInvolvement,
+                        transactionDebitSpendInvolvement = overview.transactionDebitSpendInvolvement,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,
@@ -507,6 +512,9 @@ class DashboardViewModel(
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
                             flowDetailGrouping = null,
+                            transactionAccountInvolvement = emptyMap(),
+                            transactionCardInvolvement = emptyMap(),
+                            transactionDebitSpendInvolvement = emptyMap(),
                         )
                     }
                 }
@@ -539,8 +547,8 @@ class DashboardViewModel(
             sourceContainerId = tx.sourceContainerId,
             destinationContainerId = tx.destinationContainerId,
         )
-        val parsedCardLast4 = cardInvolvement[tx.id]
-            ?.singleOrNull()
+        val parsedCardLast4 = CardTransactionInvolvementResolver
+            .resolvePrimaryCardKey(tx, cardInvolvement)
             ?.substringAfter(':', missingDelimiterValue = "")
             ?.takeIf { it.isNotEmpty() }
         return TransactionPreviewUi(

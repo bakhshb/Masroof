@@ -30,6 +30,8 @@ data class DashboardOverview(
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     /** Transaction id → card keys (`bankId:last4`) from parsed SMS card refs. */
     val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),
+    /** Transaction id → card keys that count toward Mada salary-period spending. */
+    val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
     val isCurrentPeriod: Boolean,
 )
 

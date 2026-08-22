@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
@@ -81,8 +82,15 @@ fun CardsSummaryRoute(
                 onBack = { selectedCardKey = null },
                 onOpenTransaction = onOpenTransaction,
                 onViewAllTransactions = {
+                    val cardKey = CardTransactionInvolvementResolver.cardKey(
+                        selectedDebit.bank.id,
+                        selectedDebit.last4,
+                    )
+                    val spendTransactionIds = state.transactionDebitSpendInvolvement
+                        .filter { (_, cardKeys) -> cardKey in cardKeys }
+                        .keys
                     onOpenAllTransactions(
-                        TransactionListFilterState(cardLast4s = setOf(selectedDebit.last4)),
+                        TransactionListFilterState(transactionIds = spendTransactionIds),
                     )
                 },
             )

@@ -10,12 +10,14 @@ data class TransactionListFilterState(
     val types: Set<FinancialTransactionType> = emptySet(),
     val cardLast4s: Set<String> = emptySet(),
     val accountContainerIds: Set<String> = emptySet(),
+    val transactionIds: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
         get() = searchQuery.isNotBlank() ||
             types.isNotEmpty() ||
             cardLast4s.isNotEmpty() ||
-            accountContainerIds.isNotEmpty()
+            accountContainerIds.isNotEmpty() ||
+            transactionIds.isNotEmpty()
 }
 
 data class TransactionListFilterResult(
@@ -45,7 +47,8 @@ object TransactionListFilterEngine {
         primaryCurrency: Currency = Currency.SAR,
     ): TransactionListFilterResult {
         val filtered = transactions.filter { tx ->
-            matchesTypes(tx, filter.types) &&
+            matchesTransactionIds(tx, filter.transactionIds) &&
+                matchesTypes(tx, filter.types) &&
                 matchesCards(tx, filter.cardLast4s) &&
                 matchesAccounts(tx, filter.accountContainerIds) &&
                 matchesSearch(tx, filter.searchQuery)
@@ -70,6 +73,11 @@ object TransactionListFilterEngine {
                 .accountContainerIdsFromContainers(tx.sourceContainerId, tx.destinationContainerId)
                 .toList()
         }.distinct().sorted()
+
+    private fun matchesTransactionIds(
+        tx: TransactionPreviewUi,
+        transactionIds: Set<String>,
+    ): Boolean = transactionIds.isEmpty() || tx.id in transactionIds
 
     private fun matchesTypes(
         tx: TransactionPreviewUi,

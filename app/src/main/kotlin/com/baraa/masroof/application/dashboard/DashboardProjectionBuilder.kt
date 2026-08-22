@@ -168,7 +168,7 @@ class DashboardProjectionBuilder(
             displayLocale = displayLocale,
         )
         val cardRegistry = cardRegistryRepository.listAll()
-        val (debitSpendingByCardKey, debitSalaryPeriodLabel) = DebitCardOverviewBuilder.buildSpendingByCardKey(
+        val debitSpend = DebitCardOverviewBuilder.buildSpendingByCardKey(
             salaryPeriod = period,
             debitCards = cardRegistry,
             transactions = dedupedTransactions,
@@ -184,8 +184,8 @@ class DashboardProjectionBuilder(
         val creditFacilities = CreditFacilityOverviewBuilder.build(
             overview = creditCardsFlat,
             registryCards = cardRegistry,
-            debitSpendingByCardKey = debitSpendingByCardKey,
-            debitSalaryPeriodLabel = debitSalaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
+            debitSpendingByCardKey = debitSpend.spendingByCardKey,
+            debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
         )
 
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
@@ -201,6 +201,7 @@ class DashboardProjectionBuilder(
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
             transactionCardInvolvement = transactionCardInvolvement,
+            transactionDebitSpendInvolvement = debitSpend.transactionDebitSpendInvolvement,
             transactions = dedupedTransactions,
             meta = DashboardMeta(
                 transactionCount = summary.transactionCount,
