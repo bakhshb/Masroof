@@ -28,6 +28,8 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.sms.scanner.SmsScanFailure
 import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
+import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -264,15 +266,15 @@ class DashboardViewModel(
     }
 
     private fun mapRescanStatus(result: SmsScanResult): SmsRescanStatus =
-        when (result.failure) {
-            SmsScanFailure.PermissionDenied -> SmsRescanStatus.PERMISSION_DENIED
-            is SmsScanFailure.ProviderError -> SmsRescanStatus.FAILED
-            null -> when {
-                result.parsed == 0 && result.scanned == 0 -> SmsRescanStatus.NO_MESSAGES
-                result.parsed == 0 && result.notRelevant == result.scanned -> SmsRescanStatus.NO_BANK_SMS
-                result.parsed == 0 -> SmsRescanStatus.NO_TRANSACTIONS
-                else -> SmsRescanStatus.OK
-            }
+        when (SmsScanUserOutcomeMapper.map(result)) {
+            SmsScanUserOutcome.PERMISSION_DENIED -> SmsRescanStatus.PERMISSION_DENIED
+            SmsScanUserOutcome.FAILED -> SmsRescanStatus.FAILED
+            SmsScanUserOutcome.NO_MESSAGES -> SmsRescanStatus.NO_MESSAGES
+            SmsScanUserOutcome.NO_BANK_SMS -> SmsRescanStatus.NO_BANK_SMS
+            SmsScanUserOutcome.OK -> SmsRescanStatus.OK
+            SmsScanUserOutcome.ALREADY_UP_TO_DATE -> SmsRescanStatus.ALREADY_UP_TO_DATE
+            SmsScanUserOutcome.NEEDS_REVIEW -> SmsRescanStatus.NEEDS_REVIEW
+            SmsScanUserOutcome.NO_NEW_TRANSACTIONS -> SmsRescanStatus.NO_TRANSACTIONS
         }
 
     fun openTransactionDetail(transactionId: String) {
@@ -457,6 +459,7 @@ class DashboardViewModel(
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
                         flowDetailGrouping = overview.flowDetailGrouping,
+                        transactionAccountInvolvement = overview.transactionAccountInvolvement,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,

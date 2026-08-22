@@ -47,6 +47,24 @@ class DashboardSummaryTransactionFilterTest {
     }
 
     @Test
+    fun forAccount_matchesSmsResolvedSourceViaInvolvementIndex() {
+        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val transactions = listOf(
+            preview(id = "cash", source = null, destination = null),
+        )
+        val involvement = mapOf("cash" to setOf(containerId))
+
+        val filtered = DashboardSummaryTransactionFilter.forAccount(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            maskedNumber = "3001",
+            involvementByTransactionId = involvement,
+        )
+
+        assertEquals(listOf("cash"), filtered.map { it.id })
+    }
+
+    @Test
     fun forCard_matchesCardLast4() {
         val transactions = listOf(
             preview(id = "1", cardLast4 = "4821"),

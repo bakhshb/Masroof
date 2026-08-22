@@ -396,9 +396,11 @@
     <string name="dashboard_rescan_sms">إعادة استيراد الرسائل</string>
     <string name="dashboard_rescanning">جاري استيراد الرسائل…</string>
     <string name="dashboard_rescan_ok">تم استيراد الرسائل بنجاح</string>
+    <string name="dashboard_rescan_already_up_to_date">الرسائل مُستوردة مسبقاً — لا توجد رسائل جديدة في الفترة</string>
+    <string name="dashboard_rescan_needs_review">وُجدت رسائل جديدة — راجعها من «مراجعة العمليات»</string>
     <string name="dashboard_rescan_no_messages">لا توجد رسائل في الفترة المحددة</string>
     <string name="dashboard_rescan_no_bank_sms">لا توجد رسائل بنك الجزيرة في صندوق الوارد</string>
-    <string name="dashboard_rescan_no_transactions">وُجدت رسائل لكن لم تُحوَّل إلى عمليات بعد</string>
+    <string name="dashboard_rescan_no_transactions">وُجدت رسائل جديدة لكن لم تُحوَّل إلى عمليات. قد تحتاج تأكيد ملكية الحساب/البطاقة أو مراجعة لاحقة.</string>
     <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
     <string name="dashboard_rescan_permission_denied">لا يمكن استيراد الرسائل بدون صلاحية الوصول للرسائل</string>
     <string name="dashboard_rescan_dismiss">إخفاء</string>
@@ -430,6 +432,14 @@
     <string name="review_back">رجوع</string>
     <string name="review_count">%1$d عملية تحتاج مراجعة</string>
     <string name="review_empty">لا توجد عمليات تحتاج مراجعة حالياً.</string>
+    <string name="review_ignored_empty">لا توجد عمليات متجاهلة أو غير مالية.</string>
+    <string name="review_tab_pending">بانتظار المراجعة</string>
+    <string name="review_tab_ignored">متجاهلة</string>
+    <string name="review_ignored_count">%1$d عملية متجاهلة</string>
+    <string name="review_status_ignored">تم التجاهل</string>
+    <string name="review_ignored_at">تاريخ التجاهل: %1$s</string>
+    <string name="review_ignored_detail_hint">تم تصنيف هذه الرسالة كعملية غير مالية أو تم تجاهلها.</string>
+    <string name="review_reason_user_ignored_transaction">تم التجاهل من تفاصيل العملية</string>
     <string name="review_load_error">تعذر تحميل قائمة المراجعة</string>
     <string name="review_resolved">تمت المعالجة بنجاح</string>
     <string name="review_still_pending">لا تزال العملية تحتاج مراجعة</string>

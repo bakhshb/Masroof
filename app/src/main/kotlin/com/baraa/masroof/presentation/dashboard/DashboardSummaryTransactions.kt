@@ -24,12 +24,16 @@ object DashboardSummaryTransactionFilter {
         transactions: List<TransactionPreviewUi>,
         bank: Bank,
         maskedNumber: String,
+        involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): List<TransactionPreviewUi> {
         val containerId = FinancialContainerIdFactory.accountId(bank, maskedNumber)
         val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(maskedNumber))
         return transactions.mapNotNull { tx ->
             val involvesAccount = matchesAccountContainer(tx.sourceContainerId, containerId, last4s) ||
-                matchesAccountContainer(tx.destinationContainerId, containerId, last4s)
+                matchesAccountContainer(tx.destinationContainerId, containerId, last4s) ||
+                involvementByTransactionId[tx.id].orEmpty().any { involvedId ->
+                    matchesAccountContainer(involvedId, containerId, last4s)
+                }
             if (!involvesAccount) return@mapNotNull null
             val direction = AccountTransactionPresentation.directionForAccount(tx, containerId, last4s)
             if (direction == tx.direction) tx else tx.copy(direction = direction)
@@ -38,10 +42,10 @@ object DashboardSummaryTransactionFilter {
 
     private fun matchesAccountContainer(
         containerId: String?,
-        ownedContainerId: String,
+        ownedContainerId: String?,
         ownedLast4s: Set<String>,
     ): Boolean {
-        if (containerId == null) return false
+        if (containerId == null || ownedContainerId == null) return false
         if (containerId == ownedContainerId) return true
         if (!containerId.startsWith("account:")) return false
         return containerId.substringAfterLast(':') in ownedLast4s

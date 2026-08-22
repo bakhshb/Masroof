@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -75,6 +75,7 @@ fun ReviewRoute(
             onRefresh = viewModel::refresh,
             onOpen = viewModel::openDetail,
             onDismissAllInformational = viewModel::dismissAllInformational,
+            onListModeChange = viewModel::setListMode,
         )
     }
 }
@@ -87,16 +88,37 @@ private fun ReviewListScreen(
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
     onDismissAllInformational: () -> Unit,
+    onListModeChange: (ReviewListMode) -> Unit,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.review_title),
         onBack = onBack,
         backContentDescription = stringResource(R.string.review_back),
     ) { contentModifier ->
-        when {
+        Column(modifier = contentModifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = state.listMode == ReviewListMode.PENDING,
+                    onClick = { onListModeChange(ReviewListMode.PENDING) },
+                    label = { Text(stringResource(R.string.review_tab_pending)) },
+                    enabled = !state.loading || state.items.isNotEmpty(),
+                )
+                FilterChip(
+                    selected = state.listMode == ReviewListMode.IGNORED,
+                    onClick = { onListModeChange(ReviewListMode.IGNORED) },
+                    label = { Text(stringResource(R.string.review_tab_ignored)) },
+                    enabled = !state.loading || state.items.isNotEmpty(),
+                )
+            }
+            when {
             state.loading && state.items.isEmpty() -> {
                 Column(
-                    modifier = contentModifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -105,7 +127,7 @@ private fun ReviewListScreen(
             }
             state.error == ReviewError.LOAD_FAILED && state.items.isEmpty() -> {
                 Column(
-                    modifier = contentModifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -130,7 +152,7 @@ private fun ReviewListScreen(
             }
             state.items.isEmpty() -> {
                 Column(
-                    modifier = contentModifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -142,7 +164,13 @@ private fun ReviewListScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        stringResource(R.string.review_empty),
+                        stringResource(
+                            if (state.listMode == ReviewListMode.IGNORED) {
+                                R.string.review_ignored_empty
+                            } else {
+                                R.string.review_empty
+                            },
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -157,17 +185,24 @@ private fun ReviewListScreen(
             }
             else -> {
                 LazyColumn(
-                    modifier = contentModifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         SectionHeader(
-                            title = stringResource(R.string.review_count, state.items.size),
+                            title = stringResource(
+                                if (state.listMode == ReviewListMode.IGNORED) {
+                                    R.string.review_ignored_count
+                                } else {
+                                    R.string.review_count
+                                },
+                                state.items.size,
+                            ),
                             icon = MasroofIcons.reviewQueue,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
-                    if (state.informationalDismissCount > 0) {
+                    if (state.listMode == ReviewListMode.PENDING && state.informationalDismissCount > 0) {
                         item {
                             IconTextButton(
                                 onClick = onDismissAllInformational,
@@ -186,6 +221,7 @@ private fun ReviewListScreen(
                     }
                     item { Spacer(Modifier.height(16.dp)) }
                 }
+            }
             }
         }
     }
@@ -234,9 +270,17 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = MasroofIcons.error,
+                        imageVector = if (item.ignored) {
+                            MasroofIcons.success
+                        } else {
+                            MasroofIcons.error
+                        },
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = if (item.ignored) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.size(4.dp))
@@ -244,7 +288,11 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                     Text(
                         reasonRes?.let { stringResource(it) } ?: item.reasonLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = if (item.ignored) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
                     )
                 }
             }
@@ -310,6 +358,21 @@ private fun ReviewDetailScreen(
                 icon = MasroofIcons.calendar,
                 label = stringResource(R.string.review_date, detail.dateLabel),
             )
+            detail.resolvedAtLabel?.let {
+                IconLabelRow(
+                    icon = MasroofIcons.success,
+                    label = stringResource(R.string.review_ignored_at, it),
+                )
+            }
+            if (detail.readOnly) {
+                MasroofCard {
+                    Text(
+                        stringResource(R.string.review_ignored_detail_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             detail.merchant?.let {
                 IconLabelRow(icon = MasroofIcons.merchant, label = stringResource(R.string.review_merchant, it))
             }
