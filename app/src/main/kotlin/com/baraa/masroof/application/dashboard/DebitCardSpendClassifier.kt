@@ -82,25 +82,27 @@ object DebitCardSpendClassifier {
         tx: FinancialTransaction,
         context: AccountFlowClassificationContext,
     ): Boolean {
-        when (tx.type) {
-            FinancialTransactionType.CASH_WITHDRAWAL ->
-                return !isExcludedDebitSpend(tx, context)
-            FinancialTransactionType.EXPENSE -> Unit
-            else -> return false
+        if (tx.type != FinancialTransactionType.EXPENSE &&
+            tx.type != FinancialTransactionType.CASH_WITHDRAWAL
+        ) {
+            return false
         }
         if (isExcludedDebitSpend(tx, context)) return false
-        val records = linkedRecords(tx, context)
-        if (records.any { it.event.messageFamily == MessageFamily.WITHDRAWAL }) return true
-        return records.any { record -> isDebitPurchase(record, context) }
+        return linkedRecords(tx, context).any { record -> isDebitSpendRecord(record, context) }
     }
 
-    private fun isDebitPurchase(
+    private fun isDebitSpendRecord(
         record: ParsedEventRecord,
         context: AccountFlowClassificationContext,
     ): Boolean {
-        if (record.event.messageFamily != MessageFamily.PURCHASE) return false
         val body = smsBody(record, context)
-        return !CreditCardMessageHeuristics.isCreditCardSms(body)
+        if (!CreditCardMessageHeuristics.isDebitCardSms(body)) return false
+        return when (record.event.messageFamily) {
+            MessageFamily.PURCHASE,
+            MessageFamily.WITHDRAWAL,
+            -> true
+            else -> false
+        }
     }
 
     private fun isExcludedDebitSpend(
@@ -118,18 +120,18 @@ object DebitCardSpendClassifier {
                 MessageFamily.BILL_PAYMENT,
                 MessageFamily.CARD_PAYMENT,
                 -> true
-                else -> {
-                    val body = smsBody(record, context)
-                    body.contains("سداد فاتورة") ||
-                        body.contains("سداد بطاقة") ||
-                        (
-                            body.contains("تسديد") &&
-                                (body.contains("بطاقة ائتمان") || body.contains("بطاقة إئتمان"))
-                            )
-                }
+                else -> isBillPaymentSms(smsBody(record, context))
             }
         }
     }
+
+    private fun isBillPaymentSms(body: String): Boolean =
+        body.contains("سداد فاتورة") ||
+            body.contains("سداد بطاقة") ||
+            (
+                body.contains("تسديد") &&
+                    (body.contains("بطاقة ائتمان") || body.contains("بطاقة إئتمان"))
+                )
 
     private fun linkedRecords(
         tx: FinancialTransaction,

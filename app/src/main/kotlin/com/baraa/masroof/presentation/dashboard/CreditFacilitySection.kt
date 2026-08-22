@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -40,7 +40,7 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 
-private val dashboardCarouselCardHeight = 228.dp
+private val dashboardCarouselCardMinHeight = 228.dp
 
 enum class DebitCardTilePresentation {
     /** Matches credit facility carousel tile height and structure on the home dashboard. */
@@ -81,14 +81,15 @@ fun CreditFacilitiesSection(
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
                         ownedCards = ownedCards,
-                        modifier = facilityModifier.height(dashboardCarouselCardHeight),
+                        allowInlineExpand = false,
+                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
                 items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->
                     DebitCardSummaryTile(
                         debit = debit,
                         network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
-                        modifier = facilityModifier.height(dashboardCarouselCardHeight),
+                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                         presentation = DebitCardTilePresentation.Carousel,
                         onClick = onOpenDebit?.let { open -> { open(debit) } },
                     )
@@ -240,6 +241,7 @@ fun CreditFacilityCard(
     zoneId: ZoneId,
     ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
+    allowInlineExpand: Boolean = true,
     onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
 ) {
     val primaryNetwork = cardNetworksByLast4[CardOwnershipKey.of(facility.bank, facility.primaryLast4)]
@@ -280,7 +282,7 @@ fun CreditFacilityCard(
                     )
                 }
             }
-            if (facility.supplementaries.isNotEmpty()) {
+            if (allowInlineExpand && facility.supplementaries.isNotEmpty()) {
                 Icon(
                     imageVector = if (expanded) MasroofIcons.periodPrevious else MasroofIcons.periodNext,
                     contentDescription = null,
@@ -344,7 +346,7 @@ fun CreditFacilityCard(
             )
         }
 
-        AnimatedVisibility(visible = expanded && facility.supplementaries.isNotEmpty()) {
+        AnimatedVisibility(visible = allowInlineExpand && expanded && facility.supplementaries.isNotEmpty()) {
             Column(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
