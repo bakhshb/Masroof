@@ -385,6 +385,7 @@ class ReviewViewModel(
                 review.kind.toUiLabelRes()
             },
             title = summary.title ?: "—",
+            smsBody = summary.body?.trim().orEmpty().ifEmpty { "—" },
             amountLabel = summary.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),

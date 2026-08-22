@@ -121,7 +121,10 @@ class DashboardCardFiltersTest {
         last4 = last4,
         displayLabel = "Mada ••$last4",
         linkedAccountLabel = null,
+        linkedAccountMaskedNumber = null,
         network = CardNetwork.MADA,
+        salaryPeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+        salaryPeriodLabel = null,
     )
 
     private fun emptyOverview() = CreditCardsOverview(

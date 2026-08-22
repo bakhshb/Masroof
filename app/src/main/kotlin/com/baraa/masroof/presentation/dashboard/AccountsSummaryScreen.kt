@@ -68,9 +68,6 @@ fun AccountsSummaryRoute(
             account = selectedAccount,
             state = state,
             onBack = { selectedAccountKey = null },
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onOpenTransaction = onOpenTransaction,
             onViewAllTransactions = {
                 onOpenAllTransactions(
@@ -89,9 +86,6 @@ fun AccountsSummaryRoute(
         AccountsSummaryScreen(
             state = state,
             onBack = onBack,
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onManageAccounts = onManageAccounts,
             onOpenAccount = { account -> selectedAccountKey = ownedAccountKey(account) },
         )
@@ -105,9 +99,6 @@ private fun ownedAccountKey(account: OwnedAccountUi): String =
 fun AccountsSummaryScreen(
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     onManageAccounts: () -> Unit,
     onOpenAccount: (OwnedAccountUi) -> Unit,
 ) {
@@ -115,9 +106,6 @@ fun AccountsSummaryScreen(
         title = stringResource(R.string.dashboard_accounts_summary_screen_title),
         state = state,
         onBack = onBack,
-        onPrevious = onPrevious,
-        onNext = onNext,
-        onCurrent = onCurrent,
     ) { contentModifier ->
         Column(
             modifier = contentModifier,

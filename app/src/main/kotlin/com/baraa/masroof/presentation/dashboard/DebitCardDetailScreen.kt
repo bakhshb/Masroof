@@ -2,31 +2,33 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
-fun AccountDetailScreen(
-    account: OwnedAccountUi,
+fun DebitCardDetailScreen(
+    debit: DebitCardOverview,
     state: DashboardUiState,
+    cardNetwork: com.baraa.masroof.domain.model.CardNetwork?,
     onBack: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onViewAllTransactions: () -> Unit,
 ) {
-    val summary = account.periodSummary
-    val accountTransactions = DashboardSummaryTransactionFilter.forAccount(
+    val cardTransactions = DashboardSummaryTransactionFilter.forDebitCard(
         transactions = state.allTransactions,
-        bank = account.bank,
-        maskedNumber = account.maskedNumber,
-        involvementByTransactionId = state.transactionAccountInvolvement,
+        bank = debit.bank,
+        last4 = debit.last4,
+        debitSpendInvolvementByTransactionId = state.transactionDebitSpendInvolvement,
     )
     val title = stringResource(
-        R.string.dashboard_account_item,
-        formatCardLast4(account.maskedNumber),
+        R.string.dashboard_credit_card_last4,
+        formatCardLast4(debit.last4),
     )
 
     DashboardSummaryScaffold(
@@ -38,17 +40,15 @@ fun AccountDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (summary != null) {
-                CurrentAccountSection(
-                    summary = summary,
-                    accountBadge = formatCardLast4(account.maskedNumber),
-                    presentationMode = AccountFlowPresentationMode.CashPosition,
-                    showSectionHeader = false,
-                )
-            }
+            DebitCardSummaryTile(
+                debit = debit,
+                network = cardNetwork,
+                modifier = Modifier.fillMaxWidth(),
+                showNavigationIcon = false,
+            )
 
             DashboardSummaryTransactionsSection(
-                transactions = accountTransactions,
+                transactions = cardTransactions,
                 onOpenTransaction = onOpenTransaction,
                 onViewAll = onViewAllTransactions,
             )

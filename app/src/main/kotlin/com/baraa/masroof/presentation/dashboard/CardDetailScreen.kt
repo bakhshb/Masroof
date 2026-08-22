@@ -19,9 +19,6 @@ fun CardDetailScreen(
     salaryPeriodLabel: String?,
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onViewAllTransactions: () -> Unit,
 ) {
@@ -29,6 +26,7 @@ fun CardDetailScreen(
         transactions = state.allTransactions,
         bank = row.bank,
         last4 = row.last4,
+        cardInvolvementByTransactionId = state.transactionCardInvolvement,
     )
     val title = stringResource(
         R.string.dashboard_credit_card_last4,
@@ -39,9 +37,6 @@ fun CardDetailScreen(
         title = title,
         state = state,
         onBack = onBack,
-        onPrevious = onPrevious,
-        onNext = onNext,
-        onCurrent = onCurrent,
     ) { contentModifier ->
         Column(
             modifier = contentModifier,

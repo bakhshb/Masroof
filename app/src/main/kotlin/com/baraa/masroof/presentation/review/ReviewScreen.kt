@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -251,12 +252,19 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        item.title,
-                        style = MaterialTheme.typography.titleSmall,
+                        item.smsBody,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     item.amountLabel?.let {
-                        Text(it, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            it,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
                     }
                 }
                 Text(

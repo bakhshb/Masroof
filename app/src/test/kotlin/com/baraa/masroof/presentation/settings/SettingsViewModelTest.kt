@@ -13,12 +13,6 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.application.transaction.RestoreResult
-import com.baraa.masroof.application.transaction.TransactionRestoreService
-import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.repository.RawSmsInsertResult
-import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.Dispatchers
@@ -221,15 +215,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun restoreIgnoredMessage_failure_setsFailedMessage() = runTest {
-        val vm = viewModel()
-        vm.restoreIgnoredMessage("sms-missing")
-        advanceUntilIdle()
-
-        assertEquals(SettingsRestoreMessage.NOT_IGNORED, vm.uiState.value.restoreMessage)
-    }
-
-    @Test
     fun markCardAsDebit_clearsRoleAndSetsDebitType() = runTest {
         val cards = TrackingCardRegistry(
             CardRegistryEntry(
@@ -257,8 +242,6 @@ class SettingsViewModelTest {
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
-        restoreService: TransactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
-        rawSmsRepository: RawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
     ): SettingsViewModel =
         SettingsViewModel(
             cardRegistryRepository = cards,
@@ -267,8 +250,6 @@ class SettingsViewModelTest {
                 accountRegistry = accounts,
                 cardRegistry = cards,
             ),
-            transactionRestoreService = restoreService,
-            rawSmsRepository = rawSmsRepository,
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),

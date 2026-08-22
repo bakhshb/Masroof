@@ -192,7 +192,7 @@ private fun TransactionListResultsBanner(
 }
 
 fun TransactionListFilterState.activeFilterCount(): Int {
-    var count = types.size + cardLast4s.size + accountContainerIds.size
+    var count = types.size + cardLast4s.size + accountContainerIds.size + transactionIds.size
     if (searchQuery.isNotBlank()) count++
     return count
 }

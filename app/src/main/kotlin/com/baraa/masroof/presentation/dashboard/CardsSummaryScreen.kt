@@ -22,9 +22,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
 import com.baraa.masroof.core.money.Currency
@@ -53,6 +55,9 @@ fun CardsSummaryRoute(
     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilities()
+    val selectedDebit = selectedCardKey?.let { key ->
+        followedFacilities?.debitCards?.find { CardOwnershipKey.of(it) == key }
+    }
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
             ?.flatMap { it.allCards }
@@ -61,23 +66,43 @@ fun CardsSummaryRoute(
     }
 
     BackHandler {
-        if (selectedCard != null) {
+        if (selectedCard != null || selectedDebit != null) {
             selectedCardKey = null
         } else {
             onBack()
         }
     }
 
-    if (selectedCard != null) {
+    when {
+        selectedDebit != null -> {
+            DebitCardDetailScreen(
+                debit = selectedDebit,
+                state = state,
+                cardNetwork = cardNetworks[CardOwnershipKey.of(selectedDebit)] ?: selectedDebit.network,
+                onBack = { selectedCardKey = null },
+                onOpenTransaction = onOpenTransaction,
+                onViewAllTransactions = {
+                    val cardKey = CardTransactionInvolvementResolver.cardKey(
+                        selectedDebit.bank.id,
+                        selectedDebit.last4,
+                    )
+                    val spendTransactionIds = state.transactionDebitSpendInvolvement
+                        .filter { (_, cardKeys) -> cardKey in cardKeys }
+                        .keys
+                    onOpenAllTransactions(
+                        TransactionListFilterState(transactionIds = spendTransactionIds),
+                    )
+                },
+            )
+        }
+
+        selectedCard != null -> {
         CardDetailScreen(
             row = selectedCard,
             salaryPeriodLabel = followedOverview?.salaryPeriodLabel
                 ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
             state = state,
             onBack = { selectedCardKey = null },
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onOpenTransaction = onOpenTransaction,
             onViewAllTransactions = {
                 onOpenAllTransactions(
@@ -85,17 +110,18 @@ fun CardsSummaryRoute(
                 )
             },
         )
-    } else {
+        }
+
+        else -> {
         CardsSummaryScreen(
             state = state,
             onBack = onBack,
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onManageCards = onManageCards,
             onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+            onOpenDebit = { debit -> selectedCardKey = CardOwnershipKey.of(debit) },
             cardNetworksByLast4 = cardNetworks,
         )
+        }
     }
 }
 
@@ -106,11 +132,9 @@ private fun ownedCardKey(row: CreditCardDashboardRow): String =
 fun CardsSummaryScreen(
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
+    onOpenDebit: (DebitCardOverview) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
     val followedFacilities = state.followedCreditFacilities()
@@ -120,9 +144,6 @@ fun CardsSummaryScreen(
         title = stringResource(R.string.dashboard_cards_summary_screen_title),
         state = state,
         onBack = onBack,
-        onPrevious = onPrevious,
-        onNext = onNext,
-        onCurrent = onCurrent,
     ) { contentModifier ->
         Column(
             modifier = contentModifier,
@@ -145,9 +166,11 @@ fun CardsSummaryScreen(
                         )
                     }
                     followedFacilities.debitCards.forEach { debit ->
-                        DebitCardOverviewRow(
+                        DebitCardSummaryTile(
                             debit = debit,
                             network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onOpenDebit(debit) },
                         )
                     }
                 }

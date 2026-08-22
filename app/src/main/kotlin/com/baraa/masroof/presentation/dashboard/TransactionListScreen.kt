@@ -44,6 +44,7 @@ fun TransactionListScreen(
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
     var selectedCardLast4s by rememberSaveable { mutableStateOf(listOf<String>()) }
     var selectedAccountContainerIds by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var seedTransactionIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var filtersSheetOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
@@ -53,6 +54,7 @@ fun TransactionListScreen(
         selectedTypeNames = filter.types.map { it.name }
         selectedCardLast4s = filter.cardLast4s.toList()
         selectedAccountContainerIds = filter.accountContainerIds.toList()
+        seedTransactionIds = filter.transactionIds
         filtersSheetOpen = false
         onSeedFilterApplied()
     }
@@ -62,6 +64,7 @@ fun TransactionListScreen(
         selectedTypeNames,
         selectedCardLast4s,
         selectedAccountContainerIds,
+        seedTransactionIds,
     ) {
         TransactionListFilterState(
             searchQuery = searchQuery,
@@ -70,6 +73,7 @@ fun TransactionListScreen(
             }.toSet(),
             cardLast4s = selectedCardLast4s.toSet(),
             accountContainerIds = selectedAccountContainerIds.toSet(),
+            transactionIds = seedTransactionIds,
         )
     }
 

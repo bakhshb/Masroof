@@ -19,6 +19,21 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
+    fun transactionIdFilter_limitsResults() {
+        val txs = listOf(
+            preview(id = "keep", type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
+            preview(id = "drop", type = FinancialTransactionType.EXPENSE, amount = "50", card = "7271"),
+        )
+
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(transactionIds = setOf("keep")),
+        )
+
+        assertEquals(listOf("keep"), result.transactions.map { it.id })
+    }
+
+    @Test
     fun typeFilter_limitsResults() {
         val txs = listOf(
             preview(type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
@@ -219,6 +234,7 @@ class TransactionListFilterEngineTest {
     }
 
     private fun preview(
+        id: String = "tx-${System.nanoTime()}",
         type: FinancialTransactionType,
         amount: String,
         merchant: String? = null,
@@ -232,7 +248,7 @@ class TransactionListFilterEngineTest {
         val title = merchant ?: counterparty
         val searchText = listOfNotNull(merchant, counterparty).joinToString(" ").lowercase()
         return TransactionPreviewUi(
-            id = "$type-$amount-$merchant-$card",
+            id = id,
             title = title,
             amount = money,
             localDate = java.time.LocalDate.of(2026, 8, 1),

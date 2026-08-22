@@ -12,9 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.presentation.common.IconTextButtonOutlined
-import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MasroofPeriodPill
+import com.baraa.masroof.presentation.common.MasroofPeriodDisplay
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 
 @Composable
@@ -22,9 +20,6 @@ fun DashboardSummaryScaffold(
     title: String,
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     content: @Composable (Modifier) -> Unit,
 ) {
     val context = LocalContext.current
@@ -43,13 +38,7 @@ fun DashboardSummaryScaffold(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MasroofPeriodPill(
-                label = periodRangeLabel,
-                onPrevious = onPrevious,
-                onNext = onNext,
-                previousContentDescription = stringResource(R.string.dashboard_period_previous),
-                nextContentDescription = stringResource(R.string.dashboard_period_next),
-            )
+            MasroofPeriodDisplay(label = periodRangeLabel)
 
             state.periodAdjustmentHint?.let { hint ->
                 androidx.compose.material3.Text(
@@ -57,15 +46,6 @@ fun DashboardSummaryScaffold(
                     modifier = Modifier.fillMaxWidth(),
                     style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (!state.isCurrentPeriod) {
-                IconTextButtonOutlined(
-                    onClick = onCurrent,
-                    icon = MasroofIcons.backToCurrent,
-                    text = stringResource(R.string.dashboard_back_to_current),
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
