@@ -194,9 +194,6 @@ object CurrentAccountFlowDetailGrouper {
         }.toSet()
     }
 
-    private fun isCreditCardContainer(containerId: String?): Boolean =
-        containerId?.startsWith("card:") == true
-
     private fun effectiveAmount(
         tx: FinancialTransaction,
         primaryCurrency: Currency,

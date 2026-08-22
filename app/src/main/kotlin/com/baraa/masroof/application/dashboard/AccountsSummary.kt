@@ -61,9 +61,6 @@ data class AccountsSummary(
     }
 
     companion object {
-        fun from(periodSummaries: List<OwnedAccountPeriodSummary>): AccountsSummary =
-            AccountsSummary(periodSummaries.mapNotNull(OwnedAccount::from))
-
         fun fromSummaries(
             accounts: List<Pair<Bank, String>>,
             summaries: List<CurrentAccountSummary>,
@@ -80,6 +77,3 @@ data class AccountsSummary(
 
 /** @see AccountsSummary */
 typealias OwnedAccountsFlowSummary = AccountsSummary
-
-/** @see OwnedAccount */
-typealias OwnedAccountPeriodFlow = OwnedAccount

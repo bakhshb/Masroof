@@ -284,7 +284,6 @@ class DashboardViewModel(
                 reclassifySuccess = false,
                 reclassifyError = null,
                 ignoring = false,
-                ignoreSuccess = false,
                 ignoreError = null,
             )
         }
@@ -301,7 +300,6 @@ class DashboardViewModel(
                 reclassifySuccess = false,
                 reclassifyError = null,
                 ignoring = false,
-                ignoreSuccess = false,
                 ignoreError = null,
             )
         }
@@ -361,7 +359,7 @@ class DashboardViewModel(
     fun ignoreSelectedTransaction() {
         val transactionId = _uiState.value.selectedTransactionId ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(ignoring = true, ignoreSuccess = false, ignoreError = null, reclassifyError = null) }
+            _uiState.update { it.copy(ignoring = true, ignoreError = null, reclassifyError = null) }
             when (val result = ignoreService.ignore(transactionId)) {
                 is IgnoreResult.Success -> {
                     refresh()
@@ -371,7 +369,6 @@ class DashboardViewModel(
                             selectedTransactionSms = emptyList(),
                             selectedTransactionSmsLoading = false,
                             ignoring = false,
-                            ignoreSuccess = true,
                             ignoreError = null,
                         )
                     }

@@ -4,9 +4,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
  * Period cash-flow view for one owned current account (e.g. last4 `3001`).
@@ -59,18 +56,6 @@ data class OwnedAccount(
     fun accountSummary(): AccountFlowSummary = flow.accountSummary()
 
     companion object {
-        fun from(period: OwnedAccountPeriodSummary): OwnedAccount? {
-            val containerId = FinancialContainerIdFactory.accountId(period.bank, period.maskedNumber)
-                ?: return null
-            return OwnedAccount(
-                id = accountIdFromMasked(period.maskedNumber),
-                bank = period.bank,
-                maskedNumber = period.maskedNumber,
-                containerId = containerId,
-                summary = period.summary,
-            )
-        }
-
         fun from(
             bank: Bank,
             maskedNumber: String,
@@ -85,23 +70,6 @@ data class OwnedAccount(
                 summary = summary,
             )
         }
-
-        fun buildAll(
-            ownedAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
-            transactions: List<FinancialTransaction>,
-            parsedRecords: List<ParsedEventRecord>,
-            primaryCurrency: Currency,
-            sarEquivalents: Map<String, Money>,
-            rawSmsById: Map<String, RawSms>,
-        ): List<OwnedAccount> =
-            OwnedAccountPeriodSummaryCalculator.summarize(
-                ownedAccounts = ownedAccounts,
-                transactions = transactions,
-                parsedRecords = parsedRecords,
-                primaryCurrency = primaryCurrency,
-                sarEquivalents = sarEquivalents,
-                rawSmsById = rawSmsById,
-            ).mapNotNull(OwnedAccount::from)
 
         private fun accountIdFromMasked(maskedNumber: String): String {
             val trimmed = maskedNumber.trim()
