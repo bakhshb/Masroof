@@ -108,6 +108,14 @@ data class CurrentAccountTransactionScope(
         }
     }
 
+    fun involvesOwnedAccount(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
+    ): Boolean =
+        involvesOwnedSource(tx, parsedRecordsById, rawSmsById) ||
+            involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)
+
     fun isCashWithdrawal(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,

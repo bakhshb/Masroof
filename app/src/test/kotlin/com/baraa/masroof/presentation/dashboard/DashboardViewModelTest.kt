@@ -716,6 +716,7 @@ class DashboardViewModelTest {
                     override suspend fun getById(id: String) = null
                     override suspend fun findByRawSmsId(rawSmsId: String) = null
                     override suspend fun listRequired() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
+                    override suspend fun listIgnored() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
                     override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
                     override suspend fun upsertRequired(
                         rawSmsId: String,

@@ -19,6 +19,7 @@ object ReviewReasonLabels {
             "card_payment_ownership_unresolved" -> R.string.review_reason_card_payment_ownership
             "transfer_ownership_unknown_no_guess" -> R.string.review_reason_transfer_ownership
             "transfer_missing_source_or_destination" -> R.string.review_reason_transfer_missing_side
+            "user_ignored_transaction" -> R.string.review_reason_user_ignored_transaction
             "non_financial_or_informational_message" -> R.string.review_reason_non_financial
             "review_not_found" -> R.string.review_error_not_found
             "review_not_required" -> R.string.review_error_not_required

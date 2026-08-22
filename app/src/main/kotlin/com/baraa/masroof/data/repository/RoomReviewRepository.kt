@@ -22,6 +22,9 @@ class RoomReviewRepository(
     override suspend fun listRequired(): List<ReviewItem> =
         dao.listByStatus(ReviewStatus.REQUIRED.name).map(ReviewItemMapper::toDomain)
 
+    override suspend fun listIgnored(): List<ReviewItem> =
+        dao.listIgnored().map(ReviewItemMapper::toDomain)
+
     override suspend fun listAll(): List<ReviewItem> =
         dao.listAll().map(ReviewItemMapper::toDomain)
 

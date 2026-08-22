@@ -132,6 +132,8 @@ class TransactionRestoreServiceTest {
 
         override suspend fun listRequired(): List<ReviewItem> = emptyList()
 
+        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
+
         override suspend fun listAll(): List<ReviewItem> = listOf(review)
 
         override suspend fun upsertRequired(

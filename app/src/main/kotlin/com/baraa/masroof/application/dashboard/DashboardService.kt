@@ -26,6 +26,8 @@ data class DashboardOverview(
     val accountsFleet: AccountsSummary? = null,
     val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
     val flowDetailGrouping: CurrentAccountFlowDetailGrouping,
+    /** Transaction id → owned account container ids (SMS-resolved, SingleAccount scope). */
+    val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val isCurrentPeriod: Boolean,
 )
 

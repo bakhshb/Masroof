@@ -26,6 +26,7 @@ data class DashboardProjection(
     val perAccount: List<OwnedAccountPeriodSummary>,
     val creditFacilities: CreditFacilitiesOverview,
     val flowDetail: CurrentAccountFlowDetailGrouping,
+    val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactions: List<FinancialTransaction>,
     val meta: DashboardMeta,
     val accountRegistry: List<AccountRegistryEntry>,
@@ -43,6 +44,7 @@ data class DashboardProjection(
             accountsFleet = accountsFleet,
             ownedAccountPeriodSummaries = perAccount,
             flowDetailGrouping = flowDetail,
+            transactionAccountInvolvement = transactionAccountInvolvement,
             isCurrentPeriod = isCurrentPeriod,
         )
 }

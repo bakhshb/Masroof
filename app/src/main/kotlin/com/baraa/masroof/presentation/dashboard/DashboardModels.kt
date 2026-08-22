@@ -102,6 +102,7 @@ data class DashboardUiState(
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),
     val flowDetailGrouping: com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping? = null,
+    val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val smsPermissionGranted: Boolean = true,
     val dashboardLayout: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
     val customizeSheetOpen: Boolean = false,
@@ -114,6 +115,8 @@ enum class DashboardError {
 
 enum class SmsRescanStatus {
     OK,
+    ALREADY_UP_TO_DATE,
+    NEEDS_REVIEW,
     NO_MESSAGES,
     NO_BANK_SMS,
     NO_TRANSACTIONS,

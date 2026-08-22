@@ -12,6 +12,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.CardRegistryRepository
@@ -52,13 +53,32 @@ class ReviewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {
-                applySummaries(detailLoader.loadSummaries())
+                val summaries = when (_uiState.value.listMode) {
+                    ReviewListMode.PENDING -> detailLoader.loadSummaries()
+                    ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
+                }
+                applySummaries(summaries)
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
                 _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
             }
         }
+    }
+
+    fun setListMode(mode: ReviewListMode) {
+        if (_uiState.value.listMode == mode) return
+        _uiState.update {
+            it.copy(
+                listMode = mode,
+                items = emptyList(),
+                informationalDismissCount = 0,
+                loading = true,
+                error = null,
+                message = null,
+            )
+        }
+        refresh()
     }
 
     fun dismissAllInformational() {
@@ -295,8 +315,12 @@ class ReviewViewModel(
 
     private fun toListItem(summary: ReviewDetailLoader.ReviewSummary): ReviewListItemUi {
         val review = summary.review
-        val dateLabel = summary.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
-            ?: "—"
+        val dateLabel = when {
+            isIgnoredReview(review) ->
+                review.resolvedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format) ?: "—"
+            else ->
+                summary.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format) ?: "—"
+        }
         val dismissible = shouldOfferNonFinancialDismiss(
             messageFamily = summary.messageFamily,
             reasons = review.reasons,
@@ -306,14 +330,23 @@ class ReviewViewModel(
         return ReviewListItemUi(
             id = review.id,
             kind = review.kind,
-            kindLabelRes = review.kind.toUiLabelRes(),
+            kindLabelRes = if (isIgnoredReview(review)) {
+                com.baraa.masroof.R.string.review_status_ignored
+            } else {
+                review.kind.toUiLabelRes()
+            },
             title = summary.title ?: "—",
             amountLabel = summary.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
             dismissibleAsNonFinancial = dismissible,
+            ignored = isIgnoredReview(review),
         )
     }
+
+    private fun isIgnoredReview(review: com.baraa.masroof.domain.model.ReviewItem): Boolean =
+        review.status == ReviewStatus.RESOLVED &&
+            review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
 
     private suspend fun toDetailUi(
         detail: ReviewDetailLoader.ReviewDetail,
@@ -332,7 +365,9 @@ class ReviewViewModel(
         )
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"
-        val ownershipCard = if (review.reasons.any { it in OWNERSHIP_CARD_REASONS }) {
+        val resolvedAtLabel = review.resolvedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
+        val ignored = isIgnoredReview(review)
+        val ownershipCard = if (!ignored && review.reasons.any { it in OWNERSHIP_CARD_REASONS }) {
             detail.cardRef?.takeIf { cardRef ->
                 cardRef.last4 != null &&
                     cardRegistryRepository.resolve(cardRef) == OwnershipStatus.UNKNOWN
@@ -354,16 +389,18 @@ class ReviewViewModel(
             counterparty = detail.counterparty,
             reasonLabels = review.reasons,
             pairCandidates = pairCandidates,
-            showExternalTransferAction = (isTransferOut || isTransferIn) &&
+            showExternalTransferAction = !ignored && (isTransferOut || isTransferIn) &&
                 (pendingMatch || review.kind == ReviewKind.NEEDS_REVIEW),
-            showIncomingIncomeAction = pendingMatch && isTransferIn,
-            showFinancialTypeActions = review.kind == ReviewKind.NEEDS_REVIEW &&
+            showIncomingIncomeAction = !ignored && pendingMatch && isTransferIn,
+            showFinancialTypeActions = !ignored && review.kind == ReviewKind.NEEDS_REVIEW &&
                 !dismissNonFinancial &&
                 family !in TRANSFER_MESSAGE_FAMILIES &&
                 ownershipCard == null,
-            showDismissNonFinancialAction = review.kind == ReviewKind.NEEDS_REVIEW,
+            showDismissNonFinancialAction = !ignored && review.kind == ReviewKind.NEEDS_REVIEW,
             ownershipCard = ownershipCard,
-            showOwnershipActions = ownershipCard != null,
+            showOwnershipActions = !ignored && ownershipCard != null,
+            readOnly = ignored,
+            resolvedAtLabel = resolvedAtLabel,
         )
     }
 

@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
 import com.baraa.masroof.application.dashboard.OwnedAccount
-import com.baraa.masroof.application.dashboard.externalMovement
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
@@ -243,7 +243,7 @@ private fun AccountsSummaryAccountCard(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val movement = summary?.externalMovement()
+    val movement = summary?.cashPosition()
     val remaining = movement?.remaining
     val periodInflow = movement?.inflow
     val periodOutflow = movement?.outflow

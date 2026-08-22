@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.externalMovement
+import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -348,7 +349,7 @@ fun DashboardAccountsSection(
 private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
-    val movement = summary?.externalMovement()
+    val movement = summary?.cashPosition()
     val periodInflow = movement?.inflow
     val periodOutflow = movement?.outflow
     val remaining = movement?.remaining

@@ -92,6 +92,8 @@ enum class BackupMessage {
 
 enum class SmsImportMessage {
     OK,
+    ALREADY_UP_TO_DATE,
+    NEEDS_REVIEW,
     PERMISSION_DENIED,
     NO_MESSAGES,
     NO_BANK_SMS,

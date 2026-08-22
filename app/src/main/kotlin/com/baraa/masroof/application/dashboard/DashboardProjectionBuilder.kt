@@ -110,6 +110,12 @@ class DashboardProjectionBuilder(
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
         )
+        val transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            ownedAccounts = ownedAccounts,
+        )
 
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,
@@ -174,6 +180,7 @@ class DashboardProjectionBuilder(
             perAccount = perAccount,
             creditFacilities = creditFacilities,
             flowDetail = flowDetail,
+            transactionAccountInvolvement = transactionAccountInvolvement,
             transactions = dedupedTransactions,
             meta = DashboardMeta(
                 transactionCount = summary.transactionCount,

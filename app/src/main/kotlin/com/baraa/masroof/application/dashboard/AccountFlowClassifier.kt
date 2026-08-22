@@ -142,10 +142,14 @@ object AccountFlowClassifier {
                     return emptyList()
                 }
                 listOf(
-                    if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
-                        FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
-                    } else {
-                        FlowAssignment.Expense(FlowExpenseCategory.FEE)
+                    when {
+                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
+                            FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
+
+                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
+                            FlowAssignment.Expense(FlowExpenseCategory.CASH_WITHDRAWAL)
+
+                        else -> FlowAssignment.Expense(FlowExpenseCategory.FEE)
                     },
                 )
             }

@@ -53,6 +53,9 @@ class ReviewWorkflowService(
     suspend fun listRequiredReviews(): List<ReviewItem> =
         reviewRepository.listRequired()
 
+    suspend fun listIgnoredReviews(): List<ReviewItem> =
+        reviewRepository.listIgnored()
+
     suspend fun getReview(reviewId: String): ReviewItem? =
         reviewRepository.getById(reviewId)
 
