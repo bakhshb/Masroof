@@ -323,8 +323,8 @@
     <string name="dashboard_credit_card_last4">Card ···%1$s</string>
     <string name="dashboard_credit_card_statement_spending">Spent since statement %1$s</string>
     <string name="dashboard_credit_card_statement_spending_fallback">Spent since last statement</string>
-    <string name="dashboard_debit_card_salary_spending">Salary period spending — Mada &amp; cash (from %1$s)</string>
-    <string name="dashboard_debit_card_salary_spending_fallback">Salary period spending — Mada &amp; cash</string>
+    <string name="dashboard_debit_card_salary_spending">Spent since %1$s</string>
+    <string name="dashboard_debit_card_salary_spending_fallback">Spent since period start</string>
     <string name="dashboard_debit_card_linked_account">Linked account</string>
     <string name="dashboard_credit_card_salary_spending">Salary period spending (from %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">Salary period spending</string>

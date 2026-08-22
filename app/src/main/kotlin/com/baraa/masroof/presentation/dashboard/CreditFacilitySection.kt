@@ -40,7 +40,7 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 
-private val dashboardCarouselCardMinHeight = 228.dp
+private val dashboardCarouselCardMinHeight = 230.dp
 
 enum class DebitCardTilePresentation {
     /** Matches credit facility carousel tile height and structure on the home dashboard. */
@@ -81,7 +81,6 @@ fun CreditFacilitiesSection(
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
                         ownedCards = ownedCards,
-                        allowInlineExpand = false,
                         modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
