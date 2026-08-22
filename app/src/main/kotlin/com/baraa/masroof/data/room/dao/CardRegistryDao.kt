@@ -144,6 +144,28 @@ interface CardRegistryDao {
         UPDATE card_registry
         SET cardRole = 'STANDALONE',
             parentCardLast4 = NULL
+        WHERE bankId = :bankId AND parentCardLast4 = :primaryLast4
+        """,
+    )
+    suspend fun detachSupplementariesOfPrimary(bankId: String, primaryLast4: String): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardRole = 'STANDALONE',
+            parentCardLast4 = NULL
+        WHERE bankId = :bankId
+          AND cardRole = 'PRIMARY'
+          AND last4 != :exceptLast4
+        """,
+    )
+    suspend fun demoteOtherPrimaryCards(bankId: String, exceptLast4: String): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardRole = 'STANDALONE',
+            parentCardLast4 = NULL
         WHERE bankId = :bankId AND last4 = :last4
         """,
     )

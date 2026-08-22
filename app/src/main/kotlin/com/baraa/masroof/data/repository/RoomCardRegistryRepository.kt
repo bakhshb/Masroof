@@ -100,6 +100,7 @@ class RoomCardRegistryRepository(
 
     override suspend fun setPrimaryCard(reference: CardReference) {
         val last4 = requireLast4(reference)
+        dao.demoteOtherPrimaryCards(reference.bank.id, last4)
         dao.updateCardRole(
             bankId = reference.bank.id,
             last4 = last4,
@@ -111,17 +112,26 @@ class RoomCardRegistryRepository(
 
     override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) {
         val last4 = requireLast4(reference)
+        val parentLast4 = primaryLast4.trim()
+        require(parentLast4.isNotEmpty()) { "primaryLast4 required" }
+        val parent = dao.get(reference.bank.id, parentLast4)
+            ?: throw IllegalArgumentException("primary_not_found")
+        require(parent.cardRole == CardRole.PRIMARY.name) { "parent_not_primary" }
         dao.updateCardRole(
             bankId = reference.bank.id,
             last4 = last4,
             cardRole = CardRole.SUPPLEMENTARY.name,
-            parentCardLast4 = primaryLast4.trim(),
+            parentCardLast4 = parentLast4,
         )
         dao.updateCardType(reference.bank.id, last4, CardType.CREDIT.name)
     }
 
     override suspend fun clearCardRole(reference: CardReference) {
         val last4 = requireLast4(reference)
+        val existing = dao.get(reference.bank.id, last4)
+        if (existing?.cardRole == CardRole.PRIMARY.name) {
+            dao.detachSupplementariesOfPrimary(reference.bank.id, last4)
+        }
         dao.clearSupplementaryRole(reference.bank.id, last4)
         dao.updateCardRole(
             bankId = reference.bank.id,
