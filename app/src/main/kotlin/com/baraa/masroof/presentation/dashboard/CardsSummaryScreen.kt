@@ -50,7 +50,7 @@ fun CardsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
+    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilities()
     val selectedCard = selectedCardKey?.let { key ->
@@ -146,7 +146,7 @@ fun CardsSummaryScreen(
                     followedFacilities.debitCards.forEach { debit ->
                         DebitCardOverviewRow(
                             debit = debit,
-                            network = cardNetworksByLast4[debit.last4] ?: debit.network,
+                            network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
                         )
                     }
                 }
@@ -167,7 +167,7 @@ fun CardsSummaryScreen(
                         followedOverview.cards.forEach { row ->
                             CreditCardCompactListRow(
                                 row = row,
-                                cardNetwork = cardNetworksByLast4[row.last4],
+                                cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
                                 onClick = { onOpenCard(row) },
                             )
                         }

@@ -30,6 +30,7 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -447,6 +448,20 @@ class DashboardViewModelTest {
             entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
 
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+
+        override suspend fun updateDisplayName(reference: CardReference, displayName: String?) = Unit
+
+        override suspend fun updateCardNetwork(reference: CardReference, network: com.baraa.masroof.domain.model.CardNetwork?) = Unit
+
+        override suspend fun updateCardType(reference: CardReference, cardType: com.baraa.masroof.domain.model.CardType?) = Unit
+
+        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
+
+        override suspend fun setPrimaryCard(reference: CardReference) = Unit
+
+        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
+
+        override suspend fun clearCardRole(reference: CardReference) = Unit
     }
 
     private class FakeAccountRegistry(
@@ -676,13 +691,7 @@ class DashboardViewModelTest {
                         override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
                         override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
                     },
-                    object : com.baraa.masroof.domain.repository.CardRegistryRepository {
-                        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
-                        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) = Unit
-                        override suspend fun resolve(reference: CardReference) = OwnershipStatus.UNKNOWN
-                        override suspend fun get(ref: com.baraa.masroof.domain.model.CardReference) = null
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.CardRegistryEntry>()
-                    },
+                    NoOpCardRegistryRepository(),
                 ),
             ),
             ignoreService = TransactionIgnoreService(

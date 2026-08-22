@@ -75,7 +75,7 @@ fun CreditFacilitiesSection(
         overview.debitCards.forEach { debit ->
             DebitCardOverviewRow(
                 debit = debit,
-                network = cardNetworksByLast4[debit.last4] ?: debit.network,
+                network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
             )
         }
     }
@@ -117,7 +117,7 @@ fun CreditFacilityCard(
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
 ) {
-    val primaryNetwork = cardNetworksByLast4[facility.primaryLast4]
+    val primaryNetwork = cardNetworksByLast4[CardOwnershipKey.of(facility.bank, facility.primaryLast4)]
     var expanded by rememberSaveable(facility.primaryLast4) { mutableStateOf(false) }
     val extended = MasroofThemeExtras.extendedColors
 
@@ -201,7 +201,7 @@ fun CreditFacilityCard(
                         zoneId = zoneId,
                         presentation = CreditCardMetricsPresentation.SummaryPurchases,
                         showBalanceAndDue = false,
-                        cardNetwork = cardNetworksByLast4[supplementary.last4],
+                        cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(supplementary)],
                     )
                 }
             }

@@ -170,4 +170,78 @@ interface CardRegistryDao {
         """,
     )
     suspend fun clearSupplementaryRole(bankId: String, last4: String): Int
+
+    @Query(
+        """
+        SELECT last4 FROM card_registry
+        WHERE bankId = :bankId AND cardRole = 'PRIMARY' AND last4 != :exceptLast4
+        """,
+    )
+    suspend fun listOtherPrimaryLast4s(bankId: String, exceptLast4: String): List<String>
+
+    @Transaction
+    suspend fun promoteToPrimaryAtomic(bankId: String, last4: String) {
+        listOtherPrimaryLast4s(bankId, last4).forEach { primaryLast4 ->
+            detachSupplementariesOfPrimary(bankId, primaryLast4)
+        }
+        demoteOtherPrimaryCards(bankId, last4)
+        updateCardRole(
+            bankId = bankId,
+            last4 = last4,
+            cardRole = "PRIMARY",
+            parentCardLast4 = null,
+        )
+        updateCardType(bankId, last4, "CREDIT")
+    }
+
+    @Transaction
+    suspend fun setSupplementaryAtomic(bankId: String, last4: String, parentLast4: String) {
+        val existing = get(bankId, last4)
+        if (existing?.cardRole == "PRIMARY") {
+            detachSupplementariesOfPrimary(bankId, last4)
+        }
+        updateCardRole(
+            bankId = bankId,
+            last4 = last4,
+            cardRole = "SUPPLEMENTARY",
+            parentCardLast4 = parentLast4,
+        )
+        updateCardType(bankId, last4, "CREDIT")
+    }
+
+    @Transaction
+    suspend fun clearFacilityRoleAtomic(bankId: String, last4: String) {
+        val existing = get(bankId, last4)
+        if (existing?.cardRole == "PRIMARY") {
+            detachSupplementariesOfPrimary(bankId, last4)
+        }
+        clearSupplementaryRole(bankId, last4)
+        updateCardRole(
+            bankId = bankId,
+            last4 = last4,
+            cardRole = "STANDALONE",
+            parentCardLast4 = null,
+        )
+    }
+
+    @Transaction
+    suspend fun linkDebitAtomic(
+        bankId: String,
+        last4: String,
+        linkedAccountBankId: String,
+        linkedAccountMaskedNumber: String,
+        defaultMadaWhenNetworkMissing: Boolean,
+    ) {
+        clearFacilityRoleAtomic(bankId, last4)
+        updateLinkedAccount(
+            bankId = bankId,
+            last4 = last4,
+            linkedAccountBankId = linkedAccountBankId,
+            linkedAccountMaskedNumber = linkedAccountMaskedNumber,
+        )
+        updateCardType(bankId, last4, "DEBIT")
+        if (defaultMadaWhenNetworkMissing && get(bankId, last4)?.cardNetwork == null) {
+            updateCardNetwork(bankId, last4, "MADA")
+        }
+    }
 }

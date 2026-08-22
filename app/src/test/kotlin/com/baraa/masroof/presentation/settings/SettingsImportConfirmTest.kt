@@ -14,7 +14,7 @@ import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
-import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -117,13 +117,7 @@ class SettingsImportConfirmTest {
         }
     }
 
-    private class EmptyCards : CardRegistryRepository {
-        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: CardReference) = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: CardReference): CardRegistryEntry? = null
-        override suspend fun listAll(): List<CardRegistryEntry> = emptyList()
-    }
+    private class EmptyCards : NoOpCardRegistryRepository()
 
     private class EmptyAccounts : AccountRegistryRepository {
         override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit

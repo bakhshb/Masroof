@@ -320,7 +320,7 @@ private fun DashboardCustomizableSections(
                 }
 
                 DashboardSectionId.CARDS -> {
-                    val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
+                    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
                     val followedFacilities = state.followedCreditFacilities()
                     if (followedFacilities != null) {
                         CreditFacilitiesSection(

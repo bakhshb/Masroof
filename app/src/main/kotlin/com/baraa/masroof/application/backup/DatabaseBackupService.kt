@@ -73,17 +73,28 @@ class DatabaseBackupService(
                 BackupPackageCodec.decodeManifest(manifestFile.readText())
             }.getOrElse { return@withContext BackupImportOutcome.InvalidPackage }
 
-            if (!BackupPackageCodec.validateManifest(
+            val importableVersions = mapOf(
+                MasroofDatabase.PREVIOUS_VERSION to MasroofDatabase.PREVIOUS_IDENTITY_HASH,
+            )
+            if (!BackupPackageCodec.validateManifestForImport(
                     manifest = manifest,
-                    expectedRoomVersion = MasroofDatabase.VERSION,
-                    expectedIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                    targetRoomVersion = MasroofDatabase.VERSION,
+                    targetIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                    importableVersions = importableVersions,
                 )
             ) {
                 return@withContext BackupImportOutcome.InvalidPackage
             }
 
+            val expectedDbIdentityHash = BackupPackageCodec.expectedIdentityHashForImport(
+                manifest = manifest,
+                targetRoomVersion = MasroofDatabase.VERSION,
+                targetIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                importableVersions = importableVersions,
+            ) ?: return@withContext BackupImportOutcome.InvalidPackage
+
             val identityFromDb = readIdentityHash(dbFile)
-            if (identityFromDb != MasroofDatabase.IDENTITY_HASH) {
+            if (identityFromDb != expectedDbIdentityHash) {
                 return@withContext BackupImportOutcome.InvalidPackage
             }
 

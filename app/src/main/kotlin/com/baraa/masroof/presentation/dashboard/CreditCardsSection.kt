@@ -80,7 +80,7 @@ fun CreditCardsSection(
                     salaryPeriodLabel = overview.salaryPeriodLabel,
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
-                    cardNetwork = cardNetworksByLast4[row.last4],
+                    cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
                     modifier = Modifier.width(268.dp),
                 )
             }
@@ -385,8 +385,8 @@ private fun formatSnapshotTime(
     formatter: DateTimeFormatter,
 ): String = formatter.format(instant.atZone(zoneId))
 
-fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverview {
-    val filteredCards = cards.filter { it.last4 in ownedLast4s }
+fun CreditCardsOverview.followedOnly(ownedKeys: Set<String>): CreditCardsOverview {
+    val filteredCards = cards.filter { CardOwnershipKey.of(it) in ownedKeys }
     val statementDue = resolveLatestStatementDue(filteredCards)
     return copy(
         cards = filteredCards,
@@ -398,8 +398,8 @@ fun CreditCardsOverview.followedOnly(ownedLast4s: Set<String>): CreditCardsOverv
     )
 }
 
-fun CreditCardsOverview.followedSalaryPeriodSpendingTotal(ownedLast4s: Set<String>): SignedMoneyAmount =
-    sumFollowedSpending(cards.filter { it.last4 in ownedLast4s }) { it.salaryPeriodSpendingNet }
+fun CreditCardsOverview.followedSalaryPeriodSpendingTotal(ownedKeys: Set<String>): SignedMoneyAmount =
+    sumFollowedSpending(cards.filter { CardOwnershipKey.of(it) in ownedKeys }) { it.salaryPeriodSpendingNet }
 
 private fun sumFollowedSpending(
     rows: List<CreditCardDashboardRow>,

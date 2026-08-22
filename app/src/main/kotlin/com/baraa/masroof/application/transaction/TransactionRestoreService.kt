@@ -25,12 +25,7 @@ class TransactionRestoreService(
     private val clock: InstantClock,
 ) {
     suspend fun listIgnoredRawSmsIds(): List<String> =
-        reviewRepository.listAll()
-            .filter {
-                it.status == ReviewStatus.RESOLVED &&
-                    it.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-            }
-            .map { it.rawSmsId }
+        reviewRepository.listIgnored().map { it.rawSmsId }
 
     suspend fun restore(
         rawSmsId: String,
@@ -54,7 +49,7 @@ class TransactionRestoreService(
         reconciliation.reconcileStoredEvents()
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
-            rollbackToIgnored(review.id)
+            rollbackToIgnored(review.id, rawSmsId)
             return RestoreResult.Rejected("reconcile_failed")
         }
 
@@ -65,7 +60,7 @@ class TransactionRestoreService(
         return when (val result = reclassification.reclassify(tx.id, newType)) {
             is ReclassificationResult.Success -> RestoreResult.Success(result.transaction)
             is ReclassificationResult.Rejected -> {
-                rollbackToIgnored(review.id)
+                rollbackToIgnored(review.id, rawSmsId)
                 RestoreResult.Rejected(result.reason)
             }
         }
@@ -76,7 +71,8 @@ class TransactionRestoreService(
         newType: FinancialTransactionType,
     ): RestoreResult = restore(rawSmsId, newType)
 
-    private suspend fun rollbackToIgnored(reviewId: String) {
+    private suspend fun rollbackToIgnored(reviewId: String, rawSmsId: String) {
+        financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
         reviewRepository.markResolved(
             id = reviewId,
             resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,

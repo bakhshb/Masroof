@@ -34,7 +34,12 @@ class CreditCardsOverviewFilterTest {
             currency = Currency.SAR,
         )
 
-        val filtered = overview.followedOnly(setOf("7271", "5123"))
+        val filtered = overview.followedOnly(
+            setOf(
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "7271"),
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "5123"),
+            ),
+        )
 
         assertEquals(listOf("7271", "5123"), filtered.cards.map { it.last4 })
         assertFalse(filtered.hasContent && filtered.cards.any { it.last4 == "9999" })
@@ -59,7 +64,12 @@ class CreditCardsOverviewFilterTest {
             currency = Currency.SAR,
         )
 
-        val filtered = overview.followedOnly(setOf("3478", "7271"))
+        val filtered = overview.followedOnly(
+            setOf(
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "3478"),
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "7271"),
+            ),
+        )
 
         assertEquals(
             SignedMoneyAmount.of(Money.of("150.25", Currency.SAR)),
@@ -94,7 +104,12 @@ class CreditCardsOverviewFilterTest {
             currency = Currency.SAR,
         )
 
-        val filtered = overview.followedOnly(setOf("7271", "3478"))
+        val filtered = overview.followedOnly(
+            setOf(
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "7271"),
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "3478"),
+            ),
+        )
 
         assertEquals(Money.of("8755.50", Currency.SAR), filtered.aggregateDueAmount)
         assertEquals(newerStatementAt, filtered.aggregateDueUpdatedAt)
@@ -119,7 +134,12 @@ class CreditCardsOverviewFilterTest {
             currency = Currency.SAR,
         )
 
-        val filtered = overview.followedOnly(setOf("7271", "3478"))
+        val filtered = overview.followedOnly(
+            setOf(
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "7271"),
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "3478"),
+            ),
+        )
 
         assertNull(filtered.aggregateDueAmount)
         assertNull(filtered.aggregateDueUpdatedAt)
@@ -145,7 +165,12 @@ class CreditCardsOverviewFilterTest {
             currency = Currency.SAR,
         )
 
-        val total = overview.followedSalaryPeriodSpendingTotal(setOf("3478", "7271"))
+        val total = overview.followedSalaryPeriodSpendingTotal(
+            setOf(
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "3478"),
+                CardOwnershipKey.of(Bank.BANK_ALJAZIRA, "7271"),
+            ),
+        )
 
         assertEquals(SignedMoneyAmount.of(Money.of("150.25", Currency.SAR)), total)
     }

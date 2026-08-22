@@ -53,6 +53,19 @@ class RoomCardRegistryRepositoryTest {
     }
 
     @Test
+    fun setSupplementaryCard_rejectsSelfParent() {
+        runBlocking {
+            seedCard("1111", CardRole.PRIMARY)
+
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking {
+                    repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "1111"), "1111")
+                }
+            }
+        }
+    }
+
+    @Test
     fun setSupplementaryCard_rejectsMissingPrimary() {
         runBlocking {
             seedCard("2222", CardRole.STANDALONE)

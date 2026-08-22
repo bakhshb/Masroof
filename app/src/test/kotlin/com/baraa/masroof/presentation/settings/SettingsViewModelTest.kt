@@ -332,6 +332,20 @@ class SettingsViewModelTest {
             entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
 
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+
+        override suspend fun updateDisplayName(reference: CardReference, displayName: String?) = Unit
+
+        override suspend fun updateCardNetwork(reference: CardReference, network: com.baraa.masroof.domain.model.CardNetwork?) = Unit
+
+        override suspend fun updateCardType(reference: CardReference, cardType: com.baraa.masroof.domain.model.CardType?) = Unit
+
+        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
+
+        override suspend fun setPrimaryCard(reference: CardReference) = Unit
+
+        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
+
+        override suspend fun clearCardRole(reference: CardReference) = Unit
     }
 
     private class TrackingCardRegistry(
@@ -380,6 +394,14 @@ class SettingsViewModelTest {
             reference: CardReference,
             network: com.baraa.masroof.domain.model.CardNetwork?,
         ) = Unit
+
+        override suspend fun updateDisplayName(reference: CardReference, displayName: String?) = Unit
+
+        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
+
+        override suspend fun setPrimaryCard(reference: CardReference) = Unit
+
+        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
 
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
     }

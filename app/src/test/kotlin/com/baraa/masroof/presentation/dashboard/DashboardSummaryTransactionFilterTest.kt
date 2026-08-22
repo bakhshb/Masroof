@@ -74,6 +74,7 @@ class DashboardSummaryTransactionFilterTest {
 
         val filtered = DashboardSummaryTransactionFilter.forCard(
             transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
             last4 = "4821",
         )
 

@@ -5,18 +5,18 @@ import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 
 fun DashboardUiState.followedCreditCardsOverview(): CreditCardsOverview? {
     val overview = creditCards ?: return null
-    val ownedLast4s = ownedCards.map { it.last4 }.toSet()
-    return overview.followedOnly(ownedLast4s)
+    val ownedKeys = CardOwnershipKey.ownedKeys(ownedCards)
+    return overview.followedOnly(ownedKeys)
 }
 
 fun DashboardUiState.followedCreditFacilities(): CreditFacilitiesOverview? {
     val overview = creditFacilities ?: return null
     if (!overview.hasContent) return null
-    val ownedLast4s = ownedCards.map { it.last4 }.toSet()
+    val ownedKeys = CardOwnershipKey.ownedKeys(ownedCards)
     val facilities = overview.facilities.filter { facility ->
-        facility.allCards.any { it.last4 in ownedLast4s }
+        facility.allCards.any { CardOwnershipKey.of(it) in ownedKeys }
     }
-    val debitCards = overview.debitCards.filter { it.last4 in ownedLast4s }
+    val debitCards = overview.debitCards.filter { CardOwnershipKey.of(it) in ownedKeys }
     if (facilities.isEmpty() && debitCards.isEmpty()) return null
     return overview.copy(facilities = facilities, debitCards = debitCards)
 }

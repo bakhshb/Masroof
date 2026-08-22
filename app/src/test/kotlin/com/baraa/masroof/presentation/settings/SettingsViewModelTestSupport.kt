@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
@@ -146,19 +147,5 @@ internal object SettingsViewModelTestSupport {
             override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
         }
 
-    internal fun emptyCardRegistry(): CardRegistryRepository =
-        object : CardRegistryRepository {
-            override suspend fun observe(
-                reference: com.baraa.masroof.domain.model.CardReference,
-                rawSmsId: String,
-            ) = Unit
-            override suspend fun setOwnership(
-                reference: com.baraa.masroof.domain.model.CardReference,
-                status: com.baraa.masroof.domain.model.OwnershipStatus,
-            ) = Unit
-            override suspend fun resolve(reference: com.baraa.masroof.domain.model.CardReference) =
-                com.baraa.masroof.domain.model.OwnershipStatus.UNKNOWN
-            override suspend fun get(reference: com.baraa.masroof.domain.model.CardReference) = null
-            override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.CardRegistryEntry>()
-        }
+    internal fun emptyCardRegistry(): CardRegistryRepository = NoOpCardRegistryRepository()
 }

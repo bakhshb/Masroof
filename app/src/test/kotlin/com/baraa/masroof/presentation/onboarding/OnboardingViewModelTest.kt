@@ -4,6 +4,8 @@ import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
+import com.baraa.masroof.domain.model.CardNetwork
+import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
@@ -632,6 +634,20 @@ AccountRegistryEntry(
         override suspend fun get(reference: CardReference): CardRegistryEntry? =
             entries.firstOrNull { it.bank == reference.bank && it.last4 == reference.last4 }
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+
+        override suspend fun updateDisplayName(reference: CardReference, displayName: String?) = Unit
+
+        override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) = Unit
+
+        override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
+
+        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
+
+        override suspend fun setPrimaryCard(reference: CardReference) = Unit
+
+        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
+
+        override suspend fun clearCardRole(reference: CardReference) = Unit
     }
 
     private class FakeReviewRepo : ReviewRepository {

@@ -48,6 +48,31 @@ class DashboardCardFiltersTest {
     }
 
     @Test
+    fun followedCreditFacilities_doesNotMatchSameLast4AcrossBanks() {
+        val d360 = Bank("D360")
+        val state = DashboardUiState(
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = listOf(
+                    facility("1234", emptyList(), bank = d360),
+                    facility("1234", emptyList(), bank = Bank.BANK_ALJAZIRA),
+                ),
+                debitCards = emptyList(),
+                legacyFlat = emptyOverview(),
+                currency = Currency.SAR,
+            ),
+            ownedCards = listOf(
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "1234", cardNetwork = CardNetwork.VISA),
+            ),
+        )
+
+        val filtered = state.followedCreditFacilities()
+
+        assertNotNull(filtered)
+        assertEquals(1, filtered!!.facilities.size)
+        assertEquals(Bank.BANK_ALJAZIRA, filtered.facilities.single().bank)
+    }
+
+    @Test
     fun followedCreditFacilities_returnsNullWhenNothingOwned() {
         val state = DashboardUiState(
             creditFacilities = CreditFacilitiesOverview(
@@ -62,12 +87,16 @@ class DashboardCardFiltersTest {
         assertNull(state.followedCreditFacilities())
     }
 
-    private fun facility(primary: String, supplementaries: List<String>): CreditFacilityOverview {
-        val primaryRow = cardRow(primary)
+    private fun facility(
+        primary: String,
+        supplementaries: List<String>,
+        bank: Bank = Bank.BANK_ALJAZIRA,
+    ): CreditFacilityOverview {
+        val primaryRow = cardRow(primary, bank)
         return CreditFacilityOverview(
-            bank = Bank.BANK_ALJAZIRA,
+            bank = bank,
             primary = primaryRow,
-            supplementaries = supplementaries.map(::cardRow),
+            supplementaries = supplementaries.map { cardRow(it, bank) },
             facilityDue = null,
             facilitySalaryPeriodSpending = SignedMoneyAmount.zero(Currency.SAR),
             facilityStatementSpending = SignedMoneyAmount.zero(Currency.SAR),
@@ -77,8 +106,8 @@ class DashboardCardFiltersTest {
         )
     }
 
-    private fun cardRow(last4: String) = CreditCardDashboardRow(
-        bank = Bank.BANK_ALJAZIRA,
+    private fun cardRow(last4: String, bank: Bank = Bank.BANK_ALJAZIRA) = CreditCardDashboardRow(
+        bank = bank,
         last4 = last4,
         calendarMonthSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
         statementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),

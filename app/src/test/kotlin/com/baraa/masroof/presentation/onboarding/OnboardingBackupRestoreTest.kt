@@ -15,7 +15,7 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
-import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.Dispatchers
@@ -106,13 +106,7 @@ class OnboardingBackupRestoreTest {
         override suspend fun listAll(): List<AccountRegistryEntry> = emptyList()
     }
 
-    private class EmptyCardRepo : CardRegistryRepository {
-        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: CardReference) = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: CardReference): CardRegistryEntry? = null
-        override suspend fun listAll(): List<CardRegistryEntry> = emptyList()
-    }
+    private class EmptyCardRepo : NoOpCardRegistryRepository()
 
     private class EmptyReviewRepo : ReviewRepository {
         override suspend fun getById(id: String): ReviewItem? = null

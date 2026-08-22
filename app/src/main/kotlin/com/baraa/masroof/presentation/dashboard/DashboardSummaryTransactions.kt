@@ -53,11 +53,23 @@ object DashboardSummaryTransactionFilter {
 
     fun forCard(
         transactions: List<TransactionPreviewUi>,
+        bank: Bank,
         last4: String,
-    ): List<TransactionPreviewUi> = transactions.filter { tx ->
-        tx.sourceContainerId?.endsWith(":$last4") == true ||
-            tx.destinationContainerId?.endsWith(":$last4") == true ||
-            tx.cardLast4 == last4
+    ): List<TransactionPreviewUi> {
+        val cardContainerId = FinancialContainerIdFactory.cardId(bank, last4)
+        return transactions.filter { tx ->
+            if (tx.sourceContainerId == cardContainerId || tx.destinationContainerId == cardContainerId) {
+                return@filter true
+            }
+            if (tx.cardLast4 != last4) return@filter false
+            when {
+                tx.sourceContainerId?.startsWith("card:${bank.id}:") == true -> true
+                tx.destinationContainerId?.startsWith("card:${bank.id}:") == true -> true
+                tx.sourceContainerId?.startsWith("card:") != true &&
+                    tx.destinationContainerId?.startsWith("card:") != true -> true
+                else -> false
+            }
+        }
     }
 }
 
