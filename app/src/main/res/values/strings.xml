@@ -81,12 +81,6 @@
     <string name="settings_stop_confirm_body">لن تظهر بطاقة ···%1$s في لوحة التحكم ولن تُحسب مشترياتها ضمن مصروفاتك.</string>
     <string name="settings_stop_confirm_action">إيقاف المتابعة</string>
     <string name="settings_cancel">إلغاء</string>
-    <string name="settings_ignored_messages_title">الرسائل المتجاهلة</string>
-    <string name="settings_ignored_messages_hint">يمكن استعادة الرسائل التي صنّفتها كغير مالية من هنا.</string>
-    <string name="settings_ignored_messages_empty">لا توجد رسائل متجاهلة.</string>
-    <string name="settings_ignored_messages_subtitle">%1$d رسالة</string>
-    <string name="settings_restore_message_action">استعادة</string>
-    <string name="settings_restore_success">تمت استعادة الرسالة.</string>
     <string name="settings_restore_failed">تعذّرت استعادة الرسالة.</string>
     <string name="settings_restore_not_ignored">هذه الرسالة ليست في قائمة المتجاهلة.</string>
     <string name="settings_restore_reconcile_failed">تعذّر إنشاء معاملة من هذه الرسالة.</string>
@@ -336,6 +330,8 @@
     <string name="dashboard_credit_card_last4">بطاقة ···%1$s</string>
     <string name="dashboard_credit_card_statement_spending">منصرف منذ كشف %1$s</string>
     <string name="dashboard_credit_card_statement_spending_fallback">منصرف منذ آخر كشف</string>
+    <string name="dashboard_debit_card_salary_spending">منصرف فترة الراتب — مدى وسحب (من %1$s)</string>
+    <string name="dashboard_debit_card_salary_spending_fallback">منصرف فترة الراتب — مدى وسحب</string>
     <string name="dashboard_credit_card_salary_spending">منصرف فترة الراتب (من %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">منصرف فترة الراتب</string>
     <string name="dashboard_credit_card_salary_purchases_total">منصرف منذ %1$s</string>

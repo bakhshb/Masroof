@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -62,6 +63,25 @@ class DashboardSummaryTransactionFilterTest {
         )
 
         assertEquals(listOf("cash"), filtered.map { it.id })
+    }
+
+    @Test
+    fun forCard_matchesCardInvolvementIndex() {
+        val cardKey = CardTransactionInvolvementResolver.cardKey(Bank.BANK_ALJAZIRA.id, "2210")
+        val transactions = listOf(
+            preview(id = "1", cardLast4 = null),
+            preview(id = "2", cardLast4 = "3109"),
+        )
+        val involvement = mapOf("1" to setOf(cardKey))
+
+        val filtered = DashboardSummaryTransactionFilter.forCard(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "2210",
+            cardInvolvementByTransactionId = involvement,
+        )
+
+        assertEquals(listOf("1"), filtered.map { it.id })
     }
 
     @Test

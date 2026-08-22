@@ -116,6 +116,10 @@ class DashboardProjectionBuilder(
             rawSmsById = rawSmsById,
             ownedAccounts = ownedAccounts,
         )
+        val transactionCardInvolvement = CardTransactionInvolvementResolver.buildIndex(
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+        )
 
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,
@@ -164,9 +168,24 @@ class DashboardProjectionBuilder(
             displayLocale = displayLocale,
         )
         val cardRegistry = cardRegistryRepository.listAll()
+        val (debitSpendingByCardKey, debitSalaryPeriodLabel) = DebitCardOverviewBuilder.buildSpendingByCardKey(
+            salaryPeriod = period,
+            debitCards = cardRegistry,
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            ownedAccountContainerIds = ownedAccountContainerIds,
+            ownedAccountLast4s = ownedAccountLast4s,
+            zoneId = zoneId,
+            displayLocale = displayLocale,
+        )
         val creditFacilities = CreditFacilityOverviewBuilder.build(
             overview = creditCardsFlat,
             registryCards = cardRegistry,
+            debitSpendingByCardKey = debitSpendingByCardKey,
+            debitSalaryPeriodLabel = debitSalaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
         )
 
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
@@ -181,6 +200,7 @@ class DashboardProjectionBuilder(
             creditFacilities = creditFacilities,
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
+            transactionCardInvolvement = transactionCardInvolvement,
             transactions = dedupedTransactions,
             meta = DashboardMeta(
                 transactionCount = summary.transactionCount,

@@ -28,6 +28,8 @@ data class DashboardOverview(
     val flowDetailGrouping: CurrentAccountFlowDetailGrouping,
     /** Transaction id → owned account container ids (SMS-resolved, SingleAccount scope). */
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
+    /** Transaction id → card keys (`bankId:last4`) from parsed SMS card refs. */
+    val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),
     val isCurrentPeriod: Boolean,
 )
 

@@ -41,13 +41,18 @@ data class DebitCardOverview(
     val last4: String,
     val displayLabel: String,
     val linkedAccountLabel: String?,
+    val linkedAccountMaskedNumber: String?,
     val network: com.baraa.masroof.domain.model.CardNetwork?,
+    val salaryPeriodSpendingNet: SignedMoneyAmount,
+    val salaryPeriodLabel: String?,
 )
 
 object CreditFacilityOverviewBuilder {
     fun build(
         overview: CreditCardsOverview,
         registryCards: List<CardRegistryEntry>,
+        debitSpendingByCardKey: Map<String, SignedMoneyAmount> = emptyMap(),
+        debitSalaryPeriodLabel: String? = overview.salaryPeriodLabel,
     ): CreditFacilitiesOverview {
         val ownedCredit = registryCards.filter {
             it.cardType != CardType.DEBIT && it.ownership.isOwned()
@@ -55,6 +60,7 @@ object CreditFacilityOverviewBuilder {
         val debitCards = registryCards
             .filter { it.cardType == CardType.DEBIT && it.ownership.isOwned() }
             .map { entry ->
+                val cardKey = CardTransactionInvolvementResolver.cardKey(entry.bank.id, entry.last4)
                 DebitCardOverview(
                     bank = entry.bank,
                     last4 = entry.last4,
@@ -70,7 +76,11 @@ object CreditFacilityOverviewBuilder {
                             ),
                         )
                     },
+                    linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber,
                     network = entry.cardNetwork,
+                    salaryPeriodSpendingNet = debitSpendingByCardKey[cardKey]
+                        ?: SignedMoneyAmount.zero(overview.currency),
+                    salaryPeriodLabel = debitSalaryPeriodLabel,
                 )
             }
 

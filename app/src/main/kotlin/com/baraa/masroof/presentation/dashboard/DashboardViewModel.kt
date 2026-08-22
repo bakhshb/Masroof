@@ -446,7 +446,9 @@ class DashboardViewModel(
                 if (period != activePeriod) {
                     return@launch
                 }
-                val previews = overview.transactions.map(::toPreview)
+                val previews = overview.transactions.map { tx ->
+                    toPreview(tx, overview.transactionCardInvolvement)
+                }
                 val (loadedLabel, loadedHint) = periodPresentation(overview.period)
                 _uiState.update {
                     it.copy(
@@ -464,6 +466,7 @@ class DashboardViewModel(
                         allTransactions = previews,
                         flowDetailGrouping = overview.flowDetailGrouping,
                         transactionAccountInvolvement = overview.transactionAccountInvolvement,
+                        transactionCardInvolvement = overview.transactionCardInvolvement,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,
@@ -511,7 +514,10 @@ class DashboardViewModel(
         }
     }
 
-    private fun toPreview(tx: FinancialTransaction): TransactionPreviewUi {
+    private fun toPreview(
+        tx: FinancialTransaction,
+        cardInvolvement: Map<String, Set<String>>,
+    ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
         val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
@@ -529,6 +535,14 @@ class DashboardViewModel(
         } else {
             null
         }
+        val containerCardLast4 = FinancialContainerIdParser.cardLast4FromContainers(
+            sourceContainerId = tx.sourceContainerId,
+            destinationContainerId = tx.destinationContainerId,
+        )
+        val parsedCardLast4 = cardInvolvement[tx.id]
+            ?.singleOrNull()
+            ?.substringAfter(':', missingDelimiterValue = "")
+            ?.takeIf { it.isNotEmpty() }
         return TransactionPreviewUi(
             id = tx.id,
             title = title,
@@ -539,10 +553,7 @@ class DashboardViewModel(
             type = tx.type,
             typeLabelResHint = tx.type,
             direction = TransactionTypePresentation.direction(tx.type),
-            cardLast4 = FinancialContainerIdParser.cardLast4FromContainers(
-                sourceContainerId = tx.sourceContainerId,
-                destinationContainerId = tx.destinationContainerId,
-            ),
+            cardLast4 = containerCardLast4 ?: parsedCardLast4,
             sourceContainerId = tx.sourceContainerId,
             destinationContainerId = tx.destinationContainerId,
             searchText = searchText,

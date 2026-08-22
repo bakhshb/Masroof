@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
@@ -56,10 +57,15 @@ object DashboardSummaryTransactionFilter {
         transactions: List<TransactionPreviewUi>,
         bank: Bank,
         last4: String,
+        cardInvolvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): List<TransactionPreviewUi> {
         val cardContainerId = FinancialContainerIdFactory.cardId(bank, last4)
         val bankPrefix = "card:${bank.id}:"
+        val cardKey = CardTransactionInvolvementResolver.cardKey(bank.id, last4)
         return transactions.filter { tx ->
+            if (cardKey in cardInvolvementByTransactionId[tx.id].orEmpty()) {
+                return@filter true
+            }
             if (tx.sourceContainerId == cardContainerId || tx.destinationContainerId == cardContainerId) {
                 return@filter true
             }
