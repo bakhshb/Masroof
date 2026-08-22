@@ -51,6 +51,7 @@ class DashboardService(
             reviewRepository = reviewRepository,
             accountRegistryRepository = accountRegistryRepository,
             cardRegistryRepository = cardRegistryRepository,
+            appLocaleRepository = appLocaleRepository,
             sarEquivalentResolver = sarEquivalentResolver,
             zoneId = zoneId,
             clock = clock,

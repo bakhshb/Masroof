@@ -13,6 +13,44 @@ import java.math.BigDecimal
 
 class CreditFacilityOverviewBuilderTest {
     @Test
+    fun alJaziraSetup_groupsPrimaryAndTwoSupplementariesWithMadaDebit() {
+        val overview = CreditCardsOverview(
+            cards = listOf(
+                row("1111", "400.00"),
+                row("2222", "150.00"),
+                row("3333", "75.00"),
+            ),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount(BigDecimal("625.00"), Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount(BigDecimal("625.00"), Currency.SAR),
+            aggregateStatementPeriodLabel = "Jul-Aug",
+            calendarMonthLabel = null,
+            salaryPeriodLabel = "Aug",
+            currency = Currency.SAR,
+        )
+        val registry = listOf(
+            card("1111", CardRole.PRIMARY, CardType.CREDIT),
+            card("2222", CardRole.SUPPLEMENTARY, CardType.CREDIT, parent = "1111"),
+            card("3333", CardRole.SUPPLEMENTARY, CardType.CREDIT, parent = "1111"),
+            debit("9999"),
+        )
+
+        val facilities = CreditFacilityOverviewBuilder.build(overview, registry)
+
+        assertEquals(1, facilities.facilities.size)
+        assertEquals(1, facilities.debitCards.size)
+        assertEquals("1111", facilities.facilities.single().primaryLast4)
+        assertEquals(2, facilities.facilities.single().supplementaries.size)
+        assertEquals(
+            BigDecimal("625.00"),
+            facilities.facilities.single().facilityStatementSpending.amount,
+        )
+        assertEquals("9999", facilities.debitCards.single().last4)
+    }
+
+    @Test
     fun groupsPrimaryWithSupplementariesAndSumsFacilitySpending() {
         val overview = CreditCardsOverview(
             cards = listOf(
@@ -63,15 +101,29 @@ class CreditFacilityOverviewBuilderTest {
     private fun card(
         last4: String,
         role: CardRole,
+        cardType: CardType = CardType.CREDIT,
         parent: String? = null,
     ): CardRegistryEntry =
         CardRegistryEntry(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,
-            cardType = CardType.CREDIT,
+            cardType = cardType,
             cardRole = role,
             parentCardLast4 = parent,
+            firstSeenRawSmsId = "sms",
+            lastSeenRawSmsId = "sms",
+        )
+
+    private fun debit(last4: String): CardRegistryEntry =
+        CardRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = last4,
+            ownership = OwnershipStatus.OWNED,
+            cardType = CardType.DEBIT,
+            cardNetwork = com.baraa.masroof.domain.model.CardNetwork.MADA,
+            linkedAccountBankId = Bank.BANK_ALJAZIRA.id,
+            linkedAccountMaskedNumber = "1234567890",
             firstSeenRawSmsId = "sms",
             lastSeenRawSmsId = "sms",
         )

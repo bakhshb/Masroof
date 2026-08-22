@@ -9,6 +9,8 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -23,6 +25,7 @@ class DashboardProjectionBuilder(
     private val reviewRepository: ReviewRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
+    private val appLocaleRepository: AppLocaleRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -126,27 +129,33 @@ class DashboardProjectionBuilder(
             startInclusive = cardQueryStart,
             endExclusive = cardQueryEndExclusive,
         )
-        val cardSarResolutions = sarEquivalentResolver.resolve(
+        val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = cardTransactions,
+            parsedRecords = parsedRecords,
+        )
+        val cardSarResolutions = sarEquivalentResolver.resolve(
+            transactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
         AppliedExchangeRateSyncer.sync(
-            transactions = cardTransactions,
+            transactions = enrichedCardTransactions,
             resolutions = cardSarResolutions,
             repository = financialTransactionRepository,
         )
         val cardSarEquivalents = cardSarResolutions.sarAmounts()
+        val displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag())
         val creditCardsFlat = CreditCardOverviewBuilder.build(
             salaryPeriod = period,
-            cardTransactions = cardTransactions,
+            cardTransactions = enrichedCardTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
             clock = clock,
             primaryCurrency = primaryCurrency,
             sarEquivalents = cardSarEquivalents,
+            displayLocale = displayLocale,
         )
         val cardRegistry = cardRegistryRepository.listAll()
         val creditFacilities = CreditFacilityOverviewBuilder.build(

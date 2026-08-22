@@ -2,7 +2,6 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -52,7 +51,15 @@ class TransactionRestoreService(
 
         reconciliation.reconcileStoredEvents()
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
-            ?: return RestoreResult.Rejected("reconcile_failed")
+        if (tx == null) {
+            reviewRepository.markResolved(
+                id = review.id,
+                resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+                resolvedAt = clock.now(),
+                resolvedTransactionId = null,
+            )
+            return RestoreResult.Rejected("reconcile_failed")
+        }
 
         if (newType == null || newType == tx.type) {
             return RestoreResult.Success(tx)
