@@ -17,6 +17,7 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import com.baraa.masroof.presentation.dashboard.AccountsSummaryRoute
+import com.baraa.masroof.presentation.dashboard.CardOwnershipKey
 import com.baraa.masroof.presentation.dashboard.CardsSummaryRoute
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
@@ -217,8 +218,8 @@ fun MasroofRoot(
                 },
             )
             HomeDestination.AllTransactions -> {
-                val ownedCardLast4s = remember(dashboardState.ownedCards) {
-                    dashboardState.ownedCards.map { it.last4 }.toSet()
+                val ownedCardKeys = remember(dashboardState.ownedCards) {
+                    CardOwnershipKey.ownedKeys(dashboardState.ownedCards)
                 }
                 val ownedAccountContainerIds = remember(dashboardState.ownedAccounts) {
                     dashboardState.ownedAccounts.mapNotNull { account ->
@@ -234,7 +235,7 @@ fun MasroofRoot(
                         seedFilter = transactionListSeedFilter,
                         onSeedFilterApplied = { transactionListSeedFilter = null },
                         openGeneration = transactionListOpenGeneration,
-                        ownedCardLast4s = ownedCardLast4s,
+                        ownedCardKeys = ownedCardKeys,
                         ownedAccountContainerIds = ownedAccountContainerIds,
                         transactionAccountInvolvement = dashboardState.transactionAccountInvolvement,
                     )

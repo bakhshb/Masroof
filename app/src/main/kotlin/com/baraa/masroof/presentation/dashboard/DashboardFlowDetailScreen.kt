@@ -277,6 +277,7 @@ private fun FlowDetailSummaryRow(
     amount: Money,
     direction: TransactionDirectionUi,
 ) {
+    if (amount.amount.signum() == 0) return
     val style = when {
         amount.amount.signum() == 0 -> MasroofMoneyRowStyle.Neutral
         direction == TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow

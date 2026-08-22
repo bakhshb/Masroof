@@ -39,7 +39,7 @@ fun TransactionListScreen(
     seedFilter: TransactionListFilterState? = null,
     onSeedFilterApplied: () -> Unit = {},
     openGeneration: Int = 0,
-    ownedCardLast4s: Set<String> = emptySet(),
+    ownedCardKeys: Set<String> = emptySet(),
     ownedAccountContainerIds: Set<String> = emptySet(),
     transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
 ) {
@@ -90,10 +90,10 @@ fun TransactionListScreen(
     val availableTypes = remember(transactions) {
         TransactionListFilterEngine.availableTypes(transactions)
     }
-    val availableCards = remember(transactions, ownedCardLast4s) {
+    val availableCards = remember(transactions, ownedCardKeys) {
         TransactionListFilterEngine.availableCardLast4s(
             transactions = transactions,
-            ownedCardLast4s = ownedCardLast4s,
+            ownedCardKeys = ownedCardKeys,
         )
     }
     val availableAccounts = remember(transactions, ownedAccountContainerIds, transactionAccountInvolvement) {

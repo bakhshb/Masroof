@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
-import com.baraa.masroof.application.dashboard.OwnedAccount
 import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
