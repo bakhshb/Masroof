@@ -27,6 +27,7 @@ class DatabaseBackupService(
     private val closeDatabase: () -> Unit,
     private val appVersionName: String,
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
+    private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -262,15 +263,15 @@ class DatabaseBackupService(
         }.getOrNull()
     }
 
-    private fun restartProcess() {
-        val launchIntent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
-            ?: return
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        appContext.startActivity(launchIntent)
-        Runtime.getRuntime().exit(0)
-    }
-
     companion object {
+        internal fun defaultRestartProcess(appContext: Context) {
+            val launchIntent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
+                ?: return
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            appContext.startActivity(launchIntent)
+            Runtime.getRuntime().exit(0)
+        }
+
         private val ALLOWED_ENTRIES = setOf(
             BackupPackageFormat.MANIFEST_ENTRY,
             BackupPackageFormat.DATABASE_ENTRY,

@@ -49,8 +49,8 @@ class TransactionRestoreService(
         reconciliation.reconcileStoredEvents()
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
-            rollbackToIgnored(review.id, rawSmsId)
-            return RestoreResult.Rejected("reconcile_failed")
+            val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
+            return RestoreResult.Rejected(rollbackReason ?: "reconcile_failed")
         }
 
         if (newType == null || newType == tx.type) {
@@ -60,8 +60,8 @@ class TransactionRestoreService(
         return when (val result = reclassification.reclassify(tx.id, newType)) {
             is ReclassificationResult.Success -> RestoreResult.Success(result.transaction)
             is ReclassificationResult.Rejected -> {
-                rollbackToIgnored(review.id, rawSmsId)
-                RestoreResult.Rejected(result.reason)
+                val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
+                RestoreResult.Rejected(rollbackReason ?: result.reason)
             }
         }
     }
@@ -71,13 +71,17 @@ class TransactionRestoreService(
         newType: FinancialTransactionType,
     ): RestoreResult = restore(rawSmsId, newType)
 
-    private suspend fun rollbackToIgnored(reviewId: String, rawSmsId: String) {
-        financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
+    /** Returns a failure reason when rollback could not complete; null on success. */
+    private suspend fun rollbackToIgnored(reviewId: String, rawSmsId: String): String? {
+        if (!financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)) {
+            return "rollback_delete_failed"
+        }
         reviewRepository.markResolved(
             id = reviewId,
             resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
             resolvedAt = clock.now(),
             resolvedTransactionId = null,
-        )
+        ) ?: return "rollback_review_failed"
+        return null
     }
 }

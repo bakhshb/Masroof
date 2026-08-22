@@ -62,28 +62,7 @@ class DashboardService(
     }
 
     override suspend fun loadOverview(period: FinancialPeriod): DashboardOverview {
-        val startInclusive = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId)
-        val endExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
-        val transactions = financialTransactionRepository.listOccurredBetween(
-            startInclusive = startInclusive,
-            endExclusive = endExclusive,
-        )
-        val parsedRecords = parsedEventRepository.listAll()
-        val rawSmsById = parsedRecords
-            .map { it.event.rawSmsId }
-            .distinct()
-            .mapNotNull { id -> rawSmsRepository.getById(id)?.let { id to it } }
-            .toMap()
-        val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
-            transactions = transactions,
-            parsedRecords = parsedRecords,
-        )
-        val projection = projectionBuilder.build(
-            period = period,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            enrichedTransactions = enrichedTransactions,
-        )
+        val projection = loadProjection(period)
         return projection.toOverview().copy(
             creditFacilities = projection.creditFacilities,
             accountsFleet = projection.accountsFleet,

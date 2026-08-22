@@ -457,6 +457,8 @@ class DashboardViewModelTest {
 
         override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
 
+        override suspend fun markAsDebit(reference: CardReference) = Unit
+
         override suspend fun setPrimaryCard(reference: CardReference) = Unit
 
         override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
@@ -481,6 +483,7 @@ class DashboardViewModelTest {
             entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
 
         override suspend fun listAll() = entries.toList()
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
     }
 
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
@@ -690,6 +693,10 @@ class DashboardViewModelTest {
                         override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
                         override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
                         override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
+                        override suspend fun updateDisplayName(
+                            reference: com.baraa.masroof.domain.model.AccountReference,
+                            displayName: String?,
+                        ) = Unit
                     },
                     NoOpCardRegistryRepository(),
                 ),

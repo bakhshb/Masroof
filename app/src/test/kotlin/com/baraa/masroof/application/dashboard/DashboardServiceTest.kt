@@ -178,6 +178,7 @@ class DashboardServiceTest {
         override suspend fun resolve(reference: AccountReference): OwnershipStatus = OwnershipStatus.UNKNOWN
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
         override suspend fun listAll(): List<AccountRegistryEntry> = entries
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
     }
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

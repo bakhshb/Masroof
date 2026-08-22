@@ -244,4 +244,17 @@ interface CardRegistryDao {
             updateCardNetwork(bankId, last4, "MADA")
         }
     }
+
+    @Transaction
+    suspend fun markDebitAtomic(
+        bankId: String,
+        last4: String,
+        defaultMadaWhenNetworkMissing: Boolean,
+    ) {
+        clearFacilityRoleAtomic(bankId, last4)
+        updateCardType(bankId, last4, "DEBIT")
+        if (defaultMadaWhenNetworkMissing && get(bankId, last4)?.cardNetwork == null) {
+            updateCardNetwork(bankId, last4, "MADA")
+        }
+    }
 }

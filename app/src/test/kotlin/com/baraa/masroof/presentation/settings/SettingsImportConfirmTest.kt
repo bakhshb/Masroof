@@ -125,5 +125,6 @@ class SettingsImportConfirmTest {
         override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
         override suspend fun listAll(): List<AccountRegistryEntry> = emptyList()
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
     }
 }

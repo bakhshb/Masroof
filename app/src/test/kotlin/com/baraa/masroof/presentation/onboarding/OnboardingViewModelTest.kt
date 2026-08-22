@@ -602,6 +602,7 @@ AccountRegistryEntry(
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? =
             entries.firstOrNull { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
         fun addUnknown(maskedNumber: String) {
             entries += AccountRegistryEntry(
                 Bank.BANK_ALJAZIRA,
@@ -642,6 +643,8 @@ AccountRegistryEntry(
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
 
         override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
+
+        override suspend fun markAsDebit(reference: CardReference) = Unit
 
         override suspend fun setPrimaryCard(reference: CardReference) = Unit
 

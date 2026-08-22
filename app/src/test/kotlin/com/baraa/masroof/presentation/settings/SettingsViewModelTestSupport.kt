@@ -145,6 +145,10 @@ internal object SettingsViewModelTestSupport {
                 com.baraa.masroof.domain.model.OwnershipStatus.UNKNOWN
             override suspend fun get(reference: com.baraa.masroof.domain.model.AccountReference) = null
             override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
+            override suspend fun updateDisplayName(
+                reference: com.baraa.masroof.domain.model.AccountReference,
+                displayName: String?,
+            ) = Unit
         }
 
     internal fun emptyCardRegistry(): CardRegistryRepository = NoOpCardRegistryRepository()

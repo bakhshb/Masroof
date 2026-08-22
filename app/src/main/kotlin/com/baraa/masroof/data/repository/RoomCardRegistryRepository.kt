@@ -105,6 +105,17 @@ class RoomCardRegistryRepository(
         requireExisting(card.bank.id, last4)
     }
 
+    override suspend fun markAsDebit(reference: CardReference) {
+        val last4 = requireLast4(reference)
+        requireExisting(reference.bank.id, last4)
+        dao.markDebitAtomic(
+            bankId = reference.bank.id,
+            last4 = last4,
+            defaultMadaWhenNetworkMissing = true,
+        )
+        requireExisting(reference.bank.id, last4)
+    }
+
     override suspend fun setPrimaryCard(reference: CardReference) {
         val last4 = requireLast4(reference)
         val existing = requireExisting(reference.bank.id, last4)

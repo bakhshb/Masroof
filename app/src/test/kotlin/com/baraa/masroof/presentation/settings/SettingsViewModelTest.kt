@@ -249,8 +249,7 @@ class SettingsViewModelTest {
         vm.markCardAsDebit(card)
         advanceUntilIdle()
 
-        assertTrue(cards.clearedRole)
-        assertTrue(cards.updatedDebitType)
+        assertTrue(cards.markedAsDebit)
     }
 
     private fun viewModel(
@@ -341,6 +340,8 @@ class SettingsViewModelTest {
 
         override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
 
+        override suspend fun markAsDebit(reference: CardReference) = Unit
+
         override suspend fun setPrimaryCard(reference: CardReference) = Unit
 
         override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
@@ -352,8 +353,7 @@ class SettingsViewModelTest {
         vararg initial: CardRegistryEntry,
     ) : CardRegistryRepository {
         val entries = initial.toMutableList()
-        var clearedRole: Boolean = false
-        var updatedDebitType: Boolean = false
+        var markedAsDebit: Boolean = false
 
         override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
 
@@ -371,24 +371,21 @@ class SettingsViewModelTest {
         override suspend fun get(reference: CardReference) =
             entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
 
-        override suspend fun clearCardRole(reference: CardReference) {
-            clearedRole = true
+        override suspend fun markAsDebit(reference: CardReference) {
+            markedAsDebit = true
             val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
             if (index >= 0) {
                 entries[index] = entries[index].copy(
+                    cardType = com.baraa.masroof.domain.model.CardType.DEBIT,
                     cardRole = com.baraa.masroof.domain.model.CardRole.STANDALONE,
                     parentCardLast4 = null,
                 )
             }
         }
 
-        override suspend fun updateCardType(reference: CardReference, cardType: com.baraa.masroof.domain.model.CardType?) {
-            updatedDebitType = cardType == com.baraa.masroof.domain.model.CardType.DEBIT
-            val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
-            if (index >= 0) {
-                entries[index] = entries[index].copy(cardType = cardType)
-            }
-        }
+        override suspend fun clearCardRole(reference: CardReference) = Unit
+
+        override suspend fun updateCardType(reference: CardReference, cardType: com.baraa.masroof.domain.model.CardType?) = Unit
 
         override suspend fun updateCardNetwork(
             reference: CardReference,
@@ -429,5 +426,7 @@ class SettingsViewModelTest {
             entries.find { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
 
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
+
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
     }
 }

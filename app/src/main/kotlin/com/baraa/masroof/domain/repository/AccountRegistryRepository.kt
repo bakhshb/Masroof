@@ -25,5 +25,5 @@ interface AccountRegistryRepository {
 
     suspend fun listAll(): List<AccountRegistryEntry>
 
-    suspend fun updateDisplayName(reference: AccountReference, displayName: String?) {}
+    suspend fun updateDisplayName(reference: AccountReference, displayName: String?)
 }

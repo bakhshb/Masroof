@@ -29,6 +29,8 @@ interface CardRegistryRepository {
 
     suspend fun linkDebitToAccount(card: CardReference, account: AccountReference)
 
+    suspend fun markAsDebit(reference: CardReference)
+
     suspend fun setPrimaryCard(reference: CardReference)
 
     suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String)

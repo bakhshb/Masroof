@@ -214,14 +214,7 @@ class SettingsViewModel(
 
     fun markCardAsDebit(card: ManagedCardUi) {
         updateCardMetadata(card) {
-            cardRegistryRepository.clearCardRole(CardReference(card.bank, card.last4))
-            cardRegistryRepository.updateCardType(CardReference(card.bank, card.last4), CardType.DEBIT)
-            if (card.cardNetwork == null) {
-                cardRegistryRepository.updateCardNetwork(
-                    CardReference(card.bank, card.last4),
-                    CardNetwork.MADA,
-                )
-            }
+            cardRegistryRepository.markAsDebit(CardReference(card.bank, card.last4))
         }
     }
 

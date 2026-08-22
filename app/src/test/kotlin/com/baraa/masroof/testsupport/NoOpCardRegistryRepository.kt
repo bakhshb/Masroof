@@ -30,6 +30,8 @@ open class NoOpCardRegistryRepository(
 
     override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
 
+    override suspend fun markAsDebit(reference: CardReference) = Unit
+
     override suspend fun setPrimaryCard(reference: CardReference) = Unit
 
     override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit

@@ -167,6 +167,36 @@ class RoomCardRegistryRepositoryTest {
         assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
     }
 
+    @Test
+    fun setPrimaryCard_rejectsDebitCard() {
+        runBlocking {
+            seedCard("1111", CardRole.STANDALONE)
+            repository.updateCardType(CardReference(Bank.BANK_ALJAZIRA, "1111"), CardType.DEBIT)
+
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking {
+                    repository.setPrimaryCard(CardReference(Bank.BANK_ALJAZIRA, "1111"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun markAsDebit_clearsPrimaryRoleAndSetsDebitType() = runBlocking {
+        seedCard("1111", CardRole.PRIMARY)
+        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
+        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
+        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
+
+        repository.markAsDebit(CardReference(Bank.BANK_ALJAZIRA, "1111"))
+
+        val cards = repository.listAll().associateBy { it.last4 }
+        assertEquals(CardType.DEBIT, cards.getValue("1111").cardType)
+        assertEquals(CardRole.STANDALONE, cards.getValue("1111").cardRole)
+        assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
+        assertEquals(com.baraa.masroof.domain.model.CardNetwork.MADA, cards.getValue("1111").cardNetwork)
+    }
+
     private suspend fun seedCard(last4: String, role: CardRole) {
         repository.observe(CardReference(Bank.BANK_ALJAZIRA, last4), "sms-$last4")
         repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, last4), OwnershipStatus.OWNED)
