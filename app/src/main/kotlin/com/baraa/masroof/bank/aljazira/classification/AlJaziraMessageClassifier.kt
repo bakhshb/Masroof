@@ -95,11 +95,13 @@ class AlJaziraMessageClassifier {
                     confidence = 0.4,
                 )
 
-            text.contains("سداد بطاقة") ->
+            text.contains("سداد بطاقة") || isCreditCardSettlement(text) ->
                 return AlJaziraClassification(
                     family = MessageFamily.CARD_PAYMENT,
                     direction = MoneyDirection.OUTGOING,
-                    evidence = listOf("card_payment"),
+                    evidence = listOf(
+                        if (text.contains("سداد بطاقة")) "card_payment" else "card_settlement",
+                    ),
                     confidence = 0.95,
                 )
 
@@ -227,6 +229,14 @@ class AlJaziraMessageClassifier {
             return BankNetworkType.INTER_BANK
         }
         return BankNetworkType.UNKNOWN
+    }
+
+    /** e.g. «بطاقة إئتمانية: تسديد» — settlement from account to credit card. */
+    private fun isCreditCardSettlement(text: String): Boolean {
+        if (!text.contains("تسديد")) return false
+        return text.contains("بطاقة ائتمان", ignoreCase = true) ||
+            text.contains("بطاقة إئتمان", ignoreCase = true) ||
+            text.contains("credit card", ignoreCase = true)
     }
 
     companion object {

@@ -235,6 +235,23 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun creditCardSettlement_tasdidWording_parsesAsCardPayment() {
+        val result = parse(
+            """
+            بطاقة إئتمانية: تسديد
+            بطاقة: 7271;إئتمانية
+            مبلغ: SAR 15,000.00
+            من: 3001
+            في: 2026-07-27 07:47
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.CARD_PAYMENT, result.event.messageFamily)
+        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals("7271", result.event.cardRef?.last4)
+        assertEquals(Money.of("15000.00", Currency.SAR), result.event.amount)
+    }
+
+    @Test
     fun otp_isNonFinancialWithoutAmount() {
         val result = parse("رمز التحقق الخاص بك هو 482911. لا تشاركه مع أي شخص.")
         assertTrue(result is ParseResult.NonFinancial)

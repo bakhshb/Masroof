@@ -182,7 +182,8 @@ internal data class CurrentAccountTransactionScope(
         contains("سداد فاتورة") || contains("المفوتر:")
 
     private fun String.containsCreditCardPaymentWording(): Boolean =
-        contains("سداد بطاقة") || contains("سداد بطاقه")
+        contains("سداد بطاقة") || contains("سداد بطاقه") ||
+            (contains("تسديد") && (contains("بطاقة ائتمان") || contains("بطاقة إئتمان")))
 
     private fun String.containsCashWithdrawalWording(): Boolean =
         contains("سحب نقدي") || contains("سحب نقدى")

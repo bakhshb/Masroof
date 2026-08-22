@@ -1,0 +1,17 @@
+{
+  "id": "card_payment_ar_tasdid_001",
+  "sender": "AlJazira",
+  "body": "بطاقة إئتمانية: تسديد\nبطاقة: 7271;إئتمانية\nمبلغ: SAR 15,000.00\nمن: 3001\nفي: 2026-07-27 07:47",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "CARD_PAYMENT",
+    "direction": "OUTGOING",
+    "amount": "15000.00",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "cardLast4": "7271",
+    "occurredAt": "2026-07-27T07:47:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Alternate AlJazira wording: تسديد instead of سداد بطاقة; من: 3001 without حساب."
+}
