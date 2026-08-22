@@ -175,6 +175,28 @@ interface ReviewItemDao {
                     resolvedTransactionId = resolvedTransactionId ?: existing.resolvedTransactionId,
                 )
             }
+            // Restoring a user-ignored message clears the durable ignore marker.
+            if (existing.resolutionKind == "USER_NON_FINANCIAL" &&
+                resolutionKind != "USER_NON_FINANCIAL"
+            ) {
+                updateRow(
+                    id = id,
+                    kind = existing.kind,
+                    status = status,
+                    reasons = existing.reasons,
+                    updatedAtEpochMillis = updatedAtEpochMillis,
+                    resolvedAtEpochMillis = resolvedAtEpochMillis,
+                    resolutionKind = resolutionKind,
+                    resolvedTransactionId = resolvedTransactionId,
+                )
+                return existing.copy(
+                    status = status,
+                    updatedAtEpochMillis = updatedAtEpochMillis,
+                    resolvedAtEpochMillis = resolvedAtEpochMillis,
+                    resolutionKind = resolutionKind,
+                    resolvedTransactionId = resolvedTransactionId,
+                )
+            }
             return existing
         }
         val updated = resolveIfRequired(
