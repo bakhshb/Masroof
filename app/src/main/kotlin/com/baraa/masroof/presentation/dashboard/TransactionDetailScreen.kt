@@ -39,7 +39,6 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.ShareActionIcon
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
@@ -58,6 +57,7 @@ fun TransactionDetailScreen(
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
     onIgnore: () -> Unit,
+    ownedCards: List<OwnedCardUi> = emptyList(),
 ) {
     var showReclassifySheet by rememberSaveable { mutableStateOf(false) }
     var pendingType by rememberSaveable { mutableStateOf<String?>(null) }
@@ -262,14 +262,17 @@ fun TransactionDetailScreen(
                         trailing = stringResource(TransactionDirectionPresentation.labelRes(transaction.direction)),
                     )
                     transaction.cardLast4?.let { last4 ->
-                        IconLabelRow(
-                            icon = MasroofIcons.cardPayment,
-                            label = stringResource(R.string.transaction_detail_card),
-                            trailing = stringResource(
-                                R.string.dashboard_credit_card_last4,
-                                formatCardLast4(last4),
-                            ),
+                        val cardLabel = cardDisplayLabelFromTransaction(
+                            row = transaction,
+                            cards = ownedCards,
                         )
+                        cardLabel?.let { label ->
+                            IconLabelRow(
+                                icon = MasroofIcons.cardPayment,
+                                label = stringResource(R.string.transaction_detail_card),
+                                trailing = label,
+                            )
+                        }
                     }
                     transaction.title?.let { title ->
                         IconLabelRow(

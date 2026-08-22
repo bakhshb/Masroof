@@ -101,6 +101,7 @@ fun DashboardSummaryTransactionsSection(
     transactions: List<TransactionPreviewUi>,
     onOpenTransaction: (String) -> Unit,
     onViewAll: (() -> Unit)? = null,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -131,6 +132,7 @@ fun DashboardSummaryTransactionsSection(
             transactions.forEach { row ->
                 DashboardRecentTransactionRow(
                     row = row,
+                    ownedCards = ownedCards,
                     onClick = { onOpenTransaction(row.id) },
                 )
             }

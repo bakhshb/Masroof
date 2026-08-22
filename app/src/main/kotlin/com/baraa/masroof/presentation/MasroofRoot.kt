@@ -237,6 +237,8 @@ fun MasroofRoot(
                         openGeneration = transactionListOpenGeneration,
                         ownedCardKeys = ownedCardKeys,
                         ownedAccountContainerIds = ownedAccountContainerIds,
+                        ownedCards = dashboardState.ownedCards,
+                        ownedAccounts = dashboardState.ownedAccounts,
                         transactionAccountInvolvement = dashboardState.transactionAccountInvolvement,
                     )
                     showTransactionDetail(
@@ -305,6 +307,7 @@ private fun showTransactionDetail(
                 onBack = onBack,
                 onReclassify = onReclassify,
                 onIgnore = onIgnore,
+                ownedCards = dashboardState.ownedCards,
             )
         }
         if (overlayOnList) {

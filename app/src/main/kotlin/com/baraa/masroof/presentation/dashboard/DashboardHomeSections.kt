@@ -43,7 +43,6 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.LocalDate
@@ -389,10 +388,7 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                stringResource(
-                    R.string.dashboard_account_item,
-                    formatCardLast4(account.maskedNumber),
-                ),
+                account.displayLabel(),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,

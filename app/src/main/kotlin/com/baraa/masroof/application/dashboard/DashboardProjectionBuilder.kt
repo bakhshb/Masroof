@@ -185,6 +185,7 @@ class DashboardProjectionBuilder(
         val creditFacilities = CreditFacilityOverviewBuilder.build(
             overview = creditCardsFlat,
             registryCards = cardRegistry,
+            registryAccounts = ownedAccounts,
             debitSpendingByCardKey = debitSpend.spendingByCardKey,
             debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
         )

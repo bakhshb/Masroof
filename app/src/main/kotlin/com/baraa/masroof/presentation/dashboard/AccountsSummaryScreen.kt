@@ -36,7 +36,6 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
@@ -256,10 +255,7 @@ private fun AccountsSummaryAccountCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    stringResource(
-                        R.string.dashboard_account_item,
-                        formatCardLast4(account.maskedNumber),
-                    ),
+                    account.displayLabel(),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

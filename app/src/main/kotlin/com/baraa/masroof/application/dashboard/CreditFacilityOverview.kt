@@ -51,6 +51,7 @@ object CreditFacilityOverviewBuilder {
     fun build(
         overview: CreditCardsOverview,
         registryCards: List<CardRegistryEntry>,
+        registryAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry> = emptyList(),
         debitSpendingByCardKey: Map<String, SignedMoneyAmount> = emptyMap(),
         debitSalaryPeriodLabel: String? = overview.salaryPeriodLabel,
     ): CreditFacilitiesOverview {
@@ -66,15 +67,16 @@ object CreditFacilityOverviewBuilder {
                     last4 = entry.last4,
                     displayLabel = RegistryDisplayLabels.cardLabel(entry),
                     linkedAccountLabel = entry.linkedAccount?.maskedNumber?.let { masked ->
-                        RegistryDisplayLabels.accountLabel(
-                            com.baraa.masroof.domain.model.AccountRegistryEntry(
-                                bank = entry.bank,
-                                maskedNumber = masked,
-                                ownership = entry.ownership,
-                                firstSeenRawSmsId = null,
-                                lastSeenRawSmsId = null,
-                            ),
+                        val accountEntry = registryAccounts.find {
+                            it.bank == entry.bank && it.maskedNumber == masked
+                        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry(
+                            bank = entry.bank,
+                            maskedNumber = masked,
+                            ownership = entry.ownership,
+                            firstSeenRawSmsId = null,
+                            lastSeenRawSmsId = null,
                         )
+                        RegistryDisplayLabels.accountLabel(accountEntry)
                     },
                     linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber,
                     network = entry.cardNetwork,

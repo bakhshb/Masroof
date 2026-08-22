@@ -107,6 +107,40 @@ class CreditFacilityOverviewBuilderTest {
         assertNull(facility.facilityDue)
     }
 
+    @Test
+    fun debitLinkedAccount_usesAccountDisplayNameFromRegistry() {
+        val overview = CreditCardsOverview(
+            cards = emptyList(),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementPeriodLabel = null,
+            calendarMonthLabel = null,
+            salaryPeriodLabel = "Aug",
+            currency = Currency.SAR,
+        )
+        val registryAccounts = listOf(
+            com.baraa.masroof.domain.model.AccountRegistryEntry(
+                bank = Bank.BANK_ALJAZIRA,
+                maskedNumber = "1234567890",
+                ownership = OwnershipStatus.OWNED,
+                displayName = "Home",
+                firstSeenRawSmsId = "sms",
+                lastSeenRawSmsId = "sms",
+            ),
+        )
+
+        val facilities = CreditFacilityOverviewBuilder.build(
+            overview = overview,
+            registryCards = listOf(debit("9999")),
+            registryAccounts = registryAccounts,
+        )
+
+        assertEquals("Home", facilities.debitCards.single().linkedAccountLabel)
+    }
+
     private fun row(last4: String, amount: String): CreditCardDashboardRow =
         CreditCardDashboardRow(
             bank = Bank.BANK_ALJAZIRA,

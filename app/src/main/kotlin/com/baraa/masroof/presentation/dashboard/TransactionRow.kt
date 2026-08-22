@@ -14,7 +14,6 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 
@@ -22,12 +21,11 @@ import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 fun TransactionRow(
     row: TransactionPreviewUi,
     modifier: Modifier = Modifier,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     onClick: (() -> Unit)? = null,
 ) {
     val title = row.title ?: transactionTypeLabel(row.type)
-    val cardLabel = row.cardLast4?.let { last4 ->
-        stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
-    }
+    val cardLabel = cardDisplayLabelFromTransaction(row = row, cards = ownedCards)
     val subtitle = listOfNotNull(
         transactionTypeLabel(row.type),
         cardLabel,

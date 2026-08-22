@@ -331,6 +331,7 @@ private fun DashboardCustomizableSections(
                             overview = followedFacilities,
                             cardNetworksByLast4 = cardNetworks,
                             zoneId = ZoneId.systemDefault(),
+                            ownedCards = state.ownedCards,
                             onViewAll = onOpenCardsSummary,
                         )
                     } else {
@@ -340,6 +341,7 @@ private fun DashboardCustomizableSections(
                                     overview = followedOverview,
                                     cardNetworksByLast4 = cardNetworks,
                                     zoneId = ZoneId.systemDefault(),
+                                    ownedCards = state.ownedCards,
                                     onViewAll = onOpenCardsSummary,
                                 )
                             }
@@ -387,6 +389,7 @@ private fun DashboardCustomizableSections(
                         state.recentTransactions.forEach { row ->
                             DashboardRecentTransactionRow(
                                 row = row,
+                                ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },
                             )
                             Spacer(Modifier.height(4.dp))

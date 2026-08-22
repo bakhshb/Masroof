@@ -41,6 +41,8 @@ fun TransactionListScreen(
     openGeneration: Int = 0,
     ownedCardKeys: Set<String> = emptySet(),
     ownedAccountContainerIds: Set<String> = emptySet(),
+    ownedCards: List<OwnedCardUi> = emptyList(),
+    ownedAccounts: List<OwnedAccountUi> = emptyList(),
     transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -112,6 +114,8 @@ fun TransactionListScreen(
         filter = filterState,
         transactions = filterResult.transactions,
         totalAmount = filterResult.totalAmount,
+        ownedCards = ownedCards,
+        ownedAccounts = ownedAccounts,
     )
     val canShare = filterResult.transactions.isNotEmpty()
 
@@ -193,6 +197,7 @@ fun TransactionListScreen(
                     items(filterResult.transactions, key = { it.id }) { row ->
                         TransactionListRow(
                             row = row,
+                            ownedCards = ownedCards,
                             onClick = { onOpenTransaction(row.id) },
                         )
                     }
@@ -209,6 +214,8 @@ fun TransactionListScreen(
             availableTypes = availableTypes,
             availableCards = availableCards,
             availableAccounts = availableAccounts,
+            ownedCards = ownedCards,
+            ownedAccounts = ownedAccounts,
             onTypeToggle = { type ->
                 selectedTypeNames = if (type.name in selectedTypeNames) {
                     selectedTypeNames - type.name

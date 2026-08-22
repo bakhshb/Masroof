@@ -5,11 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DebitCardOverview
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
 fun DebitCardDetailScreen(
@@ -26,10 +23,7 @@ fun DebitCardDetailScreen(
         last4 = debit.last4,
         debitSpendInvolvementByTransactionId = state.transactionDebitSpendInvolvement,
     )
-    val title = stringResource(
-        R.string.dashboard_credit_card_last4,
-        formatCardLast4(debit.last4),
-    )
+    val title = debit.displayLabel
 
     DashboardSummaryScaffold(
         title = title,
@@ -51,6 +45,7 @@ fun DebitCardDetailScreen(
                 transactions = cardTransactions,
                 onOpenTransaction = onOpenTransaction,
                 onViewAll = onViewAllTransactions,
+                ownedCards = state.ownedCards,
             )
         }
     }

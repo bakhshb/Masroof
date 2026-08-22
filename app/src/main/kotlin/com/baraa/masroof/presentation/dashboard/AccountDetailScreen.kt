@@ -4,10 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.baraa.masroof.R
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
 fun AccountDetailScreen(
@@ -24,10 +21,7 @@ fun AccountDetailScreen(
         maskedNumber = account.maskedNumber,
         involvementByTransactionId = state.transactionAccountInvolvement,
     )
-    val title = stringResource(
-        R.string.dashboard_account_item,
-        formatCardLast4(account.maskedNumber),
-    )
+    val title = account.displayLabel()
 
     DashboardSummaryScaffold(
         title = title,
@@ -41,7 +35,7 @@ fun AccountDetailScreen(
             if (summary != null) {
                 CurrentAccountSection(
                     summary = summary,
-                    accountBadge = formatCardLast4(account.maskedNumber),
+                    accountBadge = account.displayLabel(),
                     presentationMode = AccountFlowPresentationMode.CashPosition,
                     showSectionHeader = false,
                 )
@@ -51,6 +45,7 @@ fun AccountDetailScreen(
                 transactions = accountTransactions,
                 onOpenTransaction = onOpenTransaction,
                 onViewAll = onViewAllTransactions,
+                ownedCards = state.ownedCards,
             )
         }
     }

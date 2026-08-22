@@ -53,6 +53,7 @@ fun CreditFacilitiesSection(
     overview: CreditFacilitiesOverview,
     cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
     onOpenDebit: ((DebitCardOverview) -> Unit)? = null,
@@ -78,6 +79,7 @@ fun CreditFacilitiesSection(
                         facility = facility,
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
+                        ownedCards = ownedCards,
                         modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
@@ -135,10 +137,7 @@ fun DebitCardSummaryTile(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                stringResource(
-                                    R.string.dashboard_credit_card_last4,
-                                    formatCardLast4(debit.last4),
-                                ),
+                                debit.displayLabel,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             )
                         }
@@ -171,7 +170,8 @@ fun DebitCardSummaryTile(
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
-                    debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
+                    debit.linkedAccountLabel
+                        ?: debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
                         ?: stringResource(R.string.dashboard_value_unavailable),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
@@ -196,7 +196,7 @@ fun DebitCardSummaryTile(
                             )
                             debit.linkedAccountLabel?.let { linked ->
                                 Text(
-                                    stringResource(R.string.settings_linked_account_suffix, linked.takeLast(4)),
+                                    linked,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -233,6 +233,7 @@ fun CreditFacilityCard(
     facility: CreditFacilityOverview,
     cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
     onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
 ) {
@@ -266,10 +267,7 @@ fun CreditFacilityCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(facility.primaryLast4),
-                        ),
+                        facility.primary.displayLabel(ownedCards),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
                 }
@@ -356,6 +354,7 @@ fun CreditFacilityCard(
                         presentation = CreditCardMetricsPresentation.SummaryPurchases,
                         showBalanceAndDue = false,
                         cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(supplementary)],
+                        ownedCards = ownedCards,
                         modifier = if (onOpenCard != null) {
                             Modifier
                                 .fillMaxWidth()
