@@ -17,6 +17,7 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -149,6 +150,7 @@ class DashboardServiceTest {
         ftRepo: FinancialTransactionRepository,
         reviewRepo: ReviewRepository,
         accountRepo: AccountRegistryRepository = FakeAccountRepo(),
+        cardRepo: CardRegistryRepository = FakeCardRepo(),
     ): DashboardService =
         DashboardService(
             financialTransactionRepository = ftRepo,
@@ -157,10 +159,21 @@ class DashboardServiceTest {
             rawSmsRepository = FakeRawRepo(),
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
+            cardRegistryRepository = cardRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeCardRepo(
+        private val entries: List<com.baraa.masroof.domain.model.CardRegistryEntry> = emptyList(),
+    ) : CardRegistryRepository {
+        override suspend fun observe(reference: com.baraa.masroof.domain.model.CardReference, rawSmsId: String) = Unit
+        override suspend fun setOwnership(reference: com.baraa.masroof.domain.model.CardReference, status: OwnershipStatus) = Unit
+        override suspend fun resolve(reference: com.baraa.masroof.domain.model.CardReference): OwnershipStatus = OwnershipStatus.UNKNOWN
+        override suspend fun get(reference: com.baraa.masroof.domain.model.CardReference): com.baraa.masroof.domain.model.CardRegistryEntry? = null
+        override suspend fun listAll(): List<com.baraa.masroof.domain.model.CardRegistryEntry> = entries
+    }
 
     private class FakeAccountRepo(
         private val entries: List<AccountRegistryEntry> = emptyList(),

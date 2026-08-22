@@ -8,7 +8,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
-internal data class CurrentAccountTransactionScope(
+data class CurrentAccountTransactionScope(
     val ownedContainerIds: Set<String>,
     val ownedAccountLast4s: Set<String>,
     val mode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,

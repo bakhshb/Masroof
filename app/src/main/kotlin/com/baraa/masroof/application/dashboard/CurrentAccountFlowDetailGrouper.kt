@@ -3,8 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
@@ -65,8 +63,13 @@ object CurrentAccountFlowDetailGrouper {
         rawSmsById: Map<String, RawSms> = emptyMap(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
     ): CurrentAccountFlowDetailGrouping {
-        val billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords)
-        val parsedRecordsById = parsedRecords.associateBy { it.event.id }
+        val context = AccountFlowClassifier.buildContext(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            rawSmsById = rawSmsById,
+        )
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
@@ -78,100 +81,24 @@ object CurrentAccountFlowDetailGrouper {
         val selfTransfersIn = mutableListOf<FinancialTransaction>()
 
         for (tx in transactions) {
-            if (effectiveAmount(tx, primaryCurrency, sarEquivalents) == null) continue
-            when (tx.type) {
-                FinancialTransactionType.INCOME -> {
-                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) continue
-                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
-                        income.getValue(FlowIncomeCategory.SALARY).add(tx)
-                    } else {
-                        income.getValue(FlowIncomeCategory.OTHER_INCOME).add(tx)
+            if (TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents) == null) {
+                continue
+            }
+            for (assignment in AccountFlowClassifier.classify(tx, scope, context)) {
+                when (assignment) {
+                    FlowAssignment.Excluded -> Unit
+
+                    is FlowAssignment.Income ->
+                        income.getValue(assignment.category).add(tx)
+
+                    is FlowAssignment.Expense ->
+                        expense.getValue(assignment.category).add(tx)
+
+                    is FlowAssignment.SelfTransfer -> when (assignment.leg) {
+                        SelfTransferLeg.IN -> selfTransfersIn.add(tx)
+                        SelfTransferLeg.OUT -> selfTransfersOut.add(tx)
                     }
                 }
-
-                FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
-                    if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) continue
-                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
-                        income.getValue(FlowIncomeCategory.SALARY).add(tx)
-                    } else {
-                        income.getValue(FlowIncomeCategory.EXTERNAL_TRANSFER_IN).add(tx)
-                    }
-                }
-
-                FinancialTransactionType.CREDIT_CARD_PAYMENT -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    expense.getValue(FlowExpenseCategory.CREDIT_CARD_PAYMENT).add(tx)
-                }
-
-                FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    expense.getValue(FlowExpenseCategory.EXTERNAL_TRANSFER_OUT).add(tx)
-                }
-
-                FinancialTransactionType.CASH_WITHDRAWAL -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    expense.getValue(FlowExpenseCategory.CASH_WITHDRAWAL).add(tx)
-                }
-
-                FinancialTransactionType.BILL_PAYMENT -> {
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
-                }
-
-                FinancialTransactionType.EXPENSE -> {
-                    if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(
-                            tx,
-                            parsedRecordsById,
-                            rawSmsById,
-                        )
-                    ) {
-                        continue
-                    }
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    when {
-                        scope.isCreditCardPayment(tx, parsedRecordsById, rawSmsById) ->
-                            expense.getValue(FlowExpenseCategory.CREDIT_CARD_PAYMENT).add(tx)
-
-                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
-                            expense.getValue(FlowExpenseCategory.CASH_WITHDRAWAL).add(tx)
-
-                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
-                            expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
-
-                        else -> expense.getValue(FlowExpenseCategory.POS_PURCHASE).add(tx)
-                    }
-                }
-
-                FinancialTransactionType.FEE -> {
-                    if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(
-                            tx,
-                            parsedRecordsById,
-                            rawSmsById,
-                        )
-                    ) {
-                        continue
-                    }
-                    if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
-                        expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
-                    } else {
-                        expense.getValue(FlowExpenseCategory.FEE).add(tx)
-                    }
-                }
-
-                FinancialTransactionType.SELF_TRANSFER -> {
-                    if (scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
-                        selfTransfersOut.add(tx)
-                    }
-                    if (scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
-                        selfTransfersIn.add(tx)
-                    }
-                }
-
-                FinancialTransactionType.REFUND,
-                FinancialTransactionType.ADJUSTMENT,
-                FinancialTransactionType.UNKNOWN,
-                -> Unit
             }
         }
 
@@ -181,25 +108,5 @@ object CurrentAccountFlowDetailGrouper {
             selfTransfersOut = selfTransfersOut.toList(),
             selfTransfersIn = selfTransfersIn.toList(),
         )
-    }
-
-    private fun resolveBillPaymentTransactionIds(
-        transactions: List<FinancialTransaction>,
-        parsedRecords: List<ParsedEventRecord>,
-    ): Set<String> {
-        val familyByEventId = parsedRecords.associate { it.event.id to it.event.messageFamily }
-        return transactions.mapNotNull { tx ->
-            val families = tx.linkedParsedEventIds.mapNotNull { familyByEventId[it] }
-            if (families.any { it == MessageFamily.BILL_PAYMENT }) tx.id else null
-        }.toSet()
-    }
-
-    private fun effectiveAmount(
-        tx: FinancialTransaction,
-        primaryCurrency: Currency,
-        sarEquivalents: Map<String, Money>,
-    ): Money? {
-        if (tx.amount.currency == primaryCurrency) return tx.amount
-        return sarEquivalents[tx.id]
     }
 }
