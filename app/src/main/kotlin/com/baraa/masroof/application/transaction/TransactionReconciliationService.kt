@@ -4,6 +4,8 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -365,14 +367,47 @@ class TransactionReconciliationService(
     }
 
     private suspend fun persist(
-        transaction: com.baraa.masroof.domain.model.FinancialTransaction,
+        transaction: FinancialTransaction,
         rawSmsIds: List<String>,
-    ): PersistOutcome =
-        when (financialTransactionRepository.save(transaction, rawSmsIds)) {
+    ): PersistOutcome {
+        if (transaction.type == FinancialTransactionType.SELF_TRANSFER) {
+            val existing = findMatchingSelfTransfer(transaction)
+            if (existing != null) {
+                var linkedAny = false
+                for (rawSmsId in rawSmsIds) {
+                    if (!financialTransactionRepository.isRawSmsLinked(rawSmsId)) {
+                        if (financialTransactionRepository.linkRawSmsIfAbsent(existing.id, rawSmsId)) {
+                            linkedAny = true
+                        }
+                    }
+                }
+                return if (linkedAny || rawSmsIds.all { financialTransactionRepository.isRawSmsLinked(it) }) {
+                    PersistOutcome.Already
+                } else {
+                    PersistOutcome.Failed
+                }
+            }
+        }
+        return when (financialTransactionRepository.save(transaction, rawSmsIds)) {
             FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
             FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
+    }
+
+    private suspend fun findMatchingSelfTransfer(
+        transaction: FinancialTransaction,
+    ): FinancialTransaction? {
+        val source = transaction.sourceContainerId ?: return null
+        val dest = transaction.destinationContainerId ?: return null
+        return financialTransactionRepository.listAll().firstOrNull { existing ->
+            existing.id != transaction.id &&
+                existing.type == FinancialTransactionType.SELF_TRANSFER &&
+                existing.sourceContainerId == source &&
+                existing.destinationContainerId == dest &&
+                existing.amount == transaction.amount
+        }
+    }
 
     private fun eventShouldNotProduceTransaction(event: ParsedEvent, smsBody: String): Boolean {
         when (event.messageFamily) {

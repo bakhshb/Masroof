@@ -108,6 +108,13 @@ class RoomFinancialTransactionRepository(
         return true
     }
 
+    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean {
+        if (dao.findLinkByRawSmsId(rawSmsId) != null) return false
+        return dao.insertLinkIfAbsent(
+            FinancialTransactionRawSmsLinkEntity(rawSmsId = rawSmsId, transactionId = transactionId),
+        ) != -1L
+    }
+
     private suspend fun reconstruct(
         entity: com.baraa.masroof.data.room.entity.FinancialTransactionEntity,
     ): FinancialTransaction {

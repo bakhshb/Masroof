@@ -47,7 +47,7 @@ fun AccountDetailScreen(
                 CurrentAccountSection(
                     summary = summary,
                     accountBadge = formatCardLast4(account.maskedNumber),
-                    presentationMode = AccountFlowPresentationMode.ExternalMovement,
+                    presentationMode = AccountFlowPresentationMode.CashPosition,
                     showSectionHeader = false,
                 )
             }

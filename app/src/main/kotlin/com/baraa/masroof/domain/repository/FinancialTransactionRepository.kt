@@ -49,6 +49,12 @@ interface FinancialTransactionRepository {
      * Used after reparse when a message is reclassified as non-financial (e.g. OTP).
      */
     suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean
+
+    /**
+     * Attaches an additional RawSms evidence row to an existing transaction when the
+     * same transfer was assembled twice from separate bank messages.
+     */
+    suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean
 }
 
 sealed interface FinancialTransactionSaveResult {

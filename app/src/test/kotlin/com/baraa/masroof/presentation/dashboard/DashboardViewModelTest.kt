@@ -595,6 +595,8 @@ class DashboardViewModelTest {
                     source: com.baraa.masroof.domain.model.ExchangeRateSource,
                 ) = false
                 override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
             },
             rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository {
                 override suspend fun insertIfAbsent(rawSms: com.baraa.masroof.domain.model.RawSms) =
@@ -645,6 +647,8 @@ class DashboardViewModelTest {
                         source: com.baraa.masroof.domain.model.ExchangeRateSource,
                     ) = false
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
@@ -705,6 +709,8 @@ class DashboardViewModelTest {
                         source: com.baraa.masroof.domain.model.ExchangeRateSource,
                     ) = false
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },
                 reviewRepository = object : com.baraa.masroof.domain.repository.ReviewRepository {
                     override suspend fun getById(id: String) = null
