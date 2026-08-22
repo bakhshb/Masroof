@@ -21,6 +21,15 @@ interface ReviewItemDao {
     @Query("SELECT * FROM review_item ORDER BY createdAtEpochMillis, id")
     suspend fun listAll(): List<ReviewItemEntity>
 
+    @Query(
+        """
+        SELECT * FROM review_item
+        WHERE status = 'RESOLVED' AND resolutionKind = 'USER_NON_FINANCIAL'
+        ORDER BY resolvedAtEpochMillis DESC, id
+        """,
+    )
+    suspend fun listIgnored(): List<ReviewItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(entity: ReviewItemEntity): Long
 

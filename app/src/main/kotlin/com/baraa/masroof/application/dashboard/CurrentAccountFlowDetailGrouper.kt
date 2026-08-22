@@ -152,10 +152,14 @@ object CurrentAccountFlowDetailGrouper {
                         continue
                     }
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
-                        expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
-                    } else {
-                        expense.getValue(FlowExpenseCategory.FEE).add(tx)
+                    when {
+                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
+                            expense.getValue(FlowExpenseCategory.BILL_PAYMENT).add(tx)
+
+                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
+                            expense.getValue(FlowExpenseCategory.CASH_WITHDRAWAL).add(tx)
+
+                        else -> expense.getValue(FlowExpenseCategory.FEE).add(tx)
                     }
                 }
 

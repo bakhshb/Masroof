@@ -28,6 +28,8 @@ data class DashboardOverview(
     val creditCards: CreditCardsOverview,
     val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
     val flowDetailGrouping: CurrentAccountFlowDetailGrouping,
+    /** Transaction id → owned account container ids (SMS-resolved, SingleAccount scope). */
+    val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val isCurrentPeriod: Boolean,
 )
 
@@ -176,6 +178,12 @@ class DashboardService(
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
         )
+        val transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            ownedAccounts = ownedAccounts,
+        )
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardOverview(
             period = period,
@@ -186,6 +194,7 @@ class DashboardService(
             creditCards = creditCards,
             ownedAccountPeriodSummaries = ownedAccountPeriodSummaries,
             flowDetailGrouping = flowDetailGrouping,
+            transactionAccountInvolvement = transactionAccountInvolvement,
             isCurrentPeriod = period == current,
         )
     }

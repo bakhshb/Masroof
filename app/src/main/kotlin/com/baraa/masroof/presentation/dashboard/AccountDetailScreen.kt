@@ -25,6 +25,7 @@ fun AccountDetailScreen(
         transactions = state.allTransactions,
         bank = account.bank,
         maskedNumber = account.maskedNumber,
+        involvementByTransactionId = state.transactionAccountInvolvement,
     )
     val title = stringResource(
         R.string.dashboard_account_item,

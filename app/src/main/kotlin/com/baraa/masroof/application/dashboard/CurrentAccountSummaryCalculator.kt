@@ -114,10 +114,14 @@ object CurrentAccountSummaryCalculator {
                         continue
                     }
                     if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) continue
-                    if (scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById)) {
-                        billPayments += amount
-                    } else {
-                        fees += amount
+                    when {
+                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
+                            billPayments += amount
+
+                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
+                            cashWithdrawals += amount
+
+                        else -> fees += amount
                     }
                 }
 

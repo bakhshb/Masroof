@@ -421,6 +421,14 @@
     <string name="review_back">Back</string>
     <string name="review_count">%1$d transaction(s) need review</string>
     <string name="review_empty">No transactions need review right now.</string>
+    <string name="review_ignored_empty">No ignored or non-financial messages.</string>
+    <string name="review_tab_pending">Pending review</string>
+    <string name="review_tab_ignored">Ignored</string>
+    <string name="review_ignored_count">%1$d ignored</string>
+    <string name="review_status_ignored">Ignored</string>
+    <string name="review_ignored_at">Ignored on: %1$s</string>
+    <string name="review_ignored_detail_hint">This message was marked as non-financial or ignored.</string>
+    <string name="review_reason_user_ignored_transaction">Ignored from transaction details</string>
     <string name="review_load_error">Could not load review queue</string>
     <string name="review_resolved">Resolved successfully</string>
     <string name="review_still_pending">Transaction still needs review</string>

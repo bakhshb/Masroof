@@ -46,6 +46,14 @@ class ReviewDetailLoader(
         return summaries
     }
 
+    suspend fun loadIgnoredSummaries(): List<ReviewSummary> {
+        val summaries = mutableListOf<ReviewSummary>()
+        for (review in reviewWorkflowService.listIgnoredReviews()) {
+            toSummary(review)?.let { summaries += it }
+        }
+        return summaries
+    }
+
     suspend fun loadDetail(reviewId: String): ReviewDetail? {
         val review = reviewWorkflowService.getReview(reviewId) ?: return null
         return toDetail(review)

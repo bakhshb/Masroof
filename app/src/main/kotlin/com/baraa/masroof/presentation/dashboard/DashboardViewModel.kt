@@ -457,6 +457,7 @@ class DashboardViewModel(
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
                         flowDetailGrouping = overview.flowDetailGrouping,
+                        transactionAccountInvolvement = overview.transactionAccountInvolvement,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
                         selectedTransactionId = preserveSelectionId,

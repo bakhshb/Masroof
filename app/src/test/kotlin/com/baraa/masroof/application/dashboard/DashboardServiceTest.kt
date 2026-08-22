@@ -276,6 +276,7 @@ class DashboardServiceTest {
             }
 
         override suspend fun listAll(): List<ReviewItem> = listRequired()
+        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
         override suspend fun upsertRequired(
             rawSmsId: String,
             kind: ReviewKind,

@@ -361,6 +361,7 @@ class SmsIngestionServiceTest {
             override suspend fun getById(id: String): ReviewItem? = null
             override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
             override suspend fun listRequired(): List<ReviewItem> = emptyList()
+            override suspend fun listIgnored(): List<ReviewItem> = emptyList()
             override suspend fun listAll(): List<ReviewItem> = emptyList()
             override suspend fun upsertRequired(
                 rawSmsId: String,
@@ -418,6 +419,7 @@ class SmsIngestionServiceTest {
             override suspend fun getById(id: String): ReviewItem? = null
             override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
             override suspend fun listRequired(): List<ReviewItem> = emptyList()
+            override suspend fun listIgnored(): List<ReviewItem> = emptyList()
             override suspend fun listAll(): List<ReviewItem> = emptyList()
             override suspend fun upsertRequired(
                 rawSmsId: String,

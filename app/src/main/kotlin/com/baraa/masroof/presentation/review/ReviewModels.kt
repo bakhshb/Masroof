@@ -16,6 +16,7 @@ data class ReviewListItemUi(
     val dateLabel: String,
     val reasonLabel: String,
     val dismissibleAsNonFinancial: Boolean = false,
+    val ignored: Boolean = false,
 )
 
 data class ReviewDetailUi(
@@ -38,10 +39,18 @@ data class ReviewDetailUi(
     val showDismissNonFinancialAction: Boolean,
     val ownershipCard: CardReference? = null,
     val showOwnershipActions: Boolean = false,
+    val readOnly: Boolean = false,
+    val resolvedAtLabel: String? = null,
 )
+
+enum class ReviewListMode {
+    PENDING,
+    IGNORED,
+}
 
 data class ReviewUiState(
     val loading: Boolean = true,
+    val listMode: ReviewListMode = ReviewListMode.PENDING,
     val items: List<ReviewListItemUi> = emptyList(),
     val informationalDismissCount: Int = 0,
     val selectedDetail: ReviewDetailUi? = null,
