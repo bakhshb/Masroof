@@ -21,6 +21,7 @@ data class ReviewListItemUi(
 
 data class ReviewDetailUi(
     val id: String,
+    val rawSmsId: String,
     val kind: ReviewKind,
     val kindLabelRes: Int,
     val sender: String?,
@@ -39,6 +40,7 @@ data class ReviewDetailUi(
     val showDismissNonFinancialAction: Boolean,
     val ownershipCard: CardReference? = null,
     val showOwnershipActions: Boolean = false,
+    val showRestoreActions: Boolean = false,
     val readOnly: Boolean = false,
     val resolvedAtLabel: String? = null,
 )
@@ -68,6 +70,7 @@ enum class ReviewError {
 enum class ReviewMessage {
     RESOLVED,
     STILL_NEEDS_REVIEW,
+    RESTORED,
 }
 
 val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(

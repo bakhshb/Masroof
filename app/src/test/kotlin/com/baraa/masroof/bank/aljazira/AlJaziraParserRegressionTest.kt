@@ -204,6 +204,24 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun internalAtmWithdrawal_hisabRaqam_extractsSourceAccount() {
+        val result = parse(
+            """
+            سحب نقدي داخلي صراف الي
+            بطاقة 8219:مدى
+            حساب رقم: 3001
+            بمبلغ: SAR 2,200.00
+            مكان السحب: جــدة - 7225
+            في: 2026-08-02 17:41
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.WITHDRAWAL, result.event.messageFamily)
+        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
+        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals(Money.of("2200.00", Currency.SAR), result.event.amount)
+    }
+
+    @Test
     fun creditCardPurchase_isPurchaseNotCardPayment() {
         val result = parse(
             """

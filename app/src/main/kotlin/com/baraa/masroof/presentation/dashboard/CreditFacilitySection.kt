@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.CreditFacilityOverview
 import com.baraa.masroof.application.dashboard.DebitCardOverview
@@ -116,12 +117,21 @@ fun CreditFacilityCard(
     cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
+    onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
 ) {
     val primaryNetwork = cardNetworksByLast4[CardOwnershipKey.of(facility.bank, facility.primaryLast4)]
     var expanded by rememberSaveable(facility.primaryLast4) { mutableStateOf(false) }
     val extended = MasroofThemeExtras.extendedColors
 
-    MasroofCard(modifier = modifier.clickable { expanded = !expanded }) {
+    MasroofCard(
+        modifier = modifier.then(
+            if (onOpenCard != null) {
+                Modifier.clickable { onOpenCard(facility.primary) }
+            } else {
+                Modifier.clickable { expanded = !expanded }
+            },
+        ),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -147,25 +157,52 @@ fun CreditFacilityCard(
                     )
                 }
             }
-            Icon(
-                imageVector = if (expanded) MasroofIcons.periodPrevious else MasroofIcons.periodNext,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (facility.supplementaries.isNotEmpty()) {
+                Icon(
+                    imageVector = if (expanded) MasroofIcons.periodPrevious else MasroofIcons.periodNext,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { expanded = !expanded },
+                )
+            } else if (onOpenCard != null) {
+                Icon(
+                    imageVector = MasroofIcons.periodNext,
+                    contentDescription = null,
+                    tint = extended.account,
+                )
+            }
+        }
+
+        if (facility.salaryPeriodLabel != null) {
+            Text(
+                stringResource(
+                    R.string.dashboard_credit_card_salary_purchases_total,
+                    facility.salaryPeriodLabel,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            Text(
+                formatLocalizedMoney(facility.primary.salaryPeriodSpendingNet),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = extended.outflow,
             )
         }
 
         Text(
             stringResource(
-                R.string.dashboard_credit_facility_statement_total,
-                facility.aggregateStatementPeriodLabel
+                R.string.dashboard_credit_card_statement_purchases_total,
+                facility.primary.statementPeriodLabel
+                    ?: facility.aggregateStatementPeriodLabel
                     ?: stringResource(R.string.dashboard_credit_card_statement_purchases_total_fallback),
             ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
         Text(
-            formatLocalizedMoney(facility.facilityStatementSpending),
+            formatLocalizedMoney(facility.primary.statementSpendingNet),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = extended.outflow,
         )
@@ -202,6 +239,13 @@ fun CreditFacilityCard(
                         presentation = CreditCardMetricsPresentation.SummaryPurchases,
                         showBalanceAndDue = false,
                         cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(supplementary)],
+                        modifier = if (onOpenCard != null) {
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenCard(supplementary) }
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
                     )
                 }
             }

@@ -21,6 +21,7 @@ class ReviewViewModelFactory(
             detailLoader = loader,
             cardRegistryRepository = container.cardRegistryRepository,
             ownershipConfirmationService = container.ownershipConfirmationService,
+            transactionRestoreService = container.transactionRestoreService,
             refreshReviewQueue = { container.refreshReviewQueue() },
             reparseStoredSms = { rawSmsId ->
                 val raw = container.rawSmsRepository.getById(rawSmsId)

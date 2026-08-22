@@ -141,6 +141,7 @@ fun CardsSummaryScreen(
                             cardNetworksByLast4 = cardNetworksByLast4,
                             zoneId = ZoneId.systemDefault(),
                             modifier = Modifier.fillMaxWidth(),
+                            onOpenCard = onOpenCard,
                         )
                     }
                     followedFacilities.debitCards.forEach { debit ->

@@ -479,6 +479,11 @@
     <string name="review_reason_user_ignored_transaction">تم التجاهل من تفاصيل العملية</string>
     <string name="review_load_error">تعذر تحميل قائمة المراجعة</string>
     <string name="review_resolved">تمت المعالجة بنجاح</string>
+    <string name="review_restored">تمت استعادة الرسالة بنجاح</string>
+    <string name="review_restore_hint">يمكنك استعادة هذه الرسالة وإنشاء معاملة مالية منها، أو اختيار نوع مختلف للتصنيف.</string>
+    <string name="review_restore_actions_title">استعادة وتصنيف</string>
+    <string name="review_action_restore">استعادة كما هي</string>
+    <string name="review_action_restore_as">استعادة كـ %1$s</string>
     <string name="review_still_pending">لا تزال العملية تحتاج مراجعة</string>
     <string name="review_action_failed">تعذر تنفيذ الإجراء</string>
     <string name="review_sender">المرسل: %1$s</string>

@@ -67,6 +67,7 @@ fun ReviewRoute(
             onDismissNonFinancial = viewModel::resolveAsIgnored,
             onConfirmOwnershipCardOwned = viewModel::confirmOwnershipCardOwned,
             onMarkOwnershipCardExternal = viewModel::markOwnershipCardExternal,
+            onRestoreIgnored = viewModel::restoreIgnoredMessage,
         )
     } else {
         ReviewListScreen(
@@ -315,6 +316,7 @@ private fun ReviewDetailScreen(
     onDismissNonFinancial: () -> Unit,
     onConfirmOwnershipCardOwned: () -> Unit,
     onMarkOwnershipCardExternal: () -> Unit,
+    onRestoreIgnored: (FinancialTransactionType?) -> Unit,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.review_detail_title),
@@ -364,12 +366,32 @@ private fun ReviewDetailScreen(
                     label = stringResource(R.string.review_ignored_at, it),
                 )
             }
-            if (detail.readOnly) {
+            if (detail.showRestoreActions) {
                 MasroofCard {
                     Text(
-                        stringResource(R.string.review_ignored_detail_hint),
+                        stringResource(R.string.review_restore_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                SectionHeader(
+                    title = stringResource(R.string.review_restore_actions_title),
+                    icon = MasroofIcons.reviewQueue,
+                )
+                IconTextButton(
+                    onClick = { onRestoreIgnored(null) },
+                    enabled = !resolving,
+                    icon = MasroofIcons.success,
+                    text = stringResource(R.string.review_action_restore),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                REVIEW_FINANCIAL_TYPE_ACTIONS.forEach { type ->
+                    IconTextButton(
+                        onClick = { onRestoreIgnored(type) },
+                        enabled = !resolving,
+                        icon = MasroofIcons.transactionType(type),
+                        text = stringResource(R.string.review_action_restore_as, stringResource(type.toUiLabelRes())),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -522,6 +544,18 @@ private fun ReviewDetailScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                ReviewMessage.RESTORED -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = MasroofIcons.success,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.review_restored),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 null -> Unit
             }
             if (error == ReviewError.ACTION_FAILED) {
@@ -535,7 +569,7 @@ private fun ReviewDetailScreen(
                     Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
                 }
                 actionErrorDetail?.let { reason ->
-                    val detailRes = ReviewReasonLabels.labelRes(reason)
+                    val detailRes = restoreFailureLabelRes(reason) ?: ReviewReasonLabels.labelRes(reason)
                     Text(
                         detailRes?.let { stringResource(it) } ?: reason,
                         color = MaterialTheme.colorScheme.error,
@@ -550,3 +584,12 @@ private fun ReviewDetailScreen(
         }
     }
 }
+
+private fun restoreFailureLabelRes(reason: String): Int? =
+    when (reason) {
+        "not_ignored", "review_not_found" -> R.string.settings_restore_not_ignored
+        "reconcile_failed" -> R.string.settings_restore_reconcile_failed
+        "review_clear_failed", "rollback_delete_failed", "rollback_review_failed" ->
+            R.string.settings_restore_failed
+        else -> null
+    }
