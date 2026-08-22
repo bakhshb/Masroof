@@ -16,6 +16,8 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 class RoomCardRegistryRepository(
     private val dao: CardRegistryDao,
 ) : CardRegistryRepository {
+    private val roleTransitions = CardRoleTransitionHelper(dao)
+
     override suspend fun observe(reference: CardReference, rawSmsId: String) {
         if (!RegistryIdentity.isKnownBank(reference.bank)) return
         val last4 = reference.last4?.trim().orEmpty()
@@ -70,44 +72,58 @@ class RoomCardRegistryRepository(
 
     override suspend fun updateDisplayName(reference: CardReference, displayName: String?) {
         val last4 = requireLast4(reference)
-        dao.updateDisplayName(reference.bank.id, last4, displayName?.trim()?.ifEmpty { null })
+        requireExisting(reference.bank.id, last4)
+        requireUpdated(
+            dao.updateDisplayName(reference.bank.id, last4, displayName?.trim()?.ifEmpty { null }),
+        )
     }
 
     override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) {
         val last4 = requireLast4(reference)
-        dao.updateCardNetwork(reference.bank.id, last4, network?.name)
+        requireExisting(reference.bank.id, last4)
+        requireUpdated(dao.updateCardNetwork(reference.bank.id, last4, network?.name))
     }
 
     override suspend fun updateCardType(reference: CardReference, cardType: CardType?) {
         val last4 = requireLast4(reference)
-        dao.updateCardType(reference.bank.id, last4, cardType?.name)
+        requireExisting(reference.bank.id, last4)
+        requireUpdated(dao.updateCardType(reference.bank.id, last4, cardType?.name))
     }
 
     override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) {
         val last4 = requireLast4(card)
         RegistryIdentity.requireKnownBank(account.bank, "CardRegistry.linkDebitToAccount")
-        dao.updateLinkedAccount(
-            bankId = card.bank.id,
-            last4 = last4,
-            linkedAccountBankId = account.bank.id,
-            linkedAccountMaskedNumber = account.maskedNumber,
+        require(card.bank == account.bank) { "cross_bank_link" }
+        requireExisting(card.bank.id, last4)
+        roleTransitions.clearFacilityRole(card.bank.id, last4)
+        requireUpdated(
+            dao.updateLinkedAccount(
+                bankId = card.bank.id,
+                last4 = last4,
+                linkedAccountBankId = account.bank.id,
+                linkedAccountMaskedNumber = account.maskedNumber,
+            ),
         )
-        dao.updateCardType(card.bank.id, last4, CardType.DEBIT.name)
+        requireUpdated(dao.updateCardType(card.bank.id, last4, CardType.DEBIT.name))
         if (dao.get(card.bank.id, last4)?.cardNetwork == null) {
-            dao.updateCardNetwork(card.bank.id, last4, CardNetwork.MADA.name)
+            requireUpdated(dao.updateCardNetwork(card.bank.id, last4, CardNetwork.MADA.name))
         }
     }
 
     override suspend fun setPrimaryCard(reference: CardReference) {
         val last4 = requireLast4(reference)
+        requireExisting(reference.bank.id, last4)
+        roleTransitions.detachChildrenOfOtherPrimaries(reference.bank.id, last4)
         dao.demoteOtherPrimaryCards(reference.bank.id, last4)
-        dao.updateCardRole(
-            bankId = reference.bank.id,
-            last4 = last4,
-            cardRole = CardRole.PRIMARY.name,
-            parentCardLast4 = null,
+        requireUpdated(
+            dao.updateCardRole(
+                bankId = reference.bank.id,
+                last4 = last4,
+                cardRole = CardRole.PRIMARY.name,
+                parentCardLast4 = null,
+            ),
         )
-        dao.updateCardType(reference.bank.id, last4, CardType.CREDIT.name)
+        requireUpdated(dao.updateCardType(reference.bank.id, last4, CardType.CREDIT.name))
     }
 
     override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) {
@@ -117,28 +133,26 @@ class RoomCardRegistryRepository(
         val parent = dao.get(reference.bank.id, parentLast4)
             ?: throw IllegalArgumentException("primary_not_found")
         require(parent.cardRole == CardRole.PRIMARY.name) { "parent_not_primary" }
-        dao.updateCardRole(
-            bankId = reference.bank.id,
-            last4 = last4,
-            cardRole = CardRole.SUPPLEMENTARY.name,
-            parentCardLast4 = parentLast4,
+        val existing = dao.get(reference.bank.id, last4)
+            ?: throw IllegalArgumentException("card_not_found")
+        if (existing.cardRole == CardRole.PRIMARY.name) {
+            roleTransitions.detachChildrenOfPrimary(reference.bank.id, last4)
+        }
+        requireUpdated(
+            dao.updateCardRole(
+                bankId = reference.bank.id,
+                last4 = last4,
+                cardRole = CardRole.SUPPLEMENTARY.name,
+                parentCardLast4 = parentLast4,
+            ),
         )
-        dao.updateCardType(reference.bank.id, last4, CardType.CREDIT.name)
+        requireUpdated(dao.updateCardType(reference.bank.id, last4, CardType.CREDIT.name))
     }
 
     override suspend fun clearCardRole(reference: CardReference) {
         val last4 = requireLast4(reference)
-        val existing = dao.get(reference.bank.id, last4)
-        if (existing?.cardRole == CardRole.PRIMARY.name) {
-            dao.detachSupplementariesOfPrimary(reference.bank.id, last4)
-        }
-        dao.clearSupplementaryRole(reference.bank.id, last4)
-        dao.updateCardRole(
-            bankId = reference.bank.id,
-            last4 = last4,
-            cardRole = CardRole.STANDALONE.name,
-            parentCardLast4 = null,
-        )
+        requireExisting(reference.bank.id, last4)
+        roleTransitions.clearFacilityRole(reference.bank.id, last4)
     }
 
     private fun requireLast4(reference: CardReference): String {
@@ -146,5 +160,17 @@ class RoomCardRegistryRepository(
         val last4 = reference.last4?.trim().orEmpty()
         require(last4.isNotEmpty()) { "last4 required" }
         return last4
+    }
+
+    private suspend fun requireExisting(bankId: String, last4: String) {
+        if (dao.get(bankId, last4) == null) {
+            throw IllegalArgumentException("card_not_found")
+        }
+    }
+
+    private fun requireUpdated(affectedRows: Int) {
+        if (affectedRows == 0) {
+            throw IllegalArgumentException("card_update_failed")
+        }
     }
 }
