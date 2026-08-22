@@ -8,6 +8,9 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -41,6 +44,7 @@ class TransactionReconciliationService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val ownershipResolver: OwnershipResolver,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider? = null,
+    private val reviewRepository: ReviewRepository? = null,
 ) {
     suspend fun reconcileStoredEvents(): ReconciliationSummary =
         reconcileStoredEventsDetailed().summary
@@ -84,6 +88,16 @@ class TransactionReconciliationService(
 
         for (record in records) {
             val event = record.event
+            if (reviewRepository != null) {
+                val review = reviewRepository.findByRawSmsId(event.rawSmsId)
+                if (review?.status == ReviewStatus.RESOLVED &&
+                    review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
+                ) {
+                    ignored++
+                    settledRawSmsIds += event.rawSmsId
+                    continue
+                }
+            }
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
                 val body = rawSmsRepository.getById(event.rawSmsId)?.body.orEmpty()
                 if (

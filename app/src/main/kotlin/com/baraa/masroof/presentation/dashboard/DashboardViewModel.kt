@@ -12,7 +12,9 @@ import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.ForeignPurchaseSarConverter
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
+import com.baraa.masroof.application.transaction.IgnoreResult
 import com.baraa.masroof.application.transaction.ReclassificationResult
+import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
@@ -48,6 +50,7 @@ class DashboardViewModel(
     private val layoutPreferencesRepository: DashboardLayoutPreferencesRepository,
     private val rescanService: suspend () -> SmsScanResult,
     private val reclassificationService: TransactionReclassificationService,
+    private val ignoreService: TransactionIgnoreService,
     private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
     private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
@@ -280,6 +283,9 @@ class DashboardViewModel(
                 selectedTransactionSmsLoading = true,
                 reclassifySuccess = false,
                 reclassifyError = null,
+                ignoring = false,
+                ignoreSuccess = false,
+                ignoreError = null,
             )
         }
         loadSelectedTransactionSms(transactionId)
@@ -294,6 +300,9 @@ class DashboardViewModel(
                 reclassifying = false,
                 reclassifySuccess = false,
                 reclassifyError = null,
+                ignoring = false,
+                ignoreSuccess = false,
+                ignoreError = null,
             )
         }
     }
@@ -325,7 +334,7 @@ class DashboardViewModel(
     fun reclassifySelectedTransaction(newType: FinancialTransactionType) {
         val transactionId = _uiState.value.selectedTransactionId ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(reclassifying = true, reclassifySuccess = false, reclassifyError = null) }
+            _uiState.update { it.copy(reclassifying = true, reclassifySuccess = false, reclassifyError = null, ignoreError = null) }
             when (val result = reclassificationService.reclassify(transactionId, newType)) {
                 is ReclassificationResult.Success -> {
                     refreshPreservingSelection()
@@ -342,6 +351,36 @@ class DashboardViewModel(
                         it.copy(
                             reclassifying = false,
                             reclassifyError = result.reason,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun ignoreSelectedTransaction() {
+        val transactionId = _uiState.value.selectedTransactionId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(ignoring = true, ignoreSuccess = false, ignoreError = null, reclassifyError = null) }
+            when (val result = ignoreService.ignore(transactionId)) {
+                is IgnoreResult.Success -> {
+                    refresh()
+                    _uiState.update {
+                        it.copy(
+                            selectedTransactionId = null,
+                            selectedTransactionSms = emptyList(),
+                            selectedTransactionSmsLoading = false,
+                            ignoring = false,
+                            ignoreSuccess = true,
+                            ignoreError = null,
+                        )
+                    }
+                }
+                is IgnoreResult.Rejected -> {
+                    _uiState.update {
+                        it.copy(
+                            ignoring = false,
+                            ignoreError = result.reason,
                         )
                     }
                 }

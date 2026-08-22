@@ -30,6 +30,8 @@ object ReviewReasonLabels {
             "source_not_owned" -> R.string.review_reason_transfer_ownership
             "not_a_transfer" -> R.string.review_error_not_transfer
             "paired_transaction_not_supported" -> R.string.review_reason_paired_transaction_not_supported
+            "delete_failed" -> R.string.transaction_detail_ignore_failed
+            "review_resolution_failed" -> R.string.transaction_detail_ignore_failed
             "type_not_allowed" -> R.string.review_error_not_transfer
             "transaction_not_found" -> R.string.review_error_not_found
             "update_failed" -> R.string.transaction_detail_reclassify_failed

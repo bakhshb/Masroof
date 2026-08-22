@@ -345,6 +345,10 @@
     <string name="transaction_detail_sms_section">Message text</string>
     <string name="transaction_detail_sms_index">Message %1$d of %2$d</string>
     <string name="transaction_detail_edit_category">Edit category</string>
+    <string name="transaction_detail_ignore_confirm_title">Ignore transaction?</string>
+    <string name="transaction_detail_ignore_confirm_body">This removes the transaction from your dashboard totals. You can bring it back later by rescanning SMS if needed.</string>
+    <string name="transaction_detail_ignore_confirm_action">Ignore</string>
+    <string name="transaction_detail_ignore_failed">Could not ignore transaction</string>
     <string name="transaction_share">Share</string>
     <string name="transaction_share_detail_heading">%1$s — Transaction details</string>
     <string name="transaction_share_list_heading">%1$s — Period transactions %2$s</string>
