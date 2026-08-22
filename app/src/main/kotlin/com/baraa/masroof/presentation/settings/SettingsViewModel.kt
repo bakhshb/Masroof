@@ -26,9 +26,6 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.application.transaction.RestoreResult
-import com.baraa.masroof.application.transaction.TransactionRestoreService
-import com.baraa.masroof.domain.repository.RawSmsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,8 +39,6 @@ class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
-    private val transactionRestoreService: TransactionRestoreService,
-    private val rawSmsRepository: RawSmsRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
@@ -84,7 +79,6 @@ class SettingsViewModel(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
                 )
-                loadIgnoredMessages()
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -216,53 +210,6 @@ class SettingsViewModel(
         updateCardMetadata(card) {
             cardRegistryRepository.markAsDebit(CardReference(card.bank, card.last4))
         }
-    }
-
-    fun restoreIgnoredMessage(rawSmsId: String) {
-        if (_uiState.value.updating) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(updating = true, error = null, restoreMessage = null) }
-            when (val result = transactionRestoreService.restore(rawSmsId)) {
-                is RestoreResult.Success -> {
-                    refreshReviewQueue()
-                    applyRegistries(
-                        cards = cardRegistryRepository.listAll(),
-                        accounts = accountRegistryRepository.listAll(),
-                    )
-                    loadIgnoredMessages()
-                    _uiState.update {
-                        it.copy(updating = false, restoreMessage = SettingsRestoreMessage.SUCCESS)
-                    }
-                }
-                is RestoreResult.Rejected -> {
-                    _uiState.update {
-                        it.copy(
-                            updating = false,
-                            restoreMessage = when (result.reason) {
-                                "not_ignored", "review_not_found" -> SettingsRestoreMessage.NOT_IGNORED
-                                "reconcile_failed" -> SettingsRestoreMessage.RECONCILE_FAILED
-                                else -> SettingsRestoreMessage.FAILED
-                            },
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun clearRestoreMessage() {
-        _uiState.update { it.copy(restoreMessage = null) }
-    }
-
-    private suspend fun loadIgnoredMessages() {
-        val ignored = transactionRestoreService.listIgnoredRawSmsIds().map { rawSmsId ->
-            val body = rawSmsRepository.getById(rawSmsId)?.body?.trim().orEmpty()
-            val preview = body.take(120).ifEmpty {
-                "…"
-            }
-            IgnoredMessageUi(rawSmsId = rawSmsId, preview = preview)
-        }
-        _uiState.update { it.copy(ignoredMessages = ignored) }
     }
 
     fun confirmStopTracking() {

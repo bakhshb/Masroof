@@ -221,15 +221,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun restoreIgnoredMessage_failure_setsFailedMessage() = runTest {
-        val vm = viewModel()
-        vm.restoreIgnoredMessage("sms-missing")
-        advanceUntilIdle()
-
-        assertEquals(SettingsRestoreMessage.NOT_IGNORED, vm.uiState.value.restoreMessage)
-    }
-
-    @Test
     fun markCardAsDebit_clearsRoleAndSetsDebitType() = runTest {
         val cards = TrackingCardRegistry(
             CardRegistryEntry(
@@ -257,8 +248,6 @@ class SettingsViewModelTest {
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
-        restoreService: TransactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
-        rawSmsRepository: RawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
     ): SettingsViewModel =
         SettingsViewModel(
             cardRegistryRepository = cards,
@@ -267,8 +256,6 @@ class SettingsViewModelTest {
                 accountRegistry = accounts,
                 cardRegistry = cards,
             ),
-            transactionRestoreService = restoreService,
-            rawSmsRepository = rawSmsRepository,
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),

@@ -12,6 +12,7 @@ data class ReviewListItemUi(
     val kind: ReviewKind,
     val kindLabelRes: Int,
     val title: String,
+    val smsBody: String,
     val amountLabel: String?,
     val dateLabel: String,
     val reasonLabel: String,
