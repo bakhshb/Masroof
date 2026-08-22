@@ -14,9 +14,6 @@ fun AccountDetailScreen(
     account: OwnedAccountUi,
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onViewAllTransactions: () -> Unit,
 ) {
@@ -36,9 +33,6 @@ fun AccountDetailScreen(
         title = title,
         state = state,
         onBack = onBack,
-        onPrevious = onPrevious,
-        onNext = onNext,
-        onCurrent = onCurrent,
     ) { contentModifier ->
         Column(
             modifier = contentModifier,

@@ -75,9 +75,6 @@ fun CardsSummaryRoute(
                 ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
             state = state,
             onBack = { selectedCardKey = null },
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onOpenTransaction = onOpenTransaction,
             onViewAllTransactions = {
                 onOpenAllTransactions(
@@ -89,9 +86,6 @@ fun CardsSummaryRoute(
         CardsSummaryScreen(
             state = state,
             onBack = onBack,
-            onPrevious = viewModel::goToPreviousPeriod,
-            onNext = viewModel::goToNextPeriod,
-            onCurrent = viewModel::goToCurrentPeriod,
             onManageCards = onManageCards,
             onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
             cardNetworksByLast4 = cardNetworks,
@@ -106,9 +100,6 @@ private fun ownedCardKey(row: CreditCardDashboardRow): String =
 fun CardsSummaryScreen(
     state: DashboardUiState,
     onBack: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onCurrent: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
@@ -120,9 +111,6 @@ fun CardsSummaryScreen(
         title = stringResource(R.string.dashboard_cards_summary_screen_title),
         state = state,
         onBack = onBack,
-        onPrevious = onPrevious,
-        onNext = onNext,
-        onCurrent = onCurrent,
     ) { contentModifier ->
         Column(
             modifier = contentModifier,
