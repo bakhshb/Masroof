@@ -218,6 +218,7 @@ class AlJaziraParserRegressionTest {
         assertEquals(MessageFamily.WITHDRAWAL, result.event.messageFamily)
         assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
         assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
+        assertEquals("8219", result.event.cardRef?.last4)
         assertEquals(Money.of("2200.00", Currency.SAR), result.event.amount)
     }
 

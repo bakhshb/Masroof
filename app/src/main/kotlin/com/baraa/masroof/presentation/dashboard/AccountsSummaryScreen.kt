@@ -30,14 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
-import com.baraa.masroof.application.dashboard.OwnedAccount
 import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
@@ -145,16 +143,9 @@ private fun AccountsSummaryHeroCard(
     fleet: com.baraa.masroof.application.dashboard.AccountsSummary? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val resolvedFleet = fleet ?: AccountsSummary(
-        accounts = ownedAccounts.mapNotNull { account ->
-            account.periodSummary?.let { summary ->
-                OwnedAccount.from(
-                    bank = account.bank,
-                    maskedNumber = account.maskedNumber,
-                    summary = summary,
-                )
-            }
-        },
+    val resolvedFleet = resolveDashboardAccountsFleet(
+        ownedAccounts = ownedAccounts,
+        fleet = fleet,
     )
     val totalRemaining = resolvedFleet.totalRemaining
     val totalInflow = resolvedFleet.totalInflow
@@ -264,10 +255,7 @@ private fun AccountsSummaryAccountCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    stringResource(
-                        R.string.dashboard_account_item,
-                        formatCardLast4(account.maskedNumber),
-                    ),
+                    account.displayLabel(),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

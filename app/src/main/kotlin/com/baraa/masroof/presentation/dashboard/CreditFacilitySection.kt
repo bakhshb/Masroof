@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -38,11 +39,21 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 
+private val dashboardCarouselCardMinHeight = 196.dp
+
+enum class DebitCardTilePresentation {
+    /** Matches credit facility carousel tile height and structure on the home dashboard. */
+    Carousel,
+    /** Compact row for cards summary list. */
+    List,
+}
+
 @Composable
 fun CreditFacilitiesSection(
     overview: CreditFacilitiesOverview,
     cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
     onOpenDebit: ((DebitCardOverview) -> Unit)? = null,
@@ -68,14 +79,16 @@ fun CreditFacilitiesSection(
                         facility = facility,
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
-                        modifier = facilityModifier,
+                        ownedCards = ownedCards,
+                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
                 items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->
                     DebitCardSummaryTile(
                         debit = debit,
                         network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
-                        modifier = facilityModifier,
+                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        presentation = DebitCardTilePresentation.Carousel,
                         onClick = onOpenDebit?.let { open -> { open(debit) } },
                     )
                 }
@@ -91,6 +104,7 @@ fun DebitCardSummaryTile(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     showNavigationIcon: Boolean = onClick != null,
+    presentation: DebitCardTilePresentation = DebitCardTilePresentation.List,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val spendingLabel = if (debit.salaryPeriodLabel != null) {
@@ -104,50 +118,113 @@ fun DebitCardSummaryTile(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
         ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CardNetworkBadge(network = network, last4 = debit.last4)
-                Column {
-                    Text(
-                        debit.displayLabel,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    )
-                    debit.linkedAccountLabel?.let { linked ->
-                        Text(
-                            stringResource(R.string.settings_linked_account_suffix, linked.takeLast(4)),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        when (presentation) {
+            DebitCardTilePresentation.Carousel -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CardNetworkBadge(network = network, last4 = debit.last4)
+                        Column {
+                            Text(
+                                stringResource(R.string.card_network_mada),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                debit.displayLabel,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                        }
+                    }
+                    if (showNavigationIcon) {
+                        Icon(
+                            imageVector = MasroofIcons.periodNext,
+                            contentDescription = null,
+                            tint = extended.account,
                         )
                     }
                 }
+
+                Text(
+                    spendingLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text(
+                    formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = extended.outflow,
+                )
+
+                Text(
+                    stringResource(R.string.dashboard_debit_card_linked_account),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    debit.linkedAccountLabel
+                        ?: debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
+                        ?: stringResource(R.string.dashboard_value_unavailable),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
-            if (showNavigationIcon) {
-                Icon(
-                    imageVector = MasroofIcons.periodNext,
-                    contentDescription = null,
-                    tint = extended.account,
+
+            DebitCardTilePresentation.List -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CardNetworkBadge(network = network, last4 = debit.last4)
+                        Column {
+                            Text(
+                                debit.displayLabel,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            debit.linkedAccountLabel?.let { linked ->
+                                Text(
+                                    linked,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    if (showNavigationIcon) {
+                        Icon(
+                            imageVector = MasroofIcons.periodNext,
+                            contentDescription = null,
+                            tint = extended.account,
+                        )
+                    }
+                }
+
+                Text(
+                    spendingLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text(
+                    formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = extended.outflow,
                 )
             }
         }
-
-        Text(
-            spendingLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text(
-            formatLocalizedMoney(debit.salaryPeriodSpendingNet),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = extended.outflow,
-        )
     }
 }
 
@@ -156,6 +233,7 @@ fun CreditFacilityCard(
     facility: CreditFacilityOverview,
     cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
     onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
 ) {
@@ -189,10 +267,7 @@ fun CreditFacilityCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(facility.primaryLast4),
-                        ),
+                        facility.primary.displayLabel(ownedCards),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
                 }
@@ -279,6 +354,7 @@ fun CreditFacilityCard(
                         presentation = CreditCardMetricsPresentation.SummaryPurchases,
                         showBalanceAndDue = false,
                         cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(supplementary)],
+                        ownedCards = ownedCards,
                         modifier = if (onOpenCard != null) {
                             Modifier
                                 .fillMaxWidth()

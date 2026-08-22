@@ -68,15 +68,13 @@ fun transactionListShareText(
     filter: TransactionListFilterState,
     transactions: List<TransactionPreviewUi>,
     totalAmount: Money?,
+    ownedCards: List<OwnedCardUi> = emptyList(),
+    ownedAccounts: List<OwnedAccountUi> = emptyList(),
 ): String {
     val typeLabels = filter.types.map { transactionTypeLabel(it) }.sorted()
-    val cardLabels = filter.cardLast4s.map { last4 ->
-        stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
-    }.sorted()
+    val cardLabels = filter.cardLast4s.map { last4 -> cardDisplayLabel(ownedCards, last4) }.sorted()
     val accountLabels = filter.accountContainerIds.mapNotNull { containerId ->
-        com.baraa.masroof.domain.ids.FinancialContainerIdParser.accountMaskedNumber(containerId)?.let { masked ->
-            stringResource(R.string.dashboard_account_item, formatCardLast4(masked))
-        }
+        accountDisplayLabel(ownedAccounts, containerId)
     }.sorted()
     val rows = transactions.map { tx ->
         TransactionShareText.listRow(

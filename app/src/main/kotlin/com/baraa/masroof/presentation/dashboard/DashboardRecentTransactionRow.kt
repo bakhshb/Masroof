@@ -23,7 +23,6 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
@@ -32,6 +31,7 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 fun DashboardRecentTransactionRow(
     row: TransactionPreviewUi,
     modifier: Modifier = Modifier,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     onClick: (() -> Unit)? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -105,7 +105,7 @@ fun DashboardRecentTransactionRow(
                         append(transactionTypeLabel(row.type))
                         row.cardLast4?.let {
                             append(" · ")
-                            append(stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(it)))
+                            append(cardDisplayLabelFromTransaction(row = row, cards = ownedCards).orEmpty())
                         }
                         append(" · ")
                         append(formatLocalizedTransactionDate(row.localDate))

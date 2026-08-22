@@ -23,9 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +34,8 @@ fun TransactionListFilterBottomSheet(
     availableTypes: List<FinancialTransactionType>,
     availableCards: List<String>,
     availableAccounts: List<String>,
+    ownedCards: List<OwnedCardUi> = emptyList(),
+    ownedAccounts: List<OwnedAccountUi> = emptyList(),
     onTypeToggle: (FinancialTransactionType) -> Unit,
     onClearTypes: () -> Unit,
     onCardToggle: (String) -> Unit,
@@ -116,16 +116,12 @@ fun TransactionListFilterBottomSheet(
                         colors = transactionListFilterChipColors(),
                     )
                     availableAccounts.forEach { containerId ->
-                        val masked = FinancialContainerIdParser.accountMaskedNumber(containerId).orEmpty()
                         FilterChip(
                             selected = containerId in filterState.accountContainerIds,
                             onClick = { onAccountToggle(containerId) },
                             label = {
                                 Text(
-                                    stringResource(
-                                        R.string.dashboard_account_item,
-                                        formatCardLast4(masked),
-                                    ),
+                                    accountDisplayLabel(ownedAccounts, containerId) ?: containerId,
                                 )
                             },
                             colors = transactionListFilterChipColors(),
@@ -149,7 +145,7 @@ fun TransactionListFilterBottomSheet(
                             selected = last4 in filterState.cardLast4s,
                             onClick = { onCardToggle(last4) },
                             label = {
-                                Text(stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4)))
+                                Text(cardDisplayLabel(ownedCards, last4))
                             },
                             colors = transactionListFilterChipColors(),
                         )

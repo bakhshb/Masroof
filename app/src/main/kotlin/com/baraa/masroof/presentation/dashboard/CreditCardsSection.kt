@@ -58,6 +58,7 @@ fun CreditCardsSection(
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?> = emptyMap(),
+    ownedCards: List<OwnedCardUi> = emptyList(),
     onViewAll: (() -> Unit)? = null,
 ) {
     if (!overview.hasContent) return
@@ -81,7 +82,8 @@ fun CreditCardsSection(
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
                     cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
-                    modifier = Modifier.width(268.dp),
+                    ownedCards = ownedCards,
+                    modifier = Modifier.width(288.dp),
                 )
             }
         }
@@ -94,6 +96,7 @@ fun CreditCardCompactListRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     cardNetwork: CardNetwork? = null,
+    ownedCards: List<OwnedCardUi> = emptyList(),
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val statementLabel = if (row.statementPeriodLabel != null) {
@@ -119,10 +122,7 @@ fun CreditCardCompactListRow(
             CardNetworkBadge(network = cardNetwork, last4 = row.last4)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    stringResource(
-                        R.string.dashboard_credit_card_last4,
-                        formatCardLast4(row.last4),
-                    ),
+                    row.displayLabel(ownedCards),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -174,6 +174,7 @@ fun CreditCardSummaryTile(
     presentation: CreditCardMetricsPresentation = CreditCardMetricsPresentation.SummaryPurchases,
     showBalanceAndDue: Boolean = presentation == CreditCardMetricsPresentation.SummaryPurchases,
     cardNetwork: CardNetwork? = null,
+    ownedCards: List<OwnedCardUi> = emptyList(),
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val locale = LocalConfiguration.current.locales[0]
@@ -235,10 +236,7 @@ fun CreditCardSummaryTile(
                     CardNetworkBadge(network = cardNetwork, last4 = row.last4)
                     Column {
                         Text(
-                            stringResource(
-                                R.string.dashboard_credit_card_last4,
-                                formatCardLast4(row.last4),
-                            ),
+                            row.displayLabel(ownedCards),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurface,
                         )

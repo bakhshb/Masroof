@@ -2,6 +2,8 @@ package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.util.Locale
 
@@ -45,12 +47,13 @@ object TransactionListFilterEngine {
         transactions: List<TransactionPreviewUi>,
         filter: TransactionListFilterState,
         primaryCurrency: Currency = Currency.SAR,
+        accountInvolvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): TransactionListFilterResult {
         val filtered = transactions.filter { tx ->
             matchesTransactionIds(tx, filter.transactionIds) &&
                 matchesTypes(tx, filter.types) &&
                 matchesCards(tx, filter.cardLast4s) &&
-                matchesAccounts(tx, filter.accountContainerIds) &&
+                matchesAccounts(tx, filter.accountContainerIds, accountInvolvementByTransactionId) &&
                 matchesSearch(tx, filter.searchQuery)
         }
         return TransactionListFilterResult(
@@ -64,15 +67,43 @@ object TransactionListFilterEngine {
         return TYPE_DISPLAY_ORDER.filter { it in present }
     }
 
-    fun availableCardLast4s(transactions: List<TransactionPreviewUi>): List<String> =
-        transactions.mapNotNull { it.cardLast4 }.distinct().sorted()
+    fun availableCardLast4s(
+        transactions: List<TransactionPreviewUi>,
+        ownedCardKeys: Set<String> = emptySet(),
+    ): List<String> {
+        if (ownedCardKeys.isEmpty()) return emptyList()
+        val pool = mutableSetOf<String>()
+        transactions.forEach { tx ->
+            val keys = tx.cardOwnershipKeys()
+            if (keys.isNotEmpty()) {
+                keys.filter { it in ownedCardKeys }
+                    .mapTo(pool) { it.substringAfter(':') }
+            } else {
+                tx.cardLast4?.let { last4 ->
+                    if (ownedCardKeys.any { it.endsWith(":$last4") }) {
+                        pool.add(last4)
+                    }
+                }
+            }
+        }
+        return pool.sorted()
+    }
 
-    fun availableAccountContainerIds(transactions: List<TransactionPreviewUi>): List<String> =
-        transactions.flatMap { tx ->
-            com.baraa.masroof.domain.ids.FinancialContainerIdParser
+    fun availableAccountContainerIds(
+        transactions: List<TransactionPreviewUi>,
+        ownedAccountContainerIds: Set<String> = emptySet(),
+        involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
+    ): List<String> {
+        if (ownedAccountContainerIds.isEmpty()) return emptyList()
+        val fromContainers = transactions.flatMap { tx ->
+            FinancialContainerIdParser
                 .accountContainerIdsFromContainers(tx.sourceContainerId, tx.destinationContainerId)
                 .toList()
-        }.distinct().sorted()
+        }
+        val fromInvolvement = involvementByTransactionId.values.flatten()
+        val present = (fromContainers + fromInvolvement).toSet()
+        return present.intersect(ownedAccountContainerIds).sorted()
+    }
 
     private fun matchesTransactionIds(
         tx: TransactionPreviewUi,
@@ -87,10 +118,16 @@ object TransactionListFilterEngine {
     private fun matchesCards(tx: TransactionPreviewUi, cardLast4s: Set<String>): Boolean =
         cardLast4s.isEmpty() || tx.cardLast4 in cardLast4s
 
-    private fun matchesAccounts(tx: TransactionPreviewUi, accountContainerIds: Set<String>): Boolean {
+    private fun matchesAccounts(
+        tx: TransactionPreviewUi,
+        accountContainerIds: Set<String>,
+        involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
+    ): Boolean {
         if (accountContainerIds.isEmpty()) return true
-        return tx.sourceContainerId in accountContainerIds ||
-            tx.destinationContainerId in accountContainerIds
+        if (tx.sourceContainerId in accountContainerIds || tx.destinationContainerId in accountContainerIds) {
+            return true
+        }
+        return involvementByTransactionId[tx.id].orEmpty().any { it in accountContainerIds }
     }
 
     private fun matchesSearch(tx: TransactionPreviewUi, rawQuery: String): Boolean {
@@ -130,3 +167,10 @@ object TransactionListFilterEngine {
         return matching.fold(Money.zero(currency)) { acc, tx -> acc + tx.amount }
     }
 }
+
+private fun TransactionPreviewUi.cardOwnershipKeys(): List<String> =
+    listOfNotNull(sourceContainerId, destinationContainerId).mapNotNull { containerId ->
+        val last4 = FinancialContainerIdParser.cardLast4(containerId) ?: return@mapNotNull null
+        val bankId = FinancialContainerIdParser.cardBankId(containerId) ?: return@mapNotNull null
+        CardOwnershipKey.of(Bank(bankId), last4)
+    }

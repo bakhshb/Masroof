@@ -221,6 +221,79 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
+    fun availableCardLast4s_limitsToOwnedCards() {
+        val cardId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.cardId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "8219",
+        )
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "10", card = "8219", sourceAccountId = cardId),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "20", card = "9999"),
+        )
+
+        val available = TransactionListFilterEngine.availableCardLast4s(
+            transactions = txs,
+            ownedCardKeys = setOf(CardOwnershipKey.of(com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA, "8219")),
+        )
+
+        assertEquals(listOf("8219"), available)
+    }
+
+    @Test
+    fun availableCardLast4s_returnsEmptyWhenNoOwnedCards() {
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "10", card = "8219"),
+        )
+
+        assertEquals(
+            emptyList<String>(),
+            TransactionListFilterEngine.availableCardLast4s(transactions = txs),
+        )
+    }
+
+    @Test
+    fun availableAccountContainerIds_limitsToOwnedAccountsAndInvolvement() {
+        val ownedId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val otherId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "8842",
+        )
+        val txs = listOf(
+            preview(id = "cash", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "100"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "50", sourceAccountId = otherId),
+        )
+
+        val available = TransactionListFilterEngine.availableAccountContainerIds(
+            transactions = txs,
+            ownedAccountContainerIds = setOf(ownedId!!),
+            involvementByTransactionId = mapOf("cash" to setOf(ownedId)),
+        )
+
+        assertEquals(listOf(ownedId), available)
+    }
+
+    @Test
+    fun accountFilter_matchesSmsResolvedInvolvement() {
+        val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val txs = listOf(
+            preview(id = "cash", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "100"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(accountContainerIds = setOf(accountId)),
+            accountInvolvementByTransactionId = mapOf("cash" to setOf(accountId!!)),
+        )
+
+        assertEquals(listOf("cash"), result.transactions.map { it.id })
+    }
+
+    @Test
     fun availableAccountContainerIds_listsDistinctSorted() {
         val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
             com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
@@ -230,7 +303,28 @@ class TransactionListFilterEngineTest {
             preview(type = FinancialTransactionType.EXPENSE, amount = "1", sourceAccountId = accountId),
             preview(type = FinancialTransactionType.INCOME, amount = "2", destinationAccountId = accountId),
         )
-        assertEquals(listOf(accountId), TransactionListFilterEngine.availableAccountContainerIds(txs))
+        assertEquals(
+            listOf(accountId),
+            TransactionListFilterEngine.availableAccountContainerIds(
+                transactions = txs,
+                ownedAccountContainerIds = setOf(accountId!!),
+            ),
+        )
+    }
+
+    @Test
+    fun availableAccountContainerIds_returnsEmptyWhenNoOwnedAccounts() {
+        val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "1", sourceAccountId = accountId),
+        )
+        assertEquals(
+            emptyList<String>(),
+            TransactionListFilterEngine.availableAccountContainerIds(transactions = txs),
+        )
     }
 
     private fun preview(

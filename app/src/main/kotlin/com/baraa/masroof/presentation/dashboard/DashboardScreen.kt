@@ -285,6 +285,10 @@ private fun DashboardCustomizableSections(
     onRescan: () -> Unit,
 ) {
     val currentAccount = state.currentAccount ?: return
+    val accountsFleet = resolveDashboardAccountsFleet(
+        ownedAccounts = state.ownedAccounts,
+        fleet = state.accountsFleet,
+    )
 
     layout.orderedVisibleSections().forEach { entry ->
         Column(
@@ -293,7 +297,7 @@ private fun DashboardCustomizableSections(
             when (entry.id) {
                 DashboardSectionId.HERO -> {
                     DashboardHeroCard(
-                        summary = currentAccount,
+                        accountsFleet = accountsFleet,
                         period = state.period,
                         isCurrentPeriod = state.isCurrentPeriod,
                         today = today,
@@ -303,7 +307,7 @@ private fun DashboardCustomizableSections(
 
                 DashboardSectionId.QUICK -> {
                     DashboardQuickSummaryRow(
-                        summary = currentAccount,
+                        accountsFleet = accountsFleet,
                         onOpenExpenseDetails = onOpenExpenseDetails,
                         onOpenIncomeDetails = onOpenIncomeDetails,
                         showExpense = layout.quickExpenseVisible,
@@ -327,6 +331,7 @@ private fun DashboardCustomizableSections(
                             overview = followedFacilities,
                             cardNetworksByLast4 = cardNetworks,
                             zoneId = ZoneId.systemDefault(),
+                            ownedCards = state.ownedCards,
                             onViewAll = onOpenCardsSummary,
                         )
                     } else {
@@ -336,6 +341,7 @@ private fun DashboardCustomizableSections(
                                     overview = followedOverview,
                                     cardNetworksByLast4 = cardNetworks,
                                     zoneId = ZoneId.systemDefault(),
+                                    ownedCards = state.ownedCards,
                                     onViewAll = onOpenCardsSummary,
                                 )
                             }
@@ -383,6 +389,7 @@ private fun DashboardCustomizableSections(
                         state.recentTransactions.forEach { row ->
                             DashboardRecentTransactionRow(
                                 row = row,
+                                ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },
                             )
                             Spacer(Modifier.height(4.dp))

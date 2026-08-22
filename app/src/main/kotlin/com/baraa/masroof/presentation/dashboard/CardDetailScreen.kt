@@ -3,14 +3,10 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
-import com.baraa.masroof.presentation.common.formatCardLast4
 import java.time.ZoneId
 
 @Composable
@@ -28,10 +24,7 @@ fun CardDetailScreen(
         last4 = row.last4,
         cardInvolvementByTransactionId = state.transactionCardInvolvement,
     )
-    val title = stringResource(
-        R.string.dashboard_credit_card_last4,
-        formatCardLast4(row.last4),
-    )
+    val title = row.displayLabel(state.ownedCards)
 
     DashboardSummaryScaffold(
         title = title,
@@ -48,6 +41,7 @@ fun CardDetailScreen(
                 zoneId = ZoneId.systemDefault(),
                 presentation = CreditCardMetricsPresentation.DetailSpending,
                 showBalanceAndDue = true,
+                ownedCards = state.ownedCards,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -55,6 +49,7 @@ fun CardDetailScreen(
                 transactions = cardTransactions,
                 onOpenTransaction = onOpenTransaction,
                 onViewAll = onViewAllTransactions,
+                ownedCards = state.ownedCards,
             )
         }
     }

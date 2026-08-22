@@ -39,6 +39,11 @@ fun TransactionListScreen(
     seedFilter: TransactionListFilterState? = null,
     onSeedFilterApplied: () -> Unit = {},
     openGeneration: Int = 0,
+    ownedCardKeys: Set<String> = emptySet(),
+    ownedAccountContainerIds: Set<String> = emptySet(),
+    ownedCards: List<OwnedCardUi> = emptyList(),
+    ownedAccounts: List<OwnedAccountUi> = emptyList(),
+    transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -77,17 +82,28 @@ fun TransactionListScreen(
         )
     }
 
-    val filterResult = remember(transactions, filterState) {
-        TransactionListFilterEngine.apply(transactions, filterState)
+    val filterResult = remember(transactions, filterState, transactionAccountInvolvement) {
+        TransactionListFilterEngine.apply(
+            transactions = transactions,
+            filter = filterState,
+            accountInvolvementByTransactionId = transactionAccountInvolvement,
+        )
     }
     val availableTypes = remember(transactions) {
         TransactionListFilterEngine.availableTypes(transactions)
     }
-    val availableCards = remember(transactions) {
-        TransactionListFilterEngine.availableCardLast4s(transactions)
+    val availableCards = remember(transactions, ownedCardKeys) {
+        TransactionListFilterEngine.availableCardLast4s(
+            transactions = transactions,
+            ownedCardKeys = ownedCardKeys,
+        )
     }
-    val availableAccounts = remember(transactions) {
-        TransactionListFilterEngine.availableAccountContainerIds(transactions)
+    val availableAccounts = remember(transactions, ownedAccountContainerIds, transactionAccountInvolvement) {
+        TransactionListFilterEngine.availableAccountContainerIds(
+            transactions = transactions,
+            ownedAccountContainerIds = ownedAccountContainerIds,
+            involvementByTransactionId = transactionAccountInvolvement,
+        )
     }
     val activeFilterCount = filterState.activeFilterCount()
     val context = LocalContext.current
@@ -98,6 +114,8 @@ fun TransactionListScreen(
         filter = filterState,
         transactions = filterResult.transactions,
         totalAmount = filterResult.totalAmount,
+        ownedCards = ownedCards,
+        ownedAccounts = ownedAccounts,
     )
     val canShare = filterResult.transactions.isNotEmpty()
 
@@ -179,6 +197,7 @@ fun TransactionListScreen(
                     items(filterResult.transactions, key = { it.id }) { row ->
                         TransactionListRow(
                             row = row,
+                            ownedCards = ownedCards,
                             onClick = { onOpenTransaction(row.id) },
                         )
                     }
@@ -195,6 +214,8 @@ fun TransactionListScreen(
             availableTypes = availableTypes,
             availableCards = availableCards,
             availableAccounts = availableAccounts,
+            ownedCards = ownedCards,
+            ownedAccounts = ownedAccounts,
             onTypeToggle = { type ->
                 selectedTypeNames = if (type.name in selectedTypeNames) {
                     selectedTypeNames - type.name

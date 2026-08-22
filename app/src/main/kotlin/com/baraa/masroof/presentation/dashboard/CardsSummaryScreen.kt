@@ -161,6 +161,7 @@ fun CardsSummaryScreen(
                             facility = facility,
                             cardNetworksByLast4 = cardNetworksByLast4,
                             zoneId = ZoneId.systemDefault(),
+                            ownedCards = state.ownedCards,
                             modifier = Modifier.fillMaxWidth(),
                             onOpenCard = onOpenCard,
                         )
@@ -192,6 +193,7 @@ fun CardsSummaryScreen(
                             CreditCardCompactListRow(
                                 row = row,
                                 cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
+                                ownedCards = state.ownedCards,
                                 onClick = { onOpenCard(row) },
                             )
                         }

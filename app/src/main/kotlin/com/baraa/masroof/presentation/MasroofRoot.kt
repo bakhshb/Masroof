@@ -13,9 +13,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.application.notification.NotificationAction
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import com.baraa.masroof.presentation.dashboard.AccountsSummaryRoute
+import com.baraa.masroof.presentation.dashboard.CardOwnershipKey
 import com.baraa.masroof.presentation.dashboard.CardsSummaryRoute
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
@@ -216,6 +218,14 @@ fun MasroofRoot(
                 },
             )
             HomeDestination.AllTransactions -> {
+                val ownedCardKeys = remember(dashboardState.ownedCards) {
+                    CardOwnershipKey.ownedKeys(dashboardState.ownedCards)
+                }
+                val ownedAccountContainerIds = remember(dashboardState.ownedAccounts) {
+                    dashboardState.ownedAccounts.mapNotNull { account ->
+                        FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
+                    }.toSet()
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     TransactionListScreen(
                         periodLabel = dashboardState.periodLabel,
@@ -225,6 +235,11 @@ fun MasroofRoot(
                         seedFilter = transactionListSeedFilter,
                         onSeedFilterApplied = { transactionListSeedFilter = null },
                         openGeneration = transactionListOpenGeneration,
+                        ownedCardKeys = ownedCardKeys,
+                        ownedAccountContainerIds = ownedAccountContainerIds,
+                        ownedCards = dashboardState.ownedCards,
+                        ownedAccounts = dashboardState.ownedAccounts,
+                        transactionAccountInvolvement = dashboardState.transactionAccountInvolvement,
                     )
                     showTransactionDetail(
                         dashboardState = dashboardState,
@@ -292,6 +307,7 @@ private fun showTransactionDetail(
                 onBack = onBack,
                 onReclassify = onReclassify,
                 onIgnore = onIgnore,
+                ownedCards = dashboardState.ownedCards,
             )
         }
         if (overlayOnList) {

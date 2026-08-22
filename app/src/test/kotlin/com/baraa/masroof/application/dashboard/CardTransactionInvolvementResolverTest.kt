@@ -89,6 +89,74 @@ class CardTransactionInvolvementResolverTest {
         )
     }
 
+    @Test
+    fun buildIndex_fallsBackToSmsBodyWhenParsedCardRefMissing() {
+        val txWithParsedRef = transaction(
+            id = "atm",
+            source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            linked = listOf("evt-atm"),
+        )
+        val body = """
+            سحب نقدي داخلي صراف الي
+            بطاقة 8219:مدى
+            حساب رقم: 3001
+            بمبلغ: SAR 2,200.00
+            في: 2026-08-02 17:41
+        """.trimIndent()
+        val parsedRecords = listOf(
+            parsedRecordWithoutCardRef(
+                id = "evt-atm",
+                rawSmsId = "sms-atm",
+            ),
+        )
+        val rawSmsById = mapOf(
+            "sms-atm" to com.baraa.masroof.domain.model.RawSms(
+                id = "sms-atm",
+                sender = "AlJazira",
+                body = body,
+                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
+                deviceMessageId = "1",
+                bodyHash = "h",
+            ),
+        )
+
+        val index = CardTransactionInvolvementResolver.buildIndex(
+            transactions = listOf(txWithParsedRef),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+        )
+
+        assertEquals(
+            setOf(CardTransactionInvolvementResolver.cardKey(Bank.BANK_ALJAZIRA.id, "8219")),
+            index["atm"],
+        )
+    }
+
+    private fun parsedRecordWithoutCardRef(
+        id: String,
+        rawSmsId: String,
+    ): ParsedEventRecord {
+        val event = com.baraa.masroof.domain.model.ParsedEvent(
+            id = id,
+            rawSmsId = rawSmsId,
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.WITHDRAWAL,
+            direction = MoneyDirection.OUTGOING,
+            amount = Money.of("2200.00", Currency.SAR),
+            purchaseChannel = null,
+            sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destinationAccountRef = null,
+            cardRef = null,
+            merchant = null,
+            counterparty = null,
+            occurredAt = Instant.parse("2026-08-02T17:41:00Z"),
+            bankNetworkType = null,
+            confidence = Confidence(1.0),
+            parseStatus = ParseStatus.SUCCESS,
+        )
+        return ParsedEventRecord(event = event, details = ParsedEventDetails())
+    }
+
     private fun transaction(
         id: String,
         source: String?,

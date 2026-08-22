@@ -119,6 +119,7 @@ class DashboardProjectionBuilder(
         val transactionCardInvolvement = CardTransactionInvolvementResolver.buildIndex(
             transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
         )
 
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
@@ -184,6 +185,7 @@ class DashboardProjectionBuilder(
         val creditFacilities = CreditFacilityOverviewBuilder.build(
             overview = creditCardsFlat,
             registryCards = cardRegistry,
+            registryAccounts = ownedAccounts,
             debitSpendingByCardKey = debitSpend.spendingByCardKey,
             debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
         )
