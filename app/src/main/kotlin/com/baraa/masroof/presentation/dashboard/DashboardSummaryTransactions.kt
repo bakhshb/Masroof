@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.application.dashboard.CurrentAccountTransactionScope
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
@@ -53,8 +54,28 @@ object DashboardSummaryTransactionFilter {
 
     fun forCard(
         transactions: List<TransactionPreviewUi>,
+        bank: Bank,
         last4: String,
-    ): List<TransactionPreviewUi> = transactions.filter { it.cardLast4 == last4 }
+    ): List<TransactionPreviewUi> {
+        val cardContainerId = FinancialContainerIdFactory.cardId(bank, last4)
+        val bankPrefix = "card:${bank.id}:"
+        return transactions.filter { tx ->
+            if (tx.sourceContainerId == cardContainerId || tx.destinationContainerId == cardContainerId) {
+                return@filter true
+            }
+            if (tx.cardLast4 != last4) return@filter false
+            val sourceBankId = FinancialContainerIdParser.cardBankId(tx.sourceContainerId)
+            val destinationBankId = FinancialContainerIdParser.cardBankId(tx.destinationContainerId)
+            if (sourceBankId != null && sourceBankId != bank.id) return@filter false
+            if (destinationBankId != null && destinationBankId != bank.id) return@filter false
+            when {
+                tx.sourceContainerId?.startsWith(bankPrefix) == true -> true
+                tx.destinationContainerId?.startsWith(bankPrefix) == true -> true
+                sourceBankId == null && destinationBankId == null -> true
+                else -> false
+            }
+        }
+    }
 }
 
 @Composable

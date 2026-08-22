@@ -14,6 +14,12 @@ object FinancialContainerIdParser {
     fun cardLast4FromContainers(sourceContainerId: String?, destinationContainerId: String?): String? =
         cardLast4(sourceContainerId) ?: cardLast4(destinationContainerId)
 
+    fun cardBankId(containerId: String?): String? {
+        if (containerId.isNullOrBlank() || !containerId.startsWith("card:")) return null
+        val bankId = containerId.removePrefix("card:").substringBefore(':').trim()
+        return bankId.takeIf { it.isNotEmpty() }
+    }
+
     fun accountMaskedNumber(containerId: String?): String? {
         if (containerId.isNullOrBlank()) return null
         if (!containerId.startsWith("account:")) return null

@@ -27,6 +27,7 @@ fun CardDetailScreen(
 ) {
     val cardTransactions = DashboardSummaryTransactionFilter.forCard(
         transactions = state.allTransactions,
+        bank = row.bank,
         last4 = row.last4,
     )
     val title = stringResource(

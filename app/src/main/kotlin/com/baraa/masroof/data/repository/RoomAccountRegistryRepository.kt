@@ -65,4 +65,11 @@ class RoomAccountRegistryRepository(
 
     override suspend fun listAll(): List<AccountRegistryEntry> =
         dao.listAll().map(RegistryMapper::toAccountEntry)
+
+    override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) {
+        RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.updateDisplayName")
+        val masked = reference.maskedNumber?.trim().orEmpty()
+        require(masked.isNotEmpty()) { "maskedNumber required" }
+        dao.updateDisplayName(reference.bank.id, masked, displayName?.trim()?.ifEmpty { null })
+    }
 }

@@ -75,6 +75,7 @@ fun SettingsRoute(
             onBack = onBack,
             onOpenMyCards = { destination = SettingsDestination.MyCards },
             onOpenMyAccounts = { destination = SettingsDestination.MyAccounts },
+            onOpenIgnoredMessages = { destination = SettingsDestination.IgnoredMessages },
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
             onReparseStored = viewModel::reparseStoredMessages,
@@ -102,6 +103,28 @@ fun SettingsRoute(
             onResumeTracking = viewModel::resumeTracking,
             onDismissStopConfirm = viewModel::dismissStopConfirm,
             onConfirmStopTracking = viewModel::confirmStopTracking,
+            onRenameCard = viewModel::openRenameCard,
+            onDismissRenameCard = viewModel::dismissRenameCard,
+            onSaveCardName = viewModel::saveCardDisplayName,
+            onPickCardNetwork = viewModel::openCardNetworkPicker,
+            onDismissCardNetwork = viewModel::dismissCardNetworkPicker,
+            onSelectCardNetwork = viewModel::setCardNetwork,
+            onPickCardRole = viewModel::openCardRolePicker,
+            onDismissCardRole = viewModel::dismissCardRolePicker,
+            onSetPrimaryCard = viewModel::setPrimaryCard,
+            onSetSupplementaryCard = viewModel::setSupplementaryCard,
+            onClearCardRole = viewModel::clearCardRole,
+            onLinkDebitCard = viewModel::openLinkDebitCard,
+            onDismissLinkDebit = viewModel::dismissLinkDebitCard,
+            onConfirmLinkDebit = viewModel::linkDebitToAccount,
+            onMarkDebit = viewModel::markCardAsDebit,
+        )
+
+        SettingsDestination.IgnoredMessages -> SettingsIgnoredMessagesScreen(
+            state = state,
+            onBack = { destination = SettingsDestination.Hub },
+            onRestore = viewModel::restoreIgnoredMessage,
+            onClearRestoreMessage = viewModel::clearRestoreMessage,
         )
 
         SettingsDestination.MyAccounts -> SettingsMyAccountsScreen(
@@ -113,6 +136,9 @@ fun SettingsRoute(
             onResumeTracking = viewModel::resumeAccountTracking,
             onDismissStopConfirm = viewModel::dismissStopConfirm,
             onConfirmStopTracking = viewModel::confirmStopAccountTracking,
+            onRenameAccount = viewModel::openRenameAccount,
+            onDismissRenameAccount = viewModel::dismissRenameAccount,
+            onSaveAccountName = viewModel::saveAccountDisplayName,
         )
 
         SettingsDestination.About -> SettingsAboutScreen(
@@ -139,6 +165,7 @@ private fun SettingsHubScreen(
     onBack: () -> Unit,
     onOpenMyCards: () -> Unit,
     onOpenMyAccounts: () -> Unit,
+    onOpenIgnoredMessages: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
@@ -296,6 +323,19 @@ private fun SettingsHubScreen(
                 badgeCount = reviewRequiredCount.takeIf { it > 0 },
                 onClick = onOpenReview,
             )
+
+            if (state.ignoredMessages.isNotEmpty()) {
+                SettingsNavRow(
+                    icon = MasroofIcons.recentTransactions,
+                    title = stringResource(R.string.settings_ignored_messages_title),
+                    subtitle = stringResource(
+                        R.string.settings_ignored_messages_subtitle,
+                        state.ignoredMessages.size,
+                    ),
+                    badgeCount = state.ignoredMessages.size,
+                    onClick = onOpenIgnoredMessages,
+                )
+            }
 
             SettingsNavRow(
                 icon = Icons.Filled.Language,

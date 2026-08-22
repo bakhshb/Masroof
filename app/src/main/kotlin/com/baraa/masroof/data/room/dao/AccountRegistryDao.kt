@@ -81,4 +81,17 @@ interface AccountRegistryDao {
 
     @Query("SELECT * FROM account_registry ORDER BY bankId, maskedNumber")
     suspend fun listAll(): List<AccountRegistryEntity>
+
+    @Query(
+        """
+        UPDATE account_registry
+        SET displayName = :displayName
+        WHERE bankId = :bankId AND maskedNumber = :maskedNumber
+        """,
+    )
+    suspend fun updateDisplayName(
+        bankId: String,
+        maskedNumber: String,
+        displayName: String?,
+    ): Int
 }

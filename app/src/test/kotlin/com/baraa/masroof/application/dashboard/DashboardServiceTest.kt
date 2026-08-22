@@ -17,6 +17,8 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -149,6 +151,7 @@ class DashboardServiceTest {
         ftRepo: FinancialTransactionRepository,
         reviewRepo: ReviewRepository,
         accountRepo: AccountRegistryRepository = FakeAccountRepo(),
+        cardRepo: CardRegistryRepository = FakeCardRepo(),
     ): DashboardService =
         DashboardService(
             financialTransactionRepository = ftRepo,
@@ -157,10 +160,15 @@ class DashboardServiceTest {
             rawSmsRepository = FakeRawRepo(),
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
+            cardRegistryRepository = cardRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,
         )
+
+    private class FakeCardRepo(
+        entries: List<com.baraa.masroof.domain.model.CardRegistryEntry> = emptyList(),
+    ) : NoOpCardRegistryRepository(entries)
 
     private class FakeAccountRepo(
         private val entries: List<AccountRegistryEntry> = emptyList(),
@@ -170,6 +178,7 @@ class DashboardServiceTest {
         override suspend fun resolve(reference: AccountReference): OwnershipStatus = OwnershipStatus.UNKNOWN
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
         override suspend fun listAll(): List<AccountRegistryEntry> = entries
+        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
     }
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

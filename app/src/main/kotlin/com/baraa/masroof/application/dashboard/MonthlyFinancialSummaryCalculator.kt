@@ -89,8 +89,5 @@ object MonthlyFinancialSummaryCalculator {
         tx: FinancialTransaction,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
-    ): Money? {
-        if (tx.amount.currency == primaryCurrency) return tx.amount
-        return sarEquivalents[tx.id]
-    }
+    ): Money? = TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents)
 }

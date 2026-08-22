@@ -74,10 +74,28 @@ class DashboardSummaryTransactionFilterTest {
 
         val filtered = DashboardSummaryTransactionFilter.forCard(
             transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
             last4 = "4821",
         )
 
         assertEquals(listOf("1"), filtered.map { it.id })
+    }
+
+    @Test
+    fun forCard_excludesCrossBankContainerWithSameLast4() {
+        val otherBankCardId = FinancialContainerIdFactory.cardId(Bank("D360"), "4821")
+        val transactions = listOf(
+            preview(id = "other-bank", cardLast4 = "4821", source = otherBankCardId),
+            preview(id = "legacy", cardLast4 = "4821"),
+        )
+
+        val filtered = DashboardSummaryTransactionFilter.forCard(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "4821",
+        )
+
+        assertEquals(listOf("legacy"), filtered.map { it.id })
     }
 
     private fun preview(

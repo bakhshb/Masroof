@@ -14,6 +14,7 @@ import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyn
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
@@ -252,9 +253,19 @@ class AppContainer(
             rawSmsRepository = rawSmsRepository,
             appLocaleRepository = appLocaleRepository,
             accountRegistryRepository = accountRegistryRepository,
+            cardRegistryRepository = cardRegistryRepository,
             sarEquivalentResolver = TransactionSarEquivalentResolver(
                 marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
             ),
+        )
+
+    val transactionRestoreService: TransactionRestoreService =
+        TransactionRestoreService(
+            reviewRepository = reviewRepository,
+            financialTransactionRepository = financialTransactionRepository,
+            reconciliation = transactionReconciliationService,
+            reclassification = transactionReclassificationService,
+            clock = clock,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()

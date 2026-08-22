@@ -35,12 +35,21 @@ fun SettingsMyAccountsScreen(
     onResumeTracking: (ManagedAccountUi) -> Unit,
     onDismissStopConfirm: () -> Unit,
     onConfirmStopTracking: () -> Unit,
+    onRenameAccount: (ManagedAccountUi) -> Unit,
+    onDismissRenameAccount: () -> Unit,
+    onSaveAccountName: (String) -> Unit,
 ) {
     SettingsAccountStopConfirmDialog(
         target = state.stopConfirmAccountTarget,
         updating = state.updating,
         onDismiss = onDismissStopConfirm,
         onConfirm = onConfirmStopTracking,
+    )
+    SettingsRenameAccountDialog(
+        target = state.renameAccountTarget,
+        updating = state.updating,
+        onDismiss = onDismissRenameAccount,
+        onSave = onSaveAccountName,
     )
 
     MasroofSecondaryScaffold(
@@ -78,10 +87,7 @@ fun SettingsMyAccountsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.externalIn,
                         bank = account.bank,
-                        title = stringResource(
-                            R.string.onboarding_account_suffix,
-                            account.maskedNumber,
-                        ),
+                        title = account.displayLabel,
                         footer = {
                             AccountOwnershipInlinePrompt(
                                 enabled = !state.updating,
@@ -99,16 +105,21 @@ fun SettingsMyAccountsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.externalIn,
                         bank = account.bank,
-                        title = stringResource(
-                            R.string.onboarding_account_suffix,
-                            account.maskedNumber,
-                        ),
+                        title = account.displayLabel,
                         endAction = {
                             SettingsStopTrackingButton(
                                 onClick = { onRequestStopTracking(account) },
                                 enabled = !state.updating,
                                 contentDescription = stringResource(R.string.settings_stop_account_tracking),
                             )
+                        },
+                        footer = {
+                            TextButton(
+                                onClick = { onRenameAccount(account) },
+                                enabled = !state.updating,
+                            ) {
+                                Text(stringResource(R.string.settings_action_rename))
+                            }
                         },
                     )
                 }
@@ -120,10 +131,7 @@ fun SettingsMyAccountsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.externalIn,
                         bank = account.bank,
-                        title = stringResource(
-                            R.string.onboarding_account_suffix,
-                            account.maskedNumber,
-                        ),
+                        title = account.displayLabel,
                         endAction = {
                             SettingsResumeTrackingButton(
                                 onClick = { onResumeTracking(account) },
