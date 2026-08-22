@@ -24,19 +24,21 @@ object SmsScanUserOutcomeMapper {
             is SmsScanFailure.ProviderError -> return SmsScanUserOutcome.FAILED
             null -> Unit
         }
+        val bankFacing = bankFacingCount(result)
         return when {
             result.scanned == 0 -> SmsScanUserOutcome.NO_MESSAGES
             result.notRelevant == result.scanned -> SmsScanUserOutcome.NO_BANK_SMS
             result.parsed > 0 -> SmsScanUserOutcome.OK
             result.reviewRequired > 0 -> SmsScanUserOutcome.NEEDS_REVIEW
-            result.failed > 0 -> SmsScanUserOutcome.FAILED
-            isAlreadyImported(result) -> SmsScanUserOutcome.ALREADY_UP_TO_DATE
+            isAlreadyImported(result, bankFacing) -> SmsScanUserOutcome.ALREADY_UP_TO_DATE
+            result.failed > 0 && result.duplicates < bankFacing -> SmsScanUserOutcome.FAILED
             else -> SmsScanUserOutcome.NO_NEW_TRANSACTIONS
         }
     }
 
-    private fun isAlreadyImported(result: SmsScanResult): Boolean {
-        val bankFacing = result.scanned - result.notRelevant - result.skippedMalformed
-        return bankFacing > 0 && result.duplicates >= bankFacing
-    }
+    private fun bankFacingCount(result: SmsScanResult): Int =
+        result.scanned - result.notRelevant - result.skippedMalformed
+
+    private fun isAlreadyImported(result: SmsScanResult, bankFacing: Int): Boolean =
+        bankFacing > 0 && result.duplicates >= bankFacing
 }

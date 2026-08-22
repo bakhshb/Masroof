@@ -68,6 +68,32 @@ class SmsScanUserOutcomeMapperTest {
     }
 
     @Test
+    fun mostlyDuplicatesWithOneFailure_isFailed() {
+        val outcome = SmsScanUserOutcomeMapper.map(
+            SmsScanResult(
+                scanned = 5,
+                duplicates = 4,
+                failed = 1,
+                parsed = 0,
+            ),
+        )
+        assertEquals(SmsScanUserOutcome.FAILED, outcome)
+    }
+
+    @Test
+    fun allDuplicatesWithExtraFailure_isAlreadyUpToDate() {
+        val outcome = SmsScanUserOutcomeMapper.map(
+            SmsScanResult(
+                scanned = 5,
+                duplicates = 5,
+                failed = 1,
+                parsed = 0,
+            ),
+        )
+        assertEquals(SmsScanUserOutcome.ALREADY_UP_TO_DATE, outcome)
+    }
+
+    @Test
     fun unsupportedBankMessages_isNoNewTransactions() {
         val outcome = SmsScanUserOutcomeMapper.map(
             SmsScanResult(

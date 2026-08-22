@@ -10,8 +10,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewResolutionKind
-import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.isUserIgnored
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import com.baraa.masroof.domain.ownership.OwnershipResolver
@@ -92,9 +91,7 @@ class TransactionReconciliationService(
             val event = record.event
             if (reviewRepository != null) {
                 val review = reviewRepository.findByRawSmsId(event.rawSmsId)
-                if (review?.status == ReviewStatus.RESOLVED &&
-                    review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-                ) {
+                if (review?.isUserIgnored() == true) {
                     ignored++
                     settledRawSmsIds += event.rawSmsId
                     continue

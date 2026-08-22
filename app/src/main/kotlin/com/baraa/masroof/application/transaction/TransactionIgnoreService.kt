@@ -3,6 +3,7 @@ package com.baraa.masroof.application.transaction
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.isUserIgnored
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.time.InstantClock
@@ -38,9 +39,7 @@ class TransactionIgnoreService(
 
         val now = clock.now()
         val existing = reviewRepository.findByRawSmsId(rawSmsId)
-        if (existing?.status == ReviewStatus.RESOLVED &&
-            existing.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-        ) {
+        if (existing?.isUserIgnored() == true) {
             return IgnoreResult.Success
         }
 

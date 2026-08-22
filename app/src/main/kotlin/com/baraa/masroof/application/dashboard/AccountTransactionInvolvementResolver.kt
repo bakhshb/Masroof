@@ -19,14 +19,14 @@ object AccountTransactionInvolvementResolver {
         if (transactions.isEmpty() || ownedAccounts.isEmpty()) return emptyMap()
 
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
-        val scopesByContainer = CurrentAccountScopeFactory.singleAccountScopes(ownedAccounts)
-        if (scopesByContainer.isEmpty()) return emptyMap()
+        val accountScopes = CurrentAccountScopeFactory.singleAccountScopes(ownedAccounts)
+        if (accountScopes.isEmpty()) return emptyMap()
 
         val involvement = mutableMapOf<String, MutableSet<String>>()
-        for ((containerId, scope) in scopesByContainer) {
+        for (entry in accountScopes) {
             for (tx in transactions) {
-                if (scope.involvesOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
-                    involvement.getOrPut(tx.id) { linkedSetOf() }.add(containerId)
+                if (entry.scope.involvesOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
+                    involvement.getOrPut(tx.id) { linkedSetOf() }.add(entry.containerId)
                 }
             }
         }

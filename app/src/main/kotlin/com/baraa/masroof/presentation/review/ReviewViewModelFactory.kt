@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.review
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.review.ReviewDetailListDataSource
 import com.baraa.masroof.application.review.ReviewDetailLoader
 
 class ReviewViewModelFactory(
@@ -18,6 +19,7 @@ class ReviewViewModelFactory(
         )
         return ReviewViewModel(
             reviewWorkflowService = container.reviewWorkflowService,
+            listDataSource = ReviewDetailListDataSource(loader),
             detailLoader = loader,
             cardRegistryRepository = container.cardRegistryRepository,
             ownershipConfirmationService = container.ownershipConfirmationService,

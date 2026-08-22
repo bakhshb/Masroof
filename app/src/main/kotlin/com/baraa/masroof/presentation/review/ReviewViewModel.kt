@@ -5,6 +5,7 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.review.ReviewDetailLoader
+import com.baraa.masroof.application.review.ReviewListDataSource
 import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.domain.model.CardReference
@@ -29,6 +30,7 @@ import java.util.Locale
 
 class ReviewViewModel(
     private val reviewWorkflowService: ReviewWorkflowService,
+    private val listDataSource: ReviewListDataSource,
     private val detailLoader: ReviewDetailLoader,
     private val cardRegistryRepository: CardRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
@@ -65,8 +67,8 @@ class ReviewViewModel(
     private suspend fun loadSummariesForCurrentMode(): List<ReviewDetailLoader.ReviewSummary> =
         summariesForListMode(
             mode = _uiState.value.listMode,
-            loadPending = detailLoader::loadSummaries,
-            loadIgnored = detailLoader::loadIgnoredSummaries,
+            loadPending = listDataSource::loadPendingSummaries,
+            loadIgnored = listDataSource::loadIgnoredSummaries,
         )
 
     fun setListMode(mode: ReviewListMode) {
@@ -74,8 +76,6 @@ class ReviewViewModel(
         _uiState.update {
             it.copy(
                 listMode = mode,
-                items = emptyList(),
-                informationalDismissCount = 0,
                 loading = true,
                 error = null,
                 message = null,
@@ -89,7 +89,7 @@ class ReviewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             try {
-                val summaries = detailLoader.loadSummaries()
+                val summaries = listDataSource.loadPendingSummaries()
                 val dismissible = summaries.filter { summary ->
                     shouldOfferNonFinancialDismiss(
                         messageFamily = summary.messageFamily,
@@ -105,7 +105,7 @@ class ReviewViewModel(
                         is ReviewWorkflowResult.Rejected -> Unit
                     }
                 }
-                applySummaries(detailLoader.loadSummaries())
+                applySummaries(loadSummariesForCurrentMode())
                 _uiState.update {
                     it.copy(
                         resolving = false,
@@ -415,13 +415,3 @@ class ReviewViewModel(
         )
     }
 }
-
-internal suspend fun summariesForListMode(
-    mode: ReviewListMode,
-    loadPending: suspend () -> List<ReviewDetailLoader.ReviewSummary>,
-    loadIgnored: suspend () -> List<ReviewDetailLoader.ReviewSummary>,
-): List<ReviewDetailLoader.ReviewSummary> =
-    when (mode) {
-        ReviewListMode.PENDING -> loadPending()
-        ReviewListMode.IGNORED -> loadIgnored()
-    }
