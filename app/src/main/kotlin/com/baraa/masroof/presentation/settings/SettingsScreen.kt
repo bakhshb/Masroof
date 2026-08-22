@@ -215,6 +215,8 @@ private fun SettingsHubScreen(
     state.smsImportMessage?.let { message ->
         val text = when (message) {
             SmsImportMessage.OK -> stringResource(R.string.dashboard_rescan_ok)
+            SmsImportMessage.ALREADY_UP_TO_DATE -> stringResource(R.string.dashboard_rescan_already_up_to_date)
+            SmsImportMessage.NEEDS_REVIEW -> stringResource(R.string.dashboard_rescan_needs_review)
             SmsImportMessage.PERMISSION_DENIED -> stringResource(R.string.settings_import_sms_permission_denied)
             SmsImportMessage.NO_MESSAGES -> stringResource(R.string.dashboard_rescan_no_messages)
             SmsImportMessage.NO_BANK_SMS -> stringResource(R.string.dashboard_rescan_no_bank_sms)

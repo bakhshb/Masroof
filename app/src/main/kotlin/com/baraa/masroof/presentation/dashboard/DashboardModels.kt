@@ -108,6 +108,8 @@ enum class DashboardError {
 
 enum class SmsRescanStatus {
     OK,
+    ALREADY_UP_TO_DATE,
+    NEEDS_REVIEW,
     NO_MESSAGES,
     NO_BANK_SMS,
     NO_TRANSACTIONS,

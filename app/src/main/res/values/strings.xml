@@ -396,9 +396,11 @@
     <string name="dashboard_rescan_sms">إعادة استيراد الرسائل</string>
     <string name="dashboard_rescanning">جاري استيراد الرسائل…</string>
     <string name="dashboard_rescan_ok">تم استيراد الرسائل بنجاح</string>
+    <string name="dashboard_rescan_already_up_to_date">الرسائل مُستوردة مسبقاً — لا توجد رسائل جديدة في الفترة</string>
+    <string name="dashboard_rescan_needs_review">وُجدت رسائل جديدة — راجعها من «مراجعة العمليات»</string>
     <string name="dashboard_rescan_no_messages">لا توجد رسائل في الفترة المحددة</string>
     <string name="dashboard_rescan_no_bank_sms">لا توجد رسائل بنك الجزيرة في صندوق الوارد</string>
-    <string name="dashboard_rescan_no_transactions">وُجدت رسائل لكن لم تُحوَّل إلى عمليات بعد</string>
+    <string name="dashboard_rescan_no_transactions">وُجدت رسائل جديدة لكن لم تُحوَّل إلى عمليات. قد تحتاج تأكيد ملكية الحساب/البطاقة أو مراجعة لاحقة.</string>
     <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
     <string name="dashboard_rescan_permission_denied">لا يمكن استيراد الرسائل بدون صلاحية الوصول للرسائل</string>
     <string name="dashboard_rescan_dismiss">إخفاء</string>
