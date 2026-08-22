@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,7 +40,7 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 
-private val dashboardCarouselCardMinHeight = 196.dp
+private val dashboardCarouselCardHeight = 228.dp
 
 enum class DebitCardTilePresentation {
     /** Matches credit facility carousel tile height and structure on the home dashboard. */
@@ -80,14 +81,14 @@ fun CreditFacilitiesSection(
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
                         ownedCards = ownedCards,
-                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        modifier = facilityModifier.height(dashboardCarouselCardHeight),
                     )
                 }
                 items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->
                     DebitCardSummaryTile(
                         debit = debit,
                         network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
-                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        modifier = facilityModifier.height(dashboardCarouselCardHeight),
                         presentation = DebitCardTilePresentation.Carousel,
                         onClick = onOpenDebit?.let { open -> { open(debit) } },
                     )
@@ -114,12 +115,15 @@ fun DebitCardSummaryTile(
     }
 
     MasroofCard(
-        modifier = modifier.then(
-            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        ),
+        modifier = modifier
+            .fillMaxHeight()
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+            ),
     ) {
         when (presentation) {
             DebitCardTilePresentation.Carousel -> {
+                Column(modifier = Modifier.fillMaxHeight()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -176,6 +180,7 @@ fun DebitCardSummaryTile(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                }
             }
 
             DebitCardTilePresentation.List -> {
@@ -242,14 +247,17 @@ fun CreditFacilityCard(
     val extended = MasroofThemeExtras.extendedColors
 
     MasroofCard(
-        modifier = modifier.then(
-            if (onOpenCard != null) {
-                Modifier.clickable { onOpenCard(facility.primary) }
-            } else {
-                Modifier.clickable { expanded = !expanded }
-            },
-        ),
+        modifier = modifier
+            .fillMaxHeight()
+            .then(
+                if (onOpenCard != null) {
+                    Modifier.clickable { onOpenCard(facility.primary) }
+                } else {
+                    Modifier.clickable { expanded = !expanded }
+                },
+            ),
     ) {
+        Column(modifier = Modifier.fillMaxHeight()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -365,6 +373,7 @@ fun CreditFacilityCard(
                     )
                 }
             }
+        }
         }
     }
 }
