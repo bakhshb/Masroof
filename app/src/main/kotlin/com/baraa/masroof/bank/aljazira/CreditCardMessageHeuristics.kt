@@ -33,4 +33,11 @@ object CreditCardMessageHeuristics {
         if (DUE_MARKERS.any { text.contains(it, ignoreCase = true) }) return true
         return false
     }
+
+    fun isDebitCardSms(body: String): Boolean {
+        val text = body.replace('\n', ' ')
+        if (DEBIT_MARKERS.any { text.contains(it, ignoreCase = true) }) return true
+        if (text.contains("خصمت من حساب", ignoreCase = true)) return true
+        return false
+    }
 }

@@ -223,6 +223,24 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun madaGooglePayPos_parsesWithoutSourceAccount() {
+        val result = parse(
+            """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة مدى: 8219
+            لدى: MALAYSIA FOODS RESTA
+            بمبلغ: 127.00 SAR
+            في: 13:24 03-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals("8219", result.event.cardRef?.last4)
+        assertEquals("MALAYSIA FOODS RESTA", result.event.merchant)
+        assertEquals(Money.of("127.00", Currency.SAR), result.event.amount)
+        assertNull(result.event.sourceAccountRef)
+    }
+
+    @Test
     fun creditCardPurchase_isPurchaseNotCardPayment() {
         val result = parse(
             """

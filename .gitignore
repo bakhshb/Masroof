@@ -22,3 +22,6 @@ release-signing.env
 
 # Orchestration runtime state
 .orch/
+
+# Cursor agent debug logs
+.cursor/

@@ -47,4 +47,43 @@ class CreditCardMessageHeuristicsTest {
         """.trimIndent()
         assertFalse(CreditCardMessageHeuristics.isCreditCardSms(body))
     }
+
+    @Test
+    fun madaPurchase_isDebitCardSms() {
+        val body = """
+            شراء من نقاط البيع
+            بطاقة مدى: 2210
+            لدى: TEST_GROCER
+            بمبلغ: 120.00 SAR
+            خصمت من حساب: 3001
+        """.trimIndent()
+        assertTrue(CreditCardMessageHeuristics.isDebitCardSms(body))
+    }
+
+    @Test
+    fun googlePayMada_withoutAccountDebit_isDebitCardSms() {
+        val body = """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة مدى: 8219
+            لدى: MALAYSIA FOODS RESTA
+            بمبلغ: 127.00 SAR
+            في: 13:24 03-08-2026
+        """.trimIndent()
+        assertTrue(CreditCardMessageHeuristics.isDebitCardSms(body))
+        assertFalse(CreditCardMessageHeuristics.isCreditCardSms(body))
+    }
+
+    @Test
+    fun creditCardGooglePay_isNotDebitCardSms() {
+        val body = """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة ائتمانية: 7271
+            لدى: ananinja.com
+            بمبلغ: 75.00 SAR
+            الرصيد المتاح: 14569.09 SAR
+            إجمالي المبلغ المستحق:3921.11 SAR
+        """.trimIndent()
+        assertFalse(CreditCardMessageHeuristics.isDebitCardSms(body))
+        assertTrue(CreditCardMessageHeuristics.isCreditCardSms(body))
+    }
 }

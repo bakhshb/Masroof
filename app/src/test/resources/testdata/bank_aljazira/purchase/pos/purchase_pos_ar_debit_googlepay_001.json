@@ -1,0 +1,17 @@
+{
+  "id": "purchase_pos_ar_debit_googlepay_001",
+  "sender": "AlJazira",
+  "body": "شراء عبر نقاط البيع (Google Pay)\nبطاقة مدى: 8219\nلدى: MALAYSIA FOODS RESTA\nبمبلغ: 127.00 SAR\nفي: 13:24 03-08-2026",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "PURCHASE",
+    "direction": "OUTGOING",
+    "amount": "127.00",
+    "currency": "SAR",
+    "purchaseChannel": "POS",
+    "cardLast4": "8219",
+    "merchant": "MALAYSIA FOODS RESTA",
+    "occurredAt": "2026-08-03T13:24:00",
+    "parseStatus": "SUCCESS"
+  }
+}

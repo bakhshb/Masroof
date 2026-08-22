@@ -1,9 +1,12 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
  * Shared rules for Mada salary-period spending: POS purchases, cash withdrawals, and refunds.
@@ -55,13 +58,89 @@ object DebitCardSpendClassifier {
         if (tx.type == FinancialTransactionType.REFUND) {
             return Effect.Refund
         }
-        val isDebitSpend = AccountFlowClassifier.classify(tx, scope, context).any { assignment ->
+        return if (classifiesAsDebitSpend(tx, scope, context)) Effect.Expense else null
+    }
+
+    private fun classifiesAsDebitSpend(
+        tx: FinancialTransaction,
+        scope: CurrentAccountTransactionScope,
+        context: AccountFlowClassificationContext,
+    ): Boolean {
+        val fromAccountFlow = AccountFlowClassifier.classify(tx, scope, context).any { assignment ->
             assignment is FlowAssignment.Expense &&
                 (
                     assignment.category == FlowExpenseCategory.POS_PURCHASE ||
                         assignment.category == FlowExpenseCategory.CASH_WITHDRAWAL
                     )
         }
-        return if (isDebitSpend) Effect.Expense else null
+        if (fromAccountFlow) return true
+        // Google Pay / wallet Mada POS often omits "خصمت من حساب"; source is card-only.
+        return isCardAttributedDebitSpend(tx, context)
     }
+
+    private fun isCardAttributedDebitSpend(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): Boolean {
+        if (tx.type != FinancialTransactionType.EXPENSE &&
+            tx.type != FinancialTransactionType.CASH_WITHDRAWAL
+        ) {
+            return false
+        }
+        if (isExcludedDebitSpend(tx, context)) return false
+        return linkedRecords(tx, context).any { record -> isDebitSpendRecord(record, context) }
+    }
+
+    private fun isDebitSpendRecord(
+        record: ParsedEventRecord,
+        context: AccountFlowClassificationContext,
+    ): Boolean {
+        val body = smsBody(record, context)
+        if (!CreditCardMessageHeuristics.isDebitCardSms(body)) return false
+        return when (record.event.messageFamily) {
+            MessageFamily.PURCHASE,
+            MessageFamily.WITHDRAWAL,
+            -> true
+            else -> false
+        }
+    }
+
+    private fun isExcludedDebitSpend(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): Boolean {
+        if (tx.id in context.billPaymentTxIds) return true
+        if (tx.type == FinancialTransactionType.BILL_PAYMENT ||
+            tx.type == FinancialTransactionType.CREDIT_CARD_PAYMENT
+        ) {
+            return true
+        }
+        return linkedRecords(tx, context).any { record ->
+            when (record.event.messageFamily) {
+                MessageFamily.BILL_PAYMENT,
+                MessageFamily.CARD_PAYMENT,
+                -> true
+                else -> isBillPaymentSms(smsBody(record, context))
+            }
+        }
+    }
+
+    private fun isBillPaymentSms(body: String): Boolean =
+        body.contains("سداد فاتورة") ||
+            body.contains("سداد بطاقة") ||
+            (
+                body.contains("تسديد") &&
+                    (body.contains("بطاقة ائتمان") || body.contains("بطاقة إئتمان"))
+                )
+
+    private fun linkedRecords(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): List<ParsedEventRecord> =
+        tx.linkedParsedEventIds.mapNotNull { context.parsedRecordsById[it] }
+
+    private fun smsBody(
+        record: ParsedEventRecord,
+        context: AccountFlowClassificationContext,
+    ): String = context.rawSmsById[record.event.rawSmsId]?.body.orEmpty()
 }
