@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.review.ReviewDetailLoader
 import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.transaction.RestoreResult
+import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -32,6 +34,7 @@ class ReviewViewModel(
     private val detailLoader: ReviewDetailLoader,
     private val cardRegistryRepository: CardRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val transactionRestoreService: TransactionRestoreService,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
     private val appLocaleRepository: AppLocaleRepository,
@@ -181,6 +184,49 @@ class ReviewViewModel(
         }
     }
 
+    fun restoreIgnoredMessage(newType: FinancialTransactionType? = null) {
+        val rawSmsId = _uiState.value.selectedDetail?.rawSmsId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
+            try {
+                when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
+                    is RestoreResult.Success -> {
+                        refreshReviewQueue()
+                        val summaries = when (_uiState.value.listMode) {
+                            ReviewListMode.PENDING -> detailLoader.loadSummaries()
+                            ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
+                        }
+                        applySummaries(summaries)
+                        _uiState.update {
+                            it.copy(
+                                loading = false,
+                                resolving = false,
+                                selectedDetail = null,
+                                message = ReviewMessage.RESTORED,
+                                error = null,
+                            )
+                        }
+                    }
+                    is RestoreResult.Rejected -> {
+                        _uiState.update {
+                            it.copy(
+                                resolving = false,
+                                error = ReviewError.ACTION_FAILED,
+                                actionErrorDetail = result.reason,
+                            )
+                        }
+                    }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(resolving = false, error = ReviewError.ACTION_FAILED, actionErrorDetail = null)
+                }
+            }
+        }
+    }
+
     fun confirmOwnershipCardOwned() {
         val cardRef = currentOwnershipCardRef() ?: return
         runOwnershipAction(owned = true, cardRef = cardRef)
@@ -286,7 +332,10 @@ class ReviewViewModel(
     }
 
     private suspend fun refreshAfterAction(message: ReviewMessage, closeDetail: Boolean) {
-        val summaries = detailLoader.loadSummaries()
+        val summaries = when (_uiState.value.listMode) {
+            ReviewListMode.PENDING -> detailLoader.loadSummaries()
+            ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
+        }
         val items = summaries.map(::toListItem)
         _uiState.update {
             it.copy(
@@ -377,6 +426,7 @@ class ReviewViewModel(
         }
         return ReviewDetailUi(
             id = review.id,
+            rawSmsId = review.rawSmsId,
             kind = review.kind,
             kindLabelRes = review.kind.toUiLabelRes(),
             sender = detail.sender,
@@ -399,7 +449,8 @@ class ReviewViewModel(
             showDismissNonFinancialAction = !ignored && review.kind == ReviewKind.NEEDS_REVIEW,
             ownershipCard = ownershipCard,
             showOwnershipActions = !ignored && ownershipCard != null,
-            readOnly = ignored,
+            showRestoreActions = ignored,
+            readOnly = false,
             resolvedAtLabel = resolvedAtLabel,
         )
     }
