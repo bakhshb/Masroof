@@ -34,9 +34,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.CurrentAccountSummary
-import com.baraa.masroof.application.dashboard.externalMovement
+import com.baraa.masroof.application.dashboard.AccountsSummary
+import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -49,7 +51,7 @@ import java.time.temporal.ChronoUnit
 
 @Composable
 fun DashboardHeroCard(
-    summary: CurrentAccountSummary,
+    accountsFleet: AccountsSummary,
     period: FinancialPeriod?,
     isCurrentPeriod: Boolean,
     today: LocalDate,
@@ -57,8 +59,10 @@ fun DashboardHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val movement = summary.externalMovement()
-    val remaining = movement.remaining
+    val remaining = accountsFleet.totalRemaining
+        ?: SignedMoneyAmount.zero(accountsFleet.currency ?: Currency.SAR)
+    val totalInflow = accountsFleet.totalInflow ?: Money.zero(remaining.currency)
+    val totalOutflow = accountsFleet.totalOutflow ?: Money.zero(remaining.currency)
     val remainingColor = when {
         remaining.amount.signum() > 0 -> extended.inflow
         remaining.amount.signum() < 0 -> extended.outflow
@@ -134,7 +138,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_income,
-                    formatLocalizedMoney(movement.inflow),
+                    formatLocalizedMoney(totalInflow),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -143,7 +147,7 @@ fun DashboardHeroCard(
             Text(
                 stringResource(
                     R.string.dashboard_hero_footer_expense,
-                    formatLocalizedMoney(movement.outflow),
+                    formatLocalizedMoney(totalOutflow),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -175,7 +179,7 @@ private fun periodProgress(
 
 @Composable
 fun DashboardQuickSummaryRow(
-    summary: CurrentAccountSummary,
+    accountsFleet: AccountsSummary,
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
     showExpense: Boolean = true,
@@ -184,8 +188,10 @@ fun DashboardQuickSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val movement = summary.externalMovement()
-    val remaining = movement.remaining
+    val remaining = accountsFleet.totalRemaining
+        ?: SignedMoneyAmount.zero(accountsFleet.currency ?: Currency.SAR)
+    val totalInflow = accountsFleet.totalInflow ?: Money.zero(remaining.currency)
+    val totalOutflow = accountsFleet.totalOutflow ?: Money.zero(remaining.currency)
 
     val cardPadding = quickCardPadding(size)
 
@@ -210,7 +216,7 @@ fun DashboardQuickSummaryRow(
         if (showExpense) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
-                value = formatLocalizedMoney(movement.outflow),
+                value = formatLocalizedMoney(totalOutflow),
                 valueColor = extended.outflow,
                 icon = MasroofIcons.netSpending,
                 iconBackground = extended.outflowSoft,
@@ -224,7 +230,7 @@ fun DashboardQuickSummaryRow(
         if (showIncome) {
             DashboardQuickCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
-                value = formatLocalizedMoney(movement.inflow),
+                value = formatLocalizedMoney(totalInflow),
                 valueColor = extended.inflow,
                 icon = MasroofIcons.income,
                 iconBackground = extended.inflowSoft,

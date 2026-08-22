@@ -285,6 +285,10 @@ private fun DashboardCustomizableSections(
     onRescan: () -> Unit,
 ) {
     val currentAccount = state.currentAccount ?: return
+    val accountsFleet = resolveDashboardAccountsFleet(
+        ownedAccounts = state.ownedAccounts,
+        fleet = state.accountsFleet,
+    )
 
     layout.orderedVisibleSections().forEach { entry ->
         Column(
@@ -293,7 +297,7 @@ private fun DashboardCustomizableSections(
             when (entry.id) {
                 DashboardSectionId.HERO -> {
                     DashboardHeroCard(
-                        summary = currentAccount,
+                        accountsFleet = accountsFleet,
                         period = state.period,
                         isCurrentPeriod = state.isCurrentPeriod,
                         today = today,
@@ -303,7 +307,7 @@ private fun DashboardCustomizableSections(
 
                 DashboardSectionId.QUICK -> {
                     DashboardQuickSummaryRow(
-                        summary = currentAccount,
+                        accountsFleet = accountsFleet,
                         onOpenExpenseDetails = onOpenExpenseDetails,
                         onOpenIncomeDetails = onOpenIncomeDetails,
                         showExpense = layout.quickExpenseVisible,

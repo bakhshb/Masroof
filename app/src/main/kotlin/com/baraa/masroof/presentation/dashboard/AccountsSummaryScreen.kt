@@ -145,16 +145,9 @@ private fun AccountsSummaryHeroCard(
     fleet: com.baraa.masroof.application.dashboard.AccountsSummary? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val resolvedFleet = fleet ?: AccountsSummary(
-        accounts = ownedAccounts.mapNotNull { account ->
-            account.periodSummary?.let { summary ->
-                OwnedAccount.from(
-                    bank = account.bank,
-                    maskedNumber = account.maskedNumber,
-                    summary = summary,
-                )
-            }
-        },
+    val resolvedFleet = resolveDashboardAccountsFleet(
+        ownedAccounts = ownedAccounts,
+        fleet = fleet,
     )
     val totalRemaining = resolvedFleet.totalRemaining
     val totalInflow = resolvedFleet.totalInflow
