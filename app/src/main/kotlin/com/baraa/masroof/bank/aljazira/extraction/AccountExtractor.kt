@@ -108,6 +108,7 @@ class AccountExtractor {
         private val SOURCE_PATTERNS = listOf(
             DEDUCTED_FROM_ACCOUNT_PATTERN,
             Regex("""من\s*حساب\s*:\s*(\d{4})"""),
+            Regex("""حساب\s*رقم\s*:\s*(\d{4})"""),
             Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
             Regex("""(?<![\p{L}])حساب\s*:\s*(\d{4})"""),
             Regex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),

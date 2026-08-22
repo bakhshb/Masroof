@@ -200,6 +200,7 @@ data class CurrentAccountTransactionScope(
         private val SOURCE_ACCOUNT_PATTERNS = listOf(
             Regex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})"""),
             Regex("""من\s*حساب\s*:\s*(\d{4})"""),
+            Regex("""حساب\s*رقم\s*:\s*(\d{4})"""),
             Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
             Regex("""(?<![\p{L}])حساب\s*:\s*(\d{4})"""),
         )

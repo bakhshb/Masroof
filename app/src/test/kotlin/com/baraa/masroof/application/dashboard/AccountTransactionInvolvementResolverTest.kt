@@ -69,6 +69,58 @@ class AccountTransactionInvolvementResolverTest {
     }
 
     @Test
+    fun cashWithdrawal_hisabRaqam_mapsToOwnedAccount() {
+        val owned = AccountRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            maskedNumber = "3001",
+            ownership = OwnershipStatus.OWNED,
+            firstSeenRawSmsId = null,
+            lastSeenRawSmsId = null,
+        )
+        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val body = """
+            سحب نقدي داخلي صراف الي
+            بطاقة 8219:مدى
+            حساب رقم: 3001
+            بمبلغ: SAR 2,200.00
+            مكان السحب: جــدة - 7225
+            في: 2026-08-02 17:41
+        """.trimIndent()
+        val tx = tx(
+            id = "cash-atm",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "2200.00",
+            source = null,
+            linked = listOf("evt-cash-atm"),
+        )
+        val record = parsedRecord(
+            id = "evt-cash-atm",
+            family = MessageFamily.WITHDRAWAL,
+            sourceLast4 = "3001",
+            rawBody = body,
+        )
+        val rawSmsById = mapOf(
+            "sms-evt-cash-atm" to RawSms(
+                id = "sms-evt-cash-atm",
+                sender = "AlJazira",
+                body = body,
+                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
+                deviceMessageId = "1",
+                bodyHash = "h",
+            ),
+        )
+
+        val index = AccountTransactionInvolvementResolver.buildIndex(
+            transactions = listOf(tx),
+            parsedRecords = listOf(record),
+            rawSmsById = rawSmsById,
+            ownedAccounts = listOf(owned),
+        )
+
+        assertEquals(setOf(containerId), index["cash-atm"])
+    }
+
+    @Test
     fun unrelatedTransaction_notMapped() {
         val owned = AccountRegistryEntry(
             bank = Bank.BANK_ALJAZIRA,
