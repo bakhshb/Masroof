@@ -238,6 +238,7 @@
     <string name="dashboard_value_unavailable">—</string>
     <string name="dashboard_tx_badge_income">وارد</string>
     <string name="dashboard_tx_badge_expense">مصروف</string>
+    <string name="dashboard_tx_badge_transfer">تحويل</string>
     <string name="dashboard_remaining_formula">وارد %1$s − منصرف %2$s = الباقي</string>
     <string name="dashboard_salary">الراتب</string>
     <string name="dashboard_other_income">دخل آخر</string>

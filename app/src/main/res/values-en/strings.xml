@@ -231,6 +231,7 @@
     <string name="dashboard_value_unavailable">—</string>
     <string name="dashboard_tx_badge_income">Income</string>
     <string name="dashboard_tx_badge_expense">Expense</string>
+    <string name="dashboard_tx_badge_transfer">Transfer</string>
     <string name="dashboard_remaining_formula">In %1$s − spent %2$s = remaining</string>
     <string name="dashboard_salary">Salary</string>
     <string name="dashboard_other_income">Other income</string>

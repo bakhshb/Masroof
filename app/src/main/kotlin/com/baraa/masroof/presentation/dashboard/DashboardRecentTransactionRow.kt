@@ -36,20 +36,37 @@ fun DashboardRecentTransactionRow(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val title = row.title ?: transactionTypeLabel(row.type)
-    val isIncoming = row.direction == TransactionDirectionUi.INCOME ||
-        row.direction == TransactionDirectionUi.INWARD ||
-        row.direction == TransactionDirectionUi.TRANSFER_IN
-    val badgeLabel = if (isIncoming) {
-        stringResource(R.string.dashboard_tx_badge_income)
-    } else {
-        stringResource(R.string.dashboard_tx_badge_expense)
+    val badge = when (row.direction) {
+        TransactionDirectionUi.INCOME,
+        TransactionDirectionUi.INWARD,
+        TransactionDirectionUi.TRANSFER_IN,
+        -> Triple(
+            stringResource(R.string.dashboard_tx_badge_income),
+            extended.inflowSoft,
+            extended.inflow,
+        )
+
+        TransactionDirectionUi.OUTWARD -> Triple(
+            stringResource(R.string.dashboard_tx_badge_expense),
+            extended.outflowSoft,
+            extended.outflow,
+        )
+
+        TransactionDirectionUi.NEUTRAL -> Triple(
+            stringResource(R.string.dashboard_tx_badge_transfer),
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
-    val badgeColors = if (isIncoming) {
-        extended.inflowSoft to extended.inflow
-    } else {
-        extended.outflowSoft to extended.outflow
+    val amountColor = when (row.direction) {
+        TransactionDirectionUi.INCOME,
+        TransactionDirectionUi.INWARD,
+        TransactionDirectionUi.TRANSFER_IN,
+        -> extended.inflow
+
+        TransactionDirectionUi.OUTWARD -> extended.outflow
+        TransactionDirectionUi.NEUTRAL -> MaterialTheme.colorScheme.onSurface
     }
-    val amountColor = if (isIncoming) extended.inflow else extended.outflow
 
     MasroofCard(
         modifier = modifier.then(
@@ -102,13 +119,13 @@ fun DashboardRecentTransactionRow(
             Column(horizontalAlignment = Alignment.End) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = badgeColors.first,
+                    color = badge.second,
                 ) {
                     Text(
-                        badgeLabel,
+                        badge.first,
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = badgeColors.second,
+                        color = badge.third,
                     )
                 }
                 Text(
