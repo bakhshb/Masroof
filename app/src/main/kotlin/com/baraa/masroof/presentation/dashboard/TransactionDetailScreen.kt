@@ -11,16 +11,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,8 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.IconLabelRow
+import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
@@ -56,13 +53,18 @@ fun TransactionDetailScreen(
     smsLoading: Boolean,
     reclassifying: Boolean,
     reclassifySuccess: Boolean,
+    ignoring: Boolean,
     error: String?,
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
+    onIgnore: () -> Unit,
 ) {
     var showReclassifySheet by rememberSaveable { mutableStateOf(false) }
     var pendingType by rememberSaveable { mutableStateOf<String?>(null) }
     var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var showIgnoreConfirmDialog by rememberSaveable { mutableStateOf(false) }
+
+    val actionInProgress = reclassifying || ignoring
 
     val pendingTypeEnum = pendingType?.let { name ->
         runCatching { FinancialTransactionType.valueOf(name) }.getOrNull()
@@ -76,10 +78,56 @@ fun TransactionDetailScreen(
         }
     }
 
+    if (showIgnoreConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!actionInProgress) showIgnoreConfirmDialog = false
+            },
+            icon = {
+                Icon(
+                    imageVector = MasroofIcons.warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            },
+            title = { Text(stringResource(R.string.transaction_detail_ignore_confirm_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    transaction.title?.let { title ->
+                        Text(title, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(
+                        stringResource(R.string.transaction_detail_ignore_confirm_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onIgnore()
+                        showIgnoreConfirmDialog = false
+                    },
+                    enabled = !actionInProgress,
+                ) {
+                    Text(stringResource(R.string.transaction_detail_ignore_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showIgnoreConfirmDialog = false },
+                    enabled = !actionInProgress,
+                ) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+
     if (showConfirmDialog && pendingTypeEnum != null && pendingTypeEnum != transaction.type) {
         AlertDialog(
             onDismissRequest = {
-                if (!reclassifying) showConfirmDialog = false
+                if (!actionInProgress) showConfirmDialog = false
             },
             icon = {
                 Icon(
@@ -110,7 +158,7 @@ fun TransactionDetailScreen(
                         onReclassify(pendingTypeEnum)
                         showConfirmDialog = false
                     },
-                    enabled = !reclassifying,
+                    enabled = !actionInProgress,
                 ) {
                     Text(stringResource(R.string.transaction_reclassify_confirm_action))
                 }
@@ -118,7 +166,7 @@ fun TransactionDetailScreen(
             dismissButton = {
                 TextButton(
                     onClick = { showConfirmDialog = false },
-                    enabled = !reclassifying,
+                    enabled = !actionInProgress,
                 ) {
                     Text(stringResource(R.string.settings_cancel))
                 }
@@ -132,7 +180,7 @@ fun TransactionDetailScreen(
             selectedType = pendingTypeEnum,
             saving = reclassifying,
             onDismiss = {
-                if (!reclassifying) {
+                if (!actionInProgress) {
                     showReclassifySheet = false
                     pendingType = null
                 }
@@ -297,7 +345,7 @@ fun TransactionDetailScreen(
                     pendingType = null
                     showReclassifySheet = true
                 },
-                enabled = !reclassifying,
+                enabled = !actionInProgress,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
@@ -309,6 +357,14 @@ fun TransactionDetailScreen(
                 Text(stringResource(R.string.transaction_detail_edit_category))
             }
 
+            IconTextButtonOutlined(
+                onClick = { showIgnoreConfirmDialog = true },
+                enabled = !actionInProgress,
+                icon = MasroofIcons.warning,
+                text = stringResource(R.string.review_action_ignore),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             if (reclassifySuccess) {
                 Text(
                     stringResource(R.string.transaction_detail_reclassify_success),
@@ -316,8 +372,15 @@ fun TransactionDetailScreen(
                 )
             }
             error?.let { reason ->
+                val isIgnoreError = reason in IGNORE_ERROR_REASONS
                 Text(
-                    stringResource(R.string.transaction_detail_reclassify_failed),
+                    stringResource(
+                        if (isIgnoreError) {
+                            R.string.transaction_detail_ignore_failed
+                        } else {
+                            R.string.transaction_detail_reclassify_failed
+                        },
+                    ),
                     color = MaterialTheme.colorScheme.error,
                 )
                 val detailRes = ReviewReasonLabels.labelRes(reason)
@@ -328,10 +391,15 @@ fun TransactionDetailScreen(
                 )
             }
 
-            if (reclassifying) {
+            if (actionInProgress) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
         }
     }
 }
+
+private val IGNORE_ERROR_REASONS = setOf(
+    "delete_failed",
+    "review_resolution_failed",
+)
 

@@ -140,6 +140,7 @@ fun MasroofRoot(
                     dashboardState = dashboardState,
                     onBack = dashboardViewModel::closeTransactionDetail,
                     onReclassify = dashboardViewModel::reclassifySelectedTransaction,
+                    onIgnore = dashboardViewModel::ignoreSelectedTransaction,
                 )
             ) {
                 return
@@ -229,6 +230,7 @@ fun MasroofRoot(
                         dashboardState = dashboardState,
                         onBack = dashboardViewModel::closeTransactionDetail,
                         onReclassify = dashboardViewModel::reclassifySelectedTransaction,
+                        onIgnore = dashboardViewModel::ignoreSelectedTransaction,
                         overlayOnList = true,
                     )
                 }
@@ -271,6 +273,7 @@ private fun showTransactionDetail(
     dashboardState: DashboardUiState,
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
+    onIgnore: () -> Unit,
     overlayOnList: Boolean = false,
 ): Boolean {
     val selectedId = dashboardState.selectedTransactionId ?: return false
@@ -284,9 +287,11 @@ private fun showTransactionDetail(
                 smsLoading = dashboardState.selectedTransactionSmsLoading,
                 reclassifying = dashboardState.reclassifying,
                 reclassifySuccess = dashboardState.reclassifySuccess,
-                error = dashboardState.reclassifyError,
+                ignoring = dashboardState.ignoring,
+                error = dashboardState.reclassifyError ?: dashboardState.ignoreError,
                 onBack = onBack,
                 onReclassify = onReclassify,
+                onIgnore = onIgnore,
             )
         }
         if (overlayOnList) {

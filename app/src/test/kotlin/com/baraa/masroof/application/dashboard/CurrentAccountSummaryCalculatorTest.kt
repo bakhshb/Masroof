@@ -168,6 +168,7 @@ class CurrentAccountSummaryCalculatorTest {
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3478"),
             rawSmsById = emptyMap(),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.zero(Currency.SAR), summary.outflow.cashWithdrawals)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.total)
@@ -189,12 +190,14 @@ class CurrentAccountSummaryCalculatorTest {
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountA),
             ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         val summaryB = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(orphanWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountB),
             ownedAccountLast4s = setOf("3002"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.zero(Currency.SAR), summaryA.outflow.cashWithdrawals)
         assertEquals(Money.zero(Currency.SAR), summaryB.outflow.cashWithdrawals)
@@ -361,8 +364,78 @@ class CurrentAccountSummaryCalculatorTest {
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("90.00", Currency.SAR), summary.outflow.posPurchases)
+    }
+
+    @Test
+    fun madaPosWithLegacyCardSource_countsWhenSmsLinksOwnedAccount() {
+        val owned = "account:bank_aljazira:3001"
+        val cardId = "card:bank_aljazira:2210"
+        val pos = tx(
+            id = "pos-mada",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "120.00",
+            source = cardId,
+            linked = listOf("evt-pos"),
+        )
+        val parsedRecords = listOf(
+            parsedRecord(
+                id = "evt-pos",
+                family = MessageFamily.PURCHASE,
+                sourceLast4 = "3001",
+                cardLast4 = "2210",
+                rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
+            ),
+        )
+        val rawSmsById = parsedRecords.associate { record ->
+            record.event.rawSmsId to RawSms(
+                id = record.event.rawSmsId,
+                sender = "AlJazira",
+                body = record.event.counterparty.orEmpty(),
+                receivedAt = Instant.parse("2026-08-01T11:05:00Z"),
+                deviceMessageId = record.event.id,
+                bodyHash = record.event.id,
+            )
+        }
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(pos),
+            parsedRecords = parsedRecords,
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = rawSmsById,
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+        assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.posPurchases)
+    }
+
+    @Test
+    fun orphanCashWithdrawal_countedAtFleetScope_only() {
+        val owned = "account:bank_aljazira:3001"
+        val cashWithdrawal = tx(
+            id = "orphan-cash",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "2200.00",
+            source = null,
+            linked = emptyList(),
+        )
+        val fleetSummary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(cashWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.Fleet,
+        )
+        val accountSummary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(cashWithdrawal),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+        assertEquals(Money.of("2200.00", Currency.SAR), fleetSummary.outflow.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), accountSummary.outflow.cashWithdrawals)
     }
 
     @Test

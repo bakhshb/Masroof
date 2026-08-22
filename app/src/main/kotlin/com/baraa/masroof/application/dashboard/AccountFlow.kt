@@ -193,11 +193,6 @@ data class FleetAccountFlow(
     fun accountSummary(): AccountFlowSummary? = combined?.accountSummary()
 
     fun externalSummary(): AccountFlowSummary? = combined?.externalSummary()
-
-    companion object {
-        fun fromSummaries(summaries: Collection<CurrentAccountSummary>): FleetAccountFlow =
-            FleetAccountFlow(summaries.map(AccountFlow::from).toList())
-    }
 }
 
 fun CurrentAccountSummary.accountFlow(): AccountFlow = AccountFlow.from(this)

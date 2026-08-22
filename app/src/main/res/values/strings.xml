@@ -238,6 +238,7 @@
     <string name="dashboard_value_unavailable">—</string>
     <string name="dashboard_tx_badge_income">وارد</string>
     <string name="dashboard_tx_badge_expense">مصروف</string>
+    <string name="dashboard_tx_badge_transfer">تحويل</string>
     <string name="dashboard_remaining_formula">وارد %1$s − منصرف %2$s = الباقي</string>
     <string name="dashboard_salary">الراتب</string>
     <string name="dashboard_other_income">دخل آخر</string>
@@ -358,6 +359,10 @@
     <string name="transaction_detail_reclassify_success">تم تحديث التصنيف</string>
     <string name="transaction_detail_reclassify_failed">تعذر تحديث التصنيف</string>
     <string name="transaction_detail_edit_category">تعديل التصنيف</string>
+    <string name="transaction_detail_ignore_confirm_title">تجاهل العملية؟</string>
+    <string name="transaction_detail_ignore_confirm_body">سيتم حذف العملية من لوحة التحكم ولن تُحسب ضمن إجمالياتك. يمكنك إعادة استيرادها لاحقاً بإعادة مسح الرسائل إذا لزم.</string>
+    <string name="transaction_detail_ignore_confirm_action">تجاهل</string>
+    <string name="transaction_detail_ignore_failed">تعذر تجاهل العملية</string>
     <string name="transaction_share">مشاركة</string>
     <string name="transaction_share_detail_heading">%1$s — تفاصيل عملية</string>
     <string name="transaction_share_list_heading">%1$s — عمليات الفترة %2$s</string>

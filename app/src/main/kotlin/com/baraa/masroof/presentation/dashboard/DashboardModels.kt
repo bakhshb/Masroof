@@ -89,6 +89,8 @@ data class DashboardUiState(
     val reclassifying: Boolean = false,
     val reclassifyError: String? = null,
     val reclassifySuccess: Boolean = false,
+    val ignoring: Boolean = false,
+    val ignoreError: String? = null,
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),

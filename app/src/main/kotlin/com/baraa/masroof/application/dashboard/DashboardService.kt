@@ -76,6 +76,10 @@ class DashboardService(
             resolutions = sarResolutions,
             repository = financialTransactionRepository,
         )
+        val dedupedTransactions = SelfTransferDeduplicator.filter(
+            transactions = syncedTransactions,
+            parsedRecords = parsedRecords,
+        )
         val sarEquivalents = sarResolutions.sarAmounts()
         val ownedAccounts = accountRegistryRepository.listAll()
             .asSequence()
@@ -90,13 +94,13 @@ class DashboardService(
         )
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
         val currentAccount = CurrentAccountSummaryCalculator.summarize(
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -105,7 +109,7 @@ class DashboardService(
             rawSmsById = rawSmsById,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -157,14 +161,14 @@ class DashboardService(
         )
         val ownedAccountPeriodSummaries = OwnedAccountPeriodSummaryCalculator.summarize(
             ownedAccounts = ownedAccounts,
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             rawSmsById = rawSmsById,
         )
         val flowDetailGrouping = CurrentAccountFlowDetailGrouper.group(
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -178,7 +182,7 @@ class DashboardService(
             summary = summary,
             currentAccount = currentAccount,
             spendingSplit = spendingSplit,
-            transactions = syncedTransactions,
+            transactions = dedupedTransactions,
             creditCards = creditCards,
             ownedAccountPeriodSummaries = ownedAccountPeriodSummaries,
             flowDetailGrouping = flowDetailGrouping,

@@ -317,6 +317,8 @@ class SmsIngestionServiceTest {
                 source: com.baraa.masroof.domain.model.ExchangeRateSource,
             ): Boolean = false
             override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
+
+            override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
         val cards = RoomCardRegistryRepository(db.cardRegistryDao())
@@ -490,6 +492,8 @@ class SmsIngestionServiceTest {
                 source: com.baraa.masroof.domain.model.ExchangeRateSource,
             ): Boolean = false
             override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
+
+            override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
         val cards = RoomCardRegistryRepository(db.cardRegistryDao())

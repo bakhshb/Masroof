@@ -27,9 +27,12 @@ object DashboardSummaryTransactionFilter {
     ): List<TransactionPreviewUi> {
         val containerId = FinancialContainerIdFactory.accountId(bank, maskedNumber)
         val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(maskedNumber))
-        return transactions.filter { tx ->
-            matchesAccountContainer(tx.sourceContainerId, containerId, last4s) ||
+        return transactions.mapNotNull { tx ->
+            val involvesAccount = matchesAccountContainer(tx.sourceContainerId, containerId, last4s) ||
                 matchesAccountContainer(tx.destinationContainerId, containerId, last4s)
+            if (!involvesAccount) return@mapNotNull null
+            val direction = AccountTransactionPresentation.directionForAccount(tx, containerId, last4s)
+            if (direction == tx.direction) tx else tx.copy(direction = direction)
         }
     }
 

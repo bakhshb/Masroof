@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.OwnedAccountPeriodFlow
-import com.baraa.masroof.application.dashboard.OwnedAccountsFlowSummary
+import com.baraa.masroof.application.dashboard.AccountsSummary
+import com.baraa.masroof.application.dashboard.OwnedAccount
 import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -151,10 +151,10 @@ fun AccountsSummaryScreen(
 @Composable
 private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
     val extended = MasroofThemeExtras.extendedColors
-    val fleet = OwnedAccountsFlowSummary(
+    val fleet = AccountsSummary(
         accounts = ownedAccounts.mapNotNull { account ->
             account.periodSummary?.let { summary ->
-                OwnedAccountPeriodFlow(
+                OwnedAccount.from(
                     bank = account.bank,
                     maskedNumber = account.maskedNumber,
                     summary = summary,

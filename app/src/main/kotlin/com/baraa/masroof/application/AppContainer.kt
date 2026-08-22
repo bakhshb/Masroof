@@ -12,6 +12,7 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.notification.NotificationCenterService
@@ -197,6 +198,7 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             ownershipResolver = ownershipResolver,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
+            reviewRepository = reviewRepository,
         )
 
     val reviewQueueUpdater: ReviewQueueUpdater =
@@ -231,6 +233,13 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             ownershipResolver = ownershipResolver,
+        )
+
+    val transactionIgnoreService: TransactionIgnoreService =
+        TransactionIgnoreService(
+            financialTransactionRepository = financialTransactionRepository,
+            reviewRepository = reviewRepository,
+            clock = clock,
         )
 
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()

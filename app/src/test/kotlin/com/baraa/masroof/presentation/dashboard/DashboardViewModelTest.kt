@@ -16,6 +16,7 @@ import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -594,6 +595,8 @@ class DashboardViewModelTest {
                     source: com.baraa.masroof.domain.model.ExchangeRateSource,
                 ) = false
                 override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
             },
             rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository {
                 override suspend fun insertIfAbsent(rawSms: com.baraa.masroof.domain.model.RawSms) =
@@ -644,6 +647,8 @@ class DashboardViewModelTest {
                         source: com.baraa.masroof.domain.model.ExchangeRateSource,
                     ) = false
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
@@ -679,6 +684,54 @@ class DashboardViewModelTest {
                         override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.CardRegistryEntry>()
                     },
                 ),
+            ),
+            ignoreService = TransactionIgnoreService(
+                financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
+                    override suspend fun save(
+                        transaction: FinancialTransaction,
+                        rawSmsIds: Collection<String>,
+                    ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
+
+                    override suspend fun getById(id: String) = null
+                    override suspend fun findByRawSmsId(rawSmsId: String) = null
+                    override suspend fun listAll() = emptyList<FinancialTransaction>()
+                    override suspend fun listOccurredBetween(
+                        startInclusive: java.time.Instant,
+                        endExclusive: java.time.Instant,
+                    ) = emptyList<FinancialTransaction>()
+
+                    override suspend fun isRawSmsLinked(rawSmsId: String) = false
+                    override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
+                    override suspend fun update(transaction: FinancialTransaction) = false
+                    override suspend fun updateAppliedExchangeRate(
+                        id: String,
+                        exchangeRate: java.math.BigDecimal,
+                        source: com.baraa.masroof.domain.model.ExchangeRateSource,
+                    ) = false
+                    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+
+                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
+                },
+                reviewRepository = object : com.baraa.masroof.domain.repository.ReviewRepository {
+                    override suspend fun getById(id: String) = null
+                    override suspend fun findByRawSmsId(rawSmsId: String) = null
+                    override suspend fun listRequired() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
+                    override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
+                    override suspend fun upsertRequired(
+                        rawSmsId: String,
+                        kind: com.baraa.masroof.domain.model.ReviewKind,
+                        reasons: List<String>,
+                        now: java.time.Instant,
+                    ) = error("unused")
+
+                    override suspend fun markResolved(
+                        id: String,
+                        resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
+                        resolvedAt: java.time.Instant,
+                        resolvedTransactionId: String?,
+                    ) = null
+                },
+                clock = com.baraa.masroof.sms.time.InstantClock.System,
             ),
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),

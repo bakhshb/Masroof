@@ -37,6 +37,7 @@ object OwnedAccountPeriodSummaryCalculator {
                 ownedAccountContainerIds = setOf(containerId),
                 ownedAccountLast4s = last4s,
                 rawSmsById = rawSmsById,
+                scopeMode = AccountFlowScopeMode.SingleAccount,
             )
             OwnedAccountPeriodSummary(
                 bank = account.bank,
