@@ -140,7 +140,7 @@ class SettingsViewModelTest {
             ),
         )
         var refreshCalls = 0
-        val vm = viewModel(cards = cards) { refreshCalls++ }
+        val vm = viewModel(cards = cards, onRefreshReviewQueue = { refreshCalls++ })
         vm.refresh()
         advanceUntilIdle()
         vm.resumeTracking(ManagedCardUi(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL))
@@ -220,11 +220,46 @@ class SettingsViewModelTest {
         assertTrue(vm.uiState.value.stoppedAccounts.any { it.maskedNumber == "3001" })
     }
 
+    @Test
+    fun restoreIgnoredMessage_failure_setsFailedMessage() = runTest {
+        val vm = viewModel()
+        vm.restoreIgnoredMessage("sms-missing")
+        advanceUntilIdle()
+
+        assertEquals(SettingsRestoreMessage.NOT_IGNORED, vm.uiState.value.restoreMessage)
+    }
+
+    @Test
+    fun markCardAsDebit_clearsRoleAndSetsDebitType() = runTest {
+        val cards = TrackingCardRegistry(
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "7271",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+                cardRole = com.baraa.masroof.domain.model.CardRole.PRIMARY,
+            ),
+        )
+        val vm = viewModel(cards = cards)
+        vm.refresh()
+        advanceUntilIdle()
+        val card = vm.uiState.value.followedCards.single()
+
+        vm.markCardAsDebit(card)
+        advanceUntilIdle()
+
+        assertTrue(cards.clearedRole)
+        assertTrue(cards.updatedDebitType)
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
+        restoreService: TransactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
+        rawSmsRepository: RawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
     ): SettingsViewModel =
         SettingsViewModel(
             cardRegistryRepository = cards,
@@ -233,8 +268,8 @@ class SettingsViewModelTest {
                 accountRegistry = accounts,
                 cardRegistry = cards,
             ),
-            transactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
-            rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
+            transactionRestoreService = restoreService,
+            rawSmsRepository = rawSmsRepository,
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),
@@ -295,6 +330,56 @@ class SettingsViewModelTest {
 
         override suspend fun get(reference: CardReference) =
             entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
+
+        override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
+    }
+
+    private class TrackingCardRegistry(
+        vararg initial: CardRegistryEntry,
+    ) : CardRegistryRepository {
+        val entries = initial.toMutableList()
+        var clearedRole: Boolean = false
+        var updatedDebitType: Boolean = false
+
+        override suspend fun observe(reference: CardReference, rawSmsId: String) = Unit
+
+        override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
+            val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
+            if (index >= 0) {
+                entries[index] = entries[index].copy(ownership = status)
+            }
+        }
+
+        override suspend fun resolve(reference: CardReference): OwnershipStatus =
+            entries.find { it.bank == reference.bank && it.last4 == reference.last4 }?.ownership
+                ?: OwnershipStatus.UNKNOWN
+
+        override suspend fun get(reference: CardReference) =
+            entries.find { it.bank == reference.bank && it.last4 == reference.last4 }
+
+        override suspend fun clearCardRole(reference: CardReference) {
+            clearedRole = true
+            val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
+            if (index >= 0) {
+                entries[index] = entries[index].copy(
+                    cardRole = com.baraa.masroof.domain.model.CardRole.STANDALONE,
+                    parentCardLast4 = null,
+                )
+            }
+        }
+
+        override suspend fun updateCardType(reference: CardReference, cardType: com.baraa.masroof.domain.model.CardType?) {
+            updatedDebitType = cardType == com.baraa.masroof.domain.model.CardType.DEBIT
+            val index = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
+            if (index >= 0) {
+                entries[index] = entries[index].copy(cardType = cardType)
+            }
+        }
+
+        override suspend fun updateCardNetwork(
+            reference: CardReference,
+            network: com.baraa.masroof.domain.model.CardNetwork?,
+        ) = Unit
 
         override suspend fun listAll(): List<CardRegistryEntry> = entries.toList()
     }

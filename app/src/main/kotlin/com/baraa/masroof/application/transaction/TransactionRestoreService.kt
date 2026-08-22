@@ -38,7 +38,9 @@ class TransactionRestoreService(
     ): RestoreResult {
         val review = reviewRepository.findByRawSmsId(rawSmsId)
             ?: return RestoreResult.Rejected("review_not_found")
-        if (review.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL) {
+        if (review.status != ReviewStatus.RESOLVED ||
+            review.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL
+        ) {
             return RestoreResult.Rejected("not_ignored")
         }
 
@@ -52,12 +54,7 @@ class TransactionRestoreService(
         reconciliation.reconcileStoredEvents()
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
-            reviewRepository.markResolved(
-                id = review.id,
-                resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
-                resolvedAt = clock.now(),
-                resolvedTransactionId = null,
-            )
+            rollbackToIgnored(review.id)
             return RestoreResult.Rejected("reconcile_failed")
         }
 
@@ -67,7 +64,10 @@ class TransactionRestoreService(
 
         return when (val result = reclassification.reclassify(tx.id, newType)) {
             is ReclassificationResult.Success -> RestoreResult.Success(result.transaction)
-            is ReclassificationResult.Rejected -> RestoreResult.Rejected(result.reason)
+            is ReclassificationResult.Rejected -> {
+                rollbackToIgnored(review.id)
+                RestoreResult.Rejected(result.reason)
+            }
         }
     }
 
@@ -75,4 +75,13 @@ class TransactionRestoreService(
         rawSmsId: String,
         newType: FinancialTransactionType,
     ): RestoreResult = restore(rawSmsId, newType)
+
+    private suspend fun rollbackToIgnored(reviewId: String) {
+        reviewRepository.markResolved(
+            id = reviewId,
+            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+            resolvedAt = clock.now(),
+            resolvedTransactionId = null,
+        )
+    }
 }

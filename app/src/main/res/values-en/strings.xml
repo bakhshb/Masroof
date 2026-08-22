@@ -83,6 +83,8 @@
     <string name="settings_restore_message_action">Restore</string>
     <string name="settings_restore_success">Message restored.</string>
     <string name="settings_restore_failed">Could not restore message.</string>
+    <string name="settings_restore_not_ignored">This message is not in the ignored list.</string>
+    <string name="settings_restore_reconcile_failed">Could not create a transaction from this message.</string>
     <string name="settings_dismiss_message">Dismiss</string>
     <string name="settings_save">Save</string>
     <string name="settings_display_name_label">Display name</string>

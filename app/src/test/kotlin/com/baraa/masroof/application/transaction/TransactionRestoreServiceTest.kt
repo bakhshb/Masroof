@@ -69,6 +69,57 @@ class TransactionRestoreServiceTest {
         assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, reviewRepo.lastResolutionKind)
     }
 
+    @Test
+    fun restore_rejectsNonResolvedReview() = runBlocking {
+        val review = ReviewItem(
+            id = "review-1",
+            rawSmsId = "sms-1",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("user_ignored_transaction"),
+            status = ReviewStatus.REQUIRED,
+            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+            createdAt = Instant.parse("2026-08-01T00:00:00Z"),
+            updatedAt = Instant.parse("2026-08-01T00:00:00Z"),
+            resolvedAt = null,
+            resolvedTransactionId = null,
+        )
+        val service = TransactionRestoreService(
+            reviewRepository = TrackingReviewRepository(review),
+            financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = SettingsViewModelTestSupport.emptyParsedEventRepository(),
+                rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
+                financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
+                ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
+                    accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
+                    cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
+                ),
+            ),
+            reclassification = TransactionReclassificationService(
+                financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
+                effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
+                    parsedEventRepository = SettingsViewModelTestSupport.emptyParsedEventRepository(),
+                    userCorrectionRepository = object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
+                        override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
+                        override suspend fun latestForRawSmsId(rawSmsId: String) = null
+                        override suspend fun listForRawSmsId(rawSmsId: String): List<com.baraa.masroof.domain.model.UserCorrection> =
+                            emptyList()
+                    },
+                ),
+                ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
+                    accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
+                    cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
+                ),
+            ),
+            clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+        )
+
+        val result = service.restore("sms-1")
+
+        assertTrue(result is RestoreResult.Rejected)
+        assertEquals("not_ignored", (result as RestoreResult.Rejected).reason)
+    }
+
     private class TrackingReviewRepository(
         private var review: ReviewItem,
     ) : ReviewRepository {

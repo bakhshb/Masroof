@@ -69,7 +69,8 @@ fun SettingsMyCardsScreen(
     SettingsCardRoleDialog(
         target = state.cardRoleTarget,
         primaryCards = state.followedCards.filter {
-            it.cardRole == com.baraa.masroof.domain.model.CardRole.PRIMARY
+            it.cardRole == com.baraa.masroof.domain.model.CardRole.PRIMARY &&
+                it.bank == state.cardRoleTarget?.bank
         },
         updating = state.updating,
         onDismiss = onDismissCardRole,
@@ -81,7 +82,9 @@ fun SettingsMyCardsScreen(
     )
     SettingsLinkDebitDialog(
         target = state.linkDebitTarget,
-        accounts = state.followedAccounts,
+        accounts = state.followedAccounts.filter {
+            it.bank == state.linkDebitTarget?.bank
+        },
         updating = state.updating,
         onDismiss = onDismissLinkDebit,
         onLink = { account ->

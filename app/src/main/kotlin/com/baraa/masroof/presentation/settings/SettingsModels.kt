@@ -141,6 +141,8 @@ sealed interface AppUpdateUiState {
 enum class SettingsRestoreMessage {
     SUCCESS,
     FAILED,
+    NOT_IGNORED,
+    RECONCILE_FAILED,
 }
 
 enum class SettingsDestination {

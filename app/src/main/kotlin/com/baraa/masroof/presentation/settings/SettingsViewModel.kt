@@ -213,6 +213,7 @@ class SettingsViewModel(
 
     fun markCardAsDebit(card: ManagedCardUi) {
         updateCardMetadata(card) {
+            cardRegistryRepository.clearCardRole(CardReference(card.bank, card.last4))
             cardRegistryRepository.updateCardType(CardReference(card.bank, card.last4), CardType.DEBIT)
             if (card.cardNetwork == null) {
                 cardRegistryRepository.updateCardNetwork(
@@ -241,7 +242,14 @@ class SettingsViewModel(
                 }
                 is RestoreResult.Rejected -> {
                     _uiState.update {
-                        it.copy(updating = false, restoreMessage = SettingsRestoreMessage.FAILED)
+                        it.copy(
+                            updating = false,
+                            restoreMessage = when (result.reason) {
+                                "not_ignored", "review_not_found" -> SettingsRestoreMessage.NOT_IGNORED
+                                "reconcile_failed" -> SettingsRestoreMessage.RECONCILE_FAILED
+                                else -> SettingsRestoreMessage.FAILED
+                            },
+                        )
                     }
                 }
             }
@@ -253,9 +261,12 @@ class SettingsViewModel(
     }
 
     private suspend fun loadIgnoredMessages() {
-        val ignored = transactionRestoreService.listIgnoredRawSmsIds().mapNotNull { rawSmsId ->
+        val ignored = transactionRestoreService.listIgnoredRawSmsIds().map { rawSmsId ->
             val body = rawSmsRepository.getById(rawSmsId)?.body?.trim().orEmpty()
-            if (body.isEmpty()) null else IgnoredMessageUi(rawSmsId = rawSmsId, preview = body.take(120))
+            val preview = body.take(120).ifEmpty {
+                "…"
+            }
+            IgnoredMessageUi(rawSmsId = rawSmsId, preview = preview)
         }
         _uiState.update { it.copy(ignoredMessages = ignored) }
     }

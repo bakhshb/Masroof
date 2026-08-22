@@ -106,7 +106,7 @@ fun SettingsCardNetworkDialog(
         title = { Text(stringResource(R.string.settings_card_network_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                CardNetwork.entries.forEach { network ->
+                CardNetwork.entries.filter { it != CardNetwork.UNKNOWN }.forEach { network ->
                     Text(
                         text = cardNetworkLabel(network),
                         style = MaterialTheme.typography.bodyLarge,

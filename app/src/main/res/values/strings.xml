@@ -88,6 +88,8 @@
     <string name="settings_restore_message_action">استعادة</string>
     <string name="settings_restore_success">تمت استعادة الرسالة.</string>
     <string name="settings_restore_failed">تعذّرت استعادة الرسالة.</string>
+    <string name="settings_restore_not_ignored">هذه الرسالة ليست في قائمة المتجاهلة.</string>
+    <string name="settings_restore_reconcile_failed">تعذّر إنشاء معاملة من هذه الرسالة.</string>
     <string name="settings_dismiss_message">إغلاق</string>
     <string name="settings_save">حفظ</string>
     <string name="settings_display_name_label">الاسم المعروض</string>

@@ -45,6 +45,8 @@ fun SettingsIgnoredMessagesScreen(
                     stringResource(
                         when (message) {
                             SettingsRestoreMessage.SUCCESS -> R.string.settings_restore_success
+                            SettingsRestoreMessage.NOT_IGNORED -> R.string.settings_restore_not_ignored
+                            SettingsRestoreMessage.RECONCILE_FAILED -> R.string.settings_restore_reconcile_failed
                             SettingsRestoreMessage.FAILED -> R.string.settings_restore_failed
                         },
                     ),
