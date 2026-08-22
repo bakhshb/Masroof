@@ -81,7 +81,7 @@ fun CreditCardsSection(
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
                     cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
-                    modifier = Modifier.width(268.dp),
+                    modifier = Modifier.width(288.dp),
                 )
             }
         }

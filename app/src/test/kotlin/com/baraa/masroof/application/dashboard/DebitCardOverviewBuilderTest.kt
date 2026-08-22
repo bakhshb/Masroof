@@ -177,6 +177,71 @@ class DebitCardOverviewBuilderTest {
     }
 
     @Test
+    fun internalAtmWithdrawal_hisabRaqam_attributesToLinkedDebitCard() {
+        val owned = "account:bank_aljazira:3001"
+        val body = """
+            سحب نقدي داخلي صراف الي
+            بطاقة 8219:مدى
+            حساب رقم: 3001
+            بمبلغ: SAR 2,200.00
+            مكان السحب: جــدة - 7225
+            في: 2026-08-02 17:41
+        """.trimIndent()
+        val cash = tx(
+            id = "cash-atm",
+            type = FinancialTransactionType.CASH_WITHDRAWAL,
+            amount = "2200.00",
+            source = owned,
+            linked = listOf("evt-cash-atm"),
+        )
+        val parsedRecords = listOf(
+            parsedRecord(
+                id = "evt-cash-atm",
+                family = MessageFamily.WITHDRAWAL,
+                sourceLast4 = "3001",
+                cardLast4 = "8219",
+                rawBody = body,
+            ),
+        )
+        val rawSmsById = parsedRecords.associate { record ->
+            record.event.rawSmsId to RawSms(
+                id = record.event.rawSmsId,
+                sender = "AlJazira",
+                body = body,
+                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
+                deviceMessageId = record.event.id,
+                bodyHash = record.event.id,
+            )
+        }
+        val debit = CardRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "8219",
+            ownership = OwnershipStatus.OWNED,
+            cardType = CardType.DEBIT,
+            linkedAccountBankId = Bank.BANK_ALJAZIRA.id,
+            linkedAccountMaskedNumber = "3001",
+            firstSeenRawSmsId = "sms",
+            lastSeenRawSmsId = "sms",
+        )
+
+        val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
+            salaryPeriod = salaryPeriod,
+            debitCards = listOf(debit),
+            transactions = listOf(cash),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            zoneId = zoneId,
+        )
+
+        assertEquals(BigDecimal("2200.00"), result.spendingByCardKey["BANK_ALJAZIRA:8219"]?.amount)
+        assertEquals(setOf("cash-atm"), result.transactionDebitSpendInvolvement.keys)
+    }
+
+    @Test
     fun billPaymentOnLinkedAccount_isExcludedFromMadaSpending() {
         val owned = "account:bank_aljazira:3001"
         val billPayment = tx(

@@ -2,8 +2,10 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.bank.aljazira.extraction.CardExtractor
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
@@ -13,11 +15,12 @@ object CardTransactionInvolvementResolver {
     fun buildIndex(
         transactions: List<FinancialTransaction>,
         parsedRecords: List<ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): Map<String, Set<String>> {
         if (transactions.isEmpty()) return emptyMap()
         val parsedById = parsedRecords.associateBy { it.event.id }
         return transactions.associate { tx ->
-            val keys = linkedCardKeys(tx, parsedById).toMutableSet()
+            val keys = linkedCardKeys(tx, parsedById, rawSmsById).toMutableSet()
             FinancialContainerIdParser.cardLast4(tx.sourceContainerId)?.let { last4 ->
                 FinancialContainerIdParser.cardBankId(tx.sourceContainerId)?.let { bankId ->
                     keys += cardKey(bankId, last4)
@@ -47,10 +50,21 @@ object CardTransactionInvolvementResolver {
     private fun linkedCardKeys(
         tx: FinancialTransaction,
         parsedById: Map<String, ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
     ): Set<String> =
         tx.linkedParsedEventIds.mapNotNull { eventId ->
-            parsedById[eventId]?.event?.cardRef?.toCardKey()
+            val record = parsedById[eventId] ?: return@mapNotNull null
+            cardKeyFromEvent(record, rawSmsById)
         }.toSet()
+
+    private fun cardKeyFromEvent(
+        record: ParsedEventRecord,
+        rawSmsById: Map<String, RawSms>,
+    ): String? {
+        record.event.cardRef?.toCardKey()?.let { return it }
+        val body = rawSmsById[record.event.rawSmsId]?.body ?: return null
+        return CardExtractor.extractFromText(body, record.event.bank)?.toCardKey()
+    }
 
     private fun CardReference.toCardKey(): String? {
         val digits = last4 ?: return null

@@ -175,6 +175,22 @@ class OwnershipDiscoveryServiceTest {
     }
 
     @Test
+    fun withdrawal_discoversMadaCardWhenPresent() = runBlocking {
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val card = CardReference(Bank.BANK_ALJAZIRA, "8219")
+        discovery.observe(
+            event(
+                family = MessageFamily.WITHDRAWAL,
+                rawSmsId = "wd-atm",
+                source = source,
+                card = card,
+            ),
+        )
+        assertEquals(OwnershipStatus.UNKNOWN, accounts.resolve(source))
+        assertEquals(OwnershipStatus.UNKNOWN, cards.resolve(card))
+    }
+
+    @Test
     fun balanceNotice_prefersSourceThenDestination() = runBlocking {
         val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
         discovery.observe(

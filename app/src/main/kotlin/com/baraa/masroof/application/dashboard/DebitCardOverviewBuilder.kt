@@ -53,7 +53,11 @@ object DebitCardOverviewBuilder {
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
             .format(salaryPeriod.startDate)
-        val cardInvolvement = CardTransactionInvolvementResolver.buildIndex(transactions, parsedRecords)
+        val cardInvolvement = CardTransactionInvolvementResolver.buildIndex(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+        )
         val context = AccountFlowClassifier.buildContext(
             transactions = transactions,
             parsedRecords = parsedRecords,

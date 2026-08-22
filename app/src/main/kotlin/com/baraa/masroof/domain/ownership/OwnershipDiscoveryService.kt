@@ -56,6 +56,7 @@ class OwnershipDiscoveryService(
 
             MessageFamily.WITHDRAWAL -> {
                 event.sourceAccountRef?.let(accounts::add)
+                event.cardRef?.let(cards::add)
             }
 
             MessageFamily.BALANCE_NOTICE -> {
