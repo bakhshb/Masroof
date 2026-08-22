@@ -21,6 +21,7 @@ interface ReviewItemDao {
     @Query("SELECT * FROM review_item ORDER BY createdAtEpochMillis, id")
     suspend fun listAll(): List<ReviewItemEntity>
 
+    /** [ReviewStatus.RESOLVED] rows dismissed as non-financial / ignored by the user. */
     @Query(
         """
         SELECT * FROM review_item

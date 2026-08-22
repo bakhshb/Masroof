@@ -92,7 +92,7 @@ class SettingsViewModelTest {
             CardRegistryEntry(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL, "3", "3"),
         )
         var refreshCalls = 0
-        val vm = viewModel(cards = cards) { refreshCalls++ }
+        val vm = viewModel(cards = cards, onRefreshReviewQueue = { refreshCalls++ })
         vm.refresh()
         advanceUntilIdle()
         vm.resumeTracking(ManagedCardUi(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL))
@@ -154,11 +154,45 @@ class SettingsViewModelTest {
         assertTrue(vm.uiState.value.stoppedAccounts.any { it.maskedNumber == "3001" })
     }
 
+    @Test
+    fun importSmsFromPhone_allDuplicates_reportsAlreadyUpToDate() = runTest {
+        val vm = viewModel(
+            importSmsFromInbox = {
+                com.baraa.masroof.sms.scanner.SmsScanResult(scanned = 3, duplicates = 3, parsed = 0)
+            },
+        )
+        vm.importSmsFromPhone()
+        advanceUntilIdle()
+
+        assertEquals(SmsImportMessage.ALREADY_UP_TO_DATE, vm.uiState.value.smsImportMessage)
+    }
+
+    @Test
+    fun importSmsFromPhone_reviewRequired_reportsNeedsReview() = runTest {
+        val vm = viewModel(
+            importSmsFromInbox = {
+                com.baraa.masroof.sms.scanner.SmsScanResult(
+                    scanned = 2,
+                    reviewRequired = 2,
+                    inserted = 2,
+                    parsed = 0,
+                )
+            },
+        )
+        vm.importSmsFromPhone()
+        advanceUntilIdle()
+
+        assertEquals(SmsImportMessage.NEEDS_REVIEW, vm.uiState.value.smsImportMessage)
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
+        importSmsFromInbox: suspend () -> com.baraa.masroof.sms.scanner.SmsScanResult = {
+            com.baraa.masroof.sms.scanner.SmsScanResult()
+        },
     ): SettingsViewModel =
         SettingsViewModel(
             cardRegistryRepository = cards,
@@ -172,7 +206,7 @@ class SettingsViewModelTest {
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
-            importSmsFromInbox = { com.baraa.masroof.sms.scanner.SmsScanResult() },
+            importSmsFromInbox = importSmsFromInbox,
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
             appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),

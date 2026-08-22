@@ -400,6 +400,40 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun refreshWithSmsImport_allDuplicates_reportsAlreadyUpToDate() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = true,
+            rescanService = {
+                SmsScanResult(scanned = 4, duplicates = 4, parsed = 0)
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(SmsRescanStatus.ALREADY_UP_TO_DATE, vm.uiState.value.rescanStatus)
+    }
+
+    @Test
+    fun refreshWithSmsImport_reviewRequired_reportsNeedsReview() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))
+        val vm = viewModel(
+            loader = loader,
+            permissionGranted = true,
+            rescanService = {
+                SmsScanResult(scanned = 2, reviewRequired = 2, parsed = 0, inserted = 2)
+            },
+        )
+        vm.refreshWithSmsImport()
+        advanceUntilIdle()
+
+        assertEquals(SmsRescanStatus.NEEDS_REVIEW, vm.uiState.value.rescanStatus)
+    }
+
+    @Test
     fun onAppResumed_afterPermissionGranted_triggersRescan() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "10.00"))

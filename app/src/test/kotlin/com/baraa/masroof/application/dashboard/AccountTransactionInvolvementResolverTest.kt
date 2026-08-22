@@ -96,11 +96,49 @@ class AccountTransactionInvolvementResolverTest {
         assertTrue(index["other"].isNullOrEmpty())
     }
 
+    @Test
+    fun selfTransfer_mapsToBothOwnedAccounts() {
+        val accountA = AccountRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            maskedNumber = "3001",
+            ownership = OwnershipStatus.OWNED,
+            firstSeenRawSmsId = null,
+            lastSeenRawSmsId = null,
+        )
+        val accountB = AccountRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            maskedNumber = "3002",
+            ownership = OwnershipStatus.OWNED,
+            firstSeenRawSmsId = null,
+            lastSeenRawSmsId = null,
+        )
+        val containerA = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val containerB = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
+        val tx = tx(
+            id = "self",
+            type = FinancialTransactionType.SELF_TRANSFER,
+            amount = "500.00",
+            source = containerA,
+            destination = containerB,
+            linked = emptyList(),
+        )
+
+        val index = AccountTransactionInvolvementResolver.buildIndex(
+            transactions = listOf(tx),
+            parsedRecords = emptyList(),
+            rawSmsById = emptyMap(),
+            ownedAccounts = listOf(accountA, accountB),
+        )
+
+        assertEquals(setOf(containerA, containerB), index["self"])
+    }
+
     private fun tx(
         id: String,
         type: FinancialTransactionType,
         amount: String,
         source: String? = null,
+        destination: String? = null,
         linked: List<String> = listOf("evt-$id"),
     ): FinancialTransaction =
         FinancialTransaction(
@@ -109,7 +147,7 @@ class AccountTransactionInvolvementResolverTest {
             amount = Money.of(amount, Currency.SAR),
             occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
             sourceContainerId = source,
-            destinationContainerId = null,
+            destinationContainerId = destination,
             merchant = null,
             counterparty = null,
             categoryId = null,

@@ -29,6 +29,7 @@ object SmsScanUserOutcomeMapper {
             result.notRelevant == result.scanned -> SmsScanUserOutcome.NO_BANK_SMS
             result.parsed > 0 -> SmsScanUserOutcome.OK
             result.reviewRequired > 0 -> SmsScanUserOutcome.NEEDS_REVIEW
+            result.failed > 0 -> SmsScanUserOutcome.FAILED
             isAlreadyImported(result) -> SmsScanUserOutcome.ALREADY_UP_TO_DATE
             else -> SmsScanUserOutcome.NO_NEW_TRANSACTIONS
         }

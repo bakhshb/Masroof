@@ -53,4 +53,30 @@ class SmsScanUserOutcomeMapperTest {
         )
         assertEquals(SmsScanUserOutcome.NO_NEW_TRANSACTIONS, outcome)
     }
+
+    @Test
+    fun bankMessagesWithFailures_isFailed() {
+        val outcome = SmsScanUserOutcomeMapper.map(
+            SmsScanResult(
+                scanned = 3,
+                duplicates = 1,
+                failed = 2,
+                parsed = 0,
+            ),
+        )
+        assertEquals(SmsScanUserOutcome.FAILED, outcome)
+    }
+
+    @Test
+    fun unsupportedBankMessages_isNoNewTransactions() {
+        val outcome = SmsScanUserOutcomeMapper.map(
+            SmsScanResult(
+                scanned = 2,
+                unsupported = 2,
+                parsed = 0,
+                duplicates = 0,
+            ),
+        )
+        assertEquals(SmsScanUserOutcome.NO_NEW_TRANSACTIONS, outcome)
+    }
 }

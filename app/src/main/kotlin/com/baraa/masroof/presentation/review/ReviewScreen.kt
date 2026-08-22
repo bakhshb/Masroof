@@ -106,13 +106,13 @@ private fun ReviewListScreen(
                     selected = state.listMode == ReviewListMode.PENDING,
                     onClick = { onListModeChange(ReviewListMode.PENDING) },
                     label = { Text(stringResource(R.string.review_tab_pending)) },
-                    enabled = !state.loading || state.items.isNotEmpty(),
+                    enabled = !state.resolving,
                 )
                 FilterChip(
                     selected = state.listMode == ReviewListMode.IGNORED,
                     onClick = { onListModeChange(ReviewListMode.IGNORED) },
                     label = { Text(stringResource(R.string.review_tab_ignored)) },
-                    enabled = !state.loading || state.items.isNotEmpty(),
+                    enabled = !state.resolving,
                 )
             }
             when {

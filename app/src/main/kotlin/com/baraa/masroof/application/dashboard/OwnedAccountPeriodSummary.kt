@@ -22,13 +22,13 @@ object OwnedAccountPeriodSummaryCalculator {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         rawSmsById: Map<String, RawSms>,
-    ): List<OwnedAccountPeriodSummary> =
-        ownedAccounts.mapNotNull { account ->
+    ): List<OwnedAccountPeriodSummary> {
+        val scopesByContainer = CurrentAccountScopeFactory.singleAccountScopes(ownedAccounts)
+        return ownedAccounts.mapNotNull { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
                 ?: return@mapNotNull null
-            val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                listOf(account.maskedNumber),
-            )
+            val scope = scopesByContainer[containerId] ?: return@mapNotNull null
+            val last4s = scope.ownedAccountLast4s
             val summary = CurrentAccountSummaryCalculator.summarize(
                 transactions = transactions,
                 parsedRecords = parsedRecords,
@@ -45,4 +45,5 @@ object OwnedAccountPeriodSummaryCalculator {
                 summary = summary,
             )
         }
+    }
 }

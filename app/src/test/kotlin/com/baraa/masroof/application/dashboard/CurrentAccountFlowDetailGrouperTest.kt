@@ -2,7 +2,17 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -116,6 +126,69 @@ class CurrentAccountFlowDetailGrouperTest {
         assertEquals(listOf("self"), grouping.selfTransfersOut.map { it.id })
         assertEquals(listOf("self"), grouping.selfTransfersIn.map { it.id })
         assertEquals(listOf("xfer-out"), ids(grouping, FlowExpenseCategory.EXTERNAL_TRANSFER_OUT))
+    }
+
+    @Test
+    fun smsResolvedCashWithdrawalWithoutSource_groupsAsCashWithdrawalNotFee() {
+        val owned = "account:bank_aljazira:3001"
+        val cash = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = "cash-expense",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("500.00", Currency.SAR),
+            occurredAt = java.time.Instant.parse("2026-08-10T12:00:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-cash"),
+            appliedExchangeRate = null,
+            exchangeRateSource = null,
+        )
+        val parsedRecords = listOf(
+            ParsedEventRecord(
+                event = ParsedEvent(
+                    id = "evt-cash",
+                    rawSmsId = "sms-evt-cash",
+                    bank = Bank.BANK_ALJAZIRA,
+                    messageFamily = MessageFamily.WITHDRAWAL,
+                    direction = MoneyDirection.OUTGOING,
+                    amount = Money.of("500.00", Currency.SAR),
+                    purchaseChannel = null,
+                    sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    destinationAccountRef = null,
+                    cardRef = null,
+                    merchant = null,
+                    counterparty = "سحب نقدي\nمن حساب: 3001",
+                    occurredAt = java.time.Instant.parse("2026-08-10T12:00:00Z"),
+                    bankNetworkType = null,
+                    confidence = Confidence(1.0),
+                    parseStatus = ParseStatus.SUCCESS,
+                ),
+                details = ParsedEventDetails(),
+            ),
+        )
+        val rawSmsById = mapOf(
+            "sms-evt-cash" to RawSms(
+                id = "sms-evt-cash",
+                sender = "AlJazira",
+                body = "سحب نقدي\nمن حساب: 3001",
+                receivedAt = java.time.Instant.parse("2026-08-10T12:00:00Z"),
+                deviceMessageId = "1",
+                bodyHash = "h",
+            ),
+        )
+
+        val grouping = CurrentAccountFlowDetailGrouper.group(
+            transactions = listOf(cash),
+            parsedRecords = parsedRecords,
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = rawSmsById,
+        )
+
+        assertEquals(listOf("cash-expense"), ids(grouping, FlowExpenseCategory.CASH_WITHDRAWAL))
+        assertEquals(emptyList<String>(), ids(grouping, FlowExpenseCategory.FEE))
     }
 
     private fun ids(

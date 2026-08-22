@@ -14,7 +14,7 @@ import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.MissingGitHubTokenException
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.sms.scanner.SmsScanResult
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
+import com.baraa.masroof.presentation.common.toImportMessage
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
@@ -188,16 +188,7 @@ class SettingsViewModel(
     }
 
     private fun mapSmsImportMessage(result: SmsScanResult): SmsImportMessage =
-        when (SmsScanUserOutcomeMapper.map(result)) {
-            SmsScanUserOutcome.PERMISSION_DENIED -> SmsImportMessage.PERMISSION_DENIED
-            SmsScanUserOutcome.FAILED -> SmsImportMessage.FAILED
-            SmsScanUserOutcome.NO_MESSAGES -> SmsImportMessage.NO_MESSAGES
-            SmsScanUserOutcome.NO_BANK_SMS -> SmsImportMessage.NO_BANK_SMS
-            SmsScanUserOutcome.OK -> SmsImportMessage.OK
-            SmsScanUserOutcome.ALREADY_UP_TO_DATE -> SmsImportMessage.ALREADY_UP_TO_DATE
-            SmsScanUserOutcome.NEEDS_REVIEW -> SmsImportMessage.NEEDS_REVIEW
-            SmsScanUserOutcome.NO_NEW_TRANSACTIONS -> SmsImportMessage.NO_TRANSACTIONS
-        }
+        SmsScanUserOutcomeMapper.map(result).toImportMessage()
 
     fun clearUpdateMessage() {
         _uiState.update { it.copy(updateMessage = null) }

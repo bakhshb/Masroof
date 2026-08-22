@@ -12,8 +12,8 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.isUserIgnored
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.presentation.dashboard.MoneyUiFormatter
@@ -53,11 +53,7 @@ class ReviewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {
-                val summaries = when (_uiState.value.listMode) {
-                    ReviewListMode.PENDING -> detailLoader.loadSummaries()
-                    ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
-                }
-                applySummaries(summaries)
+                applySummaries(loadSummariesForCurrentMode())
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -65,6 +61,13 @@ class ReviewViewModel(
             }
         }
     }
+
+    private suspend fun loadSummariesForCurrentMode(): List<ReviewDetailLoader.ReviewSummary> =
+        summariesForListMode(
+            mode = _uiState.value.listMode,
+            loadPending = detailLoader::loadSummaries,
+            loadIgnored = detailLoader::loadIgnoredSummaries,
+        )
 
     fun setListMode(mode: ReviewListMode) {
         if (_uiState.value.listMode == mode) return
@@ -82,6 +85,7 @@ class ReviewViewModel(
     }
 
     fun dismissAllInformational() {
+        if (_uiState.value.listMode != ReviewListMode.PENDING) return
         viewModelScope.launch {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             try {
@@ -225,9 +229,9 @@ class ReviewViewModel(
                             error = null,
                         )
                     }
-                    applySummaries(detailLoader.loadSummaries())
+                    applySummaries(loadSummariesForCurrentMode())
                 } else {
-                    applySummaries(detailLoader.loadSummaries())
+                    applySummaries(loadSummariesForCurrentMode())
                     _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
                 }
             } catch (ce: CancellationException) {
@@ -286,7 +290,7 @@ class ReviewViewModel(
     }
 
     private suspend fun refreshAfterAction(message: ReviewMessage, closeDetail: Boolean) {
-        val summaries = detailLoader.loadSummaries()
+        val summaries = loadSummariesForCurrentMode()
         val items = summaries.map(::toListItem)
         _uiState.update {
             it.copy(
@@ -316,7 +320,7 @@ class ReviewViewModel(
     private fun toListItem(summary: ReviewDetailLoader.ReviewSummary): ReviewListItemUi {
         val review = summary.review
         val dateLabel = when {
-            isIgnoredReview(review) ->
+            review.isUserIgnored() ->
                 review.resolvedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format) ?: "—"
             else ->
                 summary.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format) ?: "—"
@@ -330,7 +334,7 @@ class ReviewViewModel(
         return ReviewListItemUi(
             id = review.id,
             kind = review.kind,
-            kindLabelRes = if (isIgnoredReview(review)) {
+            kindLabelRes = if (review.isUserIgnored()) {
                 com.baraa.masroof.R.string.review_status_ignored
             } else {
                 review.kind.toUiLabelRes()
@@ -340,13 +344,9 @@ class ReviewViewModel(
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
             dismissibleAsNonFinancial = dismissible,
-            ignored = isIgnoredReview(review),
+            ignored = review.isUserIgnored(),
         )
     }
-
-    private fun isIgnoredReview(review: com.baraa.masroof.domain.model.ReviewItem): Boolean =
-        review.status == ReviewStatus.RESOLVED &&
-            review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
 
     private suspend fun toDetailUi(
         detail: ReviewDetailLoader.ReviewDetail,
@@ -366,7 +366,7 @@ class ReviewViewModel(
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"
         val resolvedAtLabel = review.resolvedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
-        val ignored = isIgnoredReview(review)
+        val ignored = review.isUserIgnored()
         val ownershipCard = if (!ignored && review.reasons.any { it in OWNERSHIP_CARD_REASONS }) {
             detail.cardRef?.takeIf { cardRef ->
                 cardRef.last4 != null &&
@@ -378,7 +378,11 @@ class ReviewViewModel(
         return ReviewDetailUi(
             id = review.id,
             kind = review.kind,
-            kindLabelRes = review.kind.toUiLabelRes(),
+            kindLabelRes = if (ignored) {
+                com.baraa.masroof.R.string.review_status_ignored
+            } else {
+                review.kind.toUiLabelRes()
+            },
             sender = detail.sender,
             body = detail.body.orEmpty(),
             dateLabel = dateLabel,
@@ -411,3 +415,13 @@ class ReviewViewModel(
         )
     }
 }
+
+internal suspend fun summariesForListMode(
+    mode: ReviewListMode,
+    loadPending: suspend () -> List<ReviewDetailLoader.ReviewSummary>,
+    loadIgnored: suspend () -> List<ReviewDetailLoader.ReviewSummary>,
+): List<ReviewDetailLoader.ReviewSummary> =
+    when (mode) {
+        ReviewListMode.PENDING -> loadPending()
+        ReviewListMode.IGNORED -> loadIgnored()
+    }

@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
@@ -20,23 +19,19 @@ object AccountTransactionInvolvementResolver {
         if (transactions.isEmpty() || ownedAccounts.isEmpty()) return emptyMap()
 
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
-        val scopesByContainer = ownedAccounts.mapNotNull { account ->
-            val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
-                ?: return@mapNotNull null
-            val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                listOf(account.maskedNumber),
-            )
-            containerId to CurrentAccountTransactionScope(
-                ownedContainerIds = setOf(containerId),
-                ownedAccountLast4s = last4s,
-                mode = AccountFlowScopeMode.SingleAccount,
-            )
-        }.toMap()
+        val scopesByContainer = CurrentAccountScopeFactory.singleAccountScopes(ownedAccounts)
+        if (scopesByContainer.isEmpty()) return emptyMap()
 
+        val involvement = mutableMapOf<String, MutableSet<String>>()
+        for ((containerId, scope) in scopesByContainer) {
+            for (tx in transactions) {
+                if (scope.involvesOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
+                    involvement.getOrPut(tx.id) { linkedSetOf() }.add(containerId)
+                }
+            }
+        }
         return transactions.associate { tx ->
-            tx.id to scopesByContainer.filter { (_, scope) ->
-                scope.involvesOwnedAccount(tx, parsedRecordsById, rawSmsById)
-            }.keys
+            tx.id to involvement[tx.id].orEmpty()
         }
     }
 }
