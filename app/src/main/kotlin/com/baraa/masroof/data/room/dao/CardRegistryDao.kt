@@ -81,4 +81,71 @@ interface CardRegistryDao {
 
     @Query("SELECT * FROM card_registry ORDER BY bankId, last4")
     suspend fun listAll(): List<CardRegistryEntity>
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET displayName = :displayName
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateDisplayName(bankId: String, last4: String, displayName: String?): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardNetwork = :cardNetwork
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateCardNetwork(bankId: String, last4: String, cardNetwork: String?): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardType = :cardType
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateCardType(bankId: String, last4: String, cardType: String?): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET linkedAccountBankId = :linkedAccountBankId,
+            linkedAccountMaskedNumber = :linkedAccountMaskedNumber
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateLinkedAccount(
+        bankId: String,
+        last4: String,
+        linkedAccountBankId: String?,
+        linkedAccountMaskedNumber: String?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardRole = :cardRole,
+            parentCardLast4 = :parentCardLast4
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateCardRole(
+        bankId: String,
+        last4: String,
+        cardRole: String?,
+        parentCardLast4: String?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET cardRole = 'STANDALONE',
+            parentCardLast4 = NULL
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun clearSupplementaryRole(bankId: String, last4: String): Int
 }

@@ -49,9 +49,27 @@ class SettingsViewModelTest {
     @Test
     fun refresh_groupsCardsByOwnership() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.OWNED, "1", "1"),
-            CardRegistryEntry(Bank.BANK_ALJAZIRA, "5123", OwnershipStatus.UNKNOWN, "2", "2"),
-            CardRegistryEntry(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL, "3", "3"),
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "7271",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "5123",
+                OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = "2",
+                lastSeenRawSmsId = "2",
+            ),
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "9999",
+                OwnershipStatus.EXTERNAL,
+                firstSeenRawSmsId = "3",
+                lastSeenRawSmsId = "3",
+            ),
         )
         val vm = viewModel(cards = cards)
         vm.refresh()
@@ -73,9 +91,27 @@ class SettingsViewModelTest {
     @Test
     fun refresh_groupsAccountsByOwnership() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.OWNED, "1", "1"),
-            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3002", OwnershipStatus.UNKNOWN, "2", "2"),
-            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL, "3", "3"),
+            AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "3001",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
+            AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "3002",
+                OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = "2",
+                lastSeenRawSmsId = "2",
+            ),
+            AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "3003",
+                OwnershipStatus.EXTERNAL,
+                firstSeenRawSmsId = "3",
+                lastSeenRawSmsId = "3",
+            ),
         )
         val vm = viewModel(accounts = accounts)
         vm.refresh()
@@ -89,7 +125,13 @@ class SettingsViewModelTest {
     @Test
     fun resumeTracking_marksCardOwned() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL, "3", "3"),
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "9999",
+                OwnershipStatus.EXTERNAL,
+                firstSeenRawSmsId = "3",
+                lastSeenRawSmsId = "3",
+            ),
         )
         var refreshCalls = 0
         val vm = viewModel(cards = cards) { refreshCalls++ }
@@ -106,7 +148,13 @@ class SettingsViewModelTest {
     @Test
     fun resumeAccountTracking_marksAccountOwned() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL, "3", "3"),
+            AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "3003",
+                OwnershipStatus.EXTERNAL,
+                firstSeenRawSmsId = "3",
+                lastSeenRawSmsId = "3",
+            ),
         )
         val vm = viewModel(accounts = accounts)
         vm.refresh()
@@ -121,7 +169,13 @@ class SettingsViewModelTest {
     @Test
     fun confirmStopTracking_marksCardExternal() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.OWNED, "1", "1"),
+            CardRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "7271",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
         )
         val vm = viewModel(cards = cards)
         vm.refresh()
@@ -139,7 +193,13 @@ class SettingsViewModelTest {
     @Test
     fun confirmStopAccountTracking_marksAccountExternal() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.OWNED, "1", "1"),
+            AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                "3001",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
         )
         val vm = viewModel(accounts = accounts)
         vm.refresh()

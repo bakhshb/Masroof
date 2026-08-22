@@ -3,12 +3,6 @@ package com.baraa.masroof.data.room.entity
 import androidx.room.Entity
 import androidx.room.Index
 
-/**
- * Durable card ownership registry row.
- * Composite identity: [bankId] + [last4].
- *
- * [Bank.UNKNOWN][com.baraa.masroof.domain.model.Bank.UNKNOWN] must never be stored.
- */
 @Entity(
     tableName = "card_registry",
     primaryKeys = ["bankId", "last4"],
@@ -20,6 +14,13 @@ data class CardRegistryEntity(
     val bankId: String,
     val last4: String,
     val ownershipStatus: String,
+    val displayName: String? = null,
+    val cardNetwork: String? = null,
+    val cardType: String? = null,
+    val linkedAccountBankId: String? = null,
+    val linkedAccountMaskedNumber: String? = null,
+    val parentCardLast4: String? = null,
+    val cardRole: String? = null,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
 )

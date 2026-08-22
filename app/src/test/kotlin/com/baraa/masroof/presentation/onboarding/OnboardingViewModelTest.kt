@@ -335,11 +335,29 @@ class OnboardingViewModelTest {
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-                AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
-                AccountRegistryEntry(Bank.UNKNOWN, "9999", OwnershipStatus.UNKNOWN, null, null),
+AccountRegistryEntry(
+                    Bank.BANK_ALJAZIRA,
+                    "3001",
+                    OwnershipStatus.UNKNOWN,
+                    firstSeenRawSmsId = null,
+                    lastSeenRawSmsId = null,
+                ),
+                AccountRegistryEntry(
+                    Bank.UNKNOWN,
+                    "9999",
+                    OwnershipStatus.UNKNOWN,
+                    firstSeenRawSmsId = null,
+                    lastSeenRawSmsId = null,
+                ),
             ),
             cards = mutableListOf(
-                CardRegistryEntry(Bank.BANK_ALJAZIRA, "7271", OwnershipStatus.UNKNOWN, null, null),
+                CardRegistryEntry(
+                    Bank.BANK_ALJAZIRA,
+                    "7271",
+                    OwnershipStatus.UNKNOWN,
+                    firstSeenRawSmsId = null,
+                    lastSeenRawSmsId = null,
+                ),
             ),
         )
         advanceUntilIdle()
@@ -356,7 +374,13 @@ class OnboardingViewModelTest {
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-                AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
+                AccountRegistryEntry(
+                    Bank.BANK_ALJAZIRA,
+                    "3001",
+                    OwnershipStatus.UNKNOWN,
+                    firstSeenRawSmsId = null,
+                    lastSeenRawSmsId = null,
+                ),
             ),
         )
         advanceUntilIdle()
@@ -377,7 +401,13 @@ class OnboardingViewModelTest {
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-                AccountRegistryEntry(Bank.BANK_ALJAZIRA, "3001", OwnershipStatus.UNKNOWN, null, null),
+                AccountRegistryEntry(
+                    Bank.BANK_ALJAZIRA,
+                    "3001",
+                    OwnershipStatus.UNKNOWN,
+                    firstSeenRawSmsId = null,
+                    lastSeenRawSmsId = null,
+                ),
             ),
         )
         advanceUntilIdle()
@@ -556,7 +586,13 @@ class OnboardingViewModelTest {
         override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
             val idx = entries.indexOfFirst { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
             if (idx >= 0) entries[idx] = entries[idx].copy(ownership = status)
-            else entries += AccountRegistryEntry(reference.bank, reference.maskedNumber ?: "", status, null, null)
+            else entries += AccountRegistryEntry(
+                reference.bank,
+                reference.maskedNumber ?: "",
+                status,
+                firstSeenRawSmsId = null,
+                lastSeenRawSmsId = null,
+            )
         }
         override suspend fun resolve(reference: AccountReference): OwnershipStatus =
             entries.firstOrNull { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }?.ownership
@@ -565,7 +601,13 @@ class OnboardingViewModelTest {
             entries.firstOrNull { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
         fun addUnknown(maskedNumber: String) {
-            entries += AccountRegistryEntry(Bank.BANK_ALJAZIRA, maskedNumber, OwnershipStatus.UNKNOWN, null, null)
+            entries += AccountRegistryEntry(
+                Bank.BANK_ALJAZIRA,
+                maskedNumber,
+                OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = null,
+                lastSeenRawSmsId = null,
+            )
         }
     }
 
@@ -576,7 +618,13 @@ class OnboardingViewModelTest {
         override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
             val idx = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
             if (idx >= 0) entries[idx] = entries[idx].copy(ownership = status)
-            else entries += CardRegistryEntry(reference.bank, reference.last4 ?: "", status, null, null)
+            else entries += CardRegistryEntry(
+                reference.bank,
+                reference.last4 ?: "",
+                status,
+                firstSeenRawSmsId = null,
+                lastSeenRawSmsId = null,
+            )
         }
         override suspend fun resolve(reference: CardReference): OwnershipStatus =
             entries.firstOrNull { it.bank == reference.bank && it.last4 == reference.last4 }?.ownership
