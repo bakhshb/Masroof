@@ -81,7 +81,6 @@ fun CreditFacilitiesSection(
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
                         ownedCards = ownedCards,
-                        allowInlineExpand = false,
                         modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
