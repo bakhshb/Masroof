@@ -127,7 +127,6 @@ class MadaGooglePayPosReproTest {
             lastSeenRawSmsId = "sms",
         )
         val owned = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
-            ?: error("account id")
 
         val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
             salaryPeriod = salaryPeriod,
