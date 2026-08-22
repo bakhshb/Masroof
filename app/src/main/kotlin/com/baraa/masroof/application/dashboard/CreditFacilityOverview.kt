@@ -102,9 +102,8 @@ object CreditFacilityOverviewBuilder {
         }
 
         if (facilities.isEmpty() && overview.cards.isNotEmpty()) {
-            val grouped = overview.cards.map { buildFacility(overview, it, emptyList()) }
             return CreditFacilitiesOverview(
-                facilities = grouped,
+                facilities = emptyList(),
                 debitCards = debitCards,
                 legacyFlat = overview,
                 currency = overview.currency,

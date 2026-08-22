@@ -51,6 +51,26 @@ class CreditFacilityOverviewBuilderTest {
     }
 
     @Test
+    fun noOwnedCredit_doesNotFallbackToAllTransactionCards() {
+        val overview = CreditCardsOverview(
+            cards = listOf(row("1111", "100.00")),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount(BigDecimal("100.00"), Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount(BigDecimal("100.00"), Currency.SAR),
+            aggregateStatementPeriodLabel = "Jul-Aug",
+            calendarMonthLabel = null,
+            salaryPeriodLabel = "Aug",
+            currency = Currency.SAR,
+        )
+
+        val facilities = CreditFacilityOverviewBuilder.build(overview, registryCards = emptyList())
+
+        assertEquals(0, facilities.facilities.size)
+    }
+
+    @Test
     fun groupsPrimaryWithSupplementariesAndSumsFacilitySpending() {
         val overview = CreditCardsOverview(
             cards = listOf(

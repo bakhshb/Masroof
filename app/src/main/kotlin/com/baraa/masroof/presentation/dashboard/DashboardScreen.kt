@@ -320,19 +320,17 @@ private fun DashboardCustomizableSections(
                 }
 
                 DashboardSectionId.CARDS -> {
-                    val facilities = state.creditFacilities
                     val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
-                    if (facilities != null && facilities.hasContent) {
+                    val followedFacilities = state.followedCreditFacilities()
+                    if (followedFacilities != null) {
                         CreditFacilitiesSection(
-                            overview = facilities,
+                            overview = followedFacilities,
                             cardNetworksByLast4 = cardNetworks,
                             zoneId = ZoneId.systemDefault(),
                             onViewAll = onOpenCardsSummary,
                         )
                     } else {
-                        state.creditCards?.let { creditCards ->
-                            val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-                            val followedOverview = creditCards.followedOnly(ownedLast4s)
+                        state.followedCreditCardsOverview()?.let { followedOverview ->
                             if (followedOverview.hasContent) {
                                 CreditCardsSection(
                                     overview = followedOverview,

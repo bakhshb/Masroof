@@ -52,7 +52,7 @@ fun CardsSummaryRoute(
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
     val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
-    val followedFacilities = followedCreditFacilities(state)
+    val followedFacilities = state.followedCreditFacilities()
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
             ?.flatMap { it.allCards }
@@ -113,7 +113,7 @@ fun CardsSummaryScreen(
     onOpenCard: (CreditCardDashboardRow) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
-    val followedFacilities = followedCreditFacilities(state)
+    val followedFacilities = state.followedCreditFacilities()
     val followedOverview = followedCreditCardsOverview(state)
 
     DashboardSummaryScaffold(
@@ -189,7 +189,7 @@ fun CardsSummaryScreen(
 @Composable
 private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
     val extended = MasroofThemeExtras.extendedColors
-    val primaryRows = overview.facilities.map { it.primary }
+    val primaryRows = overview.facilities.flatMap { it.allCards }
     val due = resolveLatestStatementDue(primaryRows)?.amount
     val periodSpending = sumSignedAmounts(overview.facilities.map { it.facilitySalaryPeriodSpending })
     val statementSpending = sumSignedAmounts(overview.facilities.map { it.facilityStatementSpending })
@@ -369,23 +369,8 @@ private fun CardsSummaryHeader(
     }
 }
 
-private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOverview? {
-    val overview = state.creditCards ?: return null
-    val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-    return overview.followedOnly(ownedLast4s)
-}
-
-private fun followedCreditFacilities(state: DashboardUiState): CreditFacilitiesOverview? {
-    val overview = state.creditFacilities ?: return null
-    if (!overview.hasContent) return null
-    val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-    val facilities = overview.facilities.filter { facility ->
-        facility.allCards.any { it.last4 in ownedLast4s }
-    }
-    val debitCards = overview.debitCards.filter { it.last4 in ownedLast4s }
-    if (facilities.isEmpty() && debitCards.isEmpty()) return null
-    return overview.copy(facilities = facilities, debitCards = debitCards)
-}
+private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOverview? =
+    state.followedCreditCardsOverview()
 
 @Composable
 private fun spendingAmountColor(
