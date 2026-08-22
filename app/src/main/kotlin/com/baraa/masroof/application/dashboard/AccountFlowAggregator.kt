@@ -6,8 +6,7 @@ import com.baraa.masroof.core.money.Currency
  * Combines per-account [CurrentAccountSummary] values into one aggregate summary.
  *
  * Used when the UI needs raw category buckets across all owned accounts.
- * For display totals prefer [CurrentAccountSummary.externalMovement] or
- * [OwnedAccountsFlowSummary.totalRemaining].
+ * For display totals prefer [OwnedAccount.remaining] or [AccountsSummary.totalRemaining].
  */
 object AccountFlowAggregator {
     fun aggregate(summaries: Collection<CurrentAccountSummary>): CurrentAccountSummary {
