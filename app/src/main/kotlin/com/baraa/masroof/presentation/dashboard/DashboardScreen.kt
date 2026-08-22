@@ -320,15 +320,27 @@ private fun DashboardCustomizableSections(
                 }
 
                 DashboardSectionId.CARDS -> {
-                    state.creditCards?.let { creditCards ->
-                        val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
-                        val followedOverview = creditCards.followedOnly(ownedLast4s)
-                        if (followedOverview.hasContent) {
-                            CreditCardsSection(
-                                overview = followedOverview,
-                                zoneId = ZoneId.systemDefault(),
-                                onViewAll = onOpenCardsSummary,
-                            )
+                    val facilities = state.creditFacilities
+                    val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
+                    if (facilities != null && facilities.facilities.isNotEmpty()) {
+                        CreditFacilitiesSection(
+                            overview = facilities,
+                            cardNetworksByLast4 = cardNetworks,
+                            zoneId = ZoneId.systemDefault(),
+                            onViewAll = onOpenCardsSummary,
+                        )
+                    } else {
+                        state.creditCards?.let { creditCards ->
+                            val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
+                            val followedOverview = creditCards.followedOnly(ownedLast4s)
+                            if (followedOverview.hasContent) {
+                                CreditCardsSection(
+                                    overview = followedOverview,
+                                    cardNetworksByLast4 = cardNetworks,
+                                    zoneId = ZoneId.systemDefault(),
+                                    onViewAll = onOpenCardsSummary,
+                                )
+                            }
                         }
                     }
                 }

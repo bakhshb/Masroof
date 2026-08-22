@@ -50,7 +50,11 @@ object DashboardSummaryTransactionFilter {
     fun forCard(
         transactions: List<TransactionPreviewUi>,
         last4: String,
-    ): List<TransactionPreviewUi> = transactions.filter { it.cardLast4 == last4 }
+    ): List<TransactionPreviewUi> = transactions.filter { tx ->
+        tx.sourceContainerId?.endsWith(":$last4") == true ||
+            tx.destinationContainerId?.endsWith(":$last4") == true ||
+            tx.cardLast4 == last4
+    }
 }
 
 @Composable

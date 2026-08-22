@@ -423,6 +423,8 @@ class DashboardViewModel(
                         currentAccount = null,
                         spendingSplit = null,
                         creditCards = null,
+                        creditFacilities = null,
+                        accountsFleet = null,
                         recentTransactions = emptyList(),
                         allTransactions = emptyList(),
                         flowDetailGrouping = null,
@@ -454,6 +456,8 @@ class DashboardViewModel(
                         currentAccount = overview.currentAccount,
                         spendingSplit = overview.spendingSplit,
                         creditCards = overview.creditCards,
+                        creditFacilities = overview.creditFacilities,
+                        accountsFleet = overview.accountsFleet,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),
                         allTransactions = previews,
                         flowDetailGrouping = overview.flowDetailGrouping,
@@ -492,6 +496,8 @@ class DashboardViewModel(
                             currentAccount = null,
                             spendingSplit = null,
                             creditCards = null,
+                        creditFacilities = null,
+                        accountsFleet = null,
                             recentTransactions = emptyList(),
                             allTransactions = emptyList(),
                             flowDetailGrouping = null,
@@ -552,7 +558,13 @@ class DashboardViewModel(
     private suspend fun loadOwnedAccounts(): List<OwnedAccountUi> =
         accountRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
-            .map { OwnedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber) }
+            .map {
+                OwnedAccountUi(
+                    bank = it.bank,
+                    maskedNumber = it.maskedNumber,
+                    displayName = it.displayName,
+                )
+            }
             .sortedBy { it.maskedNumber }
 
     private fun mergeOwnedAccounts(
@@ -569,6 +581,13 @@ class DashboardViewModel(
     private suspend fun loadOwnedCards(): List<OwnedCardUi> =
         cardRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
-            .map { OwnedCardUi(bank = it.bank, last4 = it.last4) }
+            .map {
+                OwnedCardUi(
+                    bank = it.bank,
+                    last4 = it.last4,
+                    displayName = it.displayName,
+                    cardNetwork = it.cardNetwork,
+                )
+            }
             .sortedBy { it.last4 }
 }

@@ -123,7 +123,10 @@ fun AccountsSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AccountsSummaryHeroCard(ownedAccounts = state.ownedAccounts)
+            AccountsSummaryHeroCard(
+                ownedAccounts = state.ownedAccounts,
+                fleet = state.accountsFleet,
+            )
 
             AccountsSummaryHeader(
                 accountCount = state.ownedAccounts.size,
@@ -149,9 +152,12 @@ fun AccountsSummaryScreen(
 }
 
 @Composable
-private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
+private fun AccountsSummaryHeroCard(
+    ownedAccounts: List<OwnedAccountUi>,
+    fleet: com.baraa.masroof.application.dashboard.AccountsSummary? = null,
+) {
     val extended = MasroofThemeExtras.extendedColors
-    val fleet = AccountsSummary(
+    val resolvedFleet = fleet ?: AccountsSummary(
         accounts = ownedAccounts.mapNotNull { account ->
             account.periodSummary?.let { summary ->
                 OwnedAccount.from(
@@ -162,9 +168,9 @@ private fun AccountsSummaryHeroCard(ownedAccounts: List<OwnedAccountUi>) {
             }
         },
     )
-    val totalRemaining = fleet.totalRemaining
-    val totalInflow = fleet.totalInflow
-    val totalOutflow = fleet.totalOutflow
+    val totalRemaining = resolvedFleet.totalRemaining
+    val totalInflow = resolvedFleet.totalInflow
+    val totalOutflow = resolvedFleet.totalOutflow
     val remainingColor = when {
         totalRemaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
         totalRemaining.amount.signum() > 0 -> extended.inflow

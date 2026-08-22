@@ -102,6 +102,20 @@ fun SettingsRoute(
             onResumeTracking = viewModel::resumeTracking,
             onDismissStopConfirm = viewModel::dismissStopConfirm,
             onConfirmStopTracking = viewModel::confirmStopTracking,
+            onRenameCard = viewModel::openRenameCard,
+            onDismissRenameCard = viewModel::dismissRenameCard,
+            onSaveCardName = viewModel::saveCardDisplayName,
+            onPickCardNetwork = viewModel::openCardNetworkPicker,
+            onDismissCardNetwork = viewModel::dismissCardNetworkPicker,
+            onSelectCardNetwork = viewModel::setCardNetwork,
+            onPickCardRole = viewModel::openCardRolePicker,
+            onDismissCardRole = viewModel::dismissCardRolePicker,
+            onSetPrimaryCard = viewModel::setPrimaryCard,
+            onSetSupplementaryCard = viewModel::setSupplementaryCard,
+            onClearCardRole = viewModel::clearCardRole,
+            onLinkDebitCard = viewModel::openLinkDebitCard,
+            onDismissLinkDebit = viewModel::dismissLinkDebitCard,
+            onConfirmLinkDebit = viewModel::linkDebitToAccount,
         )
 
         SettingsDestination.MyAccounts -> SettingsMyAccountsScreen(
@@ -113,6 +127,9 @@ fun SettingsRoute(
             onResumeTracking = viewModel::resumeAccountTracking,
             onDismissStopConfirm = viewModel::dismissStopConfirm,
             onConfirmStopTracking = viewModel::confirmStopAccountTracking,
+            onRenameAccount = viewModel::openRenameAccount,
+            onDismissRenameAccount = viewModel::dismissRenameAccount,
+            onSaveAccountName = viewModel::saveAccountDisplayName,
         )
 
         SettingsDestination.About -> SettingsAboutScreen(

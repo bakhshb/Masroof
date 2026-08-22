@@ -41,6 +41,7 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.Instant
 import java.time.ZoneId
@@ -56,6 +57,7 @@ fun CreditCardsSection(
     overview: CreditCardsOverview,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
+    cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?> = emptyMap(),
     onViewAll: (() -> Unit)? = null,
 ) {
     if (!overview.hasContent) return
@@ -78,6 +80,7 @@ fun CreditCardsSection(
                     salaryPeriodLabel = overview.salaryPeriodLabel,
                     zoneId = zoneId,
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
+                    cardNetwork = cardNetworksByLast4[row.last4],
                     modifier = Modifier.width(268.dp),
                 )
             }
@@ -90,6 +93,7 @@ fun CreditCardCompactListRow(
     row: CreditCardDashboardRow,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    cardNetwork: CardNetwork? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val statementLabel = if (row.statementPeriodLabel != null) {
@@ -112,7 +116,7 @@ fun CreditCardCompactListRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CreditCardBrandBadge(last4 = row.last4)
+            CardNetworkBadge(network = cardNetwork, last4 = row.last4)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(
@@ -169,6 +173,7 @@ fun CreditCardSummaryTile(
     modifier: Modifier = Modifier,
     presentation: CreditCardMetricsPresentation = CreditCardMetricsPresentation.SummaryPurchases,
     showBalanceAndDue: Boolean = presentation == CreditCardMetricsPresentation.SummaryPurchases,
+    cardNetwork: CardNetwork? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val locale = LocalConfiguration.current.locales[0]
@@ -227,7 +232,7 @@ fun CreditCardSummaryTile(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    CreditCardBrandBadge(last4 = row.last4)
+                    CardNetworkBadge(network = cardNetwork, last4 = row.last4)
                     Column {
                         Text(
                             stringResource(
@@ -321,30 +326,6 @@ private fun spendingColor(amount: SignedMoneyAmount): androidx.compose.ui.graphi
         amount.amount.signum() > 0 -> extended.outflow
         amount.amount.signum() < 0 -> extended.inflow
         else -> MaterialTheme.colorScheme.onSurface
-    }
-}
-
-@Composable
-private fun CreditCardBrandBadge(last4: String) {
-    val colors = when (last4.firstOrNull()?.digitToIntOrNull()?.rem(3)) {
-        0 -> listOf(androidx.compose.ui.graphics.Color(0xFFEB001B), androidx.compose.ui.graphics.Color(0xFFF79E1B))
-        1 -> listOf(androidx.compose.ui.graphics.Color(0xFF1A1F71), androidx.compose.ui.graphics.Color(0xFF1A1F71))
-        else -> listOf(androidx.compose.ui.graphics.Color(0xFF004D40), androidx.compose.ui.graphics.Color(0xFF00695C))
-    }
-    Box(
-        modifier = Modifier
-            .size(width = 36.dp, height = 24.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(colors),
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            "••",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = androidx.compose.ui.graphics.Color.White,
-        )
     }
 }
 

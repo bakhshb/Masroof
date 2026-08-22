@@ -6,22 +6,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.formatCardLast4
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,12 +32,60 @@ fun SettingsMyCardsScreen(
     onResumeTracking: (ManagedCardUi) -> Unit,
     onDismissStopConfirm: () -> Unit,
     onConfirmStopTracking: () -> Unit,
+    onRenameCard: (ManagedCardUi) -> Unit,
+    onDismissRenameCard: () -> Unit,
+    onSaveCardName: (String) -> Unit,
+    onPickCardNetwork: (ManagedCardUi) -> Unit,
+    onDismissCardNetwork: () -> Unit,
+    onSelectCardNetwork: (com.baraa.masroof.domain.model.CardNetwork?) -> Unit,
+    onPickCardRole: (ManagedCardUi) -> Unit,
+    onDismissCardRole: () -> Unit,
+    onSetPrimaryCard: (ManagedCardUi) -> Unit,
+    onSetSupplementaryCard: (ManagedCardUi, String) -> Unit,
+    onClearCardRole: (ManagedCardUi) -> Unit,
+    onLinkDebitCard: (ManagedCardUi) -> Unit,
+    onDismissLinkDebit: () -> Unit,
+    onConfirmLinkDebit: (ManagedCardUi, ManagedAccountUi) -> Unit,
 ) {
     SettingsStopConfirmDialog(
         target = state.stopConfirmCardTarget,
         updating = state.updating,
         onDismiss = onDismissStopConfirm,
         onConfirm = onConfirmStopTracking,
+    )
+    SettingsRenameCardDialog(
+        target = state.renameCardTarget,
+        updating = state.updating,
+        onDismiss = onDismissRenameCard,
+        onSave = onSaveCardName,
+    )
+    SettingsCardNetworkDialog(
+        target = state.cardNetworkTarget,
+        updating = state.updating,
+        onDismiss = onDismissCardNetwork,
+        onSelect = onSelectCardNetwork,
+    )
+    SettingsCardRoleDialog(
+        target = state.cardRoleTarget,
+        primaryCards = state.followedCards.filter {
+            it.cardRole == com.baraa.masroof.domain.model.CardRole.PRIMARY
+        },
+        updating = state.updating,
+        onDismiss = onDismissCardRole,
+        onSetPrimary = { state.cardRoleTarget?.let(onSetPrimaryCard) },
+        onSetSupplementary = { primaryLast4 ->
+            state.cardRoleTarget?.let { onSetSupplementaryCard(it, primaryLast4) }
+        },
+        onClearRole = { state.cardRoleTarget?.let(onClearCardRole) },
+    )
+    SettingsLinkDebitDialog(
+        target = state.linkDebitTarget,
+        accounts = state.followedAccounts,
+        updating = state.updating,
+        onDismiss = onDismissLinkDebit,
+        onLink = { account ->
+            state.linkDebitTarget?.let { onConfirmLinkDebit(it, account) }
+        },
     )
 
     MasroofSecondaryScaffold(
@@ -78,10 +123,7 @@ fun SettingsMyCardsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
-                        title = stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(card.last4),
-                        ),
+                        title = card.displayLabel,
                         footer = {
                             CardOwnershipInlinePrompt(
                                 enabled = !state.updating,
@@ -99,15 +141,30 @@ fun SettingsMyCardsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
-                        title = stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(card.last4),
-                        ),
+                        title = card.displayLabel,
                         endAction = {
                             SettingsStopTrackingButton(
                                 onClick = { onRequestStopTracking(card) },
                                 enabled = !state.updating,
                                 contentDescription = stringResource(R.string.ownership_action_stop_tracking),
+                            )
+                        },
+                        footer = {
+                            cardSubtitle(card)?.let { subtitle ->
+                                Text(
+                                    subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                            SettingsCardMetadataActions(
+                                card = card,
+                                enabled = !state.updating,
+                                onRename = { onRenameCard(card) },
+                                onPickNetwork = { onPickCardNetwork(card) },
+                                onPickRole = { onPickCardRole(card) },
+                                onLinkDebit = { onLinkDebitCard(card) },
                             )
                         },
                     )
@@ -120,10 +177,7 @@ fun SettingsMyCardsScreen(
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
-                        title = stringResource(
-                            R.string.dashboard_credit_card_last4,
-                            formatCardLast4(card.last4),
-                        ),
+                        title = card.displayLabel,
                         endAction = {
                             SettingsResumeTrackingButton(
                                 onClick = { onResumeTracking(card) },
@@ -146,42 +200,15 @@ fun SettingsMyCardsScreen(
 }
 
 @Composable
-fun SettingsStopConfirmDialog(
-    target: ManagedCardUi?,
-    updating: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    target ?: return
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = MasroofIcons.warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-            )
-        },
-        title = { Text(stringResource(R.string.settings_stop_confirm_title)) },
-        text = {
-            Text(
-                stringResource(
-                    R.string.settings_stop_confirm_body,
-                    formatCardLast4(target.last4),
-                ),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !updating) {
-                Text(stringResource(R.string.settings_stop_confirm_action))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.settings_cancel))
-            }
-        },
-    )
+private fun cardSubtitle(card: ManagedCardUi): String? {
+    val parts = buildList {
+        card.cardNetwork?.let { add(cardNetworkLabel(it)) }
+        card.cardRole?.let { add(cardRoleLabel(it)) }
+        card.linkedAccountMaskedNumber?.let {
+            add(stringResource(R.string.settings_linked_account_suffix, it.takeLast(4)))
+        }
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
 @Composable

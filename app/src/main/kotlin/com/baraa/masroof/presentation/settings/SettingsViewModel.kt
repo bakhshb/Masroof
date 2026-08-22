@@ -17,7 +17,10 @@ import com.baraa.masroof.sms.scanner.SmsScanFailure
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.CardRole
+import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -93,6 +96,114 @@ class SettingsViewModel(
 
     fun dismissStopConfirm() {
         _uiState.update { it.copy(stopConfirmCardTarget = null, stopConfirmAccountTarget = null) }
+    }
+
+    fun openRenameCard(card: ManagedCardUi) {
+        _uiState.update { it.copy(renameCardTarget = card) }
+    }
+
+    fun dismissRenameCard() {
+        _uiState.update { it.copy(renameCardTarget = null) }
+    }
+
+    fun saveCardDisplayName(name: String) {
+        val target = _uiState.value.renameCardTarget ?: return
+        dismissRenameCard()
+        updateCardMetadata(target) {
+            cardRegistryRepository.updateDisplayName(
+                CardReference(target.bank, target.last4),
+                name.trim().ifEmpty { null },
+            )
+        }
+    }
+
+    fun openRenameAccount(account: ManagedAccountUi) {
+        _uiState.update { it.copy(renameAccountTarget = account) }
+    }
+
+    fun dismissRenameAccount() {
+        _uiState.update { it.copy(renameAccountTarget = null) }
+    }
+
+    fun saveAccountDisplayName(name: String) {
+        val target = _uiState.value.renameAccountTarget ?: return
+        dismissRenameAccount()
+        updateAccountMetadata(target) {
+            accountRegistryRepository.updateDisplayName(
+                AccountReference(target.bank, target.maskedNumber),
+                name.trim().ifEmpty { null },
+            )
+        }
+    }
+
+    fun openCardNetworkPicker(card: ManagedCardUi) {
+        _uiState.update { it.copy(cardNetworkTarget = card) }
+    }
+
+    fun dismissCardNetworkPicker() {
+        _uiState.update { it.copy(cardNetworkTarget = null) }
+    }
+
+    fun setCardNetwork(network: CardNetwork?) {
+        val target = _uiState.value.cardNetworkTarget ?: return
+        dismissCardNetworkPicker()
+        updateCardMetadata(target) {
+            cardRegistryRepository.updateCardNetwork(
+                CardReference(target.bank, target.last4),
+                network,
+            )
+        }
+    }
+
+    fun openCardRolePicker(card: ManagedCardUi) {
+        _uiState.update { it.copy(cardRoleTarget = card) }
+    }
+
+    fun dismissCardRolePicker() {
+        _uiState.update { it.copy(cardRoleTarget = null) }
+    }
+
+    fun setPrimaryCard(card: ManagedCardUi) {
+        dismissCardRolePicker()
+        updateCardMetadata(card) {
+            cardRegistryRepository.setPrimaryCard(CardReference(card.bank, card.last4))
+        }
+    }
+
+    fun setSupplementaryCard(card: ManagedCardUi, primaryLast4: String) {
+        dismissCardRolePicker()
+        updateCardMetadata(card) {
+            cardRegistryRepository.setSupplementaryCard(
+                CardReference(card.bank, card.last4),
+                primaryLast4,
+            )
+        }
+    }
+
+    fun clearCardRole(card: ManagedCardUi) {
+        dismissCardRolePicker()
+        updateCardMetadata(card) {
+            cardRegistryRepository.clearCardRole(CardReference(card.bank, card.last4))
+        }
+    }
+
+    fun openLinkDebitCard(card: ManagedCardUi) {
+        _uiState.update { it.copy(linkDebitTarget = card) }
+    }
+
+    fun dismissLinkDebitCard() {
+        _uiState.update { it.copy(linkDebitTarget = null) }
+    }
+
+    fun linkDebitToAccount(card: ManagedCardUi, account: ManagedAccountUi) {
+        dismissLinkDebitCard()
+        updateCardMetadata(card) {
+            cardRegistryRepository.linkDebitToAccount(
+                CardReference(card.bank, card.last4),
+                AccountReference(account.bank, account.maskedNumber),
+            )
+            cardRegistryRepository.updateCardType(CardReference(card.bank, card.last4), CardType.DEBIT)
+        }
     }
 
     fun confirmStopTracking() {
@@ -451,6 +562,46 @@ class SettingsViewModel(
         }
     }
 
+    private fun updateCardMetadata(_card: ManagedCardUi, action: suspend () -> Unit) {
+        if (_uiState.value.updating) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(updating = true, error = null) }
+            try {
+                action()
+                refreshReviewQueue()
+                applyRegistries(
+                    cards = cardRegistryRepository.listAll(),
+                    accounts = accountRegistryRepository.listAll(),
+                )
+                _uiState.update { it.copy(updating = false) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(updating = false, error = SettingsError.UPDATE_FAILED) }
+            }
+        }
+    }
+
+    private fun updateAccountMetadata(_account: ManagedAccountUi, action: suspend () -> Unit) {
+        if (_uiState.value.updating) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(updating = true, error = null) }
+            try {
+                action()
+                refreshReviewQueue()
+                applyRegistries(
+                    cards = cardRegistryRepository.listAll(),
+                    accounts = accountRegistryRepository.listAll(),
+                )
+                _uiState.update { it.copy(updating = false) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(updating = false, error = SettingsError.UPDATE_FAILED) }
+            }
+        }
+    }
+
     private fun updateCardOwnership(card: ManagedCardUi, owned: Boolean) {
         if (_uiState.value.updating) return
         viewModelScope.launch {
@@ -534,11 +685,30 @@ class SettingsViewModel(
     ) {
         val cardItems = cards
             .filter { it.bank != Bank.UNKNOWN }
-            .map { ManagedCardUi(bank = it.bank, last4 = it.last4, ownership = it.ownership) }
+            .map {
+                ManagedCardUi(
+                    bank = it.bank,
+                    last4 = it.last4,
+                    ownership = it.ownership,
+                    displayName = it.displayName,
+                    cardNetwork = it.cardNetwork,
+                    cardType = it.cardType,
+                    cardRole = it.cardRole,
+                    parentCardLast4 = it.parentCardLast4,
+                    linkedAccountMaskedNumber = it.linkedAccountMaskedNumber,
+                )
+            }
             .sortedBy { it.last4 }
         val accountItems = accounts
             .filter { it.bank != Bank.UNKNOWN }
-            .map { ManagedAccountUi(bank = it.bank, maskedNumber = it.maskedNumber, ownership = it.ownership) }
+            .map {
+                ManagedAccountUi(
+                    bank = it.bank,
+                    maskedNumber = it.maskedNumber,
+                    ownership = it.ownership,
+                    displayName = it.displayName,
+                )
+            }
             .sortedBy { it.maskedNumber }
         _uiState.update {
             it.copy(
