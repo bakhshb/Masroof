@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.CreditFacilityOverview
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -43,6 +44,7 @@ fun CreditFacilitiesSection(
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
+    facilityModifier: Modifier = Modifier.width(288.dp),
 ) {
     if (!overview.hasContent) return
 
@@ -54,17 +56,55 @@ fun CreditFacilitiesSection(
             viewAllLabel = stringResource(R.string.dashboard_view_all),
         )
 
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        if (overview.facilities.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(overview.facilities, key = { "${it.bank.id}-${it.primaryLast4}" }) { facility ->
+                    CreditFacilityCard(
+                        facility = facility,
+                        cardNetworksByLast4 = cardNetworksByLast4,
+                        zoneId = zoneId,
+                        modifier = facilityModifier,
+                    )
+                }
+            }
+        }
+
+        overview.debitCards.forEach { debit ->
+            DebitCardOverviewRow(
+                debit = debit,
+                network = cardNetworksByLast4[debit.last4] ?: debit.network,
+            )
+        }
+    }
+}
+
+@Composable
+fun DebitCardOverviewRow(
+    debit: DebitCardOverview,
+    network: CardNetwork?,
+    modifier: Modifier = Modifier,
+) {
+    MasroofCard(modifier = modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            items(overview.facilities, key = { "${it.bank.id}-${it.primaryLast4}" }) { facility ->
-                CreditFacilityCard(
-                    facility = facility,
-                    network = cardNetworksByLast4[facility.primaryLast4],
-                    zoneId = zoneId,
-                    modifier = Modifier.width(288.dp),
+            CardNetworkBadge(network = network, last4 = debit.last4)
+            Column {
+                Text(
+                    debit.displayLabel,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
+                debit.linkedAccountLabel?.let { linked ->
+                    Text(
+                        stringResource(R.string.settings_linked_account_suffix, linked.takeLast(4)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -73,10 +113,11 @@ fun CreditFacilitiesSection(
 @Composable
 fun CreditFacilityCard(
     facility: CreditFacilityOverview,
-    network: CardNetwork?,
+    cardNetworksByLast4: Map<String, CardNetwork?>,
     zoneId: ZoneId,
     modifier: Modifier = Modifier,
 ) {
+    val primaryNetwork = cardNetworksByLast4[facility.primaryLast4]
     var expanded by rememberSaveable(facility.primaryLast4) { mutableStateOf(false) }
     val extended = MasroofThemeExtras.extendedColors
 
@@ -90,7 +131,7 @@ fun CreditFacilityCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CardNetworkBadge(network = network, last4 = facility.primaryLast4)
+                CardNetworkBadge(network = primaryNetwork, last4 = facility.primaryLast4)
                 Column {
                     Text(
                         stringResource(R.string.dashboard_credit_facility_primary),
@@ -160,6 +201,7 @@ fun CreditFacilityCard(
                         zoneId = zoneId,
                         presentation = CreditCardMetricsPresentation.SummaryPurchases,
                         showBalanceAndDue = false,
+                        cardNetwork = cardNetworksByLast4[supplementary.last4],
                     )
                 }
             }

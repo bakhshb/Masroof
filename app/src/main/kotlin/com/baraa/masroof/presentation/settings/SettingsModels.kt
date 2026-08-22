@@ -8,6 +8,11 @@ import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 
+data class IgnoredMessageUi(
+    val rawSmsId: String,
+    val preview: String,
+)
+
 data class ManagedCardUi(
     val bank: Bank,
     val last4: String,
@@ -62,6 +67,8 @@ data class SettingsUiState(
     val cardNetworkTarget: ManagedCardUi? = null,
     val cardRoleTarget: ManagedCardUi? = null,
     val linkDebitTarget: ManagedCardUi? = null,
+    val ignoredMessages: List<IgnoredMessageUi> = emptyList(),
+    val restoreMessage: SettingsRestoreMessage? = null,
     val reparsingStored: Boolean = false,
     val importingSms: Boolean = false,
     val smsImportMessage: SmsImportMessage? = null,
@@ -131,9 +138,15 @@ sealed interface AppUpdateUiState {
     ) : AppUpdateUiState
 }
 
+enum class SettingsRestoreMessage {
+    SUCCESS,
+    FAILED,
+}
+
 enum class SettingsDestination {
     Hub,
     MyCards,
     MyAccounts,
+    IgnoredMessages,
     About,
 }

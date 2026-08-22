@@ -13,6 +13,12 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.application.transaction.RestoreResult
+import com.baraa.masroof.application.transaction.TransactionRestoreService
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.repository.RawSmsInsertResult
+import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import kotlinx.coroutines.Dispatchers
@@ -227,6 +233,8 @@ class SettingsViewModelTest {
                 accountRegistry = accounts,
                 cardRegistry = cards,
             ),
+            transactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
+            rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),

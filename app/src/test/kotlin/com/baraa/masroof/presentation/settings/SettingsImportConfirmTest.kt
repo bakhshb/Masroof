@@ -85,6 +85,8 @@ class SettingsImportConfirmTest {
                 accountRegistry = EmptyAccounts(),
                 cardRegistry = EmptyCards(),
             ),
+            transactionRestoreService = SettingsViewModelTestSupport.noOpRestoreService(),
+            rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
             appLocaleRepository = object : AppLocaleRepository {
                 override fun getLanguageTag() = AppLocale.DEFAULT_TAG
                 override fun setLanguageTag(languageTag: String) = Unit

@@ -76,6 +76,14 @@
     <string name="settings_stop_confirm_body">Card ...%1$s will no longer appear on the dashboard and its purchases will not count toward your spending.</string>
     <string name="settings_stop_confirm_action">Stop tracking</string>
     <string name="settings_cancel">Cancel</string>
+    <string name="settings_ignored_messages_title">Ignored messages</string>
+    <string name="settings_ignored_messages_hint">Messages you marked as non-financial can be restored here.</string>
+    <string name="settings_ignored_messages_empty">No ignored messages.</string>
+    <string name="settings_ignored_messages_subtitle">%1$d message(s)</string>
+    <string name="settings_restore_message_action">Restore</string>
+    <string name="settings_restore_success">Message restored.</string>
+    <string name="settings_restore_failed">Could not restore message.</string>
+    <string name="settings_dismiss_message">Dismiss</string>
     <string name="settings_save">Save</string>
     <string name="settings_display_name_label">Display name</string>
     <string name="settings_rename_card_title">Rename card</string>
@@ -84,6 +92,7 @@
     <string name="settings_action_network">Network</string>
     <string name="settings_action_role">Role</string>
     <string name="settings_action_link_account">Link account</string>
+    <string name="settings_action_mark_debit">Mark as Mada</string>
     <string name="settings_card_network_title">Card network</string>
     <string name="settings_card_network_clear">Clear network</string>
     <string name="settings_card_role_title">Card role</string>

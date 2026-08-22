@@ -46,6 +46,7 @@ fun SettingsMyCardsScreen(
     onLinkDebitCard: (ManagedCardUi) -> Unit,
     onDismissLinkDebit: () -> Unit,
     onConfirmLinkDebit: (ManagedCardUi, ManagedAccountUi) -> Unit,
+    onMarkDebit: (ManagedCardUi) -> Unit,
 ) {
     SettingsStopConfirmDialog(
         target = state.stopConfirmCardTarget,
@@ -165,6 +166,7 @@ fun SettingsMyCardsScreen(
                                 onPickNetwork = { onPickCardNetwork(card) },
                                 onPickRole = { onPickCardRole(card) },
                                 onLinkDebit = { onLinkDebitCard(card) },
+                                onMarkDebit = { onMarkDebit(card) },
                             )
                         },
                     )

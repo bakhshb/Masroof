@@ -24,13 +24,20 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
+import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofExtendedColors
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -43,9 +50,14 @@ fun CardsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
+    val followedFacilities = followedCreditFacilities(state)
     val selectedCard = selectedCardKey?.let { key ->
-        followedOverview?.cards?.find { ownedCardKey(it) == key }
+        followedFacilities?.facilities
+            ?.flatMap { it.allCards }
+            ?.find { ownedCardKey(it) == key }
+            ?: followedOverview?.cards?.find { ownedCardKey(it) == key }
     }
 
     BackHandler {
@@ -59,7 +71,8 @@ fun CardsSummaryRoute(
     if (selectedCard != null) {
         CardDetailScreen(
             row = selectedCard,
-            salaryPeriodLabel = followedOverview?.salaryPeriodLabel,
+            salaryPeriodLabel = followedOverview?.salaryPeriodLabel
+                ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
             state = state,
             onBack = { selectedCardKey = null },
             onPrevious = viewModel::goToPreviousPeriod,
@@ -81,6 +94,7 @@ fun CardsSummaryRoute(
             onCurrent = viewModel::goToCurrentPeriod,
             onManageCards = onManageCards,
             onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+            cardNetworksByLast4 = cardNetworks,
         )
     }
 }
@@ -97,7 +111,9 @@ fun CardsSummaryScreen(
     onCurrent: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
+    cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
+    val followedFacilities = followedCreditFacilities(state)
     val followedOverview = followedCreditCardsOverview(state)
 
     DashboardSummaryScaffold(
@@ -112,32 +128,141 @@ fun CardsSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            followedOverview?.let { overview ->
-                CardsSummaryHeroCard(overview = overview)
-            }
+            when {
+                followedFacilities != null && followedFacilities.hasContent -> {
+                    FacilitiesSummaryHeroCard(overview = followedFacilities)
+                    CardsSummaryHeader(
+                        cardCount = followedFacilities.facilities.size + followedFacilities.debitCards.size,
+                        onManageCards = onManageCards,
+                    )
+                    followedFacilities.facilities.forEach { facility ->
+                        CreditFacilityCard(
+                            facility = facility,
+                            cardNetworksByLast4 = cardNetworksByLast4,
+                            zoneId = ZoneId.systemDefault(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    followedFacilities.debitCards.forEach { debit ->
+                        DebitCardOverviewRow(
+                            debit = debit,
+                            network = cardNetworksByLast4[debit.last4] ?: debit.network,
+                        )
+                    }
+                }
 
-            CardsSummaryHeader(
-                cardCount = followedOverview?.cards?.size ?: 0,
-                onManageCards = onManageCards,
-            )
+                followedOverview != null -> {
+                    CardsSummaryHeroCard(overview = followedOverview)
+                    CardsSummaryHeader(
+                        cardCount = followedOverview.cards.size,
+                        onManageCards = onManageCards,
+                    )
+                    if (followedOverview.cards.isEmpty()) {
+                        Text(
+                            stringResource(R.string.dashboard_cards_summary_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        followedOverview.cards.forEach { row ->
+                            CreditCardCompactListRow(
+                                row = row,
+                                cardNetwork = cardNetworksByLast4[row.last4],
+                                onClick = { onOpenCard(row) },
+                            )
+                        }
+                    }
+                }
 
-            val cards = followedOverview?.cards.orEmpty()
-            if (cards.isEmpty()) {
-                Text(
-                    stringResource(R.string.dashboard_cards_summary_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                cards.forEach { row ->
-                    CreditCardCompactListRow(
-                        row = row,
-                        onClick = { onOpenCard(row) },
+                else -> {
+                    Text(
+                        stringResource(R.string.dashboard_cards_summary_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
+    val extended = MasroofThemeExtras.extendedColors
+    val primaryRows = overview.facilities.map { it.primary }
+    val due = resolveLatestStatementDue(primaryRows)?.amount
+    val periodSpending = sumSignedAmounts(overview.facilities.map { it.facilitySalaryPeriodSpending })
+    val statementSpending = sumSignedAmounts(overview.facilities.map { it.facilityStatementSpending })
+    val periodSpendingColor = spendingAmountColor(periodSpending, extended)
+    val statementSpendingColor = spendingAmountColor(statementSpending, extended)
+    val aggregateStatementLabel = overview.facilities.firstOrNull()?.aggregateStatementPeriodLabel
+    val salaryPeriodLabel = overview.facilities.firstOrNull()?.salaryPeriodLabel
+
+    MasroofCard(accent = MasroofCardAccent.Credit) {
+        Text(
+            stringResource(R.string.dashboard_credit_card_aggregate_due),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            due?.let { formatLocalizedMoney(it) }
+                ?: stringResource(R.string.dashboard_value_unavailable),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = extended.liability,
+            ),
+            modifier = Modifier.padding(top = 8.dp),
+        )
+
+        Text(
+            if (salaryPeriodLabel != null) {
+                stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
+            } else {
+                stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        Text(
+            formatLocalizedMoney(periodSpending),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = periodSpendingColor,
+            ),
+            modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Text(
+            if (aggregateStatementLabel != null) {
+                stringResource(
+                    R.string.dashboard_credit_cards_aggregate_statement_spending,
+                    aggregateStatementLabel,
+                )
+            } else {
+                stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        Text(
+            formatLocalizedMoney(statementSpending),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = statementSpendingColor,
+            ),
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+private fun sumSignedAmounts(amounts: List<SignedMoneyAmount>): SignedMoneyAmount {
+    if (amounts.isEmpty()) return SignedMoneyAmount.zero(Currency.SAR)
+    var sum = BigDecimal.ZERO
+    val currency = amounts.first().currency
+    amounts.forEach { sum = sum.add(it.amount) }
+    return SignedMoneyAmount(sum.setScale(Money.SCALE, RoundingMode.HALF_EVEN), currency)
 }
 
 @Composable
@@ -248,6 +373,18 @@ private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOve
     val overview = state.creditCards ?: return null
     val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
     return overview.followedOnly(ownedLast4s)
+}
+
+private fun followedCreditFacilities(state: DashboardUiState): CreditFacilitiesOverview? {
+    val overview = state.creditFacilities ?: return null
+    if (!overview.hasContent) return null
+    val ownedLast4s = state.ownedCards.map { it.last4 }.toSet()
+    val facilities = overview.facilities.filter { facility ->
+        facility.allCards.any { it.last4 in ownedLast4s }
+    }
+    val debitCards = overview.debitCards.filter { it.last4 in ownedLast4s }
+    if (facilities.isEmpty() && debitCards.isEmpty()) return null
+    return overview.copy(facilities = facilities, debitCards = debitCards)
 }
 
 @Composable

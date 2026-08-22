@@ -238,7 +238,13 @@ fun SettingsCardMetadataActions(
     onPickNetwork: () -> Unit,
     onPickRole: () -> Unit,
     onLinkDebit: () -> Unit,
+    onMarkDebit: () -> Unit,
 ) {
+    val isCreditCard = card.cardType != CardType.DEBIT
+    val canLinkDebit = card.cardType == CardType.DEBIT ||
+        card.cardNetwork == CardNetwork.MADA ||
+        card.cardType == null
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -251,13 +257,19 @@ fun SettingsCardMetadataActions(
         TextButton(onClick = onPickNetwork, enabled = enabled) {
             Text(stringResource(R.string.settings_action_network))
         }
-        if (card.cardType != CardType.DEBIT) {
+        if (isCreditCard) {
             TextButton(onClick = onPickRole, enabled = enabled) {
                 Text(stringResource(R.string.settings_action_role))
             }
-        } else {
+        }
+        if (canLinkDebit) {
             TextButton(onClick = onLinkDebit, enabled = enabled) {
                 Text(stringResource(R.string.settings_action_link_account))
+            }
+        }
+        if (card.cardType != CardType.DEBIT && card.cardType != CardType.CREDIT) {
+            TextButton(onClick = onMarkDebit, enabled = enabled) {
+                Text(stringResource(R.string.settings_action_mark_debit))
             }
         }
     }

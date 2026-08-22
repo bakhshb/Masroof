@@ -81,6 +81,14 @@
     <string name="settings_stop_confirm_body">لن تظهر بطاقة ···%1$s في لوحة التحكم ولن تُحسب مشترياتها ضمن مصروفاتك.</string>
     <string name="settings_stop_confirm_action">إيقاف المتابعة</string>
     <string name="settings_cancel">إلغاء</string>
+    <string name="settings_ignored_messages_title">الرسائل المتجاهلة</string>
+    <string name="settings_ignored_messages_hint">يمكن استعادة الرسائل التي صنّفتها كغير مالية من هنا.</string>
+    <string name="settings_ignored_messages_empty">لا توجد رسائل متجاهلة.</string>
+    <string name="settings_ignored_messages_subtitle">%1$d رسالة</string>
+    <string name="settings_restore_message_action">استعادة</string>
+    <string name="settings_restore_success">تمت استعادة الرسالة.</string>
+    <string name="settings_restore_failed">تعذّرت استعادة الرسالة.</string>
+    <string name="settings_dismiss_message">إغلاق</string>
     <string name="settings_save">حفظ</string>
     <string name="settings_display_name_label">الاسم المعروض</string>
     <string name="settings_rename_card_title">تسمية البطاقة</string>
@@ -89,6 +97,7 @@
     <string name="settings_action_network">الشبكة</string>
     <string name="settings_action_role">الدور</string>
     <string name="settings_action_link_account">ربط حساب</string>
+    <string name="settings_action_mark_debit">تعيين كمدى</string>
     <string name="settings_card_network_title">شبكة البطاقة</string>
     <string name="settings_card_network_clear">مسح الشبكة</string>
     <string name="settings_card_role_title">دور البطاقة</string>

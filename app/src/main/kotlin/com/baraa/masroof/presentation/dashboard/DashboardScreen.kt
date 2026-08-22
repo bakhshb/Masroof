@@ -322,7 +322,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.CARDS -> {
                     val facilities = state.creditFacilities
                     val cardNetworks = state.ownedCards.associate { it.last4 to it.cardNetwork }
-                    if (facilities != null && facilities.facilities.isNotEmpty()) {
+                    if (facilities != null && facilities.hasContent) {
                         CreditFacilitiesSection(
                             overview = facilities,
                             cardNetworksByLast4 = cardNetworks,
