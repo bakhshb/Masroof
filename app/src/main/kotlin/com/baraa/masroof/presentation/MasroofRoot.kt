@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.application.notification.NotificationAction
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import com.baraa.masroof.presentation.dashboard.AccountsSummaryRoute
@@ -216,6 +217,14 @@ fun MasroofRoot(
                 },
             )
             HomeDestination.AllTransactions -> {
+                val ownedCardLast4s = remember(dashboardState.ownedCards) {
+                    dashboardState.ownedCards.map { it.last4 }.toSet()
+                }
+                val ownedAccountContainerIds = remember(dashboardState.ownedAccounts) {
+                    dashboardState.ownedAccounts.mapNotNull { account ->
+                        FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
+                    }.toSet()
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     TransactionListScreen(
                         periodLabel = dashboardState.periodLabel,
@@ -225,6 +234,9 @@ fun MasroofRoot(
                         seedFilter = transactionListSeedFilter,
                         onSeedFilterApplied = { transactionListSeedFilter = null },
                         openGeneration = transactionListOpenGeneration,
+                        ownedCardLast4s = ownedCardLast4s,
+                        ownedAccountContainerIds = ownedAccountContainerIds,
+                        transactionAccountInvolvement = dashboardState.transactionAccountInvolvement,
                     )
                     showTransactionDetail(
                         dashboardState = dashboardState,

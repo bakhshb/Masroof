@@ -221,6 +221,63 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
+    fun availableCardLast4s_limitsToOwnedCards() {
+        val txs = listOf(
+            preview(type = FinancialTransactionType.EXPENSE, amount = "10", card = "8219"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "20", card = "9999"),
+        )
+
+        val available = TransactionListFilterEngine.availableCardLast4s(
+            transactions = txs,
+            ownedCardLast4s = setOf("8219"),
+        )
+
+        assertEquals(listOf("8219"), available)
+    }
+
+    @Test
+    fun availableAccountContainerIds_limitsToOwnedAccountsAndInvolvement() {
+        val ownedId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val otherId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "8842",
+        )
+        val txs = listOf(
+            preview(id = "cash", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "100"),
+            preview(type = FinancialTransactionType.EXPENSE, amount = "50", sourceAccountId = otherId),
+        )
+
+        val available = TransactionListFilterEngine.availableAccountContainerIds(
+            transactions = txs,
+            ownedAccountContainerIds = setOf(ownedId!!),
+            involvementByTransactionId = mapOf("cash" to setOf(ownedId)),
+        )
+
+        assertEquals(listOf(ownedId), available)
+    }
+
+    @Test
+    fun accountFilter_matchesSmsResolvedInvolvement() {
+        val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+            "3001",
+        )
+        val txs = listOf(
+            preview(id = "cash", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "100"),
+        )
+        val result = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(accountContainerIds = setOf(accountId)),
+            accountInvolvementByTransactionId = mapOf("cash" to setOf(accountId!!)),
+        )
+
+        assertEquals(listOf("cash"), result.transactions.map { it.id })
+    }
+
+    @Test
     fun availableAccountContainerIds_listsDistinctSorted() {
         val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
             com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,

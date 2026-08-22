@@ -332,6 +332,7 @@
     <string name="dashboard_credit_card_statement_spending_fallback">منصرف منذ آخر كشف</string>
     <string name="dashboard_debit_card_salary_spending">منصرف فترة الراتب — مدى وسحب (من %1$s)</string>
     <string name="dashboard_debit_card_salary_spending_fallback">منصرف فترة الراتب — مدى وسحب</string>
+    <string name="dashboard_debit_card_linked_account">الحساب المرتبط</string>
     <string name="dashboard_credit_card_salary_spending">منصرف فترة الراتب (من %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">منصرف فترة الراتب</string>
     <string name="dashboard_credit_card_salary_purchases_total">منصرف منذ %1$s</string>

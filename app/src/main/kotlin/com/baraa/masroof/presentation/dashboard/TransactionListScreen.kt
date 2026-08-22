@@ -39,6 +39,9 @@ fun TransactionListScreen(
     seedFilter: TransactionListFilterState? = null,
     onSeedFilterApplied: () -> Unit = {},
     openGeneration: Int = 0,
+    ownedCardLast4s: Set<String> = emptySet(),
+    ownedAccountContainerIds: Set<String> = emptySet(),
+    transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -77,17 +80,28 @@ fun TransactionListScreen(
         )
     }
 
-    val filterResult = remember(transactions, filterState) {
-        TransactionListFilterEngine.apply(transactions, filterState)
+    val filterResult = remember(transactions, filterState, transactionAccountInvolvement) {
+        TransactionListFilterEngine.apply(
+            transactions = transactions,
+            filter = filterState,
+            accountInvolvementByTransactionId = transactionAccountInvolvement,
+        )
     }
     val availableTypes = remember(transactions) {
         TransactionListFilterEngine.availableTypes(transactions)
     }
-    val availableCards = remember(transactions) {
-        TransactionListFilterEngine.availableCardLast4s(transactions)
+    val availableCards = remember(transactions, ownedCardLast4s) {
+        TransactionListFilterEngine.availableCardLast4s(
+            transactions = transactions,
+            ownedCardLast4s = ownedCardLast4s,
+        )
     }
-    val availableAccounts = remember(transactions) {
-        TransactionListFilterEngine.availableAccountContainerIds(transactions)
+    val availableAccounts = remember(transactions, ownedAccountContainerIds, transactionAccountInvolvement) {
+        TransactionListFilterEngine.availableAccountContainerIds(
+            transactions = transactions,
+            ownedAccountContainerIds = ownedAccountContainerIds,
+            involvementByTransactionId = transactionAccountInvolvement,
+        )
     }
     val activeFilterCount = filterState.activeFilterCount()
     val context = LocalContext.current
