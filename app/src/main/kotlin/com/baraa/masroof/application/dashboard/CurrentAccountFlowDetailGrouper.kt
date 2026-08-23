@@ -62,6 +62,7 @@ object CurrentAccountFlowDetailGrouper {
         ownedAccountLast4s: Set<String> = emptySet(),
         rawSmsById: Map<String, RawSms> = emptyMap(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
+        debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountFlowDetailGrouping {
         val context = AccountFlowClassifier.buildContext(
             transactions = transactions,
@@ -74,6 +75,8 @@ object CurrentAccountFlowDetailGrouper {
             ownedContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             mode = scopeMode,
+            ownedDebitCardContainerIds = debitCardScope.ownedDebitCardContainerIds,
+            debitCardLinkedAccountIds = debitCardScope.debitCardLinkedAccountIds,
         )
         val expense = FlowExpenseCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }
         val income = FlowIncomeCategory.entries.associateWith { mutableListOf<FinancialTransaction>() }

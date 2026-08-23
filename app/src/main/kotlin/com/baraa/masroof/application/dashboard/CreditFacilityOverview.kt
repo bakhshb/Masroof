@@ -6,6 +6,8 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.Instant
 import java.time.LocalDate
 
@@ -54,6 +56,8 @@ object CreditFacilityOverviewBuilder {
         registryAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry> = emptyList(),
         debitSpendingByCardKey: Map<String, SignedMoneyAmount> = emptyMap(),
         debitSalaryPeriodLabel: String? = overview.salaryPeriodLabel,
+        parsedRecords: List<ParsedEventRecord> = emptyList(),
+        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): CreditFacilitiesOverview {
         val ownedCredit = registryCards.filter {
             it.cardType != CardType.DEBIT && it.ownership.isOwned()
@@ -66,19 +70,19 @@ object CreditFacilityOverviewBuilder {
                     bank = entry.bank,
                     last4 = entry.last4,
                     displayLabel = RegistryDisplayLabels.cardLabel(entry),
-                    linkedAccountLabel = entry.linkedAccount?.maskedNumber?.let { masked ->
-                        val accountEntry = registryAccounts.find {
-                            it.bank == entry.bank && it.maskedNumber == masked
-                        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry(
+                    linkedAccountLabel = resolveLinkedAccountLabel(
+                        entry = entry,
+                        registryAccounts = registryAccounts,
+                        parsedRecords = parsedRecords,
+                        rawSmsById = rawSmsById,
+                    ),
+                    linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber
+                        ?: DebitLinkedAccountInferrer.inferAccountLast4(
                             bank = entry.bank,
-                            maskedNumber = masked,
-                            ownership = entry.ownership,
-                            firstSeenRawSmsId = null,
-                            lastSeenRawSmsId = null,
-                        )
-                        RegistryDisplayLabels.accountLabel(accountEntry)
-                    },
-                    linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber,
+                            cardLast4 = entry.last4,
+                            parsedRecords = parsedRecords,
+                            rawSmsById = rawSmsById,
+                        ),
                     network = entry.cardNetwork,
                     salaryPeriodSpendingNet = debitSpendingByCardKey[cardKey]
                         ?: SignedMoneyAmount.zero(overview.currency),
@@ -182,4 +186,31 @@ object CreditFacilityOverviewBuilder {
 
     private fun com.baraa.masroof.domain.model.OwnershipStatus.isOwned(): Boolean =
         this == com.baraa.masroof.domain.model.OwnershipStatus.OWNED
+
+    private fun resolveLinkedAccountLabel(
+        entry: CardRegistryEntry,
+        registryAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
+        parsedRecords: List<ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
+    ): String? {
+        val masked = entry.linkedAccountMaskedNumber
+            ?: DebitLinkedAccountInferrer.inferAccountLast4(
+                bank = entry.bank,
+                cardLast4 = entry.last4,
+                parsedRecords = parsedRecords,
+                rawSmsById = rawSmsById,
+            )
+            ?: return null
+        val accountEntry = registryAccounts.find {
+            it.bank == entry.bank &&
+                (it.maskedNumber == masked || it.maskedNumber.endsWith(masked))
+        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry(
+            bank = entry.bank,
+            maskedNumber = masked,
+            ownership = entry.ownership,
+            firstSeenRawSmsId = null,
+            lastSeenRawSmsId = null,
+        )
+        return RegistryDisplayLabels.accountLabel(accountEntry)
+    }
 }

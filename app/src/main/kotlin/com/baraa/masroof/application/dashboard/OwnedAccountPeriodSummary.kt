@@ -22,6 +22,7 @@ object OwnedAccountPeriodSummaryCalculator {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         rawSmsById: Map<String, RawSms>,
+        debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): List<OwnedAccountPeriodSummary> =
         ownedAccounts.mapNotNull { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
@@ -38,6 +39,7 @@ object OwnedAccountPeriodSummaryCalculator {
                 ownedAccountLast4s = last4s,
                 rawSmsById = rawSmsById,
                 scopeMode = AccountFlowScopeMode.SingleAccount,
+                debitCardScope = debitCardScope,
             )
             OwnedAccountPeriodSummary(
                 bank = account.bank,

@@ -17,6 +17,7 @@ object CurrentAccountSummaryCalculator {
         ownedAccountLast4s: Set<String> = emptySet(),
         rawSmsById: Map<String, RawSms> = emptyMap(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
+        debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountSummary {
         val context = AccountFlowClassifier.buildContext(
             transactions = transactions,
@@ -29,6 +30,8 @@ object CurrentAccountSummaryCalculator {
             ownedContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             mode = scopeMode,
+            ownedDebitCardContainerIds = debitCardScope.ownedDebitCardContainerIds,
+            debitCardLinkedAccountIds = debitCardScope.debitCardLinkedAccountIds,
         )
 
         var salary = Money.zero(primaryCurrency)
@@ -100,6 +103,7 @@ object CurrentAccountSummaryCalculator {
         ownedAccountContainerIds: Set<String> = emptySet(),
         ownedAccountLast4s: Set<String> = emptySet(),
         rawSmsById: Map<String, RawSms> = emptyMap(),
+        debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): SpendingSplitSummary {
         val currentAccount = summarize(
             transactions = transactions,
@@ -109,6 +113,7 @@ object CurrentAccountSummaryCalculator {
             ownedAccountContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
         )
 
         var cardGross = Money.zero(primaryCurrency)
@@ -122,13 +127,25 @@ object CurrentAccountSummaryCalculator {
                 FinancialTransactionType.BILL_PAYMENT,
                 FinancialTransactionType.FEE,
                 -> {
-                    if (TransactionAmountResolver.isCreditCardContainer(tx.sourceContainerId)) {
+                    val sourceId = tx.sourceContainerId
+                    if (sourceId != null &&
+                        sourceId in debitCardScope.ownedDebitCardContainerIds
+                    ) {
+                        continue
+                    }
+                    if (TransactionAmountResolver.isCreditCardContainer(sourceId)) {
                         cardGross += amount
                     }
                 }
 
                 FinancialTransactionType.REFUND -> {
-                    if (TransactionAmountResolver.isCreditCardContainer(tx.destinationContainerId)) {
+                    val destinationId = tx.destinationContainerId
+                    if (destinationId != null &&
+                        destinationId in debitCardScope.ownedDebitCardContainerIds
+                    ) {
+                        continue
+                    }
+                    if (TransactionAmountResolver.isCreditCardContainer(destinationId)) {
                         cardRefunds += amount
                     }
                 }

@@ -154,7 +154,67 @@ class MadaGooglePayPosReproTest {
     }
 
     @Test
-    fun creditGooglePayPos_doesNotCountTowardMadaSpending() {
+    fun googlePayMadaPos_countsTowardFleetCurrentAccountPosPurchases() {
+        val parsed = pipeline.parse(
+            SmsParseInput(
+                rawSmsId = "sms-google-pay",
+                sender = "AlJazira",
+                body = googlePayBody,
+                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
+            ),
+        ) as ParseResult.Success
+
+        val assembled = TransactionAssembler.assembleSingle(
+            event = parsed.event,
+            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+        ) as TransactionAssembler.Outcome.Assembled
+
+        val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
+        val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
+        val rawSmsById = mapOf(
+            "sms-google-pay" to RawSms(
+                id = "sms-google-pay",
+                sender = "AlJazira",
+                body = googlePayBody,
+                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
+                deviceMessageId = "1",
+                bodyHash = "h",
+            ),
+        )
+        val debit = CardRegistryEntry(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "8219",
+            ownership = OwnershipStatus.OWNED,
+            cardType = CardType.DEBIT,
+            firstSeenRawSmsId = "sms",
+            lastSeenRawSmsId = "sms",
+        )
+        val owned = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "8219")
+        val debitCardScope = DebitCardScopeFactory.fromRegistry(listOf(debit))
+
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(tx),
+            parsedRecords = listOf(parsedRecord),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
+        )
+
+        assertEquals(
+            Money.of("127.00", Currency.SAR),
+            summary.outflow.posPurchases,
+        )
+        requireNotNull(cardId)
+        requireNotNull(owned)
+    }
+
+    @Test
+    fun creditGooglePayPos_doesNotCountTowardMadaSpendingOrCurrentAccountPos() {
         val creditGooglePayBody = """
             شراء عبر نقاط البيع (Google Pay)
             بطاقة ائتمانية: 8219
@@ -204,6 +264,7 @@ class MadaGooglePayPosReproTest {
             lastSeenRawSmsId = "sms",
         )
         val owned = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val debitCardScope = DebitCardScopeFactory.fromRegistry(listOf(debit))
 
         val result = DebitCardOverviewBuilder.buildSpendingByCardKey(
             salaryPeriod = salaryPeriod,
@@ -226,6 +287,19 @@ class MadaGooglePayPosReproTest {
         assertTrue(
             "Credit Google Pay must not appear in debit spend involvement index",
             tx.id !in result.transactionDebitSpendInvolvement,
+        )
+
+        val accountSummary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(tx),
+            parsedRecords = listOf(parsedRecord),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
+        )
+        assertEquals(
+            Money.zero(Currency.SAR),
+            accountSummary.outflow.posPurchases,
         )
     }
 }

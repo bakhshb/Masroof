@@ -63,6 +63,13 @@ class DashboardProjectionBuilder(
         val ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
             ownedAccounts.map { it.maskedNumber },
         )
+        val cardRegistry = cardRegistryRepository.listAll()
+        val debitCardScope = DebitCardScopeFactory.fromRegistry(
+            cards = cardRegistry,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            registryAccounts = ownedAccounts,
+        )
 
         val summary = MonthlyFinancialSummaryCalculator.summarize(
             period = period,
@@ -79,6 +86,7 @@ class DashboardProjectionBuilder(
             ownedAccountContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
         )
         val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
             transactions = dedupedTransactions,
@@ -88,6 +96,7 @@ class DashboardProjectionBuilder(
             ownedAccountContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
         )
         val perAccount = OwnedAccountPeriodSummaryCalculator.summarize(
             ownedAccounts = ownedAccounts,
@@ -96,6 +105,7 @@ class DashboardProjectionBuilder(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
         )
         val accountsFleet = AccountsSummary.fromSummaries(
             accounts = ownedAccounts.map { it.bank to it.maskedNumber },
@@ -109,6 +119,7 @@ class DashboardProjectionBuilder(
             ownedAccountContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
             rawSmsById = rawSmsById,
+            debitCardScope = debitCardScope,
         )
         val transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(
             transactions = dedupedTransactions,
@@ -168,7 +179,6 @@ class DashboardProjectionBuilder(
             sarEquivalents = cardSarEquivalents,
             displayLocale = displayLocale,
         )
-        val cardRegistry = cardRegistryRepository.listAll()
         val debitSpend = DebitCardOverviewBuilder.buildSpendingByCardKey(
             salaryPeriod = period,
             debitCards = cardRegistry,
@@ -188,6 +198,8 @@ class DashboardProjectionBuilder(
             registryAccounts = ownedAccounts,
             debitSpendingByCardKey = debitSpend.spendingByCardKey,
             debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
         )
 
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))

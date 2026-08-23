@@ -6,6 +6,7 @@ import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -139,6 +140,87 @@ class CreditFacilityOverviewBuilderTest {
         )
 
         assertEquals("Home", facilities.debitCards.single().linkedAccountLabel)
+    }
+
+    @Test
+    fun debitWithoutRegistryLink_infersLinkedAccountFromSms() {
+        val overview = CreditCardsOverview(
+            cards = emptyList(),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementPeriodLabel = null,
+            calendarMonthLabel = null,
+            salaryPeriodLabel = "Aug",
+            currency = Currency.SAR,
+        )
+        val body = "شراء من نقاط البيع\nبطاقة مدى: 9999\nخصمت من حساب: 3001"
+        val parsedRecords = listOf(
+            ParsedEventRecord(
+                event = com.baraa.masroof.domain.model.ParsedEvent(
+                    id = "evt-pos",
+                    rawSmsId = "sms-pos",
+                    bank = Bank.BANK_ALJAZIRA,
+                    messageFamily = com.baraa.masroof.domain.model.MessageFamily.PURCHASE,
+                    direction = com.baraa.masroof.domain.model.MoneyDirection.OUTGOING,
+                    amount = null,
+                    purchaseChannel = null,
+                    cardRef = com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "9999"),
+                    sourceAccountRef = null,
+                    destinationAccountRef = null,
+                    merchant = null,
+                    counterparty = body,
+                    occurredAt = java.time.Instant.parse("2026-08-03T10:24:00Z"),
+                    bankNetworkType = null,
+                    confidence = com.baraa.masroof.domain.model.Confidence(1.0),
+                    parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
+                ),
+                details = com.baraa.masroof.parsing.model.ParsedEventDetails(),
+            ),
+        )
+        val rawSmsById = mapOf(
+            "sms-pos" to com.baraa.masroof.domain.model.RawSms(
+                id = "sms-pos",
+                sender = "AlJazira",
+                body = body,
+                receivedAt = java.time.Instant.parse("2026-08-03T10:24:00Z"),
+                deviceMessageId = "evt-pos",
+                bodyHash = "evt-pos",
+            ),
+        )
+        val registryAccounts = listOf(
+            com.baraa.masroof.domain.model.AccountRegistryEntry(
+                bank = Bank.BANK_ALJAZIRA,
+                maskedNumber = "12345678903001",
+                ownership = OwnershipStatus.OWNED,
+                displayName = "Current",
+                firstSeenRawSmsId = "sms",
+                lastSeenRawSmsId = "sms",
+            ),
+        )
+
+        val facilities = CreditFacilityOverviewBuilder.build(
+            overview = overview,
+            registryCards = listOf(
+                CardRegistryEntry(
+                    bank = Bank.BANK_ALJAZIRA,
+                    last4 = "9999",
+                    ownership = OwnershipStatus.OWNED,
+                    cardType = CardType.DEBIT,
+                    cardNetwork = com.baraa.masroof.domain.model.CardNetwork.MADA,
+                    firstSeenRawSmsId = "sms",
+                    lastSeenRawSmsId = "sms",
+                ),
+            ),
+            registryAccounts = registryAccounts,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+        )
+
+        assertEquals("Current", facilities.debitCards.single().linkedAccountLabel)
+        assertEquals("3001", facilities.debitCards.single().linkedAccountMaskedNumber)
     }
 
     private fun row(last4: String, amount: String): CreditCardDashboardRow =
