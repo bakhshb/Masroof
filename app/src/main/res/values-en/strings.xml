@@ -326,6 +326,8 @@
     <string name="dashboard_debit_card_salary_spending">Spent since %1$s</string>
     <string name="dashboard_debit_card_salary_spending_fallback">Spent since period start</string>
     <string name="dashboard_debit_card_linked_account">Linked account</string>
+    <string name="dashboard_debit_cards_aggregate_period_spending">Total Mada purchases in period (from %1$s)</string>
+    <string name="dashboard_debit_cards_aggregate_period_spending_fallback">Total Mada purchases in period</string>
     <string name="dashboard_credit_card_salary_spending">Salary period spending (from %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">Salary period spending</string>
     <string name="dashboard_credit_card_salary_purchases_total">Spent since %1$s</string>

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -12,6 +13,8 @@ data class CurrentAccountTransactionScope(
     val ownedContainerIds: Set<String>,
     val ownedAccountLast4s: Set<String>,
     val mode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
+    val ownedDebitCardContainerIds: Set<String> = emptySet(),
+    val debitCardLinkedAccountIds: Map<String, String> = emptyMap(),
 ) {
     fun involvesOwnedSource(
         tx: FinancialTransaction,
@@ -26,6 +29,18 @@ data class CurrentAccountTransactionScope(
 
         val sourceId = tx.sourceContainerId
         if (sourceId != null) {
+            if (sourceId in ownedDebitCardContainerIds) {
+                if (!isDebitCardAttributedTransaction(tx, parsedRecordsById, rawSmsById)) {
+                    return false
+                }
+                debitCardLinkedAccountIds[sourceId]?.let { linkedAccountId ->
+                    if (matchesOwnedContainer(linkedAccountId)) return true
+                }
+                return when (mode) {
+                    AccountFlowScopeMode.Fleet -> tx.type in TRUSTED_OWNED_SOURCE_TYPES
+                    AccountFlowScopeMode.SingleAccount -> false
+                }
+            }
             if (isCreditCardContainer(sourceId)) return false
             return matchesOwnedContainer(sourceId)
         }
@@ -78,9 +93,23 @@ data class CurrentAccountTransactionScope(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
-    ): Boolean =
-        isCreditCardContainer(tx.sourceContainerId) &&
-            resolveOwnedAccountSourceId(tx, parsedRecordsById, rawSmsById) == null
+    ): Boolean {
+        val sourceId = tx.sourceContainerId ?: return false
+        if (!isCreditCardContainer(sourceId)) return false
+        if (sourceId in ownedDebitCardContainerIds) {
+            if (!isDebitCardAttributedTransaction(tx, parsedRecordsById, rawSmsById)) {
+                return false
+            }
+            if (resolveOwnedAccountSourceId(tx, parsedRecordsById, rawSmsById) != null) {
+                return false
+            }
+            if (debitCardLinkedAccountIds[sourceId] != null) {
+                return false
+            }
+            return mode != AccountFlowScopeMode.Fleet
+        }
+        return resolveOwnedAccountSourceId(tx, parsedRecordsById, rawSmsById) == null
+    }
 
     fun isBillPayment(
         tx: FinancialTransaction,
@@ -197,6 +226,22 @@ data class CurrentAccountTransactionScope(
         contains("سحب نقدي") || contains("سحب نقدى")
 
     companion object {
+        fun isDebitCardAttributedTransaction(
+            tx: FinancialTransaction,
+            parsedRecordsById: Map<String, ParsedEventRecord>,
+            rawSmsById: Map<String, RawSms>,
+        ): Boolean =
+            tx.linkedParsedEventIds.mapNotNull { parsedRecordsById[it] }.any { record ->
+                val body = rawSmsById[record.event.rawSmsId]?.body.orEmpty()
+                if (!CreditCardMessageHeuristics.isDebitCardSms(body)) return@any false
+                when (record.event.messageFamily) {
+                    MessageFamily.PURCHASE,
+                    MessageFamily.WITHDRAWAL,
+                    -> true
+                    else -> false
+                }
+            }
+
         private val SOURCE_ACCOUNT_PATTERNS = listOf(
             Regex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})"""),
             Regex("""من\s*حساب\s*:\s*(\d{4})"""),

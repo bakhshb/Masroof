@@ -28,17 +28,16 @@ import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
-import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
+import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
+import com.baraa.masroof.application.dashboard.aggregateDebitSalaryPeriodSpending
+import com.baraa.masroof.application.dashboard.aggregateFacilityDue
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofExtendedColors
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -215,80 +214,101 @@ fun CardsSummaryScreen(
 @Composable
 private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
     val extended = MasroofThemeExtras.extendedColors
-    val primaryRows = overview.facilities.flatMap { it.allCards }
-    val due = resolveLatestStatementDue(primaryRows)?.amount
-    val periodSpending = sumSignedAmounts(overview.facilities.map { it.facilitySalaryPeriodSpending })
-    val statementSpending = sumSignedAmounts(overview.facilities.map { it.facilityStatementSpending })
-    val periodSpendingColor = spendingAmountColor(periodSpending, extended)
-    val statementSpendingColor = spendingAmountColor(statementSpending, extended)
+    val due = overview.aggregateFacilityDue()?.amount
+    val creditPeriodSpending = overview.aggregateCreditSalaryPeriodSpending()
+    val creditStatementSpending = overview.aggregateCreditStatementSpending()
+    val debitPeriodSpending = overview.aggregateDebitSalaryPeriodSpending()
+    val creditPeriodSpendingColor = spendingAmountColor(creditPeriodSpending, extended)
+    val creditStatementSpendingColor = spendingAmountColor(creditStatementSpending, extended)
+    val debitPeriodSpendingColor = spendingAmountColor(debitPeriodSpending, extended)
     val aggregateStatementLabel = overview.facilities.firstOrNull()?.aggregateStatementPeriodLabel
     val salaryPeriodLabel = overview.facilities.firstOrNull()?.salaryPeriodLabel
+        ?: overview.debitCards.firstOrNull()?.salaryPeriodLabel
+    val showCreditSpending = overview.facilities.isNotEmpty()
+    val showDebitSpending = overview.debitCards.isNotEmpty()
 
     MasroofCard(accent = MasroofCardAccent.Credit) {
-        Text(
-            stringResource(R.string.dashboard_credit_card_aggregate_due),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            due?.let { formatLocalizedMoney(it) }
-                ?: stringResource(R.string.dashboard_value_unavailable),
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = extended.liability,
-            ),
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        if (showCreditSpending) {
+            Text(
+                stringResource(R.string.dashboard_credit_card_aggregate_due),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                due?.let { formatLocalizedMoney(it) }
+                    ?: stringResource(R.string.dashboard_value_unavailable),
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = extended.liability,
+                ),
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
 
-        Text(
-            if (salaryPeriodLabel != null) {
-                stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
-            } else {
-                stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        Text(
-            formatLocalizedMoney(periodSpending),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
-                color = periodSpendingColor,
-            ),
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        if (showCreditSpending) {
+            Text(
+                if (salaryPeriodLabel != null) {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                formatLocalizedMoney(creditPeriodSpending),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = creditPeriodSpendingColor,
+                ),
+                modifier = Modifier.padding(top = 4.dp),
+            )
 
-        Text(
-            if (aggregateStatementLabel != null) {
-                stringResource(
-                    R.string.dashboard_credit_cards_aggregate_statement_spending,
-                    aggregateStatementLabel,
-                )
-            } else {
-                stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        Text(
-            formatLocalizedMoney(statementSpending),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
-                color = statementSpendingColor,
-            ),
-            modifier = Modifier.padding(top = 4.dp),
-        )
+            Text(
+                if (aggregateStatementLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_cards_aggregate_statement_spending,
+                        aggregateStatementLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                formatLocalizedMoney(creditStatementSpending),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = creditStatementSpendingColor,
+                ),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
+        if (showDebitSpending) {
+            Text(
+                if (salaryPeriodLabel != null) {
+                    stringResource(R.string.dashboard_debit_cards_aggregate_period_spending, salaryPeriodLabel)
+                } else {
+                    stringResource(R.string.dashboard_debit_cards_aggregate_period_spending_fallback)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                formatLocalizedMoney(debitPeriodSpending),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = debitPeriodSpendingColor,
+                ),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
-}
-
-private fun sumSignedAmounts(amounts: List<SignedMoneyAmount>): SignedMoneyAmount {
-    if (amounts.isEmpty()) return SignedMoneyAmount.zero(Currency.SAR)
-    var sum = BigDecimal.ZERO
-    val currency = amounts.first().currency
-    amounts.forEach { sum = sum.add(it.amount) }
-    return SignedMoneyAmount(sum.setScale(Money.SCALE, RoundingMode.HALF_EVEN), currency)
 }
 
 @Composable
