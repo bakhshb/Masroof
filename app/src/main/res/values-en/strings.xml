@@ -172,8 +172,8 @@
     <string name="settings_install_permission_required">Allow installing unknown apps for Masroof, then try again</string>
     <string name="settings_updates_check_failed">Could not check for updates</string>
     <string name="settings_logs_title">Diagnostic log</string>
-    <string name="settings_logs_subtitle">Update checks and errors</string>
-    <string name="settings_logs_hint">Update checks, downloads, and errors are recorded here. GitHub tokens are never written to the log.</string>
+    <string name="settings_logs_subtitle">SMS pipeline, updates, and errors</string>
+    <string name="settings_logs_hint">SMS ingestion, parsing, review actions, dashboard errors, backups, and update checks are recorded here (up to 500 entries or 14 days). Message bodies, OTPs, tokens, and amounts are never logged.</string>
     <string name="settings_logs_export">Export log</string>
     <string name="settings_logs_clear">Clear log</string>
     <string name="settings_logs_empty">No log entries yet.</string>

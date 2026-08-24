@@ -33,6 +33,7 @@ class DashboardViewModelFactory(
             permissionStateProvider = permissionStateProvider,
             appContext = container.applicationContext,
             appLocaleRepository = container.appLocaleRepository,
+            appLogService = container.appLogService,
             zoneId = zoneId,
             clock = clock,
         ) as T

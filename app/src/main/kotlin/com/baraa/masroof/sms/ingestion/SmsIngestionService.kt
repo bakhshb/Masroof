@@ -1,5 +1,8 @@
 package com.baraa.masroof.sms.ingestion
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
@@ -35,18 +38,24 @@ class SmsIngestionService(
     private val ownershipDiscovery: OwnershipDiscoveryService? = null,
     private val reconciliation: TransactionReconciliationService? = null,
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
+    private val appLogService: AppLogService? = null,
 ) {
     private val insertMutex = Mutex()
 
-    suspend fun ingest(rawSms: RawSms): SmsIngestionResult {
+    suspend fun ingest(rawSms: RawSms, logOutcome: Boolean = true): SmsIngestionResult {
         val detection = bankDetector.detect(rawSms.sender, rawSms.body)
         if (detection !is BankDetectionResult.Detected) {
-            return SmsIngestionResult.NotRelevant(
-                reason = (detection as? BankDetectionResult.Unknown)
-                    ?.reasons
-                    ?.firstOrNull()
-                    ?: "sender_not_in_scope",
-            )
+            val reason = (detection as? BankDetectionResult.Unknown)
+                ?.reasons
+                ?.firstOrNull()
+                ?: "sender_not_in_scope"
+            if (logOutcome) {
+                appLogService?.info(
+                    AppLogCategories.INGEST,
+                    "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} ($reason)",
+                )
+            }
+            return SmsIngestionResult.NotRelevant(reason = reason)
         }
 
         val insertOutcome = try {
@@ -59,16 +68,36 @@ class SmsIngestionService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            val message = e.message ?: e::class.java.simpleName
+            if (logOutcome) {
+                logIngestFailure(rawSms, message)
+            }
             return SmsIngestionResult.Failed(
                 rawSmsId = null,
-                message = e.message ?: e::class.java.simpleName,
+                message = message,
                 cause = e,
             )
         }
 
         return when (insertOutcome) {
-            RawSmsInsertResult.AlreadyExists -> SmsIngestionResult.Duplicate
-            RawSmsInsertResult.Inserted -> parseAndPersist(rawSms)
+            RawSmsInsertResult.AlreadyExists -> {
+                if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Duplicate SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                    )
+                }
+                SmsIngestionResult.Duplicate
+            }
+            RawSmsInsertResult.Inserted -> {
+                if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Inserted SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                    )
+                }
+                parseAndPersist(rawSms, logOutcome)
+            }
         }
     }
 
@@ -76,7 +105,8 @@ class SmsIngestionService(
      * Re-runs parse for an already-stored RawSms and replaces its ParsedEvent.
      * Used after parser improvements to refresh the review queue without duplicating evidence.
      */
-    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult = parseAndPersist(rawSms)
+    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult =
+        parseAndPersist(rawSms, logOutcome = false)
 
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
         val receivedAt = rawSms.receivedAt
@@ -92,7 +122,7 @@ class SmsIngestionService(
         ) != null
     }
 
-    private suspend fun parseAndPersist(rawSms: RawSms): SmsIngestionResult {
+    private suspend fun parseAndPersist(rawSms: RawSms, logOutcome: Boolean): SmsIngestionResult {
         val parseResult = try {
             parseGateway.parse(
                 SmsParseInput(
@@ -105,31 +135,46 @@ class SmsIngestionService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            val message = e.message ?: e::class.java.simpleName
+            if (logOutcome) {
+                logIngestFailure(rawSms, message)
+            }
             return SmsIngestionResult.Failed(
                 rawSmsId = rawSms.id,
-                message = e.message ?: e::class.java.simpleName,
+                message = message,
                 cause = e,
             )
         }
 
         return try {
-            mapAndSave(rawSms, parseResult)
+            mapAndSave(rawSms, parseResult, logOutcome)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            val message = e.message ?: e::class.java.simpleName
+            if (logOutcome) {
+                logIngestFailure(rawSms, message)
+            }
             SmsIngestionResult.Failed(
                 rawSmsId = rawSms.id,
-                message = e.message ?: e::class.java.simpleName,
+                message = message,
                 cause = e,
             )
         }
     }
 
-    private suspend fun mapAndSave(rawSms: RawSms, parseResult: ParseResult): SmsIngestionResult =
+    private suspend fun mapAndSave(
+        rawSms: RawSms,
+        parseResult: ParseResult,
+        logOutcome: Boolean,
+    ): SmsIngestionResult =
         when (parseResult) {
             is ParseResult.Success -> {
                 parsedEventRepository.save(parseResult.event, parseResult.details)
                 afterParsedEvent(parseResult.event)
+                if (logOutcome) {
+                    logParsedOutcome(rawSms, parseResult.event.messageFamily, "parsed")
+                }
                 SmsIngestionResult.Parsed(
                     rawSmsId = rawSms.id,
                     event = parseResult.event,
@@ -141,12 +186,21 @@ class SmsIngestionService(
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
                     afterParsedEvent(parseResult.event)
+                    if (logOutcome) {
+                        logParsedOutcome(rawSms, parseResult.event.messageFamily, "parsed_partial")
+                    }
                     SmsIngestionResult.Parsed(
                         rawSmsId = rawSms.id,
                         event = parseResult.event,
                         details = parseResult.details,
                     )
                 } else {
+                    if (logOutcome) {
+                        appLogService?.warn(
+                            AppLogCategories.INGEST,
+                            "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                        )
+                    }
                     SmsIngestionResult.Invalid(
                         rawSmsId = rawSms.id,
                         findings = parseResult.findings,
@@ -158,6 +212,14 @@ class SmsIngestionService(
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
                     afterParsedEvent(parseResult.event)
+                    if (logOutcome) {
+                        logParsedOutcome(rawSms, parseResult.event.messageFamily, "review_required")
+                    }
+                } else if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Review required from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                    )
                 }
                 SmsIngestionResult.ReviewRequired(
                     rawSmsId = rawSms.id,
@@ -171,6 +233,14 @@ class SmsIngestionService(
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
                     afterParsedEvent(parseResult.event)
+                    if (logOutcome) {
+                        logParsedOutcome(rawSms, parseResult.event.messageFamily, "non_financial")
+                    }
+                } else if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Non-financial SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                    )
                 }
                 SmsIngestionResult.NonFinancial(
                     rawSmsId = rawSms.id,
@@ -180,18 +250,50 @@ class SmsIngestionService(
                 )
             }
 
-            is ParseResult.Unsupported ->
+            is ParseResult.Unsupported -> {
+                if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Unsupported message from ${AppLogFormatting.maskSender(rawSms.sender)} (${parseResult.reason})",
+                    )
+                }
                 SmsIngestionResult.Unsupported(
                     rawSmsId = rawSms.id,
                     reason = parseResult.reason,
                 )
+            }
 
-            is ParseResult.Invalid ->
+            is ParseResult.Invalid -> {
+                if (logOutcome) {
+                    appLogService?.warn(
+                        AppLogCategories.INGEST,
+                        "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                    )
+                }
                 SmsIngestionResult.Invalid(
                     rawSmsId = rawSms.id,
                     findings = parseResult.findings,
                 )
+            }
         }
+
+    private fun logParsedOutcome(
+        rawSms: RawSms,
+        family: com.baraa.masroof.domain.model.MessageFamily,
+        outcome: String,
+    ) {
+        appLogService?.info(
+            AppLogCategories.INGEST,
+            "${outcome.replace('_', ' ')} ${AppLogFormatting.messageFamilyLabel(family)} from ${AppLogFormatting.maskSender(rawSms.sender)}",
+        )
+    }
+
+    private fun logIngestFailure(rawSms: RawSms, message: String) {
+        appLogService?.error(
+            AppLogCategories.INGEST,
+            "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)}: $message",
+        )
+    }
 
     private suspend fun afterParsedEvent(event: ParsedEvent) {
         discoverOwnership(event)

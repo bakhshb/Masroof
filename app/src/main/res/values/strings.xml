@@ -177,8 +177,8 @@
     <string name="settings_install_permission_required">فعّل «تثبيت التطبيقات غير المعروفة» لمصروف ثم أعد المحاولة</string>
     <string name="settings_updates_check_failed">تعذّر التحقق من التحديثات</string>
     <string name="settings_logs_title">سجل التشخيص</string>
-    <string name="settings_logs_subtitle">أحداث التحديث والأخطاء</string>
-    <string name="settings_logs_hint">يُسجَّل هنا التحقق من التحديثات والتحميل والأخطاء. لا يُخزَّن رمز GitHub في السجل.</string>
+    <string name="settings_logs_subtitle">مسار الرسائل والتحديثات والأخطاء</string>
+    <string name="settings_logs_hint">يُسجَّل هنا استيراد الرسائل والتحليل وإجراءات المراجعة وأخطاء لوحة التحكم والنسخ الاحتياطي والتحديثات (حتى 500 سجل أو 14 يومًا). لا يُسجَّل نص الرسالة أو رموز OTP أو الرموز المميزة أو المبالغ.</string>
     <string name="settings_logs_export">تصدير السجل</string>
     <string name="settings_logs_clear">مسح السجل</string>
     <string name="settings_logs_empty">لا توجد سجلات بعد.</string>

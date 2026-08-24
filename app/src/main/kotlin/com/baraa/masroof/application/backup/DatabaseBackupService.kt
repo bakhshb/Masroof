@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
@@ -26,6 +28,7 @@ class DatabaseBackupService(
     private val database: MasroofDatabase,
     private val closeDatabase: () -> Unit,
     private val appVersionName: String,
+    private val appLogService: AppLogService? = null,
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
 ) : DatabaseBackupGateway {
@@ -56,6 +59,13 @@ class DatabaseBackupService(
             } finally {
                 staging.deleteRecursively()
             }
+        }.onSuccess {
+            appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
+        }.onFailure { error ->
+            appLogService?.error(
+                AppLogCategories.BACKUP,
+                "Database export failed: ${error.message ?: error::class.java.simpleName}",
+            )
         }
     }
 
@@ -111,8 +121,13 @@ class DatabaseBackupService(
             dbFile.copyTo(liveDb, overwrite = true)
             restorePreferences(preferences)
             restartProcess()
+            appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
             BackupImportOutcome.SuccessNeedsRestart
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            appLogService?.error(
+                AppLogCategories.BACKUP,
+                "Database import failed: ${error.message ?: error::class.java.simpleName}",
+            )
             BackupImportOutcome.Failed
         } finally {
             staging.deleteRecursively()

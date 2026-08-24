@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.update
 
 import android.content.Context
+import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import java.io.File
 
@@ -15,12 +16,12 @@ class AppUpdateService(
 
     fun saveToken(token: String) {
         tokenRepository.setToken(token)
-        appLogService.info(UpdateCheckCoordinator.CATEGORY, "GitHub token saved")
+        appLogService.info(AppLogCategories.UPDATE, "GitHub token saved")
     }
 
     fun clearToken() {
         tokenRepository.clearToken()
-        appLogService.info(UpdateCheckCoordinator.CATEGORY, "GitHub token cleared")
+        appLogService.info(AppLogCategories.UPDATE, "GitHub token cleared")
     }
 
     fun checkForUpdate(): Result<UpdateCheckResult> {

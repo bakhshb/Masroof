@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
@@ -41,6 +44,7 @@ class ReviewWorkflowService(
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
     private val clock: InstantClock,
+    private val appLogService: AppLogService? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
     },
@@ -107,12 +111,14 @@ class ReviewWorkflowService(
                 resolvedAt = clock.now(),
                 resolvedTransactionId = tx.id,
             ) ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
+            logReviewAction("Correction applied", reviewId)
             return ReviewWorkflowResult.Success(
                 review = marked,
                 transaction = tx,
                 correction = correction,
             )
         }
+        logReviewAction("Correction saved", reviewId)
         return ReviewWorkflowResult.Success(
             review = updated,
             transaction = tx,
@@ -191,7 +197,11 @@ class ReviewWorkflowService(
                 resolutionKind = ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
                 resolvedAt = clock.now(),
             ),
-        )
+        ).also { result ->
+            if (result is ReviewWorkflowResult.Success) {
+                logReviewAction("Resolved external transfer", reviewId)
+            }
+        }
     }
 
     suspend fun resolveSelfTransferPair(
@@ -290,7 +300,14 @@ class ReviewWorkflowService(
                 resolutionKind = ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
                 resolvedAt = clock.now(),
             ),
-        )
+        ).also { result ->
+            if (result is ReviewWorkflowResult.Success) {
+                logReviewAction(
+                    "Resolved self-transfer pair",
+                    "${AppLogFormatting.maskId(outgoingReviewId)}/${AppLogFormatting.maskId(incomingReviewId)}",
+                )
+            }
+        }
     }
 
     suspend fun resolveAsIgnored(reviewId: String): ReviewWorkflowResult =
@@ -311,6 +328,7 @@ class ReviewWorkflowService(
             resolvedAt = clock.now(),
             resolvedTransactionId = null,
         ) ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
+        logReviewAction("Dismissed as non-financial", reviewId)
         return ReviewWorkflowResult.Success(review = marked, transaction = null)
     }
 
@@ -387,6 +405,17 @@ class ReviewWorkflowService(
                 resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
                 resolvedAt = clock.now(),
             ),
+        ).also { result ->
+            if (result is ReviewWorkflowResult.Success) {
+                logReviewAction("Resolved as ${type.name.lowercase()}", reviewId)
+            }
+        }
+    }
+
+    private fun logReviewAction(action: String, reviewId: String) {
+        appLogService?.info(
+            AppLogCategories.REVIEW,
+            "$action for review ${AppLogFormatting.maskId(reviewId)}",
         )
     }
 

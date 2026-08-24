@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.update
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 
 class UpdateCheckCoordinator(
@@ -15,26 +17,26 @@ class UpdateCheckCoordinator(
     }
 
     fun checkForUpdate(source: String): Result<UpdateCheckResult> {
-        appLogService.info(CATEGORY, "Update check started ($source)")
+        appLogService.info(AppLogCategories.UPDATE, "Update check started ($source)")
         val result = appUpdateService.checkForUpdate()
         result.onSuccess { outcome ->
             preferencesRepository.setLastCheckEpochMs(System.currentTimeMillis())
             when (outcome) {
                 UpdateCheckResult.UpToDate -> {
                     pendingUpdateStore.clear()
-                    appLogService.info(CATEGORY, "Update check ($source): up to date")
+                    appLogService.info(AppLogCategories.UPDATE, "Update check ($source): up to date")
                 }
                 is UpdateCheckResult.UpdateAvailable -> {
                     pendingUpdateStore.saveAvailable(outcome.manifest)
                     appLogService.info(
-                        CATEGORY,
+                        AppLogCategories.UPDATE,
                         "Update check ($source): ${outcome.manifest.versionName} available",
                     )
                 }
             }
         }.onFailure { error ->
             appLogService.error(
-                CATEGORY,
+                AppLogCategories.UPDATE,
                 "Update check ($source) failed: ${error.message ?: error::class.java.simpleName}",
             )
         }
@@ -44,7 +46,6 @@ class UpdateCheckCoordinator(
     fun restorePendingUpdate(): UpdateManifest? = pendingUpdateStore.readAvailable()
 
     companion object {
-        const val CATEGORY: String = "update"
         const val DEFAULT_MIN_INTERVAL_MS: Long = 6L * 60L * 60L * 1000L
     }
 }

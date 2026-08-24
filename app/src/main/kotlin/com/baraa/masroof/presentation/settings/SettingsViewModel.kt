@@ -9,6 +9,8 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
@@ -264,16 +266,21 @@ class SettingsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(reparsingStored = true, error = null) }
             try {
-                reparseStoredEvents()
+                val count = reparseStoredEvents()
                 refreshReviewQueue()
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
                 )
+                appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
                 _uiState.update { it.copy(reparsingStored = false) }
             } catch (ce: CancellationException) {
                 throw ce
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "Manual reparse failed: ${error.message ?: error::class.java.simpleName}",
+                )
                 _uiState.update { it.copy(reparsingStored = false, error = SettingsError.UPDATE_FAILED) }
             }
         }
@@ -294,6 +301,10 @@ class SettingsViewModel(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
                 )
+                appLogService.info(
+                    AppLogCategories.SETTINGS,
+                    "SMS import finished: ${AppLogFormatting.scanSummary(result)}",
+                )
                 _uiState.update {
                     it.copy(
                         importingSms = false,
@@ -302,7 +313,11 @@ class SettingsViewModel(
                 }
             } catch (ce: CancellationException) {
                 throw ce
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "SMS import failed: ${error.message ?: error::class.java.simpleName}",
+                )
                 _uiState.update {
                     it.copy(importingSms = false, smsImportMessage = SmsImportMessage.FAILED)
                 }
@@ -416,7 +431,10 @@ class SettingsViewModel(
     }
 
     fun checkForUpdatesIfStale(silent: Boolean = true) {
-        if (!updateCheckCoordinator.shouldCheckNow()) return
+        if (!updateCheckCoordinator.shouldCheckNow()) {
+            restorePendingUpdateState()
+            return
+        }
         checkForUpdates(silent = silent)
     }
 
@@ -442,7 +460,7 @@ class SettingsViewModel(
 
     fun clearLogs() {
         appLogService.clear()
-        appLogService.info("logs", "Diagnostic log cleared")
+        appLogService.info(AppLogCategories.LOGS, "Diagnostic log cleared")
         refreshLogs()
         _uiState.update { it.copy(logMessage = LogMessage.CLEARED) }
     }

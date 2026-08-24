@@ -19,6 +19,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
@@ -85,6 +86,8 @@ class AppContainer(
 
     val applicationScope: CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    val appLogService: AppLogService = AppLogService(appContext)
 
     private val database: MasroofDatabase =
         Room.databaseBuilder(
@@ -231,6 +234,7 @@ class AppContainer(
             reviewQueueUpdater = reviewQueueUpdater,
             manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
+            appLogService = appLogService,
         )
 
     val transactionReclassificationService: TransactionReclassificationService =
@@ -238,6 +242,7 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             ownershipResolver = ownershipResolver,
+            appLogService = appLogService,
         )
 
     val transactionIgnoreService: TransactionIgnoreService =
@@ -245,6 +250,7 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             reviewRepository = reviewRepository,
             clock = clock,
+            appLogService = appLogService,
         )
 
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
@@ -270,6 +276,7 @@ class AppContainer(
             reconciliation = transactionReconciliationService,
             reclassification = transactionReclassificationService,
             clock = clock,
+            appLogService = appLogService,
         )
 
     val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
@@ -285,6 +292,7 @@ class AppContainer(
             ownershipDiscovery = ownershipDiscoveryService,
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
+            appLogService = appLogService,
         )
 
     val smsDataSource: SmsDataSource =
@@ -294,6 +302,7 @@ class AppContainer(
         HistoricalSmsScanner(
             dataSource = smsDataSource,
             ingestionService = smsIngestionService,
+            appLogService = appLogService,
         )
 
     /**
@@ -319,6 +328,7 @@ class AppContainer(
      * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
      */
     suspend fun reparseAllStoredEvents(): Int {
+        appLogService.info(AppLogCategories.PARSE, "Reparse started")
         var count = 0
         for (record in parsedEventRepository.listAll()) {
             val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
@@ -336,6 +346,7 @@ class AppContainer(
             repository = financialTransactionRepository,
         )
         refreshReviewQueue()
+        appLogService.info(AppLogCategories.PARSE, "Reparse finished: $count events refreshed")
         return count
     }
 
@@ -350,11 +361,8 @@ class AppContainer(
             database = database,
             closeDatabase = { database.close() },
             appVersionName = BuildConfig.VERSION_NAME,
+            appLogService = appLogService,
         )
-    }
-
-    val appLogService: AppLogService by lazy {
-        AppLogService(appContext)
     }
 
     val githubTokenRepository: com.baraa.masroof.application.update.GitHubTokenRepository =

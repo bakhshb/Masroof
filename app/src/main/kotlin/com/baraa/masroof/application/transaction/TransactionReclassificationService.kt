@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -21,6 +24,7 @@ class TransactionReclassificationService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val ownershipResolver: OwnershipResolver,
+    private val appLogService: AppLogService? = null,
 ) {
     suspend fun reclassify(
         transactionId: String,
@@ -103,6 +107,10 @@ class TransactionReclassificationService(
         if (!financialTransactionRepository.update(updated)) {
             return ReclassificationResult.Rejected("update_failed")
         }
+        appLogService?.info(
+            AppLogCategories.TRANSACTION,
+            "Reclassified ${AppLogFormatting.maskId(transactionId)} to ${newType.name.lowercase()}",
+        )
         return ReclassificationResult.Success(updated)
     }
 
