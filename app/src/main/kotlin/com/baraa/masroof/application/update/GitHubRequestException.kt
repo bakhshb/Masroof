@@ -6,10 +6,10 @@ class GitHubRequestException(
     message: String,
 ) : Exception(message) {
     val requiresToken: Boolean
-        get() = !tokenWasProvided && httpCode in AUTH_REQUIRED_CODES
+        get() = !tokenWasProvided && httpCode == 404
 
     companion object {
-        private val AUTH_REQUIRED_CODES = setOf(401, 403, 404)
+        private const val AUTH_REQUIRED_CODE = 404
     }
 }
 

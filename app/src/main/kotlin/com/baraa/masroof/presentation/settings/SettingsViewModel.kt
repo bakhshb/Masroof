@@ -400,7 +400,16 @@ class SettingsViewModel(
                         it.copy(updateState = AppUpdateUiState.Idle, updateMessage = message)
                     }
                 } else {
-                    _uiState.update { it.copy(updateState = AppUpdateUiState.Idle) }
+                    _uiState.update { current ->
+                        if (current.updateState is AppUpdateUiState.Available ||
+                            current.updateState is AppUpdateUiState.ReadyToInstall ||
+                            current.updateState is AppUpdateUiState.UpToDate
+                        ) {
+                            current
+                        } else {
+                            current.copy(updateState = AppUpdateUiState.Idle)
+                        }
+                    }
                 }
             }
         }

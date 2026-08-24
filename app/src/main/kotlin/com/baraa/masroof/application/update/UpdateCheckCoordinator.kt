@@ -17,8 +17,8 @@ class UpdateCheckCoordinator(
     fun checkForUpdate(source: String): Result<UpdateCheckResult> {
         appLogService.info(CATEGORY, "Update check started ($source)")
         val result = appUpdateService.checkForUpdate()
-        preferencesRepository.setLastCheckEpochMs(System.currentTimeMillis())
         result.onSuccess { outcome ->
+            preferencesRepository.setLastCheckEpochMs(System.currentTimeMillis())
             when (outcome) {
                 UpdateCheckResult.UpToDate -> {
                     pendingUpdateStore.clear()

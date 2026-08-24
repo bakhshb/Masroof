@@ -6,13 +6,13 @@ import org.junit.Test
 
 class GitHubRequestExceptionTest {
     @Test
-    fun requiresToken_whenUnauthorizedWithoutToken() {
+    fun doesNotRequireToken_whenUnauthorizedWithoutToken() {
         val error = GitHubRequestException(
             httpCode = 401,
             tokenWasProvided = false,
             message = "auth failed",
         )
-        assertTrue(error.requiresToken)
+        assertFalse(error.requiresToken)
     }
 
     @Test
@@ -33,5 +33,15 @@ class GitHubRequestExceptionTest {
             message = "not found",
         )
         assertTrue(error.requiresToken)
+    }
+
+    @Test
+    fun doesNotRequireToken_whenForbiddenWithoutToken() {
+        val error = GitHubRequestException(
+            httpCode = 403,
+            tokenWasProvided = false,
+            message = "rate limited",
+        )
+        assertFalse(error.requiresToken)
     }
 }
