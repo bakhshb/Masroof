@@ -209,7 +209,8 @@ fun CardsSummaryScreen(
 
 @Composable
 private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
-    val due = overview.aggregateFacilityDue()?.amount
+    val aggregateDue = overview.aggregateFacilityDue()
+    val due = aggregateDue?.amount
     val creditPeriodSpending = overview.aggregateCreditSalaryPeriodSpending()
     val creditStatementSpending = overview.aggregateCreditStatementSpending()
     val debitPeriodSpending = overview.aggregateDebitSalaryPeriodSpending()
@@ -220,7 +221,7 @@ private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
     val showDebitSpending = overview.debitCards.isNotEmpty()
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
-    val dueDateHint = overview.legacyFlat.aggregateDueDate?.let { dueDate ->
+    val dueDateHint = aggregateDue?.dueDate?.let { dueDate ->
         stringResource(
             R.string.dashboard_credit_card_due_date,
             dateFormatter.format(dueDate),
