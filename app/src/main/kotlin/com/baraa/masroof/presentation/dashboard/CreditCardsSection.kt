@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -60,8 +61,10 @@ fun CreditCardsSection(
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?> = emptyMap(),
     ownedCards: List<OwnedCardUi> = emptyList(),
     onViewAll: (() -> Unit)? = null,
+    size: DashboardSectionSize = DashboardSectionSize.MEDIUM,
 ) {
     if (!overview.hasContent) return
+    val metrics = dashboardSectionMetrics(size)
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -83,7 +86,7 @@ fun CreditCardsSection(
                     presentation = CreditCardMetricsPresentation.SummaryPurchases,
                     cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
                     ownedCards = ownedCards,
-                    modifier = Modifier.width(288.dp),
+                    modifier = Modifier.width(metrics.cardWidth),
                 )
             }
         }

@@ -80,7 +80,7 @@ class DashboardViewModel(
         AppLocaleContext.wrap(appContext, languageTag)
 
     companion object {
-        const val RECENT_TRANSACTION_LIMIT: Int = 5
+        const val RECENT_TRANSACTION_LIMIT: Int = DASHBOARD_RECENT_TRANSACTION_LIMIT
     }
 
     init {

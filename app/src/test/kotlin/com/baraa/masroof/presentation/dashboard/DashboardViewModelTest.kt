@@ -12,6 +12,7 @@ import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
@@ -579,6 +580,25 @@ class DashboardViewModelTest {
         assertNull(vm.uiState.value.customizeDraft)
         assertTrue(vm.uiState.value.dashboardLayout.entry(DashboardSectionId.HERO)!!.visible)
         assertNull(layoutRepo.saved)
+    }
+
+    @Test
+    fun customizeLayout_setSectionSize_persistsAfterSave() = runTest {
+        val layoutRepo = FakeLayoutPreferencesRepository()
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        vm.setCustomizeSectionSize(DashboardSectionId.HERO, DashboardSectionSize.SMALL)
+        vm.setCustomizeSectionSize(DashboardSectionId.CARDS, DashboardSectionSize.SMALL)
+        vm.setCustomizeSectionSize(DashboardSectionId.TRANSACTIONS, DashboardSectionSize.LARGE)
+        vm.saveCustomizeLayout()
+
+        val saved = layoutRepo.saved!!
+        assertEquals(DashboardSectionSize.SMALL, saved.entry(DashboardSectionId.HERO)!!.size)
+        assertEquals(DashboardSectionSize.SMALL, saved.entry(DashboardSectionId.CARDS)!!.size)
+        assertEquals(DashboardSectionSize.LARGE, saved.entry(DashboardSectionId.TRANSACTIONS)!!.size)
+        assertEquals(DashboardSectionSize.SMALL, vm.uiState.value.dashboardLayout.entry(DashboardSectionId.HERO)!!.size)
     }
 
     private fun viewModel(

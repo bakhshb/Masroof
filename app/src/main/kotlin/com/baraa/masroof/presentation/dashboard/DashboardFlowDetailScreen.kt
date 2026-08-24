@@ -42,6 +42,7 @@ fun DashboardFlowDetailScreen(
     grouping: CurrentAccountFlowDetailGrouping,
     onBack: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -90,6 +91,7 @@ fun DashboardFlowDetailScreen(
                     FlowDetailExpenseSummarySection(summary = summary)
                     FlowDetailTransactionsSection(
                         transactions = flowExpenseTransactions(grouping, previewsById),
+                        ownedCards = ownedCards,
                         onOpenTransaction = onOpenTransaction,
                     )
                 }
@@ -97,6 +99,7 @@ fun DashboardFlowDetailScreen(
                     FlowDetailIncomeSummarySection(summary = summary)
                     FlowDetailTransactionsSection(
                         transactions = flowIncomeTransactions(grouping, previewsById),
+                        ownedCards = ownedCards,
                         onOpenTransaction = onOpenTransaction,
                     )
                 }
@@ -205,6 +208,7 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
 @Composable
 private fun FlowDetailTransactionsSection(
     transactions: List<TransactionPreviewUi>,
+    ownedCards: List<OwnedCardUi>,
     onOpenTransaction: (String) -> Unit,
 ) {
     if (transactions.isEmpty()) return
@@ -216,6 +220,7 @@ private fun FlowDetailTransactionsSection(
         transactions.forEach { row ->
             DashboardRecentTransactionRow(
                 row = row,
+                ownedCards = ownedCards,
                 onClick = { onOpenTransaction(row.id) },
             )
         }

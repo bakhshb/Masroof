@@ -1,21 +1,10 @@
 package com.baraa.masroof.presentation.dashboard
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.presentation.common.MasroofCard
-import com.baraa.masroof.presentation.common.MasroofMoneyRow
-import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
-import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 
 @Composable
 fun TransactionRow(
@@ -24,37 +13,12 @@ fun TransactionRow(
     ownedCards: List<OwnedCardUi> = emptyList(),
     onClick: (() -> Unit)? = null,
 ) {
-    val title = row.title ?: transactionTypeLabel(row.type)
-    val cardLabel = cardDisplayLabelFromTransaction(row = row, cards = ownedCards)
-    val subtitle = listOfNotNull(
-        transactionTypeLabel(row.type),
-        cardLabel,
-        formatLocalizedTransactionDate(row.localDate),
-    ).joinToString(" · ")
-    val rowStyle = when {
-        row.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> MasroofMoneyRowStyle.Highlight
-        row.direction == TransactionDirectionUi.INCOME ||
-            row.direction == TransactionDirectionUi.INWARD ||
-            row.direction == TransactionDirectionUi.TRANSFER_IN -> MasroofMoneyRowStyle.Inflow
-        row.direction == TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
-        else -> MasroofMoneyRowStyle.Neutral
-    }
-    MasroofCard(
-        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-    ) {
-        MasroofMoneyRow(
-            label = title,
-            value = formatLocalizedMoney(row.amount),
-            style = rowStyle,
-            leadingIcon = TransactionDirectionPresentation.icon(row.direction),
-        )
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-    }
+    DashboardRecentTransactionRow(
+        row = row,
+        modifier = modifier,
+        ownedCards = ownedCards,
+        onClick = onClick,
+    )
 }
 
 @Composable

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +31,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
@@ -116,7 +116,7 @@ private fun DashboardScreen(
     onDismissCustomize: () -> Unit,
     onSaveCustomize: () -> Unit,
     onToggleCustomizeSection: (DashboardSectionId) -> Unit,
-    onSetCustomizeSectionSize: (DashboardSectionId, com.baraa.masroof.application.dashboard.DashboardSectionSize) -> Unit,
+    onSetCustomizeSectionSize: (DashboardSectionId, DashboardSectionSize) -> Unit,
     onMoveCustomizeSection: (DashboardSectionId, Int) -> Unit,
     onToggleCustomizeQuickExpense: () -> Unit,
     onToggleCustomizeQuickIncome: () -> Unit,
@@ -138,6 +138,7 @@ private fun DashboardScreen(
             periodRangeLabel = periodRangeLabel,
             transactions = state.allTransactions,
             grouping = state.flowDetailGrouping ?: CurrentAccountFlowDetailGrouping.empty(),
+            ownedCards = state.ownedCards,
             onBack = { flowDetailMode = null },
             onOpenTransaction = onOpenTransaction,
         )
@@ -291,6 +292,7 @@ private fun DashboardCustomizableSections(
     )
 
     layout.orderedVisibleSections().forEach { entry ->
+        val metrics = dashboardSectionMetrics(entry.size)
         Column(
             modifier = Modifier.dashboardSectionFrame(entry.size, editing),
         ) {
@@ -319,6 +321,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
+                        size = entry.size,
                         onViewAll = onOpenAccountsSummary,
                     )
                 }
@@ -333,6 +336,7 @@ private fun DashboardCustomizableSections(
                             zoneId = ZoneId.systemDefault(),
                             ownedCards = state.ownedCards,
                             onViewAll = onOpenCardsSummary,
+                            size = entry.size,
                         )
                     } else {
                         state.followedCreditCardsOverview()?.let { followedOverview ->
@@ -343,6 +347,7 @@ private fun DashboardCustomizableSections(
                                     zoneId = ZoneId.systemDefault(),
                                     ownedCards = state.ownedCards,
                                     onViewAll = onOpenCardsSummary,
+                                    size = entry.size,
                                 )
                             }
                         }
@@ -386,13 +391,13 @@ private fun DashboardCustomizableSections(
                             )
                         }
                     } else {
-                        state.recentTransactions.forEach { row ->
+                        state.recentTransactions.take(metrics.recentTransactionCount).forEach { row ->
                             DashboardRecentTransactionRow(
                                 row = row,
                                 ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(metrics.transactionSpacing))
                         }
                     }
                 }

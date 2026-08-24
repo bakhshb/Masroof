@@ -30,6 +30,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.CreditFacilityOverview
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -39,8 +40,6 @@ import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
-
-private val dashboardCarouselCardMinHeight = 235.dp
 
 enum class DebitCardTilePresentation {
     /** Matches credit facility carousel tile height and structure on the home dashboard. */
@@ -58,9 +57,12 @@ fun CreditFacilitiesSection(
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
     onOpenDebit: ((DebitCardOverview) -> Unit)? = null,
-    facilityModifier: Modifier = Modifier.width(288.dp),
+    size: DashboardSectionSize = DashboardSectionSize.MEDIUM,
+    facilityModifier: Modifier? = null,
 ) {
     if (!overview.hasContent) return
+    val metrics = dashboardSectionMetrics(size)
+    val tileModifier = facilityModifier ?: Modifier.width(metrics.cardWidth)
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -81,14 +83,14 @@ fun CreditFacilitiesSection(
                         cardNetworksByLast4 = cardNetworksByLast4,
                         zoneId = zoneId,
                         ownedCards = ownedCards,
-                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        modifier = tileModifier.heightIn(min = metrics.cardMinHeight),
                     )
                 }
                 items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->
                     DebitCardSummaryTile(
                         debit = debit,
                         network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
-                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        modifier = tileModifier.heightIn(min = metrics.cardMinHeight),
                         presentation = DebitCardTilePresentation.Carousel,
                         onClick = onOpenDebit?.let { open -> { open(debit) } },
                     )

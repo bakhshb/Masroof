@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -67,6 +67,7 @@ fun DashboardRecentTransactionRow(
         TransactionDirectionUi.OUTWARD -> extended.outflow
         TransactionDirectionUi.NEUTRAL -> MaterialTheme.colorScheme.onSurface
     }
+    val cardNetwork = resolveCardNetworkFromTransaction(row, ownedCards)
 
     MasroofCard(
         modifier = modifier.then(
@@ -78,20 +79,7 @@ fun DashboardRecentTransactionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = MasroofIcons.transactionType(row.type),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            TransactionLeadingMark(type = row.type, network = cardNetwork, last4 = row.cardLast4)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
@@ -136,5 +124,35 @@ fun DashboardRecentTransactionRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TransactionLeadingMark(
+    type: com.baraa.masroof.domain.model.FinancialTransactionType,
+    network: CardNetwork?,
+    last4: String?,
+) {
+    if (network != null) {
+        CardNetworkBadge(
+            network = network,
+            last4 = last4.orEmpty(),
+            modifier = Modifier.size(40.dp),
+        )
+        return
+    }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.size(40.dp),
+    ) {
+        Icon(
+            imageVector = MasroofIcons.transactionType(type),
+            contentDescription = null,
+            modifier = Modifier
+                .padding(10.dp)
+                .size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

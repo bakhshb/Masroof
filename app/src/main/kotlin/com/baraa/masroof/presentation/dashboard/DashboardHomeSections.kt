@@ -7,13 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -33,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
+import com.baraa.masroof.application.dashboard.DashboardSectionSize
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.core.money.Currency
@@ -52,10 +51,11 @@ fun DashboardHeroCard(
     period: FinancialPeriod?,
     isCurrentPeriod: Boolean,
     today: LocalDate,
-    size: com.baraa.masroof.application.dashboard.DashboardSectionSize = com.baraa.masroof.application.dashboard.DashboardSectionSize.MEDIUM,
+    size: DashboardSectionSize = DashboardSectionSize.MEDIUM,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
+    val metrics = dashboardSectionMetrics(size)
     val remaining = accountsFleet.totalRemaining
         ?: SignedMoneyAmount.zero(accountsFleet.currency ?: Currency.SAR)
     val totalInflow = accountsFleet.totalInflow ?: Money.zero(remaining.currency)
@@ -67,6 +67,7 @@ fun DashboardHeroCard(
     }
 
     MasroofCard(modifier = modifier) {
+        Column(modifier = Modifier.padding(metrics.heroExtraPadding)) {
         Text(
             stringResource(R.string.dashboard_hero_remaining_title),
             style = MaterialTheme.typography.bodySmall,
@@ -77,7 +78,7 @@ fun DashboardHeroCard(
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = remainingColor,
-                fontSize = MaterialTheme.typography.headlineMedium.fontSize * heroAmountStyleScale(size),
+                fontSize = MaterialTheme.typography.headlineMedium.fontSize * metrics.heroAmountScale,
             ),
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -118,37 +119,40 @@ fun DashboardHeroCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp)
-                    .height(6.dp)
+                    .height(metrics.heroProgressHeight)
                     .clip(RoundedCornerShape(999.dp)),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(
-                    R.string.dashboard_hero_footer_income,
-                    formatLocalizedMoney(totalInflow),
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                stringResource(
-                    R.string.dashboard_hero_footer_expense,
-                    formatLocalizedMoney(totalOutflow),
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (metrics.showHeroFooter) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(
+                        R.string.dashboard_hero_footer_income,
+                        formatLocalizedMoney(totalInflow),
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(
+                        R.string.dashboard_hero_footer_expense,
+                        formatLocalizedMoney(totalOutflow),
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         }
     }
 }
@@ -181,7 +185,7 @@ fun DashboardQuickSummaryRow(
     onOpenIncomeDetails: () -> Unit,
     showExpense: Boolean = true,
     showIncome: Boolean = true,
-    size: com.baraa.masroof.application.dashboard.DashboardSectionSize = com.baraa.masroof.application.dashboard.DashboardSectionSize.MEDIUM,
+    size: DashboardSectionSize = DashboardSectionSize.MEDIUM,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -189,8 +193,7 @@ fun DashboardQuickSummaryRow(
         ?: SignedMoneyAmount.zero(accountsFleet.currency ?: Currency.SAR)
     val totalInflow = accountsFleet.totalInflow ?: Money.zero(remaining.currency)
     val totalOutflow = accountsFleet.totalOutflow ?: Money.zero(remaining.currency)
-
-    val cardPadding = quickCardPadding(size)
+    val metrics = dashboardSectionMetrics(size)
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -207,7 +210,9 @@ fun DashboardQuickSummaryRow(
             icon = MasroofIcons.appLogo,
             iconBackground = MaterialTheme.colorScheme.surfaceVariant,
             iconTint = MaterialTheme.colorScheme.primary,
-            contentPadding = cardPadding,
+            contentPadding = metrics.quickPadding,
+            minHeight = metrics.quickMinHeight,
+            iconSize = metrics.quickIconSize,
             modifier = Modifier.weight(1f),
         )
         if (showExpense) {
@@ -220,7 +225,9 @@ fun DashboardQuickSummaryRow(
                 iconTint = extended.outflow,
                 clickable = true,
                 onClick = onOpenExpenseDetails,
-                contentPadding = cardPadding,
+                contentPadding = metrics.quickPadding,
+                minHeight = metrics.quickMinHeight,
+                iconSize = metrics.quickIconSize,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -234,7 +241,9 @@ fun DashboardQuickSummaryRow(
                 iconTint = extended.inflow,
                 clickable = true,
                 onClick = onOpenIncomeDetails,
-                contentPadding = cardPadding,
+                contentPadding = metrics.quickPadding,
+                minHeight = metrics.quickMinHeight,
+                iconSize = metrics.quickIconSize,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -250,13 +259,15 @@ private fun DashboardQuickCard(
     iconBackground: Color,
     iconTint: Color,
     contentPadding: androidx.compose.ui.unit.Dp = 10.dp,
+    minHeight: androidx.compose.ui.unit.Dp = 118.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 28.dp,
     modifier: Modifier = Modifier,
     clickable: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier
-            .heightIn(min = 118.dp)
+            .heightIn(min = minHeight)
             .then(
                 if (clickable && onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
             ),
@@ -288,7 +299,7 @@ private fun DashboardQuickCard(
             }
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(iconSize)
                     .clip(RoundedCornerShape(8.dp))
                     .background(iconBackground),
                 contentAlignment = Alignment.Center,
@@ -296,7 +307,7 @@ private fun DashboardQuickCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size((iconSize.value * 0.57f).dp),
                     tint = iconTint,
                 )
             }
@@ -326,9 +337,11 @@ private fun DashboardQuickCard(
 fun DashboardAccountsSection(
     accounts: List<OwnedAccountUi>,
     modifier: Modifier = Modifier,
+    size: DashboardSectionSize = DashboardSectionSize.MEDIUM,
     onViewAll: (() -> Unit)? = null,
 ) {
     if (accounts.isEmpty()) return
+    val metrics = dashboardSectionMetrics(size)
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
@@ -342,14 +355,18 @@ fun DashboardAccountsSection(
                 if (index > 0) {
                     Spacer(Modifier.height(4.dp))
                 }
-                DashboardAccountRow(account = account, index = index)
+                DashboardAccountRow(account = account, index = index, metrics = metrics)
             }
         }
     }
 }
 
 @Composable
-private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
+private fun DashboardAccountRow(
+    account: OwnedAccountUi,
+    index: Int,
+    metrics: DashboardSectionMetrics,
+) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
     val movement = summary?.cashPosition()
@@ -372,7 +389,7 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(metrics.accountIconSize)
                 .clip(RoundedCornerShape(12.dp))
                 .background(iconBg),
             contentAlignment = Alignment.Center,
@@ -380,7 +397,7 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size((metrics.accountIconSize.value * 0.53f).dp),
                 tint = iconTint,
             )
         }
@@ -392,7 +409,7 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (periodInflow != null && periodOutflow != null) {
+            if (metrics.showAccountPeriodFlow && periodInflow != null && periodOutflow != null) {
                 Text(
                     stringResource(
                         R.string.dashboard_account_period_in_out,
@@ -413,7 +430,10 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
             Text(
                 remaining?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * metrics.accountAmountScale,
+                ),
                 color = remaining?.let { value ->
                     when {
                         value.amount.signum() > 0 -> extended.inflow
