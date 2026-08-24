@@ -161,7 +161,11 @@ fun TransactionListScreen(
             return@MasroofSecondaryScaffold
         }
 
-        Column(modifier = contentModifier.fillMaxSize()) {
+        Column(
+            modifier = contentModifier
+                .fillMaxSize()
+                .padding(top = 12.dp),
+        ) {
             TransactionListToolbar(
                 periodLabel = periodLabel,
                 searchQuery = searchQuery,
@@ -179,7 +183,7 @@ fun TransactionListScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (filterResult.transactions.isEmpty()) {
                     item {
@@ -195,7 +199,7 @@ fun TransactionListScreen(
                     }
                 } else {
                     items(filterResult.transactions, key = { it.id }) { row ->
-                        TransactionListRow(
+                        TransactionPreviewRow(
                             row = row,
                             ownedCards = ownedCards,
                             onClick = { onOpenTransaction(row.id) },

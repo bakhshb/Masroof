@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -28,7 +27,7 @@ import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @Composable
-fun DashboardRecentTransactionRow(
+fun TransactionPreviewRow(
     row: TransactionPreviewUi,
     modifier: Modifier = Modifier,
     ownedCards: List<OwnedCardUi> = emptyList(),

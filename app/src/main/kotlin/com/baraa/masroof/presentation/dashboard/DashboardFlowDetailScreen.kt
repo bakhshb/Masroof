@@ -214,7 +214,7 @@ private fun FlowDetailTransactionsSection(
             title = stringResource(R.string.dashboard_flow_detail_transactions_title),
         )
         transactions.forEach { row ->
-            DashboardRecentTransactionRow(
+            TransactionPreviewRow(
                 row = row,
                 onClick = { onOpenTransaction(row.id) },
             )
