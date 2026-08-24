@@ -142,58 +142,21 @@ private fun AccountsSummaryHeroCard(
     ownedAccounts: List<OwnedAccountUi>,
     fleet: com.baraa.masroof.application.dashboard.AccountsSummary? = null,
 ) {
-    val extended = MasroofThemeExtras.extendedColors
     val resolvedFleet = resolveDashboardAccountsFleet(
         ownedAccounts = ownedAccounts,
         fleet = fleet,
     )
     val totalRemaining = resolvedFleet.totalRemaining
-    val totalInflow = resolvedFleet.totalInflow
-    val totalOutflow = resolvedFleet.totalOutflow
-    val remainingColor = when {
-        totalRemaining == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        totalRemaining.amount.signum() > 0 -> extended.inflow
-        totalRemaining.amount.signum() < 0 -> extended.outflow
-        else -> MaterialTheme.colorScheme.onSurface
-    }
 
-    MasroofCard(accent = MasroofCardAccent.Account) {
-        Text(
-            stringResource(R.string.dashboard_accounts_remaining_total_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            if (totalRemaining != null) {
-                formatLocalizedMoney(totalRemaining)
-            } else {
-                stringResource(R.string.dashboard_value_unavailable)
-            },
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = remainingColor,
-            ),
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        if (totalInflow != null && totalOutflow != null) {
-            Text(
-                stringResource(
-                    R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(totalInflow),
-                    formatLocalizedMoney(totalOutflow),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        Text(
-            stringResource(R.string.dashboard_accounts_fleet_total_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
+    DashboardSummaryMetricCard(
+        title = stringResource(R.string.dashboard_accounts_remaining_total_title),
+        amount = totalRemaining?.let { formatLocalizedMoney(it) }
+            ?: stringResource(R.string.dashboard_value_unavailable),
+        tone = DashboardMetricTone.Signed,
+        signedAmount = totalRemaining?.amount,
+        accent = MasroofCardAccent.Account,
+        hint = stringResource(R.string.dashboard_accounts_fleet_total_hint),
+    )
 }
 
 @Composable

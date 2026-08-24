@@ -23,10 +23,10 @@ import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
+import com.baraa.masroof.presentation.common.MasroofPeriodDisplay
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
-import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 enum class DashboardFlowDetailMode {
     Expense,
@@ -44,20 +44,21 @@ fun DashboardFlowDetailScreen(
     onOpenTransaction: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val extended = MasroofThemeExtras.extendedColors
     val movement = summary.externalMovement()
     val presentation = when (mode) {
         DashboardFlowDetailMode.Expense -> FlowDetailPresentation(
             titleRes = R.string.dashboard_expense_details_title,
             total = movement.outflow,
-            totalColor = extended.outflow,
-            totalLabelRes = R.string.dashboard_flow_detail_expense_total,
+            totalTitleRes = R.string.dashboard_total_spent,
+            tone = DashboardMetricTone.Outflow,
+            totalHintRes = R.string.dashboard_flow_detail_expense_total_hint,
         )
         DashboardFlowDetailMode.Income -> FlowDetailPresentation(
             titleRes = R.string.dashboard_income_details_title,
             total = movement.inflow,
-            totalColor = extended.inflow,
-            totalLabelRes = R.string.dashboard_flow_detail_income_total,
+            totalTitleRes = R.string.dashboard_total_inflow,
+            tone = DashboardMetricTone.Inflow,
+            totalHintRes = R.string.dashboard_flow_detail_income_total_hint,
         )
     }
     val formattedTotal = formatLocalizedMoney(presentation.total)
@@ -75,14 +76,13 @@ fun DashboardFlowDetailScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            FlowDetailHeroCard(
-                periodRangeLabel = periodRangeLabel,
-                totalLabel = stringResource(presentation.totalLabelRes, formattedTotal),
-                totalColor = presentation.totalColor,
-                totalHintRes = when (mode) {
-                    DashboardFlowDetailMode.Expense -> R.string.dashboard_flow_detail_expense_total_hint
-                    DashboardFlowDetailMode.Income -> R.string.dashboard_flow_detail_income_total_hint
-                },
+            MasroofPeriodDisplay(label = periodRangeLabel)
+
+            DashboardSummaryMetricCard(
+                title = stringResource(presentation.totalTitleRes),
+                amount = formattedTotal,
+                tone = presentation.tone,
+                hint = stringResource(presentation.totalHintRes),
             )
 
             when (mode) {
@@ -108,37 +108,10 @@ fun DashboardFlowDetailScreen(
 private data class FlowDetailPresentation(
     val titleRes: Int,
     val total: Money,
-    val totalColor: androidx.compose.ui.graphics.Color,
-    val totalLabelRes: Int,
+    val totalTitleRes: Int,
+    val tone: DashboardMetricTone,
+    val totalHintRes: Int,
 )
-
-@Composable
-private fun FlowDetailHeroCard(
-    periodRangeLabel: String,
-    totalLabel: String,
-    totalColor: androidx.compose.ui.graphics.Color,
-    totalHintRes: Int,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            stringResource(R.string.dashboard_flow_detail_period, periodRangeLabel),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            totalLabel,
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = totalColor,
-            ),
-        )
-        Text(
-            stringResource(totalHintRes),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 @Composable
 private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
