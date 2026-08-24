@@ -17,6 +17,7 @@ import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
+import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
@@ -544,6 +545,7 @@ class SettingsViewModel(
                 withContext(Dispatchers.Main) {
                     apkInstaller.install(apkFile).getOrThrow()
                 }
+                dismissUpdateUiWhileInstalling()
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -739,13 +741,39 @@ class SettingsViewModel(
     }
 
     private fun restorePendingUpdateState() {
-        val manifest = updateCheckCoordinator.restorePendingUpdate() ?: return
-        if (_uiState.value.updateState is AppUpdateUiState.Checking ||
-            _uiState.value.updateState is AppUpdateUiState.Downloading
-        ) {
+        if (_uiState.value.updateState is AppUpdateUiState.Checking) {
+            return
+        }
+        if (_uiState.value.updateState is AppUpdateUiState.Downloading) {
+            val downloading = _uiState.value.updateState as AppUpdateUiState.Downloading
+            clearStaleUpdateUiIfInstalled(downloading.manifest)
+            return
+        }
+        val manifest = updateCheckCoordinator.restorePendingUpdate()
+        if (manifest == null) {
+            clearStaleUpdateUiIfInstalled()
             return
         }
         applyAvailableUpdate(manifest, silent = true)
+    }
+
+    private fun dismissUpdateUiWhileInstalling() {
+        _uiState.update { it.copy(updateState = AppUpdateUiState.Idle, updateMessage = null) }
+    }
+
+    private fun clearStaleUpdateUiIfInstalled(manifest: UpdateManifest? = null) {
+        val resolvedManifest =
+            manifest ?: when (val current = _uiState.value.updateState) {
+                is AppUpdateUiState.Available -> current.manifest
+                is AppUpdateUiState.ReadyToInstall -> current.manifest
+                is AppUpdateUiState.Downloading -> current.manifest
+                else -> return
+            }
+        if (!appUpdateService.isUpdateStillNeeded(resolvedManifest)) {
+            appUpdateService.clearDownloadedApk(resolvedManifest)
+            updateCheckCoordinator.clearPendingUpdate()
+            _uiState.update { it.copy(updateState = AppUpdateUiState.Idle, updateMessage = null) }
+        }
     }
 
     private fun applyAvailableUpdate(

@@ -35,7 +35,6 @@ fun AccountDetailScreen(
             if (summary != null) {
                 AccountPeriodSummaryCard(
                     summary = summary,
-                    accountBadge = null,
                 )
             }
 

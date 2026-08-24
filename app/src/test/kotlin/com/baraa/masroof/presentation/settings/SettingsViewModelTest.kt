@@ -6,6 +6,7 @@ import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.update.ApkIntegrityVerifier
 import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
@@ -271,6 +272,81 @@ class SettingsViewModelTest {
         assertEquals(AppUpdateUiState.Idle, vm.uiState.value.updateState)
         assertNull(updateCheckCoordinator.restorePendingUpdate())
         assertFalse(appUpdateService.hasConfiguredToken())
+    }
+
+    @Test
+    fun refresh_clearsStalePendingUpdateAfterInstall() = runTest {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val pendingUpdateStore = com.baraa.masroof.application.update.PendingUpdateStore(
+            context.getSharedPreferences("pending_update_prefs_vm_stale_test", android.content.Context.MODE_PRIVATE),
+        ).also { it.clear() }
+        val installedManifest = UpdateManifest(
+            versionCode = 4,
+            versionName = "0.2.1",
+            apkFileName = "masroof.apk",
+            sha256 = "abc",
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(installedManifest)
+        val appUpdateService = SettingsViewModelTestFixtures.appUpdateService()
+        val updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(
+            appUpdateService = appUpdateService,
+            pendingUpdateStore = pendingUpdateStore,
+        )
+        val vm = viewModel(
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = updateCheckCoordinator,
+        )
+
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals(AppUpdateUiState.Idle, vm.uiState.value.updateState)
+        assertNull(updateCheckCoordinator.restorePendingUpdate())
+    }
+
+    @Test
+    fun installPendingUpdate_clearsUpdateUiAfterLaunchingInstaller() = runTest {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val pendingUpdateStore = com.baraa.masroof.application.update.PendingUpdateStore(
+            context.getSharedPreferences("pending_update_prefs_vm_install_test", android.content.Context.MODE_PRIVATE),
+        ).also { it.clear() }
+        val apkBytes = "fake-apk".toByteArray()
+        val sha256 = ApkIntegrityVerifier.sha256Hex(
+            java.io.File(context.cacheDir, "sha-temp").apply {
+                writeBytes(apkBytes)
+            },
+        )
+        val manifest = UpdateManifest(
+            versionCode = 99,
+            versionName = "9.9.0",
+            apkFileName = "masroof.apk",
+            sha256 = sha256,
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(manifest)
+        val appUpdateService = SettingsViewModelTestFixtures.appUpdateService()
+        val apkFile = appUpdateService.updateApkFile(manifest)
+        apkFile.parentFile?.mkdirs()
+        apkFile.writeBytes(apkBytes)
+        val updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(
+            appUpdateService = appUpdateService,
+            pendingUpdateStore = pendingUpdateStore,
+        )
+        val vm = viewModel(
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = updateCheckCoordinator,
+        )
+
+        vm.refresh()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.updateState is AppUpdateUiState.ReadyToInstall)
+
+        vm.installPendingUpdate()
+        advanceUntilIdle()
+
+        assertEquals(AppUpdateUiState.Idle, vm.uiState.value.updateState)
+        assertEquals(manifest, pendingUpdateStore.readAvailable())
     }
 
     private fun viewModel(

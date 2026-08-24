@@ -49,6 +49,8 @@ enum class MasroofCardAccent {
     Account,
     Credit,
     Liability,
+    Inflow,
+    Outflow,
 }
 
 enum class MasroofMoneyRowStyle {
@@ -156,6 +158,8 @@ fun MasroofCard(
         MasroofCardAccent.Account -> extended.account
         MasroofCardAccent.Credit -> extended.card
         MasroofCardAccent.Liability -> extended.liability
+        MasroofCardAccent.Inflow -> extended.inflow
+        MasroofCardAccent.Outflow -> extended.outflow
     }
     Card(
         modifier = modifier
@@ -211,6 +215,8 @@ fun MasroofBadge(
         MasroofCardAccent.Account -> extended.accountSoft to extended.account
         MasroofCardAccent.Credit -> extended.cardSoft to extended.card
         MasroofCardAccent.Liability -> extended.liabilitySoft to extended.liability
+        MasroofCardAccent.Inflow -> extended.inflowSoft to extended.inflow
+        MasroofCardAccent.Outflow -> extended.outflowSoft to extended.outflow
         MasroofCardAccent.None -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(

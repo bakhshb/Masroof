@@ -111,6 +111,37 @@ class UpdateCheckCoordinatorTest {
         assertNull(pendingUpdateStore.readAvailable())
     }
 
+    @Test
+    fun restorePendingUpdate_clearsStaleManifestWhenAlreadyInstalled() {
+        val manifest = UpdateManifest(
+            versionCode = 4,
+            versionName = "0.2.1",
+            apkFileName = "masroof.apk",
+            sha256 = "def",
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(manifest)
+        val coordinator = coordinator()
+
+        assertNull(coordinator.restorePendingUpdate())
+        assertNull(pendingUpdateStore.readAvailable())
+    }
+
+    @Test
+    fun restorePendingUpdate_returnsManifestWhenStillNeeded() {
+        val manifest = UpdateManifest(
+            versionCode = 99,
+            versionName = "9.9.0",
+            apkFileName = "masroof.apk",
+            sha256 = "abc",
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(manifest)
+        val coordinator = coordinator()
+
+        assertEquals(manifest, coordinator.restorePendingUpdate())
+    }
+
     private fun coordinator(
         minIntervalMs: Long = 0L,
         now: () -> Long = { System.currentTimeMillis() },

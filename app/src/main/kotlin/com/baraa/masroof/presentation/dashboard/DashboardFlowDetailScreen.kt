@@ -22,6 +22,7 @@ import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofPeriodDisplay
@@ -78,7 +79,12 @@ fun DashboardFlowDetailScreen(
         ) {
             MasroofPeriodDisplay(label = periodRangeLabel)
 
-            MasroofCard {
+            MasroofCard(
+                accent = when (mode) {
+                    DashboardFlowDetailMode.Expense -> MasroofCardAccent.Outflow
+                    DashboardFlowDetailMode.Income -> MasroofCardAccent.Inflow
+                },
+            ) {
                 DashboardSummaryPrimaryMetric(
                     title = stringResource(presentation.totalTitleRes),
                     amount = formattedTotal,
