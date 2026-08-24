@@ -25,6 +25,9 @@ fun CardDetailScreen(
         cardInvolvementByTransactionId = state.transactionCardInvolvement,
     )
     val title = row.displayLabel(state.ownedCards)
+    val cardNetwork = state.ownedCards
+        .find { it.bank == row.bank && it.last4 == row.last4 }
+        ?.cardNetwork
 
     DashboardSummaryScaffold(
         title = title,
@@ -35,12 +38,11 @@ fun CardDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CreditCardSummaryTile(
+            CreditCardDetailSummaryCard(
                 row = row,
                 salaryPeriodLabel = salaryPeriodLabel,
                 zoneId = ZoneId.systemDefault(),
-                presentation = CreditCardMetricsPresentation.DetailSpending,
-                showBalanceAndDue = true,
+                cardNetwork = cardNetwork,
                 ownedCards = state.ownedCards,
                 modifier = Modifier.fillMaxWidth(),
             )

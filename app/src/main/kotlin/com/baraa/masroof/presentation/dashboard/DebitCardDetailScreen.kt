@@ -34,11 +34,10 @@ fun DebitCardDetailScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DebitCardSummaryTile(
+            DebitCardDetailSummaryCard(
                 debit = debit,
                 network = cardNetwork,
                 modifier = Modifier.fillMaxWidth(),
-                showNavigationIcon = false,
             )
 
             DashboardSummaryTransactionsSection(

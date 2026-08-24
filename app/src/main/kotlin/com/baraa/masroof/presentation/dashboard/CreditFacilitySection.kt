@@ -33,6 +33,7 @@ import com.baraa.masroof.application.dashboard.CreditFacilityOverview
 import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -99,6 +100,60 @@ fun CreditFacilitiesSection(
 }
 
 @Composable
+fun DebitCardDetailSummaryCard(
+    debit: DebitCardOverview,
+    network: CardNetwork?,
+    modifier: Modifier = Modifier,
+) {
+    val spendingLabel = if (debit.salaryPeriodLabel != null) {
+        stringResource(R.string.dashboard_debit_card_salary_spending, debit.salaryPeriodLabel)
+    } else {
+        stringResource(R.string.dashboard_debit_card_salary_spending_fallback)
+    }
+    val linkedAccountValue = debit.linkedAccountLabel
+        ?: debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
+        ?: stringResource(R.string.dashboard_value_unavailable)
+
+    val metrics = listOf(
+        DashboardSummaryMetricItem(
+            title = spendingLabel,
+            amount = formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+            tone = spendingMetricTone(debit.salaryPeriodSpendingNet),
+        ),
+        DashboardSummaryMetricItem(
+            title = stringResource(R.string.dashboard_debit_card_linked_account),
+            amount = linkedAccountValue,
+            tone = DashboardMetricTone.Neutral,
+        ),
+    )
+
+    MasroofCard(modifier = modifier, accent = MasroofCardAccent.Credit) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CardNetworkBadge(network = network, last4 = debit.last4)
+            Column {
+                Text(
+                    stringResource(R.string.card_network_mada),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    debit.displayLabel,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+            }
+        }
+
+        DashboardSummaryMetricGrid(
+            metrics = metrics,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+    }
+}
+
+@Composable
 fun DebitCardSummaryTile(
     debit: DebitCardOverview,
     network: CardNetwork?,
@@ -113,6 +168,7 @@ fun DebitCardSummaryTile(
     } else {
         stringResource(R.string.dashboard_debit_card_salary_spending_fallback)
     }
+    val spendingColor = resolveMetricToneColor(spendingMetricTone(debit.salaryPeriodSpendingNet))
 
     MasroofCard(
         modifier = modifier
@@ -124,62 +180,62 @@ fun DebitCardSummaryTile(
         when (presentation) {
             DebitCardTilePresentation.Carousel -> {
                 Column(modifier = Modifier.fillMaxHeight()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CardNetworkBadge(network = network, last4 = debit.last4)
-                        Column {
-                            Text(
-                                stringResource(R.string.card_network_mada),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                debit.displayLabel,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CardNetworkBadge(network = network, last4 = debit.last4)
+                            Column {
+                                Text(
+                                    stringResource(R.string.card_network_mada),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    debit.displayLabel,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
+                        }
+                        if (showNavigationIcon) {
+                            Icon(
+                                imageVector = MasroofIcons.periodNext,
+                                contentDescription = null,
+                                tint = extended.account,
                             )
                         }
                     }
-                    if (showNavigationIcon) {
-                        Icon(
-                            imageVector = MasroofIcons.periodNext,
-                            contentDescription = null,
-                            tint = extended.account,
-                        )
-                    }
-                }
 
-                Text(
-                    spendingLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-                Text(
-                    formatLocalizedMoney(debit.salaryPeriodSpendingNet),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = extended.outflow,
-                )
+                    Text(
+                        spendingLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Text(
+                        formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = spendingColor,
+                    )
 
-                Text(
-                    stringResource(R.string.dashboard_debit_card_linked_account),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                Text(
-                    debit.linkedAccountLabel
-                        ?: debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
-                        ?: stringResource(R.string.dashboard_value_unavailable),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                    Text(
+                        stringResource(R.string.dashboard_debit_card_linked_account),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Text(
+                        debit.linkedAccountLabel
+                            ?: debit.linkedAccountMaskedNumber?.let { formatCardLast4(it) }
+                            ?: stringResource(R.string.dashboard_value_unavailable),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
 
@@ -226,7 +282,7 @@ fun DebitCardSummaryTile(
                 Text(
                     formatLocalizedMoney(debit.salaryPeriodSpendingNet),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = extended.outflow,
+                    color = spendingColor,
                 )
             }
         }

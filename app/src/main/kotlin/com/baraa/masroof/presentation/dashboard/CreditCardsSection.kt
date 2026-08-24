@@ -1,25 +1,18 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,13 +23,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.resolveLatestStatementDue
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -166,6 +159,75 @@ fun CreditCardCompactListRow(
 }
 
 @Composable
+fun CreditCardDetailSummaryCard(
+    row: CreditCardDashboardRow,
+    salaryPeriodLabel: String?,
+    zoneId: ZoneId,
+    cardNetwork: CardNetwork? = null,
+    ownedCards: List<OwnedCardUi> = emptyList(),
+    modifier: Modifier = Modifier,
+) {
+    val locale = LocalConfiguration.current.locales[0]
+    val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
+
+    val salaryPeriodLabelText = if (salaryPeriodLabel != null) {
+        stringResource(R.string.dashboard_credit_card_salary_spending, salaryPeriodLabel)
+    } else {
+        stringResource(R.string.dashboard_credit_card_salary_spending_fallback)
+    }
+    val statementLabelText = if (row.statementPeriodLabel != null) {
+        stringResource(R.string.dashboard_credit_card_statement_spending, row.statementPeriodLabel)
+    } else {
+        stringResource(R.string.dashboard_credit_card_statement_spending_fallback)
+    }
+
+    val metrics = buildCreditCardSummaryMetrics(
+        row = row,
+        salaryPeriodLabelText = salaryPeriodLabelText,
+        statementLabelText = statementLabelText,
+        showBalanceAndDue = true,
+    )
+
+    MasroofCard(modifier = modifier, accent = MasroofCardAccent.Credit) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CardNetworkBadge(network = cardNetwork, last4 = row.last4)
+            Column {
+                Text(
+                    row.displayLabel(ownedCards),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.dashboard_credit_card_credit_badge),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        DashboardSummaryMetricGrid(
+            metrics = metrics,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+
+        row.snapshot?.updatedAt?.let { at ->
+            Text(
+                stringResource(
+                    R.string.dashboard_credit_card_updated,
+                    formatSnapshotTime(at, zoneId, dateTimeFormatter),
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
 fun CreditCardSummaryTile(
     row: CreditCardDashboardRow,
     salaryPeriodLabel: String?,
@@ -176,7 +238,6 @@ fun CreditCardSummaryTile(
     cardNetwork: CardNetwork? = null,
     ownedCards: List<OwnedCardUi> = emptyList(),
 ) {
-    val extended = MasroofThemeExtras.extendedColors
     val locale = LocalConfiguration.current.locales[0]
     val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
 
@@ -253,53 +314,14 @@ fun CreditCardSummaryTile(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CreditCardMetricTile(
-                        label = salaryPeriodLabelText,
-                        value = formatLocalizedMoney(row.salaryPeriodSpendingNet),
-                        valueColor = spendingColor(row.salaryPeriodSpendingNet),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(creditCardMetricTileHeight),
-                    )
-                    CreditCardMetricTile(
-                        label = statementLabelText,
-                        value = formatLocalizedMoney(row.statementSpendingNet),
-                        valueColor = spendingColor(row.statementSpendingNet),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(creditCardMetricTileHeight),
-                    )
-                }
-
-                if (showBalanceAndDue) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        CreditCardMetricTile(
-                            label = stringResource(R.string.dashboard_credit_card_current_balance),
-                            value = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
-                                ?: stringResource(R.string.dashboard_value_unavailable),
-                            valueColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(creditCardMetricTileHeight),
-                        )
-                        CreditCardMetricTile(
-                            label = stringResource(R.string.dashboard_credit_card_card_due),
-                            value = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
-                                ?: stringResource(R.string.dashboard_value_unavailable),
-                            valueColor = extended.liability,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(creditCardMetricTileHeight),
-                        )
-                    }
-                }
+                DashboardSummaryMetricGrid(
+                    metrics = buildCreditCardSummaryMetrics(
+                        row = row,
+                        salaryPeriodLabelText = salaryPeriodLabelText,
+                        statementLabelText = statementLabelText,
+                        showBalanceAndDue = showBalanceAndDue,
+                    ),
+                )
 
                 row.snapshot?.updatedAt?.let { at ->
                     Text(
@@ -318,64 +340,49 @@ fun CreditCardSummaryTile(
 }
 
 @Composable
-private fun spendingColor(amount: SignedMoneyAmount): androidx.compose.ui.graphics.Color {
-    val extended = MasroofThemeExtras.extendedColors
-    return when {
-        amount.amount.signum() > 0 -> extended.outflow
-        amount.amount.signum() < 0 -> extended.inflow
-        else -> MaterialTheme.colorScheme.onSurface
+private fun buildCreditCardSummaryMetrics(
+    row: CreditCardDashboardRow,
+    salaryPeriodLabelText: String,
+    statementLabelText: String,
+    showBalanceAndDue: Boolean,
+): List<DashboardSummaryMetricItem> = buildList {
+    add(
+        DashboardSummaryMetricItem(
+            title = salaryPeriodLabelText,
+            amount = formatLocalizedMoney(row.salaryPeriodSpendingNet),
+            tone = spendingMetricTone(row.salaryPeriodSpendingNet),
+        ),
+    )
+    add(
+        DashboardSummaryMetricItem(
+            title = statementLabelText,
+            amount = formatLocalizedMoney(row.statementSpendingNet),
+            tone = spendingMetricTone(row.statementSpendingNet),
+        ),
+    )
+    if (showBalanceAndDue) {
+        add(
+            DashboardSummaryMetricItem(
+                title = stringResource(R.string.dashboard_credit_card_current_balance),
+                amount = row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) }
+                    ?: stringResource(R.string.dashboard_value_unavailable),
+                tone = DashboardMetricTone.Neutral,
+            ),
+        )
+        add(
+            DashboardSummaryMetricItem(
+                title = stringResource(R.string.dashboard_credit_card_card_due),
+                amount = row.snapshot?.dueAmount?.let { formatLocalizedMoney(it) }
+                    ?: stringResource(R.string.dashboard_value_unavailable),
+                tone = DashboardMetricTone.Liability,
+            ),
+        )
     }
 }
-
-private val creditCardMetricTileHeight = 76.dp
 
 @Composable
-private fun CreditCardMetricTile(
-    label: String,
-    value: String,
-    valueColor: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .fillMaxHeight(),
-        shape = RoundedCornerShape(12.dp),
-        color = extended.miniBackground,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            extended.cardBorder,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    lineHeight = 16.sp,
-                ),
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
+private fun spendingColor(amount: SignedMoneyAmount): androidx.compose.ui.graphics.Color =
+    resolveMetricToneColor(spendingMetricTone(amount))
 
 private fun formatSnapshotTime(
     instant: Instant,

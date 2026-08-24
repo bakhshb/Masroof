@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -90,29 +88,13 @@ private fun DashboardSummaryMetricBlock(
     hint: String?,
     signedAmount: BigDecimal?,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            amount,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = resolveMetricToneColor(tone, signedAmount),
-            ),
-        )
-        hint?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    DashboardSummaryPrimaryMetric(
+        title = title,
+        amount = amount,
+        tone = tone,
+        hint = hint,
+        signedAmount = signedAmount,
+    )
 }
 
 @Composable

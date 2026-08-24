@@ -33,11 +33,9 @@ fun AccountDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (summary != null) {
-                CurrentAccountSection(
+                AccountPeriodSummaryCard(
                     summary = summary,
-                    accountBadge = account.displayLabel(),
-                    presentationMode = AccountFlowPresentationMode.CashPosition,
-                    showSectionHeader = false,
+                    accountBadge = null,
                 )
             }
 
