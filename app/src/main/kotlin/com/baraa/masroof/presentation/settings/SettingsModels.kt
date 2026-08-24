@@ -74,7 +74,15 @@ data class SettingsUiState(
     val githubTokenConfigured: Boolean = false,
     val updateState: AppUpdateUiState = AppUpdateUiState.Idle,
     val updateMessage: AppUpdateMessage? = null,
+    val exportingLogs: Boolean = false,
+    val logMessage: LogMessage? = null,
 )
+
+enum class LogMessage {
+    EXPORT_SUCCESS,
+    EXPORT_FAILED,
+    CLEARED,
+}
 
 enum class BackupMessage {
     EXPORT_SUCCESS,
@@ -138,4 +146,5 @@ enum class SettingsDestination {
     MyCards,
     MyAccounts,
     About,
+    Logs,
 }

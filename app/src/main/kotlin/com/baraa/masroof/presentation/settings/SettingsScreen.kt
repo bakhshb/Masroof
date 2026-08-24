@@ -48,6 +48,7 @@ fun SettingsRoute(
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onRequestExportLogs: () -> Unit,
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -77,6 +78,7 @@ fun SettingsRoute(
             onOpenMyAccounts = { destination = SettingsDestination.MyAccounts },
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
+            onOpenLogs = { destination = SettingsDestination.Logs },
             onReparseStored = viewModel::reparseStoredMessages,
             onImportSms = viewModel::importSmsFromPhone,
             onClearSmsImportMessage = viewModel::clearSmsImportMessage,
@@ -146,6 +148,12 @@ fun SettingsRoute(
             onInstallUpdate = viewModel::installPendingUpdate,
             onClearUpdateMessage = viewModel::clearUpdateMessage,
         )
+
+        SettingsDestination.Logs -> SettingsLogsScreen(
+            viewModel = viewModel,
+            onBack = { destination = SettingsDestination.Hub },
+            onRequestExport = onRequestExportLogs,
+        )
     }
 }
 
@@ -159,6 +167,7 @@ private fun SettingsHubScreen(
     onOpenMyAccounts: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenLogs: () -> Unit,
     onReparseStored: () -> Unit,
     onImportSms: () -> Unit,
     onClearSmsImportMessage: () -> Unit,
@@ -389,6 +398,13 @@ private fun SettingsHubScreen(
                     CircularProgressIndicator()
                 }
             }
+
+            SettingsNavRow(
+                icon = MasroofIcons.recentTransactions,
+                title = stringResource(R.string.settings_logs_title),
+                subtitle = stringResource(R.string.settings_logs_subtitle),
+                onClick = onOpenLogs,
+            )
 
             SettingsNavRow(
                 icon = MasroofIcons.periodHint,

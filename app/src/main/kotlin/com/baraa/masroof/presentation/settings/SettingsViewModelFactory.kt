@@ -27,6 +27,8 @@ class SettingsViewModelFactory(
             permissionStateProvider = permissionStateProvider,
             appVersion = appVersion,
             appUpdateService = container.appUpdateService,
+            updateCheckCoordinator = container.updateCheckCoordinator,
+            appLogService = container.appLogService,
             apkInstaller = container.apkInstaller,
             canInstallPackages = {
                 InstallPermissionHelper.canInstallPackages(container.applicationContext)

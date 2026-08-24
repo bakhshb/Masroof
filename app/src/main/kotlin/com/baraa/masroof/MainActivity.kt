@@ -42,7 +42,6 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
-    private var silentUpdateCheckDone = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(
@@ -146,6 +145,14 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    val logExportLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.CreateDocument("text/plain"),
+                    ) { uri: Uri? ->
+                        if (uri != null) {
+                            settingsViewModel.exportLogs(uri)
+                        }
+                    }
+
                     MasroofRoot(
                         onboardingViewModel = onboardingViewModel,
                         dashboardViewModel = dashboardViewModel,
@@ -169,6 +176,10 @@ class MainActivity : ComponentActivity() {
                         onRequestImport = {
                             importLauncher.launch(arrayOf("*/*"))
                         },
+                        onRequestExportLogs = {
+                            val name = container.appLogService.exportFileName()
+                            logExportLauncher.launch(name)
+                        },
                         onRequestRestoreBackup = {
                             onboardingImportLauncher.launch(arrayOf("*/*"))
                         },
@@ -186,10 +197,7 @@ class MainActivity : ComponentActivity() {
         if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
             dashboardViewModel.onAppResumed()
             reviewViewModel.refresh()
-            if (!silentUpdateCheckDone) {
-                silentUpdateCheckDone = true
-                settingsViewModel.checkForUpdates(silent = true)
-            }
+            settingsViewModel.checkForUpdatesIfStale(silent = true)
         }
     }
 

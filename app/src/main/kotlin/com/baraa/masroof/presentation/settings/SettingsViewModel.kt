@@ -9,9 +9,11 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
-import com.baraa.masroof.application.update.MissingGitHubTokenException
+import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
+import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
@@ -48,6 +50,8 @@ class SettingsViewModel(
     private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
     private val appUpdateService: AppUpdateService,
+    private val updateCheckCoordinator: UpdateCheckCoordinator,
+    private val appLogService: AppLogService,
     private val apkInstaller: ApkInstaller,
     private val canInstallPackages: () -> Boolean,
     private val onRequestInstallPermission: () -> Unit = {},
@@ -60,7 +64,13 @@ class SettingsViewModel(
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private val _logEntries = MutableStateFlow(appLogService.readAll())
+    val logEntries: StateFlow<List<com.baraa.masroof.application.logging.AppLogEntry>> = _logEntries.asStateFlow()
     private var pendingImportUri: Uri? = null
+
+    fun refreshLogs() {
+        _logEntries.value = appLogService.readAll()
+    }
 
     fun refresh() {
         viewModelScope.launch {
@@ -74,6 +84,7 @@ class SettingsViewModel(
                     smsPermissionGranted = permissionStateProvider(),
                 )
             }
+            restorePendingUpdateState()
             try {
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
@@ -358,7 +369,9 @@ class SettingsViewModel(
             try {
                 val result =
                     withContext(Dispatchers.IO) {
-                        appUpdateService.checkForUpdate().getOrThrow()
+                        updateCheckCoordinator.checkForUpdate(
+                            if (silent) "background" else "manual",
+                        ).getOrThrow()
                     }
                 when (result) {
                     UpdateCheckResult.UpToDate ->
@@ -378,7 +391,7 @@ class SettingsViewModel(
                 if (!silent) {
                     val message =
                         when {
-                            error is MissingGitHubTokenException -> AppUpdateMessage.TOKEN_REQUIRED
+                            error is PrivateRepoRequiresTokenException -> AppUpdateMessage.TOKEN_REQUIRED
                             error.message?.contains("authentication failed", ignoreCase = true) == true ->
                                 AppUpdateMessage.AUTH_FAILED
                             else -> AppUpdateMessage.CHECK_FAILED
@@ -391,6 +404,42 @@ class SettingsViewModel(
                 }
             }
         }
+    }
+
+    fun checkForUpdatesIfStale(silent: Boolean = true) {
+        if (!updateCheckCoordinator.shouldCheckNow()) return
+        checkForUpdates(silent = silent)
+    }
+
+    fun exportLogs(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(exportingLogs = true, logMessage = null) }
+            try {
+                withContext(Dispatchers.IO) {
+                    appLogService.exportTo(uri).getOrThrow()
+                }
+                _uiState.update {
+                    it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_FAILED)
+                }
+            }
+        }
+    }
+
+    fun clearLogs() {
+        appLogService.clear()
+        appLogService.info("logs", "Diagnostic log cleared")
+        refreshLogs()
+        _uiState.update { it.copy(logMessage = LogMessage.CLEARED) }
+    }
+
+    fun clearLogMessage() {
+        _uiState.update { it.copy(logMessage = null) }
     }
 
     fun downloadUpdate() {
@@ -658,6 +707,16 @@ class SettingsViewModel(
         }
     }
 
+    private fun restorePendingUpdateState() {
+        val manifest = updateCheckCoordinator.restorePendingUpdate() ?: return
+        if (_uiState.value.updateState is AppUpdateUiState.Checking ||
+            _uiState.value.updateState is AppUpdateUiState.Downloading
+        ) {
+            return
+        }
+        applyAvailableUpdate(manifest, silent = true)
+    }
+
     private fun applyAvailableUpdate(
         manifest: com.baraa.masroof.application.update.UpdateManifest,
         silent: Boolean,
@@ -676,11 +735,7 @@ class SettingsViewModel(
         _uiState.update {
             it.copy(
                 updateState = nextState,
-                updateMessage = if (silent || nextState is AppUpdateUiState.ReadyToInstall) {
-                    AppUpdateMessage.UPDATE_AVAILABLE
-                } else {
-                    AppUpdateMessage.UPDATE_AVAILABLE
-                },
+                updateMessage = if (silent) null else AppUpdateMessage.UPDATE_AVAILABLE,
             )
         }
     }

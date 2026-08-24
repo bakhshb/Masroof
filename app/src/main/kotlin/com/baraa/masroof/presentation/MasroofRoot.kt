@@ -62,6 +62,7 @@ fun MasroofRoot(
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onRequestExportLogs: () -> Unit,
     onRequestRestoreBackup: () -> Unit,
 ) {
     val onboardingState by onboardingViewModel.uiState.collectAsState()
@@ -263,6 +264,7 @@ fun MasroofRoot(
                 onLocaleChanged = onLocaleChanged,
                 onRequestExport = onRequestExport,
                 onRequestImport = onRequestImport,
+                onRequestExportLogs = onRequestExportLogs,
                 onRequestSmsPermission = onRequestPermissions,
                 onOpenAppSettings = onOpenAppSettings,
             )

@@ -127,6 +127,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     implementation(libs.okhttp)
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.serialization.json)

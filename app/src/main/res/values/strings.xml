@@ -153,7 +153,7 @@
     <string name="settings_import_failed">تعذّر استيراد البيانات</string>
     <string name="settings_import_invalid">ملف النسخة غير صالح أو غير متوافق</string>
     <string name="settings_updates_title">تحديث التطبيق</string>
-    <string name="settings_updates_hint">للمستودع الخاص على GitHub: أدخل رمز وصول للقراءة فقط (PAT) ثم تحقق من التحديثات. يُحمَّل التحديث من GitHub Releases دون متجر Google Play.</string>
+    <string name="settings_updates_hint">للمستودعات العامة يمكن التحقق بدون رمز. للمستودع الخاص على GitHub أدخل رمز وصول للقراءة فقط (PAT). يُحمَّل التحديث من GitHub Releases دون متجر Google Play، ويُعاد التحقق تلقائياً يومياً.</string>
     <string name="settings_github_token_label">رمز GitHub (قراءة فقط)</string>
     <string name="settings_github_token_placeholder">ghp_… أو github_pat_…</string>
     <string name="settings_github_token_save">حفظ الرمز</string>
@@ -161,7 +161,7 @@
     <string name="settings_github_token_configured">تم حفظ الرمز على الجهاز (تخزين خاص للتطبيق).</string>
     <string name="settings_github_token_missing">لم يُضبط رمز GitHub بعد.</string>
     <string name="settings_github_token_saved">تم حفظ رمز GitHub</string>
-    <string name="settings_github_token_required">أدخل رمز GitHub أولاً ثم اضغط حفظ الرمز</string>
+    <string name="settings_github_token_required">المستودع خاص — أدخل رمز GitHub للقراءة فقط ثم اضغط حفظ الرمز</string>
     <string name="settings_github_auth_failed">فشل التحقق من GitHub — تأكد أن الرمز للقراءة فقط وله صلاحية Contents على المستودع</string>
     <string name="settings_check_updates">التحقق من التحديثات</string>
     <string name="settings_updates_up_to_date">أنت على آخر نسخة</string>
@@ -176,6 +176,15 @@
     <string name="settings_install_failed">تعذّر بدء التثبيت</string>
     <string name="settings_install_permission_required">فعّل «تثبيت التطبيقات غير المعروفة» لمصروف ثم أعد المحاولة</string>
     <string name="settings_updates_check_failed">تعذّر التحقق من التحديثات</string>
+    <string name="settings_logs_title">سجل التشخيص</string>
+    <string name="settings_logs_subtitle">أحداث التحديث والأخطاء</string>
+    <string name="settings_logs_hint">يُسجَّل هنا التحقق من التحديثات والتحميل والأخطاء. لا يُخزَّن رمز GitHub في السجل.</string>
+    <string name="settings_logs_export">تصدير السجل</string>
+    <string name="settings_logs_clear">مسح السجل</string>
+    <string name="settings_logs_empty">لا توجد سجلات بعد.</string>
+    <string name="settings_logs_export_success">تم تصدير السجل</string>
+    <string name="settings_logs_export_failed">تعذّر تصدير السجل</string>
+    <string name="settings_logs_cleared">تم مسح السجل</string>
     <string name="onboarding_restore_backup">استيراد نسخة محفوظة</string>
     <string name="onboarding_restore_backup_hint">إذا نقلت مصروف من جوال آخر، استورد ملف النسخة هنا.</string>
     <string name="onboarding_restore_failed">تعذّر استيراد النسخة</string>

@@ -259,6 +259,8 @@ class SettingsViewModelTest {
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
             appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),
+            updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(),
+            appLogService = SettingsViewModelTestFixtures.appLogService(),
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
             canInstallPackages = { true },
         )

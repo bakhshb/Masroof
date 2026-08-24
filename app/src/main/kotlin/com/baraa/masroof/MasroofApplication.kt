@@ -2,13 +2,15 @@ package com.baraa.masroof
 
 import android.app.Application
 import android.content.Context
+import androidx.work.Configuration
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.update.UpdateCheckScheduler
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 
 /**
  * Application entry and composition root holder for Masroof.
  */
-class MasroofApplication : Application() {
+class MasroofApplication : Application(), Configuration.Provider {
     lateinit var container: AppContainer
         private set
 
@@ -21,7 +23,11 @@ class MasroofApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        UpdateCheckScheduler.schedule(this)
     }
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().build()
 
     override fun onTerminate() {
         if (::container.isInitialized) {

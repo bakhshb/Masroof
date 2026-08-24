@@ -19,9 +19,13 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.GitHubReleaseClient
+import com.baraa.masroof.application.update.PendingUpdateStore
+import com.baraa.masroof.application.update.UpdateCheckCoordinator
+import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.presentation.locale.AppLocaleContext
@@ -349,6 +353,10 @@ class AppContainer(
         )
     }
 
+    val appLogService: AppLogService by lazy {
+        AppLogService(appContext)
+    }
+
     val githubTokenRepository: com.baraa.masroof.application.update.GitHubTokenRepository =
         SharedPrefsGitHubTokenRepository(
             appContext.getSharedPreferences(
@@ -356,6 +364,24 @@ class AppContainer(
                 Context.MODE_PRIVATE,
             ),
         )
+
+    val pendingUpdateStore: PendingUpdateStore by lazy {
+        PendingUpdateStore(
+            appContext.getSharedPreferences(
+                PendingUpdateStore.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+    }
+
+    val updateCheckPreferencesRepository: UpdateCheckPreferencesRepository by lazy {
+        UpdateCheckPreferencesRepository(
+            appContext.getSharedPreferences(
+                UpdateCheckPreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+    }
 
     val appUpdateService: AppUpdateService by lazy {
         AppUpdateService(
@@ -368,6 +394,16 @@ class AppContainer(
                     repo = BuildConfig.GITHUB_REPO,
                 ),
             updateChecker = UpdateChecker(installedVersionCode = BuildConfig.VERSION_CODE),
+            appLogService = appLogService,
+        )
+    }
+
+    val updateCheckCoordinator: UpdateCheckCoordinator by lazy {
+        UpdateCheckCoordinator(
+            appUpdateService = appUpdateService,
+            pendingUpdateStore = pendingUpdateStore,
+            preferencesRepository = updateCheckPreferencesRepository,
+            appLogService = appLogService,
         )
     }
 
