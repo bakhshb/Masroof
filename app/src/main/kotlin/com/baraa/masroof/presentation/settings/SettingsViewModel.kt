@@ -460,7 +460,6 @@ class SettingsViewModel(
 
     fun clearLogs() {
         appLogService.clear()
-        appLogService.info(AppLogCategories.LOGS, "Diagnostic log cleared")
         refreshLogs()
         _uiState.update { it.copy(logMessage = LogMessage.CLEARED) }
     }

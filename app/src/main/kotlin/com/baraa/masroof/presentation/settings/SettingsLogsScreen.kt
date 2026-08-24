@@ -12,11 +12,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -125,6 +130,22 @@ fun SettingsLogsScreen(
             title = stringResource(R.string.settings_logs_title),
             onBack = onBack,
             backContentDescription = stringResource(R.string.settings_back),
+            actions = {
+                IconButton(
+                    onClick = { showClearConfirm = true },
+                    enabled = entries.isNotEmpty() && !state.exportingLogs,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteOutline,
+                        contentDescription = stringResource(R.string.settings_logs_clear),
+                        tint = if (entries.isNotEmpty()) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            },
         ) { contentModifier ->
             Column(
                 modifier = contentModifier.fillMaxSize(),
@@ -174,6 +195,9 @@ fun SettingsLogsScreen(
                         onClick = { showClearConfirm = true },
                         enabled = entries.isNotEmpty() && !state.exportingLogs,
                         modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
                     ) {
                         Text(stringResource(R.string.settings_logs_clear))
                     }
