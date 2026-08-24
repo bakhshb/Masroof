@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewResolutionKind
@@ -23,6 +26,7 @@ class TransactionRestoreService(
     private val reconciliation: TransactionReconciliationService,
     private val reclassification: TransactionReclassificationService,
     private val clock: InstantClock,
+    private val appLogService: AppLogService? = null,
 ) {
     suspend fun listIgnoredRawSmsIds(): List<String> =
         reviewRepository.listIgnored().map { it.rawSmsId }
@@ -54,11 +58,15 @@ class TransactionRestoreService(
         }
 
         if (newType == null || newType == tx.type) {
+            logRestore(rawSmsId, tx.id, newType)
             return RestoreResult.Success(tx)
         }
 
         return when (val result = reclassification.reclassify(tx.id, newType)) {
-            is ReclassificationResult.Success -> RestoreResult.Success(result.transaction)
+            is ReclassificationResult.Success -> {
+                logRestore(rawSmsId, result.transaction.id, newType)
+                RestoreResult.Success(result.transaction)
+            }
             is ReclassificationResult.Rejected -> {
                 val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
                 RestoreResult.Rejected(rollbackReason ?: result.reason)
@@ -83,5 +91,17 @@ class TransactionRestoreService(
             resolvedTransactionId = null,
         ) ?: return "rollback_review_failed"
         return null
+    }
+
+    private fun logRestore(
+        rawSmsId: String,
+        transactionId: String,
+        newType: FinancialTransactionType?,
+    ) {
+        val typeSuffix = newType?.name?.lowercase()?.let { " as $it" } ?: ""
+        appLogService?.info(
+            AppLogCategories.TRANSACTION,
+            "Restored SMS ${AppLogFormatting.maskId(rawSmsId)} to transaction ${AppLogFormatting.maskId(transactionId)}$typeSuffix",
+        )
     }
 }

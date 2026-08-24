@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogService
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
@@ -58,6 +60,7 @@ class DashboardViewModel(
     private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
     private val appLocaleRepository: AppLocaleRepository,
+    private val appLogService: AppLogService? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -484,6 +487,7 @@ class DashboardViewModel(
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
+                appLogService?.error(AppLogCategories.DASHBOARD, "Dashboard load failed for period ${period.startDate}")
                 if (period != activePeriod) {
                     return@launch
                 }

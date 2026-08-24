@@ -1,5 +1,9 @@
 package com.baraa.masroof.sms.scanner
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogLevel
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
@@ -46,8 +50,13 @@ sealed interface SmsScanFailure {
 class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
     private val ingestionService: SmsIngestionService,
+    private val appLogService: AppLogService? = null,
 ) {
     suspend fun scan(receivedAfter: Instant? = null): SmsScanResult {
+        appLogService?.info(
+            AppLogCategories.SCAN,
+            "Historical scan started${receivedAfter?.let { " after $it" } ?: ""}",
+        )
         var scanned = 0
         var inserted = 0
         var duplicates = 0
@@ -92,7 +101,7 @@ class HistoricalSmsScanner(
                             continue
                         }
 
-                        when (val outcome = ingestionService.ingest(rawSms)) {
+                        when (val outcome = ingestionService.ingest(rawSms, logOutcome = false)) {
                             is SmsIngestionResult.Duplicate -> duplicates++
                             is SmsIngestionResult.NotRelevant -> notRelevant++
                             is SmsIngestionResult.Parsed -> {
@@ -128,11 +137,26 @@ class HistoricalSmsScanner(
                 }
             }
         } catch (_: SmsPermissionException) {
-            return snapshot(SmsScanFailure.PermissionDenied)
+            val result = snapshot(SmsScanFailure.PermissionDenied)
+            logScanFinished(result)
+            return result
         } catch (e: SmsProviderException) {
-            return snapshot(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
+            val result = snapshot(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
+            logScanFinished(result)
+            return result
         }
 
-        return snapshot(failure = null)
+        val result = snapshot(failure = null)
+        logScanFinished(result)
+        return result
+    }
+
+    private fun logScanFinished(result: SmsScanResult) {
+        val level = if (result.failure != null) AppLogLevel.WARN else AppLogLevel.INFO
+        appLogService?.log(
+            level,
+            AppLogCategories.SCAN,
+            "Historical scan finished: ${AppLogFormatting.scanSummary(result)}",
+        )
     }
 }

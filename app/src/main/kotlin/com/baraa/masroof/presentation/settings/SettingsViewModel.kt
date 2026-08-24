@@ -9,9 +9,13 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
-import com.baraa.masroof.application.update.MissingGitHubTokenException
+import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
+import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
@@ -48,6 +52,8 @@ class SettingsViewModel(
     private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
     private val appUpdateService: AppUpdateService,
+    private val updateCheckCoordinator: UpdateCheckCoordinator,
+    private val appLogService: AppLogService,
     private val apkInstaller: ApkInstaller,
     private val canInstallPackages: () -> Boolean,
     private val onRequestInstallPermission: () -> Unit = {},
@@ -60,9 +66,16 @@ class SettingsViewModel(
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private val _logEntries = MutableStateFlow(appLogService.readAll())
+    val logEntries: StateFlow<List<com.baraa.masroof.application.logging.AppLogEntry>> = _logEntries.asStateFlow()
     private var pendingImportUri: Uri? = null
 
+    fun refreshLogs() {
+        _logEntries.value = appLogService.readAll()
+    }
+
     fun refresh() {
+        refreshLogs()
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -74,6 +87,7 @@ class SettingsViewModel(
                     smsPermissionGranted = permissionStateProvider(),
                 )
             }
+            restorePendingUpdateState()
             try {
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
@@ -253,16 +267,21 @@ class SettingsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(reparsingStored = true, error = null) }
             try {
-                reparseStoredEvents()
+                val count = reparseStoredEvents()
                 refreshReviewQueue()
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
                 )
+                appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
                 _uiState.update { it.copy(reparsingStored = false) }
             } catch (ce: CancellationException) {
                 throw ce
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "Manual reparse failed: ${error.message ?: error::class.java.simpleName}",
+                )
                 _uiState.update { it.copy(reparsingStored = false, error = SettingsError.UPDATE_FAILED) }
             }
         }
@@ -283,6 +302,10 @@ class SettingsViewModel(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
                 )
+                appLogService.info(
+                    AppLogCategories.SETTINGS,
+                    "SMS import finished: ${AppLogFormatting.scanSummary(result)}",
+                )
                 _uiState.update {
                     it.copy(
                         importingSms = false,
@@ -291,7 +314,11 @@ class SettingsViewModel(
                 }
             } catch (ce: CancellationException) {
                 throw ce
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "SMS import failed: ${error.message ?: error::class.java.simpleName}",
+                )
                 _uiState.update {
                     it.copy(importingSms = false, smsImportMessage = SmsImportMessage.FAILED)
                 }
@@ -331,7 +358,9 @@ class SettingsViewModel(
     }
 
     fun clearGithubToken() {
+        appUpdateService.clearDownloadCache()
         appUpdateService.clearToken()
+        updateCheckCoordinator.clearPendingUpdate()
         _uiState.update {
             it.copy(
                 githubTokenConfigured = false,
@@ -358,7 +387,9 @@ class SettingsViewModel(
             try {
                 val result =
                     withContext(Dispatchers.IO) {
-                        appUpdateService.checkForUpdate().getOrThrow()
+                        updateCheckCoordinator.checkForUpdate(
+                            if (silent) "background" else "manual",
+                        ).getOrThrow()
                     }
                 when (result) {
                     UpdateCheckResult.UpToDate ->
@@ -378,7 +409,7 @@ class SettingsViewModel(
                 if (!silent) {
                     val message =
                         when {
-                            error is MissingGitHubTokenException -> AppUpdateMessage.TOKEN_REQUIRED
+                            error is PrivateRepoRequiresTokenException -> AppUpdateMessage.TOKEN_REQUIRED
                             error.message?.contains("authentication failed", ignoreCase = true) == true ->
                                 AppUpdateMessage.AUTH_FAILED
                             else -> AppUpdateMessage.CHECK_FAILED
@@ -386,11 +417,60 @@ class SettingsViewModel(
                     _uiState.update {
                         it.copy(updateState = AppUpdateUiState.Idle, updateMessage = message)
                     }
+                    restorePendingUpdateState()
                 } else {
-                    _uiState.update { it.copy(updateState = AppUpdateUiState.Idle) }
+                    _uiState.update { current ->
+                        if (current.updateState is AppUpdateUiState.Available ||
+                            current.updateState is AppUpdateUiState.ReadyToInstall ||
+                            current.updateState is AppUpdateUiState.UpToDate
+                        ) {
+                            current
+                        } else {
+                            current.copy(updateState = AppUpdateUiState.Idle)
+                        }
+                    }
+                    restorePendingUpdateState()
                 }
             }
         }
+    }
+
+    fun checkForUpdatesIfStale(silent: Boolean = true) {
+        if (!updateCheckCoordinator.shouldCheckNow()) {
+            restorePendingUpdateState()
+            return
+        }
+        checkForUpdates(silent = silent)
+    }
+
+    fun exportLogs(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(exportingLogs = true, logMessage = null) }
+            try {
+                withContext(Dispatchers.IO) {
+                    appLogService.exportTo(uri).getOrThrow()
+                }
+                _uiState.update {
+                    it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_FAILED)
+                }
+            }
+        }
+    }
+
+    fun clearLogs() {
+        appLogService.clear()
+        refreshLogs()
+        _uiState.update { it.copy(logMessage = LogMessage.CLEARED) }
+    }
+
+    fun clearLogMessage() {
+        _uiState.update { it.copy(logMessage = null) }
     }
 
     fun downloadUpdate() {
@@ -658,6 +738,16 @@ class SettingsViewModel(
         }
     }
 
+    private fun restorePendingUpdateState() {
+        val manifest = updateCheckCoordinator.restorePendingUpdate() ?: return
+        if (_uiState.value.updateState is AppUpdateUiState.Checking ||
+            _uiState.value.updateState is AppUpdateUiState.Downloading
+        ) {
+            return
+        }
+        applyAvailableUpdate(manifest, silent = true)
+    }
+
     private fun applyAvailableUpdate(
         manifest: com.baraa.masroof.application.update.UpdateManifest,
         silent: Boolean,
@@ -676,11 +766,7 @@ class SettingsViewModel(
         _uiState.update {
             it.copy(
                 updateState = nextState,
-                updateMessage = if (silent || nextState is AppUpdateUiState.ReadyToInstall) {
-                    AppUpdateMessage.UPDATE_AVAILABLE
-                } else {
-                    AppUpdateMessage.UPDATE_AVAILABLE
-                },
+                updateMessage = if (silent) null else AppUpdateMessage.UPDATE_AVAILABLE,
             )
         }
     }

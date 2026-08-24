@@ -48,6 +48,7 @@ fun SettingsRoute(
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onRequestExportLogs: () -> Unit,
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -64,9 +65,21 @@ fun SettingsRoute(
         }
     }
 
-    BackHandler(enabled = destination != SettingsDestination.Hub) {
-        destination = SettingsDestination.Hub
+    LaunchedEffect(destination) {
+        if (destination == SettingsDestination.About || destination == SettingsDestination.Logs) {
+            viewModel.refreshLogs()
+        }
     }
+
+    BackHandler(enabled = destination != SettingsDestination.Hub) {
+        destination = when (destination) {
+            SettingsDestination.Logs -> SettingsDestination.About
+            else -> SettingsDestination.Hub
+        }
+    }
+
+    val logEntries by viewModel.logEntries.collectAsState()
+    val logErrorCount = logEntries.count { it.level == com.baraa.masroof.application.logging.AppLogLevel.ERROR }
 
     when (destination) {
         SettingsDestination.Hub -> SettingsHubScreen(
@@ -138,13 +151,21 @@ fun SettingsRoute(
             githubTokenConfigured = state.githubTokenConfigured,
             updateState = state.updateState,
             updateMessage = state.updateMessage,
+            logErrorCount = logErrorCount,
             onBack = { destination = SettingsDestination.Hub },
+            onOpenLogs = { destination = SettingsDestination.Logs },
             onSaveGithubToken = viewModel::saveGithubToken,
             onClearGithubToken = viewModel::clearGithubToken,
             onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
             onDownloadUpdate = viewModel::downloadUpdate,
             onInstallUpdate = viewModel::installPendingUpdate,
             onClearUpdateMessage = viewModel::clearUpdateMessage,
+        )
+
+        SettingsDestination.Logs -> SettingsLogsScreen(
+            viewModel = viewModel,
+            onBack = { destination = SettingsDestination.About },
+            onRequestExport = onRequestExportLogs,
         )
     }
 }

@@ -17,8 +17,9 @@ class GitHubReleaseClient(
     private val repo: String,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    fun fetchLatestManifest(token: String): Result<UpdateManifest> {
-        val release = fetchLatestRelease(token).getOrElse { return Result.failure(it) }
+    fun fetchLatestManifest(token: String? = null): Result<UpdateManifest> {
+        val tokenWasProvided = token.isConfigured()
+        val release = fetchLatestRelease(token, tokenWasProvided).getOrElse { return Result.failure(it) }
         val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
         val versionAsset = assets.firstOrNull { asset ->
             asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
@@ -27,18 +28,19 @@ class GitHubReleaseClient(
         val downloadUrl = versionAsset?.get("url")?.jsonPrimitive?.contentOrNull
             ?: return Result.failure(IllegalStateException("version.json asset not found in latest release"))
 
-        return downloadText(downloadUrl, token).mapCatching { body ->
+        return downloadText(downloadUrl, token, tokenWasProvided).mapCatching { body ->
             json.decodeFromString(UpdateManifest.serializer(), body)
         }
     }
 
     fun downloadReleaseAsset(
-        token: String,
+        token: String? = null,
         manifest: UpdateManifest,
         destination: java.io.File,
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit = { _, _ -> },
     ): Result<java.io.File> {
-        val release = fetchLatestRelease(token).getOrElse { return Result.failure(it) }
+        val tokenWasProvided = token.isConfigured()
+        val release = fetchLatestRelease(token, tokenWasProvided).getOrElse { return Result.failure(it) }
         val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
         val apkAsset = assets.firstOrNull { asset ->
             asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == manifest.apkFileName
@@ -47,10 +49,10 @@ class GitHubReleaseClient(
         val downloadUrl = apkAsset?.get("url")?.jsonPrimitive?.contentOrNull
             ?: return Result.failure(IllegalStateException("APK asset not found: ${manifest.apkFileName}"))
 
-        return downloadBinary(downloadUrl, token, destination, onProgress)
+        return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
-    private fun fetchLatestRelease(token: String): Result<JsonObject> {
+    private fun fetchLatestRelease(token: String?, tokenWasProvided: Boolean): Result<JsonObject> {
         val request =
             authorizedRequest(token)
                 .url("https://api.github.com/repos/$owner/$repo/releases/latest")
@@ -58,10 +60,10 @@ class GitHubReleaseClient(
                 .get()
                 .build()
 
-        return executeJson(request)
+        return executeJson(request, tokenWasProvided)
     }
 
-    private fun downloadText(url: String, token: String): Result<String> {
+    private fun downloadText(url: String, token: String?, tokenWasProvided: Boolean): Result<String> {
         val request =
             authorizedRequest(token)
                 .url(url)
@@ -69,12 +71,13 @@ class GitHubReleaseClient(
                 .get()
                 .build()
 
-        return executeBody(request).map { it.string() }
+        return executeBody(request, tokenWasProvided).map { it.string() }
     }
 
     private fun downloadBinary(
         url: String,
-        token: String,
+        token: String?,
+        tokenWasProvided: Boolean,
         destination: java.io.File,
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit,
     ): Result<java.io.File> {
@@ -85,7 +88,7 @@ class GitHubReleaseClient(
                 .get()
                 .build()
 
-        return executeBody(request).mapCatching { body ->
+        return executeBody(request, tokenWasProvided).mapCatching { body ->
             destination.parentFile?.mkdirs()
             val totalBytes = body.contentLength()
             body.byteStream().use { input ->
@@ -105,18 +108,26 @@ class GitHubReleaseClient(
         }
     }
 
-    private fun authorizedRequest(token: String): Request.Builder =
-        Request.Builder()
-            .header("Authorization", authorizationHeader(token))
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "Masroof-Android")
+    internal fun buildAuthorizedRequestForTest(token: String?): Request.Builder = authorizedRequest(token)
 
-    private fun executeJson(request: Request): Result<JsonObject> =
-        executeBody(request).mapCatching { body ->
+    private fun authorizedRequest(token: String?): Request.Builder {
+        val builder =
+            Request.Builder()
+                .header("X-GitHub-Api-Version", "2022-11-28")
+                .header("User-Agent", "Masroof-Android")
+        val trimmed = token?.trim().orEmpty()
+        if (trimmed.isNotEmpty()) {
+            builder.header("Authorization", authorizationHeader(trimmed))
+        }
+        return builder
+    }
+
+    private fun executeJson(request: Request, tokenWasProvided: Boolean): Result<JsonObject> =
+        executeBody(request, tokenWasProvided).mapCatching { body ->
             json.parseToJsonElement(body.string()).jsonObject
         }
 
-    private fun executeBody(request: Request): Result<okhttp3.ResponseBody> {
+    private fun executeBody(request: Request, tokenWasProvided: Boolean): Result<okhttp3.ResponseBody> {
         val response = httpClient.newCall(request).execute()
         val body = response.body
         if (!response.isSuccessful) {
@@ -125,8 +136,10 @@ class GitHubReleaseClient(
             val code = response.code
             response.close()
             return Result.failure(
-                IllegalStateException(
-                    when (code) {
+                GitHubRequestException(
+                    httpCode = code,
+                    tokenWasProvided = tokenWasProvided,
+                    message = when (code) {
                         401, 403 ->
                             "GitHub authentication failed (HTTP $code). " +
                                 "Use a read-only token with Contents access for this repo."
@@ -154,6 +167,8 @@ class GitHubReleaseClient(
             else -> return "Bearer $trimmed"
         }
     }
+
+    private fun String?.isConfigured(): Boolean = !this.isNullOrBlank()
 
     companion object {
         const val VERSION_JSON_NAME: String = "version.json"

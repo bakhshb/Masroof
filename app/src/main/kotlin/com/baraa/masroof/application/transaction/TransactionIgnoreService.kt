@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
@@ -21,6 +24,7 @@ class TransactionIgnoreService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val reviewRepository: ReviewRepository,
     private val clock: InstantClock,
+    private val appLogService: AppLogService? = null,
 ) {
     suspend fun ignore(transactionId: String): IgnoreResult {
         financialTransactionRepository.getById(transactionId)
@@ -59,6 +63,10 @@ class TransactionIgnoreService(
                 resolvedAt = now,
                 resolvedTransactionId = null,
             ) ?: return IgnoreResult.Rejected("review_resolution_failed")
+            appLogService?.info(
+                AppLogCategories.TRANSACTION,
+                "Ignored transaction ${AppLogFormatting.maskId(transactionId)}",
+            )
             return IgnoreResult.Success
         }
 
@@ -68,6 +76,10 @@ class TransactionIgnoreService(
             resolvedAt = now,
             resolvedTransactionId = null,
         ) ?: return IgnoreResult.Rejected("review_resolution_failed")
+        appLogService?.info(
+            AppLogCategories.TRANSACTION,
+            "Ignored transaction ${AppLogFormatting.maskId(transactionId)}",
+        )
         return IgnoreResult.Success
     }
 }
