@@ -387,7 +387,7 @@ private fun DashboardCustomizableSections(
                         }
                     } else {
                         state.recentTransactions.forEach { row ->
-                            DashboardRecentTransactionRow(
+                            TransactionPreviewRow(
                                 row = row,
                                 ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },

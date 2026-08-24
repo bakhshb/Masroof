@@ -130,7 +130,7 @@ fun DashboardSummaryTransactionsSection(
             )
         } else {
             transactions.forEach { row ->
-                DashboardRecentTransactionRow(
+                TransactionPreviewRow(
                     row = row,
                     ownedCards = ownedCards,
                     onClick = { onOpenTransaction(row.id) },

@@ -199,7 +199,7 @@ fun TransactionListScreen(
                     }
                 } else {
                     items(filterResult.transactions, key = { it.id }) { row ->
-                        DashboardRecentTransactionRow(
+                        TransactionPreviewRow(
                             row = row,
                             ownedCards = ownedCards,
                             onClick = { onOpenTransaction(row.id) },
