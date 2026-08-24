@@ -127,7 +127,7 @@ fun DebitCardDetailSummaryCard(
         ),
     )
 
-    MasroofCard(modifier = modifier, accent = MasroofCardAccent.Credit) {
+    MasroofCard(modifier = modifier, accent = MasroofCardAccent.Account) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,

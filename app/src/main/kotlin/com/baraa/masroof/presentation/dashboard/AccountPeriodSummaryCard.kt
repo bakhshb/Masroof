@@ -2,13 +2,11 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -16,7 +14,6 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.presentation.common.MasroofBadge
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
@@ -27,7 +24,6 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 @Composable
 fun AccountPeriodSummaryCard(
     summary: CurrentAccountSummary,
-    accountBadge: String?,
     modifier: Modifier = Modifier,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -35,30 +31,21 @@ fun AccountPeriodSummaryCard(
     val net = movement.remaining
 
     MasroofCard(modifier = modifier, accent = MasroofCardAccent.Account) {
-        Row(
+        DashboardSummaryPrimaryMetric(
+            title = stringResource(R.string.dashboard_remaining_title),
+            amount = formatLocalizedMoney(net),
+            tone = when {
+                net.amount.signum() > 0 -> DashboardMetricTone.Inflow
+                net.amount.signum() < 0 -> DashboardMetricTone.Outflow
+                else -> DashboardMetricTone.Neutral
+            },
+            hint = stringResource(
+                R.string.dashboard_remaining_formula,
+                formatLocalizedMoney(movement.inflow),
+                formatLocalizedMoney(movement.outflow),
+            ),
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            DashboardSummaryPrimaryMetric(
-                title = stringResource(R.string.dashboard_remaining_title),
-                amount = formatLocalizedMoney(net),
-                tone = when {
-                    net.amount.signum() > 0 -> DashboardMetricTone.Inflow
-                    net.amount.signum() < 0 -> DashboardMetricTone.Outflow
-                    else -> DashboardMetricTone.Neutral
-                },
-                hint = stringResource(
-                    R.string.dashboard_remaining_formula,
-                    formatLocalizedMoney(movement.inflow),
-                    formatLocalizedMoney(movement.outflow),
-                ),
-                modifier = Modifier.weight(1f),
-            )
-            accountBadge?.let { badge ->
-                MasroofBadge(text = badge, accent = MasroofCardAccent.Account)
-            }
-        }
+        )
 
         Text(
             stringResource(R.string.dashboard_account_remaining_calculated_hint),
