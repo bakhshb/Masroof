@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.CardNetwork
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -36,36 +37,47 @@ fun DashboardRecentTransactionRow(
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val title = row.title ?: transactionTypeLabel(row.type)
-    val badge = when (row.direction) {
-        TransactionDirectionUi.INCOME,
-        TransactionDirectionUi.INWARD,
-        TransactionDirectionUi.TRANSFER_IN,
-        -> Triple(
-            stringResource(R.string.dashboard_tx_badge_income),
-            extended.inflowSoft,
-            extended.inflow,
-        )
-
-        TransactionDirectionUi.OUTWARD -> Triple(
-            stringResource(R.string.dashboard_tx_badge_expense),
-            extended.outflowSoft,
+    val badge = when (row.type) {
+        FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> Triple(
+            transactionTypeLabel(row.type),
+            extended.highlight,
             extended.outflow,
         )
 
-        TransactionDirectionUi.NEUTRAL -> Triple(
-            stringResource(R.string.dashboard_tx_badge_transfer),
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    val amountColor = when (row.direction) {
-        TransactionDirectionUi.INCOME,
-        TransactionDirectionUi.INWARD,
-        TransactionDirectionUi.TRANSFER_IN,
-        -> extended.inflow
+        else -> when (row.direction) {
+            TransactionDirectionUi.INCOME,
+            TransactionDirectionUi.INWARD,
+            TransactionDirectionUi.TRANSFER_IN,
+            -> Triple(
+                stringResource(R.string.dashboard_tx_badge_income),
+                extended.inflowSoft,
+                extended.inflow,
+            )
 
-        TransactionDirectionUi.OUTWARD -> extended.outflow
-        TransactionDirectionUi.NEUTRAL -> MaterialTheme.colorScheme.onSurface
+            TransactionDirectionUi.OUTWARD -> Triple(
+                stringResource(R.string.dashboard_tx_badge_expense),
+                extended.outflowSoft,
+                extended.outflow,
+            )
+
+            TransactionDirectionUi.NEUTRAL -> Triple(
+                stringResource(R.string.dashboard_tx_badge_transfer),
+                MaterialTheme.colorScheme.surfaceVariant,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    val amountColor = when (row.type) {
+        FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> extended.outflow
+        else -> when (row.direction) {
+            TransactionDirectionUi.INCOME,
+            TransactionDirectionUi.INWARD,
+            TransactionDirectionUi.TRANSFER_IN,
+            -> extended.inflow
+
+            TransactionDirectionUi.OUTWARD -> extended.outflow
+            TransactionDirectionUi.NEUTRAL -> MaterialTheme.colorScheme.onSurface
+        }
     }
     val cardNetwork = resolveCardNetworkFromTransaction(row, ownedCards)
 
@@ -129,7 +141,7 @@ fun DashboardRecentTransactionRow(
 
 @Composable
 private fun TransactionLeadingMark(
-    type: com.baraa.masroof.domain.model.FinancialTransactionType,
+    type: FinancialTransactionType,
     network: CardNetwork?,
     last4: String?,
 ) {
@@ -137,7 +149,10 @@ private fun TransactionLeadingMark(
         CardNetworkBadge(
             network = network,
             last4 = last4.orEmpty(),
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(
+                width = TransactionCardNetworkBadgeWidth,
+                height = TransactionCardNetworkBadgeHeight,
+            ),
         )
         return
     }

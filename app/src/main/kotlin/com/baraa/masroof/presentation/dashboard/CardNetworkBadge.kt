@@ -5,7 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,11 +32,16 @@ import androidx.compose.ui.unit.sp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.CardNetwork
 
+val CardNetworkBadgeWidth = 52.dp
+val CardNetworkBadgeHeight = 32.dp
+val TransactionCardNetworkBadgeWidth = 40.dp
+val TransactionCardNetworkBadgeHeight = 25.dp
+
 @Composable
 fun CardNetworkBadge(
     network: CardNetwork?,
     last4: String,
-    modifier: Modifier = Modifier.size(width = 52.dp, height = 32.dp),
+    modifier: Modifier = Modifier.size(width = CardNetworkBadgeWidth, height = CardNetworkBadgeHeight),
 ) {
     val shape = RoundedCornerShape(8.dp)
     val description = networkContentDescription(network)
@@ -98,7 +106,7 @@ private fun BrandWordmark(
             fontWeight = FontWeight.Black,
             fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
             fontSize = 11.sp,
-            letterSpacing = letterSpacingEm.sp,
+            letterSpacing = (letterSpacingEm * 11).sp,
             color = Color.White,
         ),
         maxLines = 1,
@@ -130,7 +138,7 @@ fun cardNetworkWordmark(network: CardNetwork?): String =
         CardNetwork.VISA -> "VISA"
         CardNetwork.MASTERCARD -> "MC"
         CardNetwork.AMEX -> "AMEX"
-        CardNetwork.UNKNOWN, null -> "CARD"
+        CardNetwork.UNKNOWN, null -> "••"
     }
 
 @Composable

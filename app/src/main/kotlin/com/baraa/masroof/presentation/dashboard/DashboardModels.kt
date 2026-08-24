@@ -12,6 +12,7 @@ import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -29,6 +30,7 @@ data class OwnedCardUi(
     val last4: String,
     val displayName: String? = null,
     val cardNetwork: com.baraa.masroof.domain.model.CardNetwork? = null,
+    val cardType: CardType? = null,
 )
 
 data class OwnedAccountUi(

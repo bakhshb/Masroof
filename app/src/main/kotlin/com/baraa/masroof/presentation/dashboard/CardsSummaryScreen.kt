@@ -51,7 +51,7 @@ fun CardsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
+    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to effectiveCardNetwork(it) }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilities()
     val selectedDebit = selectedCardKey?.let { key ->

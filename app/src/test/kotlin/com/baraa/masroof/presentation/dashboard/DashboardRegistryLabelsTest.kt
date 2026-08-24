@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
+import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -111,6 +112,55 @@ class DashboardRegistryLabelsTest {
         )
 
         assertEquals(CardNetwork.MADA, network)
+    }
+
+    @Test
+    fun resolveCardNetwork_madaDebit_withNullNetwork_infersMada() {
+        val mada = OwnedCardUi(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "8219",
+            cardNetwork = null,
+            cardType = CardType.DEBIT,
+        )
+        val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "8219")
+
+        val network = resolveCardNetworkFromTransaction(
+            row = preview(cardLast4 = "8219", source = cardId),
+            cards = listOf(mada),
+        )
+
+        assertEquals(CardNetwork.MADA, network)
+    }
+
+    @Test
+    fun resolveCardNetwork_ambiguousLast4_returnsNull() {
+        val visa = OwnedCardUi(Bank.BANK_ALJAZIRA, "7271", cardNetwork = CardNetwork.VISA)
+        val otherBankVisa = OwnedCardUi(Bank("other-bank"), "7271", cardNetwork = CardNetwork.VISA)
+
+        assertNull(
+            resolveCardNetworkFromTransaction(
+                row = preview(cardLast4 = "7271"),
+                cards = listOf(visa, otherBankVisa),
+            ),
+        )
+        assertNull(
+            resolveOwnedCardForTransaction(
+                row = preview(cardLast4 = "7271"),
+                cards = listOf(visa, otherBankVisa),
+            ),
+        )
+    }
+
+    @Test
+    fun effectiveCardNetwork_debitWithoutNetwork_defaultsToMada() {
+        val debit = OwnedCardUi(
+            bank = Bank.BANK_ALJAZIRA,
+            last4 = "8219",
+            cardNetwork = null,
+            cardType = CardType.DEBIT,
+        )
+
+        assertEquals(CardNetwork.MADA, effectiveCardNetwork(debit))
     }
 
     @Test

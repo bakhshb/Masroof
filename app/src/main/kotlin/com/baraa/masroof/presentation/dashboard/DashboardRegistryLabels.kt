@@ -7,6 +7,7 @@ import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
+import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.presentation.common.formatCardLast4
 
 object DashboardRegistryLabels {
@@ -120,13 +121,18 @@ fun cardDisplayLabelFromTransaction(
     }
 }
 
+fun effectiveCardNetwork(card: OwnedCardUi): CardNetwork? {
+    val network = card.cardNetwork?.takeUnless { it == CardNetwork.UNKNOWN }
+    if (network != null) return network
+    if (card.cardType == CardType.DEBIT) return CardNetwork.MADA
+    return null
+}
+
 fun resolveCardNetworkFromTransaction(
     row: TransactionPreviewUi,
     cards: List<OwnedCardUi>,
 ): CardNetwork? =
-    resolveOwnedCardForTransaction(row, cards)
-        ?.cardNetwork
-        ?.takeUnless { it == CardNetwork.UNKNOWN }
+    resolveOwnedCardForTransaction(row, cards)?.let(::effectiveCardNetwork)
 
 fun resolveOwnedCardForTransaction(
     row: TransactionPreviewUi,
@@ -136,10 +142,9 @@ fun resolveOwnedCardForTransaction(
     val containerId = listOfNotNull(row.sourceContainerId, row.destinationContainerId)
         .firstOrNull { it.startsWith("card:") }
     val bankId = containerId?.let { FinancialContainerIdParser.cardBankId(it) }
-    return if (bankId != null) {
-        cards.find { it.bank.id == bankId && it.last4 == last4 }
-    } else {
-        val matches = cards.filter { it.last4 == last4 }
-        matches.singleOrNull() ?: matches.firstOrNull()
+    if (bankId != null) {
+        return cards.find { it.bank.id == bankId && it.last4 == last4 }
     }
+    val matches = cards.filter { it.last4 == last4 }
+    return matches.singleOrNull()
 }

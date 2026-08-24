@@ -11,7 +11,7 @@ class CardNetworkWordmarkTest {
         assertEquals("mada", cardNetworkWordmark(CardNetwork.MADA))
         assertEquals("MC", cardNetworkWordmark(CardNetwork.MASTERCARD))
         assertEquals("AMEX", cardNetworkWordmark(CardNetwork.AMEX))
-        assertEquals("CARD", cardNetworkWordmark(CardNetwork.UNKNOWN))
-        assertEquals("CARD", cardNetworkWordmark(null))
+        assertEquals("••", cardNetworkWordmark(CardNetwork.UNKNOWN))
+        assertEquals("••", cardNetworkWordmark(null))
     }
 }

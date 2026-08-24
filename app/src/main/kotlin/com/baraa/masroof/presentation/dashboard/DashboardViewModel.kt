@@ -609,6 +609,7 @@ class DashboardViewModel(
                     last4 = it.last4,
                     displayName = it.displayName,
                     cardNetwork = it.cardNetwork,
+                    cardType = it.cardType,
                 )
             }
             .sortedBy { it.last4 }
