@@ -20,6 +20,7 @@ import java.math.BigDecimal
 enum class DashboardMetricTone {
     Inflow,
     Outflow,
+    Liability,
     Signed,
     Neutral,
 }
@@ -120,6 +121,7 @@ fun resolveMetricToneColor(tone: DashboardMetricTone, signedAmount: BigDecimal? 
     return when (tone) {
         DashboardMetricTone.Inflow -> extended.inflow
         DashboardMetricTone.Outflow -> extended.outflow
+        DashboardMetricTone.Liability -> extended.liability
         DashboardMetricTone.Signed -> signedAmount?.let { signedAmountMetricTone(it) }
             ?.let { resolveMetricToneColor(it) }
             ?: MaterialTheme.colorScheme.onSurface

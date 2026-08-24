@@ -218,6 +218,14 @@ private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
         ?: overview.debitCards.firstOrNull()?.salaryPeriodLabel
     val showCreditSpending = overview.facilities.isNotEmpty()
     val showDebitSpending = overview.debitCards.isNotEmpty()
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
+    val dueDateHint = overview.legacyFlat.aggregateDueDate?.let { dueDate ->
+        stringResource(
+            R.string.dashboard_credit_card_due_date,
+            dateFormatter.format(dueDate),
+        )
+    }
 
     val metrics = buildList {
         if (showCreditSpending) {
@@ -226,7 +234,8 @@ private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
                     title = stringResource(R.string.dashboard_credit_card_aggregate_due),
                     amount = due?.let { formatLocalizedMoney(it) }
                         ?: stringResource(R.string.dashboard_value_unavailable),
-                    tone = DashboardMetricTone.Outflow,
+                    tone = DashboardMetricTone.Liability,
+                    hint = dueDateHint,
                 ),
             )
             add(
@@ -284,13 +293,21 @@ private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
 
+    val dueDateHint = overview.aggregateDueDate?.let { dueDate ->
+        stringResource(
+            R.string.dashboard_credit_card_due_date,
+            dateFormatter.format(dueDate),
+        )
+    }
+
     val metrics = buildList {
         add(
             DashboardSummaryMetricItem(
                 title = stringResource(R.string.dashboard_credit_card_aggregate_due),
                 amount = aggregateDue?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
-                tone = DashboardMetricTone.Outflow,
+                tone = DashboardMetricTone.Liability,
+                hint = dueDateHint,
             ),
         )
         add(
@@ -323,21 +340,8 @@ private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
         )
     }
 
-    val dueDateHint = overview.aggregateDueDate?.let { dueDate ->
-        stringResource(
-            R.string.dashboard_credit_card_due_date,
-            dateFormatter.format(dueDate),
-        )
-    }
-
     DashboardSummaryMetricsCard(
-        metrics = metrics.mapIndexed { index, metric ->
-            if (index == metrics.lastIndex && dueDateHint != null) {
-                metric.copy(hint = dueDateHint)
-            } else {
-                metric
-            }
-        },
+        metrics = metrics,
         accent = MasroofCardAccent.Credit,
     )
 }

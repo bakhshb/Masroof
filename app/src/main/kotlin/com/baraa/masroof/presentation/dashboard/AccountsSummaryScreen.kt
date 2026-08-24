@@ -147,6 +147,17 @@ private fun AccountsSummaryHeroCard(
         fleet = fleet,
     )
     val totalRemaining = resolvedFleet.totalRemaining
+    val totalInflow = resolvedFleet.totalInflow
+    val totalOutflow = resolvedFleet.totalOutflow
+    val formulaHint = if (totalInflow != null && totalOutflow != null) {
+        stringResource(
+            R.string.dashboard_remaining_formula,
+            formatLocalizedMoney(totalInflow),
+            formatLocalizedMoney(totalOutflow),
+        )
+    } else {
+        null
+    }
 
     DashboardSummaryMetricCard(
         title = stringResource(R.string.dashboard_accounts_remaining_total_title),
@@ -155,7 +166,8 @@ private fun AccountsSummaryHeroCard(
         tone = DashboardMetricTone.Signed,
         signedAmount = totalRemaining?.amount,
         accent = MasroofCardAccent.Account,
-        hint = stringResource(R.string.dashboard_accounts_fleet_total_hint),
+        hint = listOfNotNull(formulaHint, stringResource(R.string.dashboard_accounts_fleet_total_hint))
+            .joinToString("\n"),
     )
 }
 
