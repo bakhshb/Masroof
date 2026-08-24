@@ -1,38 +1,52 @@
 package com.baraa.masroof.presentation.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.logging.AppLogEntry
 import com.baraa.masroof.application.logging.AppLogLevel
+import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCardAccent
+import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Button
-import java.time.Instant
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -47,6 +61,8 @@ fun SettingsLogsScreen(
     val entries by viewModel.logEntries.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val messageText = state.logMessage?.let { resolveLogMessage(it) }
+    var selectedFilter by rememberSaveable { mutableStateOf(SettingsLogFilter.ALL) }
+    var showClearConfirm by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshLogs()
@@ -59,7 +75,52 @@ fun SettingsLogsScreen(
         }
     }
 
-    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text(stringResource(R.string.settings_logs_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_logs_clear_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirm = false
+                        viewModel.clearLogs()
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.settings_logs_clear_confirm_action),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+
+    val locale = remember(state.languageTag) {
+        AppLocale.displayLocale(state.languageTag)
+    }
+    val zoneId = remember { ZoneId.systemDefault() }
+    val filteredEntries = remember(entries, selectedFilter) {
+        filterLogEntries(entries, selectedFilter)
+    }
+    val todayLabel = stringResource(R.string.settings_logs_day_today)
+    val yesterdayLabel = stringResource(R.string.settings_logs_day_yesterday)
+    val listItems = remember(filteredEntries, state.languageTag, todayLabel, yesterdayLabel) {
+        groupLogEntriesByDay(
+            entries = filteredEntries,
+            zoneId = zoneId,
+            todayLabel = todayLabel,
+            yesterdayLabel = yesterdayLabel,
+            dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale),
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         MasroofSecondaryScaffold(
             title = stringResource(R.string.settings_logs_title),
             onBack = onBack,
@@ -69,10 +130,33 @@ fun SettingsLogsScreen(
                 modifier = contentModifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    stringResource(R.string.settings_logs_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_logs_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Text(
+                            stringResource(
+                                R.string.settings_logs_status,
+                                entries.size,
+                                LOG_MAX_ENTRIES,
+                                LOG_RETENTION_DAYS,
+                            ),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                LogFilterChips(
+                    selected = selectedFilter,
+                    onSelected = { selectedFilter = it },
                 )
 
                 Row(
@@ -87,7 +171,7 @@ fun SettingsLogsScreen(
                         Text(stringResource(R.string.settings_logs_export))
                     }
                     OutlinedButton(
-                        onClick = viewModel::clearLogs,
+                        onClick = { showClearConfirm = true },
                         enabled = entries.isNotEmpty() && !state.exportingLogs,
                         modifier = Modifier.weight(1f),
                     ) {
@@ -104,21 +188,40 @@ fun SettingsLogsScreen(
                     }
                 }
 
-                if (entries.isEmpty()) {
-                    MasroofCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            stringResource(R.string.settings_logs_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(entries.asReversed(), key = { it.id }) { entry ->
-                            LogEntryCard(entry = entry)
+                when {
+                    entries.isEmpty() -> LogEmptyState()
+                    filteredEntries.isEmpty() -> LogFilteredEmptyState()
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(
+                                items = listItems,
+                                key = { item ->
+                                    when (item) {
+                                        is SettingsLogListItem.DayHeader -> "header-${item.label}"
+                                        is SettingsLogListItem.Entry -> "entry-${item.entry.id}"
+                                    }
+                                },
+                            ) { item ->
+                                when (item) {
+                                    is SettingsLogListItem.DayHeader ->
+                                        Text(
+                                            item.label,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
+                                        )
+                                    is SettingsLogListItem.Entry ->
+                                        LogEntryCard(
+                                            entry = item.entry,
+                                            locale = locale,
+                                            zoneId = zoneId,
+                                            languageTag = state.languageTag,
+                                        )
+                                }
+                            }
                         }
                     }
                 }
@@ -132,36 +235,151 @@ fun SettingsLogsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LogEntryCard(entry: AppLogEntry) {
-    val formatter = remember {
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+private fun LogFilterChips(
+    selected: SettingsLogFilter,
+    onSelected: (SettingsLogFilter) -> Unit,
+) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SettingsLogFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = selected == filter,
+                onClick = { onSelected(filter) },
+                label = { Text(logFilterLabel(filter)) },
+                colors = chipColors,
+            )
+        }
     }
-    val timestamp = remember(entry.timestampEpochMs) {
-        formatter.format(Instant.ofEpochMilli(entry.timestampEpochMs).atZone(ZoneId.systemDefault()))
-    }
-    val levelColor = when (entry.level) {
-        AppLogLevel.INFO -> MaterialTheme.colorScheme.primary
-        AppLogLevel.WARN -> MaterialTheme.colorScheme.tertiary
-        AppLogLevel.ERROR -> MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun logFilterLabel(filter: SettingsLogFilter): String =
+    when (filter) {
+        SettingsLogFilter.ALL -> stringResource(R.string.settings_logs_filter_all)
+        SettingsLogFilter.ERRORS -> stringResource(R.string.settings_logs_filter_errors)
+        SettingsLogFilter.WARNINGS -> stringResource(R.string.settings_logs_filter_warnings)
+        SettingsLogFilter.SMS_PIPELINE -> stringResource(R.string.settings_logs_filter_sms)
+        SettingsLogFilter.UPDATES -> stringResource(R.string.settings_logs_filter_updates)
     }
 
+@Composable
+private fun LogEmptyState() {
+    MasroofCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IconLabelRow(
+                icon = MasroofIcons.recentTransactions,
+                label = stringResource(R.string.settings_logs_empty_title),
+                iconTint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                stringResource(R.string.settings_logs_empty_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LogFilteredEmptyState() {
     MasroofCard(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "$timestamp · ${entry.category}",
-            style = MaterialTheme.typography.labelSmall,
+            stringResource(R.string.settings_logs_filter_empty),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
         )
-        Text(
-            entry.level.name,
-            style = MaterialTheme.typography.labelMedium,
-            color = levelColor,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+    }
+}
+
+@Composable
+private fun LogEntryCard(
+    entry: AppLogEntry,
+    locale: Locale,
+    zoneId: ZoneId,
+    languageTag: String,
+) {
+    val extendedColors = MasroofThemeExtras.extendedColors
+    val accent = when (entry.level) {
+        AppLogLevel.WARN -> MasroofCardAccent.Liability
+        else -> MasroofCardAccent.None
+    }
+    val accentColor = when (entry.level) {
+        AppLogLevel.INFO -> MaterialTheme.colorScheme.primary
+        AppLogLevel.WARN -> extendedColors.liability
+        AppLogLevel.ERROR -> MaterialTheme.colorScheme.error
+    }
+    val timestamp = remember(entry.timestampEpochMs, languageTag) {
+        formatLogTimestamp(entry.timestampEpochMs, zoneId, locale)
+    }
+
+    MasroofCard(
+        modifier = Modifier.fillMaxWidth(),
+        accent = accent,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LogLevelPill(level = entry.level, accentColor = accentColor)
+            Text(
+                timestamp,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Surface(
+            modifier = Modifier.padding(top = 8.dp),
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        ) {
+            Text(
+                logCategoryLabel(entry.category),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             entry.message,
-            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            modifier = Modifier.padding(top = 6.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun LogLevelPill(
+    level: AppLogLevel,
+    accentColor: androidx.compose.ui.graphics.Color,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = accentColor.copy(alpha = 0.14f),
+    ) {
+        Text(
+            stringResource(logLevelLabelRes(level)),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = accentColor,
         )
     }
 }

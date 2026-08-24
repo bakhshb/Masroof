@@ -66,8 +66,14 @@ fun SettingsRoute(
     }
 
     BackHandler(enabled = destination != SettingsDestination.Hub) {
-        destination = SettingsDestination.Hub
+        destination = when (destination) {
+            SettingsDestination.Logs -> SettingsDestination.About
+            else -> SettingsDestination.Hub
+        }
     }
+
+    val logEntries by viewModel.logEntries.collectAsState()
+    val logErrorCount = logEntries.count { it.level == com.baraa.masroof.application.logging.AppLogLevel.ERROR }
 
     when (destination) {
         SettingsDestination.Hub -> SettingsHubScreen(
@@ -78,7 +84,6 @@ fun SettingsRoute(
             onOpenMyAccounts = { destination = SettingsDestination.MyAccounts },
             onOpenReview = onOpenReview,
             onOpenAbout = { destination = SettingsDestination.About },
-            onOpenLogs = { destination = SettingsDestination.Logs },
             onReparseStored = viewModel::reparseStoredMessages,
             onImportSms = viewModel::importSmsFromPhone,
             onClearSmsImportMessage = viewModel::clearSmsImportMessage,
@@ -140,7 +145,9 @@ fun SettingsRoute(
             githubTokenConfigured = state.githubTokenConfigured,
             updateState = state.updateState,
             updateMessage = state.updateMessage,
+            logErrorCount = logErrorCount,
             onBack = { destination = SettingsDestination.Hub },
+            onOpenLogs = { destination = SettingsDestination.Logs },
             onSaveGithubToken = viewModel::saveGithubToken,
             onClearGithubToken = viewModel::clearGithubToken,
             onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
@@ -151,7 +158,7 @@ fun SettingsRoute(
 
         SettingsDestination.Logs -> SettingsLogsScreen(
             viewModel = viewModel,
-            onBack = { destination = SettingsDestination.Hub },
+            onBack = { destination = SettingsDestination.About },
             onRequestExport = onRequestExportLogs,
         )
     }
@@ -167,7 +174,6 @@ private fun SettingsHubScreen(
     onOpenMyAccounts: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
-    onOpenLogs: () -> Unit,
     onReparseStored: () -> Unit,
     onImportSms: () -> Unit,
     onClearSmsImportMessage: () -> Unit,
@@ -398,13 +404,6 @@ private fun SettingsHubScreen(
                     CircularProgressIndicator()
                 }
             }
-
-            SettingsNavRow(
-                icon = MasroofIcons.recentTransactions,
-                title = stringResource(R.string.settings_logs_title),
-                subtitle = stringResource(R.string.settings_logs_subtitle),
-                onClick = onOpenLogs,
-            )
 
             SettingsNavRow(
                 icon = MasroofIcons.periodHint,

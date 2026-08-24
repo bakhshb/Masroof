@@ -53,7 +53,9 @@ fun SettingsAboutScreen(
     githubTokenConfigured: Boolean,
     updateState: AppUpdateUiState,
     updateMessage: AppUpdateMessage?,
+    logErrorCount: Int = 0,
     onBack: () -> Unit,
+    onOpenLogs: () -> Unit,
     onSaveGithubToken: (String) -> Unit,
     onClearGithubToken: () -> Unit,
     onCheckForUpdates: () -> Unit,
@@ -116,6 +118,14 @@ fun SettingsAboutScreen(
                 icon = MasroofIcons.externalIn,
                 title = stringResource(R.string.settings_about_banks_title),
                 body = stringResource(R.string.bank_aljazira),
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.recentTransactions,
+                title = stringResource(R.string.settings_logs_title),
+                subtitle = stringResource(R.string.settings_logs_subtitle),
+                badgeCount = logErrorCount.takeIf { it > 0 },
+                onClick = onOpenLogs,
             )
 
             UpdateSectionCard(
