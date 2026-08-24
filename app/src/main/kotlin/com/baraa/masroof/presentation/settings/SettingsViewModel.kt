@@ -358,6 +358,7 @@ class SettingsViewModel(
 
     fun clearGithubToken() {
         appUpdateService.clearToken()
+        updateCheckCoordinator.clearPendingUpdate()
         _uiState.update {
             it.copy(
                 githubTokenConfigured = false,

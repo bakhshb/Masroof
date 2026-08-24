@@ -66,12 +66,12 @@ class IncomingSmsReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         val ingestion: SmsIngestionService = app.container.smsIngestionService
-        app.container.appLogService.info(
-            AppLogCategories.SMS,
-            "Live SMS received from ${AppLogFormatting.maskSender(assembled.sender)}",
-        )
         app.container.applicationScope.launch {
             try {
+                app.container.appLogService.info(
+                    AppLogCategories.SMS,
+                    "Live SMS received from ${AppLogFormatting.maskSender(assembled.sender)}",
+                )
                 ingestion.ingest(rawSms)
             } finally {
                 pendingResult.finish()

@@ -11,8 +11,15 @@ class UpdateCheckPreferencesRepository(
         prefs.edit().putLong(KEY_LAST_CHECK_MS, epochMs).apply()
     }
 
+    fun getLastAttemptEpochMs(): Long = prefs.getLong(KEY_LAST_ATTEMPT_MS, 0L)
+
+    fun setLastAttemptEpochMs(epochMs: Long) {
+        prefs.edit().putLong(KEY_LAST_ATTEMPT_MS, epochMs).apply()
+    }
+
     companion object {
         const val PREFS_NAME: String = "update_check_prefs"
         private const val KEY_LAST_CHECK_MS: String = "last_check_epoch_ms"
+        private const val KEY_LAST_ATTEMPT_MS: String = "last_attempt_epoch_ms"
     }
 }

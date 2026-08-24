@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.update
 
 import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 
 class UpdateCheckCoordinator(
@@ -10,17 +9,21 @@ class UpdateCheckCoordinator(
     private val preferencesRepository: UpdateCheckPreferencesRepository,
     private val appLogService: AppLogService,
     private val minIntervalMs: Long = DEFAULT_MIN_INTERVAL_MS,
+    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val performUpdateCheck: () -> Result<UpdateCheckResult> = { appUpdateService.checkForUpdate() },
 ) {
-    fun shouldCheckNow(nowEpochMs: Long = System.currentTimeMillis()): Boolean {
-        val lastCheck = preferencesRepository.getLastCheckEpochMs()
-        return lastCheck == 0L || nowEpochMs - lastCheck >= minIntervalMs
+    fun shouldCheckNow(nowEpochMs: Long = clock()): Boolean {
+        val lastAttempt = preferencesRepository.getLastAttemptEpochMs()
+        return lastAttempt == 0L || nowEpochMs - lastAttempt >= minIntervalMs
     }
 
     fun checkForUpdate(source: String): Result<UpdateCheckResult> {
+        val now = clock()
+        preferencesRepository.setLastAttemptEpochMs(now)
         appLogService.info(AppLogCategories.UPDATE, "Update check started ($source)")
-        val result = appUpdateService.checkForUpdate()
+        val result = performUpdateCheck()
         result.onSuccess { outcome ->
-            preferencesRepository.setLastCheckEpochMs(System.currentTimeMillis())
+            preferencesRepository.setLastCheckEpochMs(now)
             when (outcome) {
                 UpdateCheckResult.UpToDate -> {
                     pendingUpdateStore.clear()
@@ -44,6 +47,10 @@ class UpdateCheckCoordinator(
     }
 
     fun restorePendingUpdate(): UpdateManifest? = pendingUpdateStore.readAvailable()
+
+    fun clearPendingUpdate() {
+        pendingUpdateStore.clear()
+    }
 
     companion object {
         const val DEFAULT_MIN_INTERVAL_MS: Long = 6L * 60L * 60L * 1000L

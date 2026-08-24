@@ -65,6 +65,12 @@ fun SettingsRoute(
         }
     }
 
+    LaunchedEffect(destination) {
+        if (destination == SettingsDestination.About || destination == SettingsDestination.Logs) {
+            viewModel.refreshLogs()
+        }
+    }
+
     BackHandler(enabled = destination != SettingsDestination.Hub) {
         destination = when (destination) {
             SettingsDestination.Logs -> SettingsDestination.About
