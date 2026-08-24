@@ -7,10 +7,6 @@ class GitHubRequestException(
 ) : Exception(message) {
     val requiresToken: Boolean
         get() = !tokenWasProvided && httpCode == 404
-
-    companion object {
-        private const val AUTH_REQUIRED_CODE = 404
-    }
 }
 
 class PrivateRepoRequiresTokenException :
