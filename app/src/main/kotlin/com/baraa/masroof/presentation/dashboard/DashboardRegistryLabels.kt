@@ -114,8 +114,14 @@ fun cardDisplayLabelFromTransaction(
 ): String? {
     val last4 = row.cardLast4 ?: return null
     val match = resolveOwnedCardForTransaction(row, cards)
-    return if (match != null) {
-        cardDisplayLabel(cards, match.bank, last4)
+    if (match != null) {
+        return cardDisplayLabel(cards, match.bank, last4)
+    }
+    val containerHasBank = listOfNotNull(row.sourceContainerId, row.destinationContainerId)
+        .any { it.startsWith("card:") }
+    val sameLast4Count = cards.count { it.last4 == last4 }
+    return if (!containerHasBank && sameLast4Count > 1) {
+        stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
     } else {
         cardDisplayLabel(cards, last4)
     }
