@@ -739,13 +739,30 @@ class SettingsViewModel(
     }
 
     private fun restorePendingUpdateState() {
-        val manifest = updateCheckCoordinator.restorePendingUpdate() ?: return
         if (_uiState.value.updateState is AppUpdateUiState.Checking ||
             _uiState.value.updateState is AppUpdateUiState.Downloading
         ) {
             return
         }
+        val manifest = updateCheckCoordinator.restorePendingUpdate()
+        if (manifest == null) {
+            clearInstalledUpdateState()
+            return
+        }
         applyAvailableUpdate(manifest, silent = true)
+    }
+
+    private fun clearInstalledUpdateState() {
+        val current = _uiState.value.updateState
+        val installedManifest =
+            when (current) {
+                is AppUpdateUiState.Available -> current.manifest
+                is AppUpdateUiState.ReadyToInstall -> current.manifest
+                else -> return
+            }
+        if (!appUpdateService.isUpdateStillNeeded(installedManifest)) {
+            _uiState.update { it.copy(updateState = AppUpdateUiState.Idle, updateMessage = null) }
+        }
     }
 
     private fun applyAvailableUpdate(

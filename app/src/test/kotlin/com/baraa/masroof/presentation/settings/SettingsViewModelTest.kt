@@ -273,6 +273,37 @@ class SettingsViewModelTest {
         assertFalse(appUpdateService.hasConfiguredToken())
     }
 
+    @Test
+    fun refresh_clearsStalePendingUpdateAfterInstall() = runTest {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val pendingUpdateStore = com.baraa.masroof.application.update.PendingUpdateStore(
+            context.getSharedPreferences("pending_update_prefs_vm_stale_test", android.content.Context.MODE_PRIVATE),
+        ).also { it.clear() }
+        val installedManifest = UpdateManifest(
+            versionCode = 4,
+            versionName = "0.2.1",
+            apkFileName = "masroof.apk",
+            sha256 = "abc",
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(installedManifest)
+        val appUpdateService = SettingsViewModelTestFixtures.appUpdateService()
+        val updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(
+            appUpdateService = appUpdateService,
+            pendingUpdateStore = pendingUpdateStore,
+        )
+        val vm = viewModel(
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = updateCheckCoordinator,
+        )
+
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals(AppUpdateUiState.Idle, vm.uiState.value.updateState)
+        assertNull(updateCheckCoordinator.restorePendingUpdate())
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),

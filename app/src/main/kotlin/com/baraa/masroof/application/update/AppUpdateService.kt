@@ -73,6 +73,9 @@ class AppUpdateService(
         File(context.cacheDir, "updates").deleteRecursively()
     }
 
+    fun isUpdateStillNeeded(manifest: UpdateManifest): Boolean =
+        updateChecker.isUpdateAvailable(manifest)
+
     private fun mapGitHubError(error: Throwable, @Suppress("UNUSED_PARAMETER") token: String?): Throwable =
         when {
             error is GitHubRequestException && error.requiresToken ->

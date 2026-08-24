@@ -48,7 +48,19 @@ class UpdateCheckCoordinator(
         return result
     }
 
-    fun restorePendingUpdate(): UpdateManifest? = pendingUpdateStore.readAvailable()
+    fun restorePendingUpdate(): UpdateManifest? {
+        val manifest = pendingUpdateStore.readAvailable() ?: return null
+        if (appUpdateService.isUpdateStillNeeded(manifest)) {
+            return manifest
+        }
+        pendingUpdateStore.clear()
+        appUpdateService.clearDownloadedApk(manifest)
+        appLogService.info(
+            AppLogCategories.UPDATE,
+            "Cleared stale pending update ${manifest.versionName} (already installed)",
+        )
+        return null
+    }
 
     fun clearPendingUpdate() {
         pendingUpdateStore.clear()
