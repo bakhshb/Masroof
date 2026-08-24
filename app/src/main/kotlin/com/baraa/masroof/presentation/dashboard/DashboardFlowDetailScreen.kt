@@ -21,11 +21,11 @@ import com.baraa.masroof.application.dashboard.externalMovement
 import com.baraa.masroof.application.dashboard.FlowExpenseCategory
 import com.baraa.masroof.application.dashboard.FlowIncomeCategory
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofPeriodDisplay
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 enum class DashboardFlowDetailMode {
@@ -74,32 +74,35 @@ fun DashboardFlowDetailScreen(
             modifier = contentModifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             MasroofPeriodDisplay(label = periodRangeLabel)
 
-            DashboardSummaryMetricCard(
-                title = stringResource(presentation.totalTitleRes),
-                amount = formattedTotal,
-                tone = presentation.tone,
-                hint = stringResource(presentation.totalHintRes),
-            )
+            MasroofCard {
+                DashboardSummaryPrimaryMetric(
+                    title = stringResource(presentation.totalTitleRes),
+                    amount = formattedTotal,
+                    tone = presentation.tone,
+                    hint = stringResource(presentation.totalHintRes),
+                )
 
-            when (mode) {
-                DashboardFlowDetailMode.Expense -> {
-                    FlowDetailExpenseSummarySection(summary = summary)
-                    FlowDetailTransactionsSection(
-                        transactions = flowExpenseTransactions(grouping, previewsById),
-                        onOpenTransaction = onOpenTransaction,
-                    )
+                DashboardSummaryCardDivider()
+
+                when (mode) {
+                    DashboardFlowDetailMode.Expense -> FlowDetailExpenseSummarySection(summary = summary)
+                    DashboardFlowDetailMode.Income -> FlowDetailIncomeSummarySection(summary = summary)
                 }
-                DashboardFlowDetailMode.Income -> {
-                    FlowDetailIncomeSummarySection(summary = summary)
-                    FlowDetailTransactionsSection(
-                        transactions = flowIncomeTransactions(grouping, previewsById),
-                        onOpenTransaction = onOpenTransaction,
-                    )
-                }
+            }
+
+            val flowTransactions = when (mode) {
+                DashboardFlowDetailMode.Expense -> flowExpenseTransactions(grouping, previewsById)
+                DashboardFlowDetailMode.Income -> flowIncomeTransactions(grouping, previewsById)
+            }
+            if (flowTransactions.isNotEmpty()) {
+                DashboardSummaryTransactionsSection(
+                    transactions = flowTransactions,
+                    onOpenTransaction = onOpenTransaction,
+                )
             }
         }
     }
@@ -116,6 +119,7 @@ private data class FlowDetailPresentation(
 @Composable
 private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreExpenseSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
                 label = stringResource(row.labelRes),
@@ -124,10 +128,8 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.outflow.selfTransfersOut.amount.signum() > 0) {
-            Text(
-                stringResource(R.string.dashboard_self_transfers),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            DashboardSummaryBreakdownHeader(
+                title = stringResource(R.string.dashboard_self_transfers),
                 modifier = Modifier.padding(top = 4.dp),
             )
             FlowDetailSummaryRow(
@@ -147,6 +149,7 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
 @Composable
 private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreIncomeSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
                 label = stringResource(row.labelRes),
@@ -155,10 +158,8 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
             )
         }
         if (summary.inflow.selfTransfersIn.amount.signum() > 0) {
-            Text(
-                stringResource(R.string.dashboard_self_transfers),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            DashboardSummaryBreakdownHeader(
+                title = stringResource(R.string.dashboard_self_transfers),
                 modifier = Modifier.padding(top = 4.dp),
             )
             FlowDetailSummaryRow(
@@ -170,26 +171,6 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
                 stringResource(R.string.dashboard_self_transfers_neutral_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FlowDetailTransactionsSection(
-    transactions: List<TransactionPreviewUi>,
-    onOpenTransaction: (String) -> Unit,
-) {
-    if (transactions.isEmpty()) return
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MasroofSectionTitle(
-            title = stringResource(R.string.dashboard_flow_detail_transactions_title),
-        )
-        transactions.forEach { row ->
-            TransactionPreviewRow(
-                row = row,
-                onClick = { onOpenTransaction(row.id) },
             )
         }
     }
@@ -218,33 +199,6 @@ private fun List<TransactionPreviewUi>.sortedByDateDesc(): List<TransactionPrevi
     )
 
 @Composable
-fun DashboardFlowBreakdownCard(
-    summary: CurrentAccountSummary,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            stringResource(R.string.dashboard_flow_detail_breakdown_title),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            stringResource(R.string.dashboard_income_details_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowDetailIncomeSummarySection(summary = summary)
-        Text(
-            stringResource(R.string.dashboard_expense_details_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        FlowDetailExpenseSummarySection(summary = summary)
-    }
-}
-
-@Composable
 private fun FlowDetailSummaryRow(
     label: String,
     amount: Money,
@@ -252,7 +206,6 @@ private fun FlowDetailSummaryRow(
 ) {
     if (amount.amount.signum() == 0) return
     val style = when {
-        amount.amount.signum() == 0 -> MasroofMoneyRowStyle.Neutral
         direction == TransactionDirectionUi.OUTWARD -> MasroofMoneyRowStyle.Outflow
         direction == TransactionDirectionUi.NEUTRAL -> MasroofMoneyRowStyle.Neutral
         else -> MasroofMoneyRowStyle.Inflow
