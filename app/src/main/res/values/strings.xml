@@ -188,6 +188,9 @@
     <string name="settings_logs_filter_empty">لا توجد سجلات لهذا الفلتر.</string>
     <string name="settings_logs_day_today">اليوم</string>
     <string name="settings_logs_day_yesterday">أمس</string>
+    <string name="settings_log_time_just_now">الآن</string>
+    <string name="settings_log_time_minutes_ago">منذ %1$d د</string>
+    <string name="settings_log_time_hours_ago">منذ %1$d س</string>
     <string name="settings_log_level_info">معلومات</string>
     <string name="settings_log_level_warn">تنبيه</string>
     <string name="settings_log_level_error">خطأ</string>

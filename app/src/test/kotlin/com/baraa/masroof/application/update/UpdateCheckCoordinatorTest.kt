@@ -47,6 +47,15 @@ class UpdateCheckCoordinatorTest {
     }
 
     @Test
+    fun shouldCheckNow_fallsBackToLastSuccessWhenNoAttemptRecorded() {
+        val now = 1_700_000_000_000L
+        preferencesRepository.setLastCheckEpochMs(now - 10_000L)
+        val coordinator = coordinator(minIntervalMs = 60_000L, now = { now })
+
+        assertFalse(coordinator.shouldCheckNow())
+    }
+
+    @Test
     fun checkForUpdate_recordsAttemptOnFailure() {
         val now = 1_700_000_000_000L
         var current = now

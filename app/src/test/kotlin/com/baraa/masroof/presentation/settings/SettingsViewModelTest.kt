@@ -6,6 +6,7 @@ import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
@@ -24,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -237,11 +239,49 @@ class SettingsViewModelTest {
         assertTrue(cards.markedAsDebit)
     }
 
+    @Test
+    fun clearGithubToken_clearsTokenPendingUpdateAndResetsUi() = runTest {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val pendingUpdateStore = com.baraa.masroof.application.update.PendingUpdateStore(
+            context.getSharedPreferences("pending_update_prefs_vm_test", android.content.Context.MODE_PRIVATE),
+        ).also { it.clear() }
+        val manifest = UpdateManifest(
+            versionCode = 99,
+            versionName = "9.9.0",
+            apkFileName = "masroof.apk",
+            sha256 = "abc",
+            releaseNotes = null,
+        )
+        pendingUpdateStore.saveAvailable(manifest)
+        val appUpdateService = SettingsViewModelTestFixtures.appUpdateService(token = "secret-token")
+        val updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(
+            appUpdateService = appUpdateService,
+            pendingUpdateStore = pendingUpdateStore,
+        )
+        val vm = viewModel(
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = updateCheckCoordinator,
+        )
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.clearGithubToken()
+
+        assertFalse(vm.uiState.value.githubTokenConfigured)
+        assertEquals(AppUpdateUiState.Idle, vm.uiState.value.updateState)
+        assertNull(updateCheckCoordinator.restorePendingUpdate())
+        assertFalse(appUpdateService.hasConfiguredToken())
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
+        appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
+            SettingsViewModelTestFixtures.appUpdateService(),
+        updateCheckCoordinator: com.baraa.masroof.application.update.UpdateCheckCoordinator =
+            SettingsViewModelTestFixtures.updateCheckCoordinator(appUpdateService = appUpdateService),
     ): SettingsViewModel =
         SettingsViewModel(
             cardRegistryRepository = cards,
@@ -258,8 +298,8 @@ class SettingsViewModelTest {
             importSmsFromInbox = { com.baraa.masroof.sms.scanner.SmsScanResult() },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
-            appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),
-            updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(),
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = updateCheckCoordinator,
             appLogService = SettingsViewModelTestFixtures.appLogService(),
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
             canInstallPackages = { true },

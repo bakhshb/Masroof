@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.ZoneId
+import java.util.Locale
 
 class SettingsLogPresentationTest {
     @Test
@@ -61,6 +62,34 @@ class SettingsLogPresentationTest {
         assertEquals("Today", (grouped[0] as SettingsLogListItem.DayHeader).label)
         assertEquals(1L, (grouped[1] as SettingsLogListItem.Entry).entry.id)
         assertEquals("Yesterday", (grouped[2] as SettingsLogListItem.DayHeader).label)
+    }
+
+    @Test
+    fun formatLogTimestamp_usesRelativeLabels() {
+        val now = 1_700_000_000_000L
+        val labels = LogTimestampLabels(
+            justNow = "Just now",
+            minutesAgoFormat = "%1\$d min ago",
+            hoursAgoFormat = "%1\$d h ago",
+        )
+
+        val justNow = formatLogTimestamp(
+            timestampEpochMs = now - 30_000L,
+            zoneId = ZoneId.of("UTC"),
+            locale = Locale.ENGLISH,
+            labels = labels,
+            nowEpochMs = now,
+        )
+        val minutesAgo = formatLogTimestamp(
+            timestampEpochMs = now - 5 * 60_000L,
+            zoneId = ZoneId.of("UTC"),
+            locale = Locale.ENGLISH,
+            labels = labels,
+            nowEpochMs = now,
+        )
+
+        assertEquals("Just now", justNow)
+        assertEquals("5 min ago", minutesAgo)
     }
 
     private fun entry(

@@ -74,21 +74,28 @@ internal fun groupLogEntriesByDay(
     }
 }
 
+internal data class LogTimestampLabels(
+    val justNow: String,
+    val minutesAgoFormat: String,
+    val hoursAgoFormat: String,
+)
+
 internal fun formatLogTimestamp(
     timestampEpochMs: Long,
     zoneId: ZoneId,
     locale: Locale,
+    labels: LogTimestampLabels,
     nowEpochMs: Long = System.currentTimeMillis(),
 ): String {
     val instant = Instant.ofEpochMilli(timestampEpochMs)
     val now = Instant.ofEpochMilli(nowEpochMs)
     val minutes = ChronoUnit.MINUTES.between(instant, now).coerceAtLeast(0)
     return when {
-        minutes < 1 -> if (locale.language == "ar") "الآن" else "Just now"
-        minutes < 60 -> if (locale.language == "ar") "منذ $minutes د" else "$minutes min ago"
+        minutes < 1 -> labels.justNow
+        minutes < 60 -> String.format(locale, labels.minutesAgoFormat, minutes)
         ChronoUnit.HOURS.between(instant, now) < 24 -> {
             val hours = ChronoUnit.HOURS.between(instant, now)
-            if (locale.language == "ar") "منذ $hours س" else "$hours h ago"
+            String.format(locale, labels.hoursAgoFormat, hours)
         }
         else -> {
             val formatter = DateTimeFormatter.ofPattern("d MMM · HH:mm", locale)

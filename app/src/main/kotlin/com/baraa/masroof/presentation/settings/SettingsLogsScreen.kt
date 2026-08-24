@@ -115,6 +115,11 @@ fun SettingsLogsScreen(
     }
     val todayLabel = stringResource(R.string.settings_logs_day_today)
     val yesterdayLabel = stringResource(R.string.settings_logs_day_yesterday)
+    val timestampLabels = LogTimestampLabels(
+        justNow = stringResource(R.string.settings_log_time_just_now),
+        minutesAgoFormat = stringResource(R.string.settings_log_time_minutes_ago),
+        hoursAgoFormat = stringResource(R.string.settings_log_time_hours_ago),
+    )
     val listItems = remember(filteredEntries, state.languageTag, todayLabel, yesterdayLabel) {
         groupLogEntriesByDay(
             entries = filteredEntries,
@@ -242,7 +247,7 @@ fun SettingsLogsScreen(
                                             entry = item.entry,
                                             locale = locale,
                                             zoneId = zoneId,
-                                            languageTag = state.languageTag,
+                                            timestampLabels = timestampLabels,
                                         )
                                 }
                             }
@@ -337,7 +342,7 @@ private fun LogEntryCard(
     entry: AppLogEntry,
     locale: Locale,
     zoneId: ZoneId,
-    languageTag: String,
+    timestampLabels: LogTimestampLabels,
 ) {
     val extendedColors = MasroofThemeExtras.extendedColors
     val accent = when (entry.level) {
@@ -349,8 +354,8 @@ private fun LogEntryCard(
         AppLogLevel.WARN -> extendedColors.liability
         AppLogLevel.ERROR -> MaterialTheme.colorScheme.error
     }
-    val timestamp = remember(entry.timestampEpochMs, languageTag) {
-        formatLogTimestamp(entry.timestampEpochMs, zoneId, locale)
+    val timestamp = remember(entry.timestampEpochMs, timestampLabels) {
+        formatLogTimestamp(entry.timestampEpochMs, zoneId, locale, timestampLabels)
     }
 
     MasroofCard(

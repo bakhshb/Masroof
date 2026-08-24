@@ -69,6 +69,10 @@ class AppUpdateService(
         updateApkFile(manifest).delete()
     }
 
+    fun clearDownloadCache() {
+        File(context.cacheDir, "updates").deleteRecursively()
+    }
+
     private fun mapGitHubError(error: Throwable, @Suppress("UNUSED_PARAMETER") token: String?): Throwable =
         when {
             error is GitHubRequestException && error.requiresToken ->

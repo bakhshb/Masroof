@@ -14,6 +14,8 @@ class UpdateCheckCoordinator(
 ) {
     fun shouldCheckNow(nowEpochMs: Long = clock()): Boolean {
         val lastAttempt = preferencesRepository.getLastAttemptEpochMs()
+            .takeIf { it != 0L }
+            ?: preferencesRepository.getLastCheckEpochMs()
         return lastAttempt == 0L || nowEpochMs - lastAttempt >= minIntervalMs
     }
 

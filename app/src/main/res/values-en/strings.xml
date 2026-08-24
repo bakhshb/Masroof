@@ -183,6 +183,9 @@
     <string name="settings_logs_filter_empty">No entries match this filter.</string>
     <string name="settings_logs_day_today">Today</string>
     <string name="settings_logs_day_yesterday">Yesterday</string>
+    <string name="settings_log_time_just_now">Just now</string>
+    <string name="settings_log_time_minutes_ago">%1$d min ago</string>
+    <string name="settings_log_time_hours_ago">%1$d h ago</string>
     <string name="settings_log_level_info">Info</string>
     <string name="settings_log_level_warn">Warning</string>
     <string name="settings_log_level_error">Error</string>

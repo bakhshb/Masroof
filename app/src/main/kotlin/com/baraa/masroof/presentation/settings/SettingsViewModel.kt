@@ -75,6 +75,7 @@ class SettingsViewModel(
     }
 
     fun refresh() {
+        refreshLogs()
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -357,6 +358,7 @@ class SettingsViewModel(
     }
 
     fun clearGithubToken() {
+        appUpdateService.clearDownloadCache()
         appUpdateService.clearToken()
         updateCheckCoordinator.clearPendingUpdate()
         _uiState.update {
@@ -415,6 +417,7 @@ class SettingsViewModel(
                     _uiState.update {
                         it.copy(updateState = AppUpdateUiState.Idle, updateMessage = message)
                     }
+                    restorePendingUpdateState()
                 } else {
                     _uiState.update { current ->
                         if (current.updateState is AppUpdateUiState.Available ||
@@ -426,6 +429,7 @@ class SettingsViewModel(
                             current.copy(updateState = AppUpdateUiState.Idle)
                         }
                     }
+                    restorePendingUpdateState()
                 }
             }
         }

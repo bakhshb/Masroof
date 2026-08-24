@@ -20,7 +20,6 @@ internal object SettingsViewModelTestFixtures {
         AppLogService(ApplicationProvider.getApplicationContext())
 
     fun appUpdateService(
-        tokenConfigured: Boolean = false,
         token: String? = null,
         appLogService: AppLogService = appLogService(),
     ): AppUpdateService {
@@ -39,8 +38,7 @@ internal object SettingsViewModelTestFixtures {
                     storedToken = null
                 }
 
-                override fun hasToken(): Boolean =
-                    if (tokenConfigured) true else storedToken != null
+                override fun hasToken(): Boolean = !storedToken.isNullOrBlank()
             }
         return AppUpdateService(
             context = context,
@@ -54,11 +52,12 @@ internal object SettingsViewModelTestFixtures {
     fun updateCheckCoordinator(
         appUpdateService: AppUpdateService = appUpdateService(),
         appLogService: AppLogService = appLogService(),
+        pendingUpdateStore: PendingUpdateStore? = null,
     ): UpdateCheckCoordinator {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return UpdateCheckCoordinator(
             appUpdateService = appUpdateService,
-            pendingUpdateStore = PendingUpdateStore(
+            pendingUpdateStore = pendingUpdateStore ?: PendingUpdateStore(
                 context.getSharedPreferences(PendingUpdateStore.PREFS_NAME, Context.MODE_PRIVATE),
             ),
             preferencesRepository = UpdateCheckPreferencesRepository(
