@@ -287,7 +287,7 @@ class AppContainer(
             pipeline = AlJaziraParsingPipeline(),
         )
 
-    val bankSmsRegistry: BankSmsRegistry =
+    private val bankSmsRegistry: BankSmsRegistry =
         BankSmsRegistry(
             adapters = listOf(alJaziraSmsAdapter),
         )

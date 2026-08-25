@@ -41,18 +41,18 @@ class SmsIngestionService(
     private val insertMutex = Mutex()
 
     suspend fun ingest(rawSms: RawSms, logOutcome: Boolean = true): SmsIngestionResult {
-        val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)
-        if (route is BankRoutingResult.NotMatched) {
-            if (logOutcome) {
-                appLogService?.info(
-                    AppLogCategories.INGEST,
-                    "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} (${route.reason})",
-                )
+        val adapter = when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
+            is BankRoutingResult.NotMatched -> {
+                if (logOutcome) {
+                    appLogService?.info(
+                        AppLogCategories.INGEST,
+                        "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} (${route.reason})",
+                    )
+                }
+                return SmsIngestionResult.NotRelevant(reason = route.reason)
             }
-            return SmsIngestionResult.NotRelevant(reason = route.reason)
+            is BankRoutingResult.Matched -> route.adapter
         }
-
-        val adapter = (route as BankRoutingResult.Matched).adapter
         val insertOutcome = try {
             insertMutex.withLock {
                 if (hasCrossSourceNearDuplicate(rawSms)) {
@@ -99,14 +99,21 @@ class SmsIngestionService(
     /**
      * Re-runs parse for an already-stored RawSms and replaces its ParsedEvent.
      * Used after parser improvements to refresh the review queue without duplicating evidence.
+     *
+     * Does not re-apply ingest-time sender detection. Stored SMS is already accepted
+     * evidence; detector allowlist changes must not skip backlog refresh. The bank
+     * adapter is chosen from the existing ParsedEvent when present.
      */
-    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult =
-        when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
-            is BankRoutingResult.NotMatched ->
-                SmsIngestionResult.NotRelevant(reason = route.reason)
-            is BankRoutingResult.Matched ->
-                parseAndPersist(rawSms, route.adapter, logOutcome = false)
-        }
+    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult {
+        val storedBank = parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.bank
+        val adapter = storedBank?.let(bankSmsRegistry::adapterFor)
+            ?: when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
+                is BankRoutingResult.Matched -> route.adapter
+                is BankRoutingResult.NotMatched ->
+                    return SmsIngestionResult.NotRelevant(reason = route.reason)
+            }
+        return parseAndPersist(rawSms, adapter, logOutcome = false)
+    }
 
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
         val receivedAt = rawSms.receivedAt

@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank
 
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.parsing.model.BankDetectionResult
 
 /**
@@ -24,4 +25,7 @@ class BankSmsRegistry(
             reason = unmatchedReason ?: "sender_not_in_scope",
         )
     }
+
+    fun adapterFor(bank: Bank): BankSmsAdapter? =
+        adapters.firstOrNull { it.bank == bank }
 }

@@ -6,6 +6,7 @@ import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -106,6 +107,22 @@ class BankSmsRegistryTest {
 
         assertTrue(result is BankRoutingResult.Matched)
         assertEquals(first, (result as BankRoutingResult.Matched).adapter)
+    }
+
+    @Test
+    fun adapterFor_returnsRegisteredAdapterByBank() {
+        val first = FakeBankSmsAdapter(
+            bank = Bank("FIRST"),
+            detection = BankDetectionResult.Unknown(reasons = listOf("first_unknown")),
+        )
+        val second = FakeBankSmsAdapter(
+            bank = Bank.BANK_ALJAZIRA,
+            detection = BankDetectionResult.Unknown(reasons = listOf("aljazira_unknown")),
+        )
+        val registry = BankSmsRegistry(listOf(first, second))
+
+        assertEquals(second, registry.adapterFor(Bank.BANK_ALJAZIRA))
+        assertNull(registry.adapterFor(Bank("MISSING")))
     }
 
     private class FakeBankSmsAdapter(

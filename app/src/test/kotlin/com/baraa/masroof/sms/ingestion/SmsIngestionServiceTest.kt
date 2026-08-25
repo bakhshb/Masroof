@@ -16,9 +16,12 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
@@ -160,11 +163,71 @@ class SmsIngestionServiceTest {
                 deviceMessageId = null,
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             )
-            assertTrue(service.ingest(raw) is SmsIngestionResult.NotRelevant)
+            val result = service.ingest(raw)
+            assertTrue(result is SmsIngestionResult.NotRelevant)
+            assertEquals(
+                "sender_not_recognized_as_bank_aljazira",
+                (result as SmsIngestionResult.NotRelevant).reason,
+            )
             assertNull(rawRepo.getById(raw.id))
         }
         assertEquals(0, db.rawSmsDao().count())
         assertEquals(0, parseCalls.get())
+    }
+
+    @Test
+    fun reparseStored_alJaziraPurchase_runsParserAgain() = runBlocking {
+        val raw = aljaziraPurchase(id = "android-sms:reparse", deviceId = "reparse")
+        assertTrue(service.ingest(raw) is SmsIngestionResult.Parsed)
+        parseCalls.set(0)
+        val result = service.reparseStored(raw)
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertEquals(Money.of("51.99", Currency.SAR), (result as SmsIngestionResult.Parsed).event.amount)
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(1, parseCalls.get())
+    }
+
+    @Test
+    fun reparseStored_doesNotReapplyIngestDetection() = runBlocking {
+        val exploding = SmsParseGateway { throw IllegalStateException("reparse-boom") }
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
+        )
+        val raw = RawSms(
+            id = "android-sms:other-bank-stored",
+            sender = "OtherBank",
+            body = "شراء عبر الانترنت بمبلغ: 10.00 SAR",
+            receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
+            deviceMessageId = "other-bank-stored",
+            bodyHash = SmsBodyHasher.sha256Hex("شراء عبر الانترنت بمبلغ: 10.00 SAR"),
+        )
+        rawRepo.insertIfAbsent(raw)
+        parsedRepo.save(
+            ParsedEvent(
+                id = "evt-other-bank-stored",
+                rawSmsId = raw.id,
+                bank = Bank.BANK_ALJAZIRA,
+                messageFamily = MessageFamily.PURCHASE,
+                direction = MoneyDirection.OUTGOING,
+                amount = Money.of("10.00", Currency.SAR),
+                purchaseChannel = null,
+                sourceAccountRef = null,
+                destinationAccountRef = null,
+                cardRef = null,
+                merchant = null,
+                counterparty = null,
+                occurredAt = null,
+                bankNetworkType = null,
+                confidence = Confidence(score = 1.0),
+                parseStatus = ParseStatus.SUCCESS,
+            ),
+        )
+        val result = svc.reparseStored(raw)
+        assertTrue(result is SmsIngestionResult.Failed)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertNotNull(parsedRepo.findByRawSmsId(raw.id))
     }
 
     @Test
