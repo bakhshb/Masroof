@@ -24,8 +24,8 @@ Merges to `main` no longer publish stable releases automatically. Stable release
 
 | Channel | Updates offered |
 |---------|-----------------|
-| **Stable** | Stable releases only |
-| **Nightly** | Stable and nightly — highest `versionCode` wins |
+| **Stable** | Stable releases only (`releases/latest/download/version.json`) |
+| **Nightly** | Rolling `nightly` pre-release plus latest stable — highest `versionCode` wins |
 
 Users choose the channel in **Settings → Update channel** (default: Stable). The About screen shows the active channel under the app version.
 
@@ -36,6 +36,8 @@ Users choose the channel in **Settings → Update channel** (default: Stable). T
 - Nightly builds inject `0.2.28-nightly-1` style names at build time; they are not committed to Gradle.
 - Each release ships `version.json` with `"channel": "stable"` or `"nightly"` plus `releaseTag`.
 - Nightly GitHub releases are **pre-releases**; stable releases are marked **latest**.
+- Each nightly also refreshes a rolling **`nightly`** pre-release used by the in-app updater.
+- Old immutable `v*-nightly-*` pre-releases are pruned (last 10 kept).
 
 ## What you do for each change
 

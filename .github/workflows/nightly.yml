@@ -103,3 +103,23 @@ jobs:
             "${{ steps.version.outputs.version_code }}" \
             "${{ steps.version.outputs.tag }}" \
             true
+
+      - name: Refresh rolling nightly release
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/refresh-rolling-nightly-release.sh
+          ./scripts/refresh-rolling-nightly-release.sh \
+            "${{ github.sha }}" \
+            "masroof-${{ steps.version.outputs.version_name }}.apk" \
+            "version.json" \
+            "${{ steps.version.outputs.tag }}"
+
+      - name: Prune old nightly releases
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/prune-nightly-releases.sh
+          ./scripts/prune-nightly-releases.sh 10

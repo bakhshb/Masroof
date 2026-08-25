@@ -16,6 +16,7 @@ class GitHubReleaseClient(
     private val owner: String,
     private val repo: String,
     private val json: Json = Json { ignoreUnknownKeys = true },
+    private val releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
 ) {
     fun findBestManifest(
         channel: UpdateChannel,
@@ -23,49 +24,46 @@ class GitHubReleaseClient(
         token: String? = null,
     ): Result<UpdateManifest?> {
         val tokenWasProvided = token.isConfigured()
-        var best: UpdateManifest? = null
-        var page = 1
-        var isFirstVersionedRelease = true
+        val manifests = mutableListOf<UpdateManifest>()
 
-        while (page <= MAX_SCAN_PAGES) {
-            val pageReleases =
-                listReleasesPage(token, tokenWasProvided, page).getOrElse { return Result.failure(it) }
-            if (pageReleases.isEmpty()) {
-                break
+        when (channel) {
+            UpdateChannel.STABLE -> {
+                fetchManifestFromUrl(
+                    url = stableManifestDownloadUrl(owner, repo, releaseBaseUrl),
+                    fallbackReleaseTag = LATEST_STABLE_RELEASE_TAG,
+                    token = token,
+                    tokenWasProvided = tokenWasProvided,
+                ).fold(
+                    onSuccess = { manifests.add(it) },
+                    onFailure = { return Result.failure(it) },
+                )
             }
-
-            for (release in pageReleases) {
-                if (!releaseHasVersionAsset(release)) {
-                    continue
-                }
-
-                val manifestResult = manifestFromRelease(release, token, tokenWasProvided)
-                if (manifestResult.isFailure) {
-                    if (isFirstVersionedRelease) {
-                        return Result.failure(
-                            manifestResult.exceptionOrNull()
-                                ?: IllegalStateException("Could not read latest release manifest"),
-                        )
-                    }
-                    continue
-                }
-                isFirstVersionedRelease = false
-
-                val manifest = manifestResult.getOrThrow()
-                if (channel.acceptsManifestChannel(manifest.normalizedChannel) &&
-                    manifest.versionCode > installedVersionCode
-                ) {
-                    best = UpdateManifestSelector.pickBetter(best, manifest)
-                }
+            UpdateChannel.NIGHTLY -> {
+                fetchManifestFromUrl(
+                    url = nightlyManifestDownloadUrl(owner, repo, releaseBaseUrl),
+                    fallbackReleaseTag = ROLLING_NIGHTLY_TAG,
+                    token = token,
+                    tokenWasProvided = tokenWasProvided,
+                ).fold(
+                    onSuccess = { manifests.add(it) },
+                    onFailure = { return Result.failure(it) },
+                )
+                fetchManifestFromUrl(
+                    url = stableManifestDownloadUrl(owner, repo, releaseBaseUrl),
+                    fallbackReleaseTag = LATEST_STABLE_RELEASE_TAG,
+                    token = token,
+                    tokenWasProvided = tokenWasProvided,
+                ).onSuccess { manifests.add(it) }
             }
-
-            if (pageReleases.size < RELEASES_PAGE_SIZE) {
-                break
-            }
-            page++
         }
 
-        return Result.success(best)
+        return Result.success(
+            UpdateManifestSelector.bestForChannel(
+                channel = channel,
+                installedVersionCode = installedVersionCode,
+                manifests = manifests,
+            ),
+        )
     }
 
     fun fetchManifest(
@@ -97,29 +95,20 @@ class GitHubReleaseClient(
         return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
-    private fun releaseHasVersionAsset(release: JsonObject): Boolean {
-        val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
-        return assets.any { asset ->
-            asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
-        }
-    }
-
-    private fun listReleasesPage(
+    private fun fetchManifestFromUrl(
+        url: String,
+        fallbackReleaseTag: String,
         token: String?,
         tokenWasProvided: Boolean,
-        page: Int,
-    ): Result<List<JsonObject>> {
-        val request =
-            authorizedRequest(token)
-                .url("https://api.github.com/repos/$owner/$repo/releases?per_page=$RELEASES_PAGE_SIZE&page=$page")
-                .header("Accept", "application/vnd.github+json")
-                .get()
-                .build()
-
-        return executeJsonArray(request, tokenWasProvided).map { array ->
-            array.map { it.jsonObject }
+    ): Result<UpdateManifest> =
+        downloadText(url, token, tokenWasProvided).mapCatching { body ->
+            val manifest = json.decodeFromString(UpdateManifest.serializer(), body)
+            if (manifest.releaseTag.isNullOrBlank()) {
+                manifest.withReleaseTag(fallbackReleaseTag)
+            } else {
+                manifest
+            }
         }
-    }
 
     private fun manifestFromRelease(
         release: JsonObject,
@@ -223,11 +212,6 @@ class GitHubReleaseClient(
             json.parseToJsonElement(body.string()).jsonObject
         }
 
-    private fun executeJsonArray(request: Request, tokenWasProvided: Boolean): Result<JsonArray> =
-        executeBody(request, tokenWasProvided).mapCatching { body ->
-            json.parseToJsonElement(body.string()).jsonArray
-        }
-
     private fun executeBody(request: Request, tokenWasProvided: Boolean): Result<okhttp3.ResponseBody> {
         val response = httpClient.newCall(request).execute()
         val body = response.body
@@ -273,8 +257,23 @@ class GitHubReleaseClient(
 
     companion object {
         const val VERSION_JSON_NAME: String = "version.json"
-        private const val RELEASES_PAGE_SIZE: Int = 100
-        private const val MAX_SCAN_PAGES: Int = 2
+        const val ROLLING_NIGHTLY_TAG: String = "nightly"
+        internal const val LATEST_STABLE_RELEASE_TAG: String = "latest"
+        private const val DEFAULT_RELEASE_BASE_URL: String = "https://github.com"
+
+        fun stableManifestDownloadUrl(
+            owner: String,
+            repo: String,
+            releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
+        ): String =
+            "$releaseBaseUrl/$owner/$repo/releases/latest/download/$VERSION_JSON_NAME"
+
+        fun nightlyManifestDownloadUrl(
+            owner: String,
+            repo: String,
+            releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
+        ): String =
+            "$releaseBaseUrl/$owner/$repo/releases/download/$ROLLING_NIGHTLY_TAG/$VERSION_JSON_NAME"
 
         fun defaultHttpClient(): OkHttpClient =
             OkHttpClient.Builder()
