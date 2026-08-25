@@ -1,19 +1,8 @@
 package com.baraa.masroof.domain.rules
 
-import com.baraa.masroof.domain.model.Account
-import com.baraa.masroof.domain.model.AccountType
-import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.Card
-import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.TransferOwnershipType
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TransferOwnershipResolverTest {

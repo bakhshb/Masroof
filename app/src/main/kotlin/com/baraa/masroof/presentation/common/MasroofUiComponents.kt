@@ -110,69 +110,6 @@ fun IconLabelRow(
 }
 
 @Composable
-fun SummaryMiniCard(
-    modifier: Modifier,
-    title: String,
-    value: String,
-    icon: ImageVector,
-) {
-    MasroofCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-    }
-}
-
-@Composable
-fun MetricHighlightCard(
-    title: String,
-    value: String,
-    icon: ImageVector,
-    subtitle: String? = null,
-    modifier: Modifier = Modifier,
-) {
-    MasroofCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        Text(
-            value,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        subtitle?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-@Composable
 fun IconTextButton(
     onClick: () -> Unit,
     text: String,

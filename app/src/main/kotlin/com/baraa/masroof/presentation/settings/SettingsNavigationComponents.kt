@@ -148,10 +148,3 @@ fun SettingsReparseRow(
     }
 }
 
-@Composable
-fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(vertical = 4.dp),
-        color = MaterialTheme.colorScheme.outline,
-    )
-}
