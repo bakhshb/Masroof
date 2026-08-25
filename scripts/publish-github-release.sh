@@ -56,7 +56,7 @@ RELEASE_ARGS=(
   "${SOURCE_ROOT}/${RELEASE_APK}"
   "${SOURCE_ROOT}/version.json"
   --title "$TAG"
-  --generate-release-notes
+  --generate-notes
 )
 if [[ "$PRERELEASE" == "true" ]]; then
   RELEASE_ARGS+=(--prerelease)
