@@ -14,12 +14,8 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val appVersionName =
-    project.findProperty("appVersionNameOverride")?.toString()
-        ?: "0.2.28"
-val appVersionCode =
-    project.findProperty("appVersionCodeOverride")?.toString()?.toIntOrNull()
-        ?: 31
+val appVersionName = "0.2.28"
+val appVersionCode = 31
 val githubOwner = "bakhshb"
 val githubRepo = "Masroof"
 
@@ -139,5 +135,4 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
-    testImplementation("com.squareup.okhttp3:mockwebserver:${libs.versions.okhttp.get()}")
 }

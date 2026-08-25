@@ -1,7 +1,7 @@
 package com.baraa.masroof.application.update
 
 class UpdateChecker(
-    val installedVersionCode: Int,
+    private val installedVersionCode: Int,
 ) {
     fun isUpdateAvailable(manifest: UpdateManifest): Boolean =
         manifest.versionCode > installedVersionCode

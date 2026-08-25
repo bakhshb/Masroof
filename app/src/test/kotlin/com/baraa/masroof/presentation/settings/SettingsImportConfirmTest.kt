@@ -93,7 +93,6 @@ class SettingsImportConfirmTest {
                 override fun getThemeMode() = ThemeMode.SYSTEM
                 override fun setThemeMode(mode: ThemeMode) = Unit
             },
-            updateChannelPreferencesRepository = SettingsViewModelTestFixtures.updateChannelPreferencesRepository(),
             databaseBackupService = backup,
             refreshReviewQueue = {},
             reparseStoredEvents = { 0 },

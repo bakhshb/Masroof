@@ -15,10 +15,8 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
-import com.baraa.masroof.application.update.UpdateChannelPreferencesRepository
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
-import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
@@ -48,7 +46,6 @@ class SettingsViewModel(
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
-    private val updateChannelPreferencesRepository: UpdateChannelPreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
@@ -67,7 +64,6 @@ class SettingsViewModel(
             appVersion = appVersion,
             languageTag = appLocaleRepository.getLanguageTag(),
             themeMode = themePreferencesRepository.getThemeMode(),
-            updateChannel = updateChannelPreferencesRepository.getUpdateChannel(),
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -88,7 +84,6 @@ class SettingsViewModel(
                     error = null,
                     languageTag = appLocaleRepository.getLanguageTag(),
                     themeMode = themePreferencesRepository.getThemeMode(),
-                    updateChannel = updateChannelPreferencesRepository.getUpdateChannel(),
                     githubTokenConfigured = appUpdateService.hasConfiguredToken(),
                     smsPermissionGranted = permissionStateProvider(),
                 )
@@ -578,21 +573,6 @@ class SettingsViewModel(
         if (mode == themePreferencesRepository.getThemeMode()) return
         themePreferencesRepository.setThemeMode(mode)
         _uiState.update { it.copy(themeMode = mode) }
-    }
-
-    fun setUpdateChannel(channel: UpdateChannel) {
-        if (channel == updateChannelPreferencesRepository.getUpdateChannel()) return
-        updateChannelPreferencesRepository.setUpdateChannel(channel)
-        updateCheckCoordinator.clearPendingUpdate()
-        appUpdateService.clearDownloadCache()
-        _uiState.update {
-            it.copy(
-                updateChannel = channel,
-                updateState = AppUpdateUiState.Idle,
-                updateMessage = null,
-            )
-        }
-        checkForUpdates(silent = false)
     }
 
     fun clearBackupMessage() {

@@ -8,8 +8,6 @@ import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.GitHubReleaseClient
 import com.baraa.masroof.application.update.GitHubTokenRepository
 import com.baraa.masroof.application.update.PendingUpdateStore
-import com.baraa.masroof.application.update.UpdateChannel
-import com.baraa.masroof.application.update.UpdateChannelPreferencesRepository
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
@@ -45,25 +43,11 @@ internal object SettingsViewModelTestFixtures {
         return AppUpdateService(
             context = context,
             tokenRepository = tokenRepository,
-            channelPreferencesRepository = updateChannelPreferencesRepository(),
             releaseClient = GitHubReleaseClient(OkHttpClient(), "bakhshb", "Masroof"),
             updateChecker = UpdateChecker(installedVersionCode = 4),
             appLogService = appLogService,
         )
     }
-
-    fun updateChannelPreferencesRepository(
-        channel: UpdateChannel = UpdateChannel.STABLE,
-    ): UpdateChannelPreferencesRepository =
-        object : UpdateChannelPreferencesRepository {
-            private var storedChannel: UpdateChannel = channel
-
-            override fun getUpdateChannel(): UpdateChannel = storedChannel
-
-            override fun setUpdateChannel(channel: UpdateChannel) {
-                storedChannel = channel
-            }
-        }
 
     fun updateCheckCoordinator(
         appUpdateService: AppUpdateService = appUpdateService(),

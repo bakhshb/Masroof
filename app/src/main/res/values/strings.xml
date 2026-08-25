@@ -119,12 +119,6 @@
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
     <string name="settings_theme_system">تلقائي (حسب النظام)</string>
-    <string name="settings_update_channel_title">قناة التحديث</string>
-    <string name="settings_update_channel_stable">مستقر</string>
-    <string name="settings_update_channel_stable_hint">إصدارات مستقرة فقط</string>
-    <string name="settings_update_channel_nightly">ليلي</string>
-    <string name="settings_update_channel_nightly_hint">إصدارات مستقرة وليلية — يُختار أعلى رقم إصدار</string>
-    <string name="settings_about_update_channel">قناة التحديث: %1$s</string>
     <string name="settings_about_section">عن التطبيق</string>
     <string name="settings_app_version_label">نسخة التطبيق</string>
     <string name="settings_about_subtitle">نسخة %1$s</string>

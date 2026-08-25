@@ -1,27 +1,25 @@
 name: Release
 
 on:
-  workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: masroof-publish
+  group: release-${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
   release:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'push' &&
-        !contains(github.ref_name, '-nightly-') &&
-        !contains(github.ref_name, '-rollback-')
-      )
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -31,28 +29,21 @@ jobs:
         with:
           token: ${{ github.token }}
 
-      - name: Bump stable version (manual dispatch only)
+      - name: Bump version (main / manual dispatch only)
         id: bump
-        if: github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/bump-stable-release.sh scripts/gradle-version.sh scripts/next-version-code.sh
-          ./scripts/bump-stable-release.sh
+          chmod +x scripts/bump-version.sh scripts/ensure-unique-release-tag.sh
+          ./scripts/bump-version.sh
+          ./scripts/ensure-unique-release-tag.sh
 
       - name: Resolve version and tag
         id: version
         run: |
-          chmod +x scripts/gradle-version.sh
-          # shellcheck source=scripts/gradle-version.sh
-          source scripts/gradle-version.sh
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION_NAME="${{ steps.bump.outputs.version_name }}"
-            VERSION_CODE="${{ steps.bump.outputs.version_code }}"
-          else
-            VERSION_NAME="$(read_gradle_version_name)"
-            VERSION_CODE="$(read_gradle_version_code)"
-          fi
+          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
@@ -74,6 +65,7 @@ jobs:
             echo "Release ${TAG} already exists — skipping build."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "No existing release for ${TAG} — will build."
           fi
 
       - name: Set up JDK 17
@@ -83,14 +75,6 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-
-      - name: Set up Android SDK
-        if: steps.skip.outputs.skip != 'true'
-        uses: android-actions/setup-android@v3
-
-      - name: Configure local SDK path
-        if: steps.skip.outputs.skip != 'true'
-        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
       - name: Decode release keystore
         if: steps.skip.outputs.skip != 'true'
@@ -117,21 +101,43 @@ jobs:
           keyPassword=${RELEASE_KEY_PASSWORD}
           EOF
 
-      - name: Build and publish stable release
+      - name: Build release APK
         if: steps.skip.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          chmod +x scripts/publish-github-release.sh scripts/gradle-version.sh scripts/verify-release-version.sh
-          ./scripts/publish-github-release.sh \
-            stable \
-            "${{ steps.version.outputs.version_name }}" \
-            "${{ steps.version.outputs.version_code }}" \
-            "${{ steps.version.outputs.tag }}" \
-            false
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Commit version bump to main (manual dispatch only)
-        if: steps.skip.outputs.skip != 'true' && github.event_name == 'workflow_dispatch'
+      - name: Prepare release artifacts
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          RELEASE_APK="masroof-${VERSION_NAME}.apk"
+          cp "$APK_PATH" "$RELEASE_APK"
+          SHA256=$(sha256sum "$RELEASE_APK" | awk '{print $1}')
+          cat > version.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "${VERSION_NAME}",
+            "apkFileName": "${RELEASE_APK}",
+            "sha256": "${SHA256}"
+          }
+          EOF
+          cat version.json
+
+      - name: Publish GitHub Release
+        if: steps.skip.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: |
+            masroof-*.apk
+            version.json
+          generate_release_notes: true
+
+      - name: Commit version bump to main
+        if: steps.skip.outputs.skip != 'true' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
           git config user.name "github-actions[bot]"
