@@ -53,13 +53,6 @@ class GitHubReleaseClient(
                     scanBestImmutableNightlyManifest(installedVersionCode, token, tokenWasProvided)
                         ?.let { manifests.add(it) }
                 }
-
-                if (manifests.isEmpty()) {
-                    return Result.failure(
-                        rollingResult.exceptionOrNull()
-                            ?: IllegalStateException("No nightly update manifests available"),
-                    )
-                }
             }
         }
 

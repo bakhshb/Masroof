@@ -161,6 +161,22 @@ class GitHubReleaseClientManifestTest {
     }
 
     @Test
+    fun nightlyChannel_returnsUpToDateWhenNoNewerManifestsFound() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(
+            MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"),
+        )
+
+        val result = client.findBestManifest(UpdateChannel.NIGHTLY, installedVersionCode = 20, token = "ghp_test")
+
+        assertTrue(result.isSuccess)
+        assertNull(result.getOrThrow())
+    }
+
+    @Test
     fun legacyManifestWithoutReleaseTag_usesReleaseTagNameForDownload() {
         enqueueRelease(
             tagName = "v0.2.10",
