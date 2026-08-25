@@ -17,10 +17,8 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       (
-        github.event.comment.body == '/release' ||
-        startsWith(github.event.comment.body, '/release ') ||
-        github.event.comment.body == '/rollback' ||
-        startsWith(github.event.comment.body, '/rollback ')
+        matches(github.event.comment.body, '(?s)^\s*/release(\s.*)?$') ||
+        matches(github.event.comment.body, '(?s)^\s*/rollback(\s.*)?$')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45

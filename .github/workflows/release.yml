@@ -15,6 +15,13 @@ concurrency:
 
 jobs:
   release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        !contains(github.ref_name, '-nightly-') &&
+        !contains(github.ref_name, '-rollback-')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

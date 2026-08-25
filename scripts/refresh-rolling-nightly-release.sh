@@ -40,14 +40,14 @@ git tag -f nightly "$COMMIT_SHA"
 git push -f origin nightly
 
 if gh release view nightly >/dev/null 2>&1; then
-  gh release upload nightly "$APK_PATH" "$ROLLING_MANIFEST" --clobber
+  gh release upload nightly "$APK_PATH" "${ROLLING_MANIFEST}#version.json" --clobber
   gh release edit nightly \
     --prerelease \
     --title "$TITLE" \
     --notes "$NOTES"
 else
   gh release create nightly \
-    "$APK_PATH" "$ROLLING_MANIFEST" \
+    "$APK_PATH" "${ROLLING_MANIFEST}#version.json" \
     --target "$COMMIT_SHA" \
     --title "$TITLE" \
     --notes "$NOTES" \

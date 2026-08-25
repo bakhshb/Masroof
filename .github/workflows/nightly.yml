@@ -123,3 +123,13 @@ jobs:
         run: |
           chmod +x scripts/prune-nightly-releases.sh
           ./scripts/prune-nightly-releases.sh 10
+
+      - name: Verify rolling nightly manifest
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/verify-rolling-nightly-manifest.sh
+          ./scripts/verify-rolling-nightly-manifest.sh \
+            "${{ steps.version.outputs.version_code }}" \
+            "${{ steps.version.outputs.version_name }}"

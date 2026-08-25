@@ -17,6 +17,7 @@ class GitHubReleaseClient(
     private val repo: String,
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
+    private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
 ) {
     fun findBestManifest(
         channel: UpdateChannel,
@@ -39,21 +40,43 @@ class GitHubReleaseClient(
                 )
             }
             UpdateChannel.NIGHTLY -> {
-                fetchManifestFromUrl(
-                    url = nightlyManifestDownloadUrl(owner, repo, releaseBaseUrl),
-                    fallbackReleaseTag = ROLLING_NIGHTLY_TAG,
-                    token = token,
-                    tokenWasProvided = tokenWasProvided,
-                ).fold(
+                val rollingResult =
+                    fetchManifestFromUrl(
+                        url = nightlyManifestDownloadUrl(owner, repo, releaseBaseUrl),
+                        fallbackReleaseTag = ROLLING_NIGHTLY_TAG,
+                        token = token,
+                        tokenWasProvided = tokenWasProvided,
+                    )
+                var rollingMissing = false
+                rollingResult.fold(
                     onSuccess = { manifests.add(it) },
-                    onFailure = { return Result.failure(it) },
+                    onFailure = { error ->
+                        if (error.isNotFound()) {
+                            rollingMissing = true
+                        } else {
+                            return Result.failure(error)
+                        }
+                    },
                 )
+
                 fetchManifestFromUrl(
                     url = stableManifestDownloadUrl(owner, repo, releaseBaseUrl),
                     fallbackReleaseTag = LATEST_STABLE_RELEASE_TAG,
                     token = token,
                     tokenWasProvided = tokenWasProvided,
                 ).onSuccess { manifests.add(it) }
+
+                if (rollingMissing) {
+                    scanBestImmutableNightlyManifest(installedVersionCode, token, tokenWasProvided)
+                        ?.let { manifests.add(it) }
+                }
+
+                if (manifests.isEmpty()) {
+                    return Result.failure(
+                        rollingResult.exceptionOrNull()
+                            ?: IllegalStateException("No nightly update manifests available"),
+                    )
+                }
             }
         }
 
@@ -95,6 +118,51 @@ class GitHubReleaseClient(
         return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
+    private fun scanBestImmutableNightlyManifest(
+        installedVersionCode: Int,
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): UpdateManifest? {
+        var best: UpdateManifest? = null
+        var page = 1
+
+        while (page <= MAX_SCAN_PAGES) {
+            val pageReleases =
+                listReleasesPage(token, tokenWasProvided, page).getOrElse { return best }
+            if (pageReleases.isEmpty()) {
+                break
+            }
+
+            for (release in pageReleases) {
+                val releaseTag =
+                    release["tag_name"]?.jsonPrimitive?.contentOrNull
+                        ?: continue
+                if (!IMMUTABLE_NIGHTLY_TAG_REGEX.containsMatchIn(releaseTag)) {
+                    continue
+                }
+                if (!releaseHasVersionAsset(release)) {
+                    continue
+                }
+
+                val manifest =
+                    manifestFromRelease(release, token, tokenWasProvided).getOrNull()
+                        ?: continue
+                if (manifest.normalizedChannel == UpdateChannel.NIGHTLY.storageValue() &&
+                    manifest.versionCode > installedVersionCode
+                ) {
+                    best = UpdateManifestSelector.pickBetter(best, manifest)
+                }
+            }
+
+            if (pageReleases.size < RELEASES_PAGE_SIZE) {
+                break
+            }
+            page++
+        }
+
+        return best
+    }
+
     private fun fetchManifestFromUrl(
         url: String,
         fallbackReleaseTag: String,
@@ -132,15 +200,39 @@ class GitHubReleaseClient(
         }
     }
 
+    private fun releaseHasVersionAsset(release: JsonObject): Boolean {
+        val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
+        return assets.any { asset ->
+            asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
+        }
+    }
+
+    private fun listReleasesPage(
+        token: String?,
+        tokenWasProvided: Boolean,
+        page: Int,
+    ): Result<List<JsonObject>> {
+        val request =
+            authorizedRequest(token)
+                .url("$apiBaseUrl/repos/$owner/$repo/releases?per_page=$RELEASES_PAGE_SIZE&page=$page")
+                .header("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+
+        return executeJsonArray(request, tokenWasProvided).map { array ->
+            array.map { it.jsonObject }
+        }
+    }
+
     private fun fetchReleaseByTag(
         releaseTag: String,
         token: String?,
         tokenWasProvided: Boolean,
     ): Result<JsonObject> {
-        val normalizedTag = if (releaseTag.startsWith("v")) releaseTag else "v$releaseTag"
+        val normalizedTag = normalizeReleaseTagForApi(releaseTag)
         val request =
             authorizedRequest(token)
-                .url("https://api.github.com/repos/$owner/$repo/releases/tags/$normalizedTag")
+                .url("$apiBaseUrl/repos/$owner/$repo/releases/tags/$normalizedTag")
                 .header("Accept", "application/vnd.github+json")
                 .get()
                 .build()
@@ -193,6 +285,9 @@ class GitHubReleaseClient(
         }
     }
 
+    private fun Throwable.isNotFound(): Boolean =
+        this is GitHubRequestException && httpCode == 404
+
     internal fun buildAuthorizedRequestForTest(token: String?): Request.Builder = authorizedRequest(token)
 
     private fun authorizedRequest(token: String?): Request.Builder {
@@ -210,6 +305,11 @@ class GitHubReleaseClient(
     private fun executeJson(request: Request, tokenWasProvided: Boolean): Result<JsonObject> =
         executeBody(request, tokenWasProvided).mapCatching { body ->
             json.parseToJsonElement(body.string()).jsonObject
+        }
+
+    private fun executeJsonArray(request: Request, tokenWasProvided: Boolean): Result<JsonArray> =
+        executeBody(request, tokenWasProvided).mapCatching { body ->
+            json.parseToJsonElement(body.string()).jsonArray
         }
 
     private fun executeBody(request: Request, tokenWasProvided: Boolean): Result<okhttp3.ResponseBody> {
@@ -260,6 +360,10 @@ class GitHubReleaseClient(
         const val ROLLING_NIGHTLY_TAG: String = "nightly"
         internal const val LATEST_STABLE_RELEASE_TAG: String = "latest"
         private const val DEFAULT_RELEASE_BASE_URL: String = "https://github.com"
+        private const val DEFAULT_API_BASE_URL: String = "https://api.github.com"
+        private const val RELEASES_PAGE_SIZE: Int = 100
+        private const val MAX_SCAN_PAGES: Int = 2
+        private val IMMUTABLE_NIGHTLY_TAG_REGEX = Regex("^v[0-9].*-nightly-")
 
         fun stableManifestDownloadUrl(
             owner: String,
@@ -274,6 +378,14 @@ class GitHubReleaseClient(
             releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
         ): String =
             "$releaseBaseUrl/$owner/$repo/releases/download/$ROLLING_NIGHTLY_TAG/$VERSION_JSON_NAME"
+
+        internal fun normalizeReleaseTagForApi(releaseTag: String): String {
+            val trimmed = releaseTag.trim()
+            if (trimmed == ROLLING_NIGHTLY_TAG || trimmed == LATEST_STABLE_RELEASE_TAG) {
+                return trimmed
+            }
+            return if (trimmed.startsWith("v")) trimmed else "v$trimmed"
+        }
 
         fun defaultHttpClient(): OkHttpClient =
             OkHttpClient.Builder()

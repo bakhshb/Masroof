@@ -41,7 +41,7 @@ fi
 
 for tag in "${TAGS_TO_DELETE[@]}"; do
   echo "Deleting old nightly release ${tag}"
-  gh release delete "$tag" --yes
+  gh release delete "$tag" --yes --cleanup-tag
 done
 
 echo "Pruned ${#TAGS_TO_DELETE[@]} nightly release(s); keeping ${KEEP}"

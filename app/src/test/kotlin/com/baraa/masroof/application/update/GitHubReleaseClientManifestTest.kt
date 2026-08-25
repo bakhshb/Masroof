@@ -14,18 +14,21 @@ class GitHubReleaseClientManifestTest {
     private lateinit var server: MockWebServer
     private lateinit var client: GitHubReleaseClient
     private lateinit var releaseBaseUrl: String
+    private lateinit var apiBaseUrl: String
 
     @Before
     fun setUp() {
         server = MockWebServer()
         server.start()
         releaseBaseUrl = server.url("/").toString().removeSuffix("/")
+        apiBaseUrl = releaseBaseUrl
         client =
             GitHubReleaseClient(
                 httpClient = OkHttpClient.Builder().build(),
                 owner = "o",
                 repo = "r",
                 releaseBaseUrl = releaseBaseUrl,
+                apiBaseUrl = apiBaseUrl,
             )
     }
 
@@ -130,6 +133,40 @@ class GitHubReleaseClientManifestTest {
     }
 
     @Test
+    fun nightlyChannel_fallsBackToImmutableNightlyWhenRollingMissing() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(
+            MockResponse()
+                .setBody(
+                    """
+                    [
+                      {
+                        "tag_name": "v0.2.12-nightly-3",
+                        "assets": [
+                          { "name": "version.json", "url": "$apiBaseUrl/version-asset" }
+                        ]
+                      }
+                    ]
+                    """.trimIndent(),
+                )
+                .addHeader("Content-Type", "application/json"),
+        )
+        enqueueManifest(
+            versionCode = 15,
+            versionName = "0.2.12-nightly-3",
+            channel = "nightly",
+            releaseTag = "v0.2.12-nightly-3",
+        )
+
+        val result = client.findBestManifest(UpdateChannel.NIGHTLY, installedVersionCode = 11, token = "ghp_test")
+
+        assertTrue(result.isSuccess)
+        assertEquals(15, result.getOrThrow()?.versionCode)
+        assertEquals("v0.2.12-nightly-3", result.getOrThrow()?.resolvedReleaseTag())
+    }
+
+    @Test
     fun returnsNullWhenAlreadyUpToDate() {
         enqueueManifest(
             versionCode = 10,
@@ -154,6 +191,49 @@ class GitHubReleaseClientManifestTest {
             "$releaseBaseUrl/o/r/releases/download/nightly/version.json",
             GitHubReleaseClient.nightlyManifestDownloadUrl("o", "r", releaseBaseUrl),
         )
+    }
+
+    @Test
+    fun normalizeReleaseTagForApi_preservesRollingNightlyTag() {
+        assertEquals("nightly", GitHubReleaseClient.normalizeReleaseTagForApi("nightly"))
+        assertEquals("v0.2.12", GitHubReleaseClient.normalizeReleaseTagForApi("0.2.12"))
+        assertEquals("v0.2.12-nightly-1", GitHubReleaseClient.normalizeReleaseTagForApi("v0.2.12-nightly-1"))
+    }
+
+    @Test
+    fun downloadReleaseAsset_usesNightlyTagWithoutVPrefix() {
+        val manifest =
+            UpdateManifest(
+                versionCode = 13,
+                versionName = "0.2.12-nightly-1",
+                apkFileName = "masroof-0.2.12-nightly-1.apk",
+                sha256 = "abc",
+                channel = "nightly",
+                releaseTag = "nightly",
+            )
+        server.enqueue(
+            MockResponse()
+                .setBody(
+                    """
+                    {
+                      "tag_name": "nightly",
+                      "assets": [
+                        { "name": "masroof-0.2.12-nightly-1.apk", "url": "$apiBaseUrl/apk-asset" }
+                      ]
+                    }
+                    """.trimIndent(),
+                )
+                .addHeader("Content-Type", "application/json"),
+        )
+        server.enqueue(MockResponse().setBody("apk-bytes").setResponseCode(200))
+
+        val destination = createTempFile("masroof", ".apk")
+        val result = client.downloadReleaseAsset("ghp_test", manifest, destination)
+
+        assertTrue(result.isSuccess)
+        assertEquals("/repos/o/r/releases/tags/nightly", server.takeRequest().path)
+        assertEquals("/apk-asset", server.takeRequest().path)
+        destination.delete()
     }
 
     private fun enqueueManifest(
