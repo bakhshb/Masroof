@@ -111,13 +111,6 @@ fun resolveMetricToneColor(tone: DashboardMetricTone, signedAmount: BigDecimal? 
     }
 }
 
-fun signedMoneyMetricTone(amount: SignedMoneyAmount): DashboardMetricTone =
-    when (amount.amount.signum()) {
-        1 -> DashboardMetricTone.Inflow
-        -1 -> DashboardMetricTone.Outflow
-        else -> DashboardMetricTone.Neutral
-    }
-
 fun spendingMetricTone(amount: SignedMoneyAmount): DashboardMetricTone =
     when (amount.amount.signum()) {
         1 -> DashboardMetricTone.Outflow

@@ -109,6 +109,18 @@ interface FinancialTransactionDao {
     suspend fun deleteTransactionById(id: String): Int
 
     @Transaction
+    suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean {
+        val link = findLinkByRawSmsId(rawSmsId) ?: return false
+        val linkedRawSmsIds = listRawSmsIdsForTransaction(link.transactionId)
+        if (linkedRawSmsIds.size != 1 || linkedRawSmsIds.single() != rawSmsId) {
+            return false
+        }
+        deleteLinkByRawSmsId(rawSmsId)
+        deleteTransactionById(link.transactionId)
+        return true
+    }
+
+    @Transaction
     suspend fun saveAtomic(
         entity: FinancialTransactionEntity,
         links: List<FinancialTransactionRawSmsLinkEntity>,

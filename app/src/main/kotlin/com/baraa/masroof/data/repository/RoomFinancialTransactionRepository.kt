@@ -97,16 +97,8 @@ class RoomFinancialTransactionRepository(
             source = source.name,
         ) > 0
 
-    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean {
-        val link = dao.findLinkByRawSmsId(rawSmsId) ?: return false
-        val linkedRawSmsIds = dao.listRawSmsIdsForTransaction(link.transactionId)
-        if (linkedRawSmsIds.size != 1 || linkedRawSmsIds.single() != rawSmsId) {
-            return false
-        }
-        dao.deleteLinkByRawSmsId(rawSmsId)
-        dao.deleteTransactionById(link.transactionId)
-        return true
-    }
+    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
+        dao.deleteIfExclusiveRawSmsLink(rawSmsId)
 
     override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean {
         if (dao.findLinkByRawSmsId(rawSmsId) != null) return false

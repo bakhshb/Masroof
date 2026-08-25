@@ -236,46 +236,6 @@ fun MasroofBadge(
 }
 
 @Composable
-fun MasroofMiniCard(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    subtitle: String? = null,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    Surface(
-        modifier = modifier,
-        shape = MasroofCardShape,
-        color = extended.miniBackground,
-        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = valueColor,
-            )
-            subtitle?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun MasroofMoneyRow(
     label: String,
     value: String,
@@ -522,26 +482,6 @@ fun MasroofSectionTitle(
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.onSurface,
     )
-}
-
-@Composable
-fun MasroofCycleChip(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    Surface(
-        modifier = modifier,
-        shape = MasroofBadgeShape,
-        color = extended.cardSoft,
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = extended.card,
-        )
-    }
 }
 
 @Composable
