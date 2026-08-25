@@ -101,12 +101,15 @@ class SmsIngestionService(
      * Used after parser improvements to refresh the review queue without duplicating evidence.
      *
      * Does not re-apply ingest-time sender detection. Stored SMS is already accepted
-     * evidence; detector allowlist changes must not skip backlog refresh. The bank
-     * adapter is chosen from the existing ParsedEvent when present.
+     * evidence; detector allowlist changes must not skip backlog refresh.
+     *
+     * Adapter selection: existing ParsedEvent bank, else the sole registered adapter,
+     * else ingest routing only when bank identity cannot be determined.
      */
     suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult {
         val storedBank = parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.bank
         val adapter = storedBank?.let(bankSmsRegistry::adapterFor)
+            ?: bankSmsRegistry.singleAdapterOrNull()
             ?: when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
                 is BankRoutingResult.Matched -> route.adapter
                 is BankRoutingResult.NotMatched ->

@@ -125,6 +125,22 @@ class BankSmsRegistryTest {
         assertNull(registry.adapterFor(Bank("MISSING")))
     }
 
+    @Test
+    fun singleAdapterOrNull_onlyWhenExactlyOneAdapter() {
+        val only = FakeBankSmsAdapter(
+            bank = Bank.BANK_ALJAZIRA,
+            detection = BankDetectionResult.Unknown(reasons = listOf("unused")),
+        )
+        val other = FakeBankSmsAdapter(
+            bank = Bank("OTHER"),
+            detection = BankDetectionResult.Unknown(reasons = listOf("unused")),
+        )
+
+        assertEquals(only, BankSmsRegistry(listOf(only)).singleAdapterOrNull())
+        assertNull(BankSmsRegistry(emptyList()).singleAdapterOrNull())
+        assertNull(BankSmsRegistry(listOf(only, other)).singleAdapterOrNull())
+    }
+
     private class FakeBankSmsAdapter(
         override val bank: Bank,
         private val detection: BankDetectionResult,

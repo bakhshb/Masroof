@@ -28,4 +28,7 @@ class BankSmsRegistry(
 
     fun adapterFor(bank: Bank): BankSmsAdapter? =
         adapters.firstOrNull { it.bank == bank }
+
+    fun singleAdapterOrNull(): BankSmsAdapter? =
+        adapters.singleOrNull()
 }

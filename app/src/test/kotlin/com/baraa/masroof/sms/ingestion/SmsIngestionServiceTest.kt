@@ -231,6 +231,30 @@ class SmsIngestionServiceTest {
     }
 
     @Test
+    fun reparseStored_rawSmsWithoutParsedEvent_stillInvokesParser() = runBlocking {
+        val exploding = SmsParseGateway { throw IllegalStateException("reparse-no-event-boom") }
+        val svc = SmsIngestionService(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
+        )
+        val raw = RawSms(
+            id = "android-sms:unsupported-stored",
+            sender = "OtherBank",
+            body = "شراء عبر الانترنت بمبلغ: 10.00 SAR",
+            receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
+            deviceMessageId = "unsupported-stored",
+            bodyHash = SmsBodyHasher.sha256Hex("شراء عبر الانترنت بمبلغ: 10.00 SAR"),
+        )
+        rawRepo.insertIfAbsent(raw)
+        val result = svc.reparseStored(raw)
+        assertTrue(result is SmsIngestionResult.Failed)
+        assertTrue(result !is SmsIngestionResult.NotRelevant)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+    }
+
+    @Test
     fun parserFailure_keepsRawSmsAndReturnsFailed() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("boom") }
         val svc = SmsIngestionService(
