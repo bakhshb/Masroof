@@ -23,9 +23,52 @@ class GitHubReleaseClient(
         token: String? = null,
     ): Result<UpdateManifest?> {
         val tokenWasProvided = token.isConfigured()
-        return listReleaseManifests(token, tokenWasProvided).map { manifests ->
-            UpdateManifestSelector.bestForChannel(channel, installedVersionCode, manifests)
+        var best: UpdateManifest? = null
+        var page = 1
+        var globalIndex = 0
+
+        while (page <= MAX_SCAN_PAGES) {
+            val pageReleases =
+                listReleasesPage(token, tokenWasProvided, page).getOrElse { return Result.failure(it) }
+            if (pageReleases.isEmpty()) {
+                break
+            }
+
+            for (release in pageReleases) {
+                val hasVersionAsset = releaseHasVersionAsset(release)
+                if (!hasVersionAsset) {
+                    globalIndex++
+                    continue
+                }
+
+                val manifestResult = manifestFromRelease(release, token, tokenWasProvided)
+                if (manifestResult.isFailure) {
+                    if (globalIndex == 0) {
+                        return Result.failure(
+                            manifestResult.exceptionOrNull()
+                                ?: IllegalStateException("Could not read latest release manifest"),
+                        )
+                    }
+                    globalIndex++
+                    continue
+                }
+
+                val manifest = manifestResult.getOrThrow()
+                if (channel.acceptsManifestChannel(manifest.normalizedChannel) &&
+                    manifest.versionCode > installedVersionCode
+                ) {
+                    best = UpdateManifestSelector.pickBetter(best, manifest)
+                }
+                globalIndex++
+            }
+
+            if (pageReleases.size < RELEASES_PAGE_SIZE) {
+                break
+            }
+            page++
         }
+
+        return Result.success(best)
     }
 
     fun fetchManifest(
@@ -57,25 +100,28 @@ class GitHubReleaseClient(
         return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
-    private fun listReleaseManifests(token: String?, tokenWasProvided: Boolean): Result<List<UpdateManifest>> {
-        val releases = listReleases(token, tokenWasProvided).getOrElse { return Result.failure(it) }
-        if (releases.isEmpty()) {
-            return Result.success(emptyList())
+    private fun releaseHasVersionAsset(release: JsonObject): Boolean {
+        val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
+        return assets.any { asset ->
+            asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
         }
+    }
 
-        val manifests = mutableListOf<UpdateManifest>()
-        var manifestFailures = 0
-        for (release in releases) {
-            manifestFromRelease(release, token, tokenWasProvided)
-                .onSuccess { manifests += it }
-                .onFailure { manifestFailures++ }
+    private fun listReleasesPage(
+        token: String?,
+        tokenWasProvided: Boolean,
+        page: Int,
+    ): Result<List<JsonObject>> {
+        val request =
+            authorizedRequest(token)
+                .url("https://api.github.com/repos/$owner/$repo/releases?per_page=$RELEASES_PAGE_SIZE&page=$page")
+                .header("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+
+        return executeJsonArray(request, tokenWasProvided).map { array ->
+            array.map { it.jsonObject }
         }
-        if (manifests.isEmpty() && manifestFailures > 0) {
-            return Result.failure(
-                IllegalStateException("Could not read version.json from any GitHub release"),
-            )
-        }
-        return Result.success(manifests)
     }
 
     private fun manifestFromRelease(
@@ -98,31 +144,6 @@ class GitHubReleaseClient(
             json.decodeFromString(UpdateManifest.serializer(), body)
                 .withReleaseTag(releaseTag)
         }
-    }
-
-    private fun listReleases(token: String?, tokenWasProvided: Boolean): Result<List<JsonObject>> {
-        val releases = mutableListOf<JsonObject>()
-        var page = 1
-        while (true) {
-            val request =
-                authorizedRequest(token)
-                    .url("https://api.github.com/repos/$owner/$repo/releases?per_page=$RELEASES_PAGE_SIZE&page=$page")
-                    .header("Accept", "application/vnd.github+json")
-                    .get()
-                    .build()
-
-            val pageReleases =
-                executeJsonArray(request, tokenWasProvided).getOrElse { return Result.failure(it) }
-            if (pageReleases.isEmpty()) {
-                break
-            }
-            releases += pageReleases.map { it.jsonObject }
-            if (pageReleases.size < RELEASES_PAGE_SIZE) {
-                break
-            }
-            page++
-        }
-        return Result.success(releases)
     }
 
     private fun fetchReleaseByTag(
@@ -256,6 +277,7 @@ class GitHubReleaseClient(
     companion object {
         const val VERSION_JSON_NAME: String = "version.json"
         private const val RELEASES_PAGE_SIZE: Int = 100
+        private const val MAX_SCAN_PAGES: Int = 2
 
         fun defaultHttpClient(): OkHttpClient =
             OkHttpClient.Builder()

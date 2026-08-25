@@ -592,7 +592,7 @@ class SettingsViewModel(
                 updateMessage = null,
             )
         }
-        checkForUpdates(silent = true)
+        checkForUpdates(silent = false)
     }
 
     fun clearBackupMessage() {

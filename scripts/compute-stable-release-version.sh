@@ -26,6 +26,9 @@ else
 fi
 
 NEW_NAME="$(bump_patch_version_name "$VERSION_NAME")"
+if command -v gh >/dev/null 2>&1; then
+  NEW_NAME="$(resolve_unique_stable_version_name "$NEW_NAME")"
+fi
 
 echo "version_name=${NEW_NAME}" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "version_code=${NEW_CODE}" >> "${GITHUB_OUTPUT:-/dev/null}"

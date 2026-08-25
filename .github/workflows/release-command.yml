@@ -9,7 +9,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: release-command
+  group: masroof-publish
   cancel-in-progress: false
 
 jobs:
@@ -17,10 +17,10 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       (
-        github.event.comment.body == '/release' ||
-        startsWith(github.event.comment.body, '/release ') ||
-        github.event.comment.body == '/rollback' ||
-        startsWith(github.event.comment.body, '/rollback ')
+        trim(github.event.comment.body) == '/release' ||
+        startsWith(trim(github.event.comment.body), '/release ') ||
+        trim(github.event.comment.body) == '/rollback' ||
+        startsWith(trim(github.event.comment.body), '/rollback ')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -59,19 +59,30 @@ jobs:
             core.setOutput('merge_sha', pr.data.merge_commit_sha);
             core.setOutput('pr_number', String(pr.data.number));
 
-      - name: Checkout merge commit
+      - name: Checkout main (tooling)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Checkout merge commit (source)
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.pr.outputs.merge_sha }}
+          path: source
           fetch-depth: 0
 
       - name: Fetch main for stable version baseline
         if: steps.pr.outputs.command == '/release'
+        working-directory: source
         run: git fetch origin main
 
       - name: Resolve stable version (/release)
         id: release_version
         if: steps.pr.outputs.command == '/release'
+        working-directory: tooling
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -81,12 +92,14 @@ jobs:
       - name: Resolve rollback version (/rollback)
         id: rollback_version
         if: steps.pr.outputs.command == '/rollback'
+        working-directory: tooling
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           chmod +x scripts/next-version-code.sh scripts/gradle-version.sh
           # shellcheck source=scripts/gradle-version.sh
           source scripts/gradle-version.sh
+          GRADLE_VERSION_FILE="${GITHUB_WORKSPACE}/source/app/build.gradle.kts"
           VERSION_NAME="$(read_gradle_version_name)"
           VERSION_CODE=$(./scripts/next-version-code.sh)
           TAG="v${VERSION_NAME}-rollback-${VERSION_CODE}"
@@ -128,8 +141,18 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Set up Android SDK
+        if: steps.skip.outputs.skip != 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: source
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
       - name: Decode release keystore
         if: steps.skip.outputs.skip != 'true'
+        working-directory: source
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
@@ -141,6 +164,7 @@ jobs:
 
       - name: Create keystore.properties
         if: steps.skip.outputs.skip != 'true'
+        working-directory: source
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -157,9 +181,11 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_ROOT: ${{ github.workspace }}/source
+          TOOLING_ROOT: ${{ github.workspace }}/tooling
         run: |
-          chmod +x scripts/publish-github-release.sh
-          ./scripts/publish-github-release.sh \
+          chmod +x "${TOOLING_ROOT}/scripts/publish-github-release.sh"
+          "${TOOLING_ROOT}/scripts/publish-github-release.sh" \
             stable \
             "${{ steps.version.outputs.version_name }}" \
             "${{ steps.version.outputs.version_code }}" \
@@ -170,7 +196,7 @@ jobs:
         if: >-
           steps.skip.outputs.skip != 'true' &&
           steps.pr.outputs.command == '/release'
-        continue-on-error: true
+        working-directory: tooling
         run: |
           git fetch origin main
           git checkout main

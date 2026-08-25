@@ -62,6 +62,31 @@ class UpdateManifestSelectorTest {
     }
 
     @Test
+    fun sameVersionCode_prefersStableOverNightly() {
+        val tiedNightly =
+            nightlyManifest.copy(
+                versionCode = 10,
+                versionName = "0.2.10-nightly-2",
+                releaseTag = "v0.2.10-nightly-2",
+            )
+        val tiedStable =
+            stableManifest.copy(
+                versionCode = 10,
+                versionName = "0.2.10",
+                releaseTag = "v0.2.10",
+            )
+
+        val selected =
+            UpdateManifestSelector.bestForChannel(
+                channel = UpdateChannel.NIGHTLY,
+                installedVersionCode = 9,
+                manifests = listOf(tiedNightly, tiedStable),
+            )
+
+        assertEquals(tiedStable, selected)
+    }
+
+    @Test
     fun legacyManifestWithoutChannel_isTreatedAsStable() {
         val legacy =
             UpdateManifest(

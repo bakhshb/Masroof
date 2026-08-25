@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: nightly-${{ github.workflow }}
+  group: masroof-publish
   cancel-in-progress: false
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/next-version-code.sh scripts/next-nightly-version-name.sh
+          chmod +x scripts/next-version-code.sh scripts/next-nightly-version-name.sh scripts/gradle-version.sh
           VERSION_NAME=$(./scripts/next-nightly-version-name.sh)
           VERSION_CODE=$(./scripts/next-version-code.sh)
           TAG="v${VERSION_NAME}"
@@ -57,6 +57,14 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
+
+      - name: Set up Android SDK
+        if: steps.skip.outputs.skip != 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        if: steps.skip.outputs.skip != 'true'
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
       - name: Decode release keystore
         if: steps.skip.outputs.skip != 'true'
@@ -88,7 +96,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/publish-github-release.sh
+          chmod +x scripts/publish-github-release.sh scripts/gradle-version.sh scripts/verify-release-version.sh
           ./scripts/publish-github-release.sh \
             nightly \
             "${{ steps.version.outputs.version_name }}" \

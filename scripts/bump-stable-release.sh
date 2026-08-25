@@ -12,6 +12,9 @@ GRADLE_VERSION_FILE="$FILE"
 
 VERSION_NAME="$(read_gradle_version_name)"
 NEW_NAME="$(bump_patch_version_name "$VERSION_NAME")"
+if command -v gh >/dev/null 2>&1; then
+  NEW_NAME="$(resolve_unique_stable_version_name "$NEW_NAME")"
+fi
 set_gradle_version "$NEW_NAME" "$NEW_CODE"
 
 echo "version_name=${NEW_NAME}" >> "${GITHUB_OUTPUT:-/dev/null}"

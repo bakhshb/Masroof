@@ -13,20 +13,32 @@ VERSION_CODE="$3"
 TAG="$4"
 PRERELEASE="${5:-false}"
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+TOOLING_ROOT="${TOOLING_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SOURCE_ROOT="${SOURCE_ROOT:-$TOOLING_ROOT}"
+GRADLE_FILE="${SOURCE_ROOT}/app/build.gradle.kts"
 
-./gradlew assembleRelease \
-  -PappVersionNameOverride="${VERSION_NAME}" \
-  -PappVersionCodeOverride="${VERSION_CODE}" \
-  --no-daemon
+# shellcheck source=scripts/gradle-version.sh
+source "${TOOLING_ROOT}/scripts/gradle-version.sh"
+
+if [[ ! -f "$GRADLE_FILE" ]]; then
+  echo "Gradle file not found: ${GRADLE_FILE}"
+  exit 1
+fi
+
+set_gradle_version_in "$GRADLE_FILE" "$VERSION_NAME" "$VERSION_CODE"
+"${TOOLING_ROOT}/scripts/verify-release-version.sh" "$GRADLE_FILE" "$VERSION_NAME" "$VERSION_CODE"
+
+cd "$SOURCE_ROOT"
+./gradlew assembleRelease --no-daemon
 
 APK_PATH="app/build/outputs/apk/release/app-release.apk"
-RELEASE_APK="masroof-${VERSION_NAME}.apk"
-cp "$APK_PATH" "$RELEASE_APK"
-SHA256=$(sha256sum "$RELEASE_APK" | awk '{print $1}')
+"${TOOLING_ROOT}/scripts/verify-release-version.sh" "$GRADLE_FILE" "$VERSION_NAME" "$VERSION_CODE" "$APK_PATH"
 
-cat > version.json <<EOF
+RELEASE_APK="masroof-${VERSION_NAME}.apk"
+cp "$APK_PATH" "${SOURCE_ROOT}/${RELEASE_APK}"
+SHA256=$(sha256sum "${SOURCE_ROOT}/${RELEASE_APK}" | awk '{print $1}')
+
+cat > "${SOURCE_ROOT}/version.json" <<EOF
 {
   "versionCode": ${VERSION_CODE},
   "versionName": "${VERSION_NAME}",
@@ -37,9 +49,15 @@ cat > version.json <<EOF
 }
 EOF
 
-cat version.json
+cat "${SOURCE_ROOT}/version.json"
 
-RELEASE_ARGS=(gh release create "$TAG" "$RELEASE_APK" version.json --title "$TAG" --generate-release-notes)
+RELEASE_ARGS=(
+  gh release create "$TAG"
+  "${SOURCE_ROOT}/${RELEASE_APK}"
+  "${SOURCE_ROOT}/version.json"
+  --title "$TAG"
+  --generate-release-notes
+)
 if [[ "$PRERELEASE" == "true" ]]; then
   RELEASE_ARGS+=(--prerelease)
 else

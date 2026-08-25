@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.workflow }}
+  group: masroof-publish
   cancel-in-progress: false
 
 jobs:
@@ -30,14 +30,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/bump-stable-release.sh
+          chmod +x scripts/bump-stable-release.sh scripts/gradle-version.sh scripts/next-version-code.sh
           ./scripts/bump-stable-release.sh
 
       - name: Resolve version and tag
         id: version
         run: |
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
+          chmod +x scripts/gradle-version.sh
+          # shellcheck source=scripts/gradle-version.sh
+          source scripts/gradle-version.sh
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION_NAME="${{ steps.bump.outputs.version_name }}"
+            VERSION_CODE="${{ steps.bump.outputs.version_code }}"
+          else
+            VERSION_NAME="$(read_gradle_version_name)"
+            VERSION_CODE="$(read_gradle_version_code)"
+          fi
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
@@ -69,6 +77,14 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Set up Android SDK
+        if: steps.skip.outputs.skip != 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        if: steps.skip.outputs.skip != 'true'
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
       - name: Decode release keystore
         if: steps.skip.outputs.skip != 'true'
         env:
@@ -99,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/publish-github-release.sh
+          chmod +x scripts/publish-github-release.sh scripts/gradle-version.sh scripts/verify-release-version.sh
           ./scripts/publish-github-release.sh \
             stable \
             "${{ steps.version.outputs.version_name }}" \
@@ -109,7 +125,6 @@ jobs:
 
       - name: Commit version bump to main (manual dispatch only)
         if: steps.skip.outputs.skip != 'true' && github.event_name == 'workflow_dispatch'
-        continue-on-error: true
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
           git config user.name "github-actions[bot]"
