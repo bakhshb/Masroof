@@ -40,7 +40,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -51,7 +50,6 @@ import com.baraa.masroof.presentation.common.MasroofLogo
 @Composable
 fun SettingsAboutScreen(
     appVersion: String,
-    updateChannel: UpdateChannel,
     githubTokenConfigured: Boolean,
     updateState: AppUpdateUiState,
     updateMessage: AppUpdateMessage?,
@@ -100,14 +98,6 @@ fun SettingsAboutScreen(
             )
             Text(
                 stringResource(R.string.settings_about_version, appVersion),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                stringResource(
-                    R.string.settings_about_update_channel,
-                    updateChannelLabel(updateChannel),
-                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

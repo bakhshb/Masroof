@@ -1,6 +1,6 @@
 # Release and in-app updates
 
-Masroof ships **nightly** builds automatically when you merge to `main`, and **stable** builds when you comment `/release` on a merged pull request. See [CI.md](CI.md) for the full pipeline.
+Masroof release APKs are built in **GitHub Actions** when you **merge to `main`** (see [CI.md](CI.md)). The app checks for updates using your personal GitHub token and installs APKs without Google Play.
 
 ## One-time setup
 
@@ -24,6 +24,8 @@ From the repo root, with [GitHub CLI](https://cli.github.com/) logged in as the 
 ./scripts/upload-release-secrets.sh
 ```
 
+This creates `release.keystore`, `keystore.properties`, and uploads four secrets to GitHub. Those files are gitignored — do not commit them.
+
 **Option B — manual**
 
 In the repository: **Settings → Secrets and variables → Actions**, add:
@@ -41,37 +43,27 @@ In the repository: **Settings → Secrets and variables → Actions**, add:
 2. Create a **fine-grained token** with **Contents: Read-only** on the `Masroof` repository only.
 3. On the phone: **Settings → About → App update** → paste token → **Save token**.
 
+The token is stored in app-private storage on the device and is never committed to the repo.
+
 ### 4. Branch protection (recommended)
 
 See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
 
-## Releasing a new stable version
+## Releasing a new version
 
-1. Open a PR with your changes (version bump is **not** manual).
+1. Open a PR with your changes (version bump is **automatic** on merge).
 2. Wait for **CI** to pass → merge to `main`.
-3. A **nightly** pre-release is published automatically (`v0.2.28-nightly-1`, etc.).
-4. When you are ready to ship stable, comment **`/release`** on the merged PR (repo write access required).
-5. The workflow builds a stable APK from that PR's merge commit, publishes it as the latest release, and bumps `main`.
+3. **Release** workflow bumps version, builds APK, publishes GitHub Release, and commits the new version to `main`.
 
-To ship code from an older merged PR without reverting git history, comment **`/rollback`** on that PR instead.
-
-## Update channels
-
-| Channel | What you get |
-|---------|----------------|
-| **Stable** (default) | Latest stable GitHub release only |
-| **Nightly** | Rolling `nightly` pre-release plus latest stable — highest `versionCode` wins |
-
-Choose the channel in **Settings → Update channel**. The About screen shows your current channel under the version number.
+No manual `git tag` or version edit in Gradle is required.
 
 ## Updating the app on your phone
 
 1. Open Masroof → **Settings → About**.
 2. Ensure your GitHub token is saved.
-3. Pick **Stable** or **Nightly** under **Settings → Update channel** if needed.
-4. Tap **Check for updates** (or wait for an automatic check).
-5. **Download update** → **Install update**.
-6. If prompted, allow **Install unknown apps** for Masroof.
+3. Tap **Check for updates** (or wait for an automatic check on first launch after onboarding).
+4. **Download update** → **Install update**.
+5. If prompted, allow **Install unknown apps** for Masroof.
 
 ## Local release build (optional)
 
@@ -83,16 +75,8 @@ cp keystore.properties.example keystore.properties
 
 Output: `app/build/outputs/apk/release/app-release.apk`
 
-Override version for local testing:
-
-```bash
-./gradlew assembleRelease \
-  -PappVersionNameOverride=0.2.28-nightly-local \
-  -PappVersionCodeOverride=99
-```
-
 ## Notes
 
 - **Debug APK → release APK**: different signing keys; uninstall the debug build first, then install release.
 - **Private repo**: only devices with a valid read token can fetch updates.
-- **`versionCode`** is global across stable and nightly; nightlies do not change Gradle on `main`.
+- **versionCode** increases automatically on each merge to `main` (committed back by Release workflow).

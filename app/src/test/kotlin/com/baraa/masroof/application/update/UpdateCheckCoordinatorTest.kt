@@ -166,12 +166,6 @@ class UpdateCheckCoordinatorTest {
                 override fun clearToken() = Unit
                 override fun hasToken(): Boolean = false
             },
-            channelPreferencesRepository =
-                object : UpdateChannelPreferencesRepository {
-                    override fun getUpdateChannel(): UpdateChannel = UpdateChannel.STABLE
-
-                    override fun setUpdateChannel(channel: UpdateChannel) = Unit
-                },
             releaseClient = GitHubReleaseClient(OkHttpClient(), "bakhshb", "Masroof"),
             updateChecker = UpdateChecker(installedVersionCode = 4),
             appLogService = appLogService,

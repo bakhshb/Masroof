@@ -8,7 +8,6 @@ import java.io.File
 class AppUpdateService(
     private val context: Context,
     private val tokenRepository: GitHubTokenRepository,
-    private val channelPreferencesRepository: UpdateChannelPreferencesRepository,
     private val releaseClient: GitHubReleaseClient,
     private val updateChecker: UpdateChecker,
     private val appLogService: AppLogService,
@@ -27,23 +26,14 @@ class AppUpdateService(
 
     fun checkForUpdate(): Result<UpdateCheckResult> {
         val token = tokenRepository.getToken()
-        val channel = channelPreferencesRepository.getUpdateChannel()
-        return releaseClient.findBestManifest(
-            channel = channel,
-            installedVersionCode = updateChecker.installedVersionCode,
-            token = token,
-        ).fold(
+        return releaseClient.fetchLatestManifest(token).fold(
             onSuccess = { manifest ->
-                if (manifest == null) {
-                    Result.success(UpdateCheckResult.UpToDate)
-                } else {
-                    Result.success(
-                        when (val availability = updateChecker.evaluate(manifest)) {
-                            UpdateAvailability.UpToDate -> UpdateCheckResult.UpToDate
-                            is UpdateAvailability.Available -> UpdateCheckResult.UpdateAvailable(availability.manifest)
-                        },
-                    )
-                }
+                Result.success(
+                    when (val availability = updateChecker.evaluate(manifest)) {
+                        UpdateAvailability.UpToDate -> UpdateCheckResult.UpToDate
+                        is UpdateAvailability.Available -> UpdateCheckResult.UpdateAvailable(availability.manifest)
+                    },
+                )
             },
             onFailure = { error -> Result.failure(mapGitHubError(error, token)) },
         )

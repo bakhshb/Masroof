@@ -31,11 +31,6 @@ jobs:
       - name: Configure local SDK path
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
-      - name: Verify Gradle version helpers
-        run: |
-          chmod +x scripts/test-gradle-version.sh scripts/gradle-version.sh
-          ./scripts/test-gradle-version.sh
-
       - name: Build, lint, and test
         run: ./gradlew assembleDebug lintDebug test --stacktrace
 

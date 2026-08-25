@@ -20,7 +20,6 @@ class SettingsViewModelFactory(
             ownershipConfirmationService = container.ownershipConfirmationService,
             appLocaleRepository = container.appLocaleRepository,
             themePreferencesRepository = container.themePreferencesRepository,
-            updateChannelPreferencesRepository = container.updateChannelPreferencesRepository,
             databaseBackupService = container.databaseBackupService,
             refreshReviewQueue = { container.refreshReviewQueue() },
             reparseStoredEvents = { container.reparseAllStoredEvents() },

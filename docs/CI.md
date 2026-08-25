@@ -1,60 +1,35 @@
 # CI and release pipeline
 
-Masroof uses three GitHub Actions workflows for shipping:
+Masroof uses two GitHub Actions workflows:
 
 | Workflow | When | What |
 |----------|------|------|
 | **CI** | Pull request → `main` | `test`, `lint`, `assembleDebug` |
-| **Nightly** | Push to `main` (after merge) | Signed nightly pre-release APK |
-| **Release command** | `/release` or `/rollback` on a merged PR | Stable APK from that PR's merge commit |
-| **Release** | Manual dispatch or `v*` tag | Stable APK from current `main` (fallback) |
+| **Release** | Push to `main` (after merge) | Signed `assembleRelease` + GitHub Release |
+
+There is **no** CI run on every `main` push anymore — only the release job runs after merge.
 
 ## Flow
 
 ```text
 Branch → open PR → CI runs (must pass)
-       → merge PR → Nightly runs on main
-       → comment /release on merged PR → stable release from that merge commit
-       → comment /rollback on older merged PR → stable rollback APK (higher versionCode)
+       → merge PR → Release runs on main
+       → if version new → APK on GitHub Releases
+       → if version unchanged → release skipped (green, no new APK)
 ```
 
-Merges to `main` no longer publish stable releases automatically. Stable releases are intentional: comment `/release` on the merged PR when you want to ship.
-
-## Update channels in the app
-
-| Channel | Updates offered |
-|---------|-----------------|
-| **Stable** | Latest stable GitHub release only |
-| **Nightly** | Rolling `nightly` pre-release plus latest stable — highest `versionCode` wins |
-
-Users choose the channel in **Settings → Update channel** (default: Stable). The About screen shows the active channel under the app version.
-
-## Versioning
-
-- One global `versionCode` across stable and nightly builds (max existing + 1).
-- `app/build.gradle.kts` on `main` tracks the **last stable** `versionName` and `versionCode`.
-- Nightly builds inject `0.2.28-nightly-1` style names at build time; they are not committed to Gradle.
-- Each release ships `version.json` with `"channel": "stable"` or `"nightly"` plus `releaseTag`.
-- Nightly GitHub releases are **pre-releases**; stable releases are marked **latest**.
-- Each nightly also refreshes a rolling **`nightly`** pre-release used by the in-app updater.
-- Old immutable `v*-nightly-*` pre-releases are pruned (last 10 kept).
-
-## What you do for each change
+## What you do for each release
 
 1. Open a PR with your code changes (**do not** edit version in `app/build.gradle.kts`).
 2. Wait for **CI** to pass.
-3. Merge PR to `main` → **Nightly** publishes `v{stable}-nightly-{N}`.
-4. When ready to ship stable, comment `/release` on the merged PR (write access required).
-5. Update on your phone via **Settings → About** (pick channel first if you want nightlies).
+3. Merge PR to `main`.
+4. **Release** automatically:
+   - bumps `appVersionCode` (+1) and patch `appVersionName` (e.g. `0.2.1` → `0.2.2`)
+   - builds signed APK and publishes GitHub Release
+   - commits the version bump back to `main`
+5. Update on your phone via Settings → About or wait for in-app update check.
 
-## `/release` and `/rollback`
-
-Only users with write access (`OWNER`, `MEMBER`, or `COLLABORATOR`) can run these commands on a **merged** pull request:
-
-| Command | Result |
-|---------|--------|
-| `/release` | Stable APK built from that PR's merge commit; bumps `main` Gradle version |
-| `/rollback` | Stable APK rebuilt from an older merged PR's commit with a new higher `versionCode` (does not revert `main` git history) |
+Every merge to `main` produces a new version. Merge only when you want to ship.
 
 ## What you do once (already done if you followed RELEASE.md)
 
@@ -71,19 +46,25 @@ Repo → **Settings → Branches → Add rule** for `main`:
 - Require a pull request before merging
 - Require status check: **CI** / `build-lint-test`
 
-## Manual stable release
+Then merges are blocked until tests pass.
 
-**Actions → Release → Run workflow** builds a stable release from current `main` if you need to retry without a PR comment.
+## Manual release
 
-Pushing a `v*` tag still triggers **Release** (optional).
+**Actions → Release → Run workflow** still works if you need to retry without a new merge.
 
-## Release did not publish?
+Pushing a `v*` tag still triggers Release (optional; not required for normal flow).
 
-If **Nightly** or **Release command** shows green but no new APK:
+## Release did not publish after merge?
 
-1. Open the workflow run → check **Skip if release already published**.
-2. For `/release`, ensure the PR is merged and you have write access.
-3. Allow **github-actions[bot]** to bypass branch rules for `main` so `chore: bump version` commits can push after `/release`.
+If **Release** failed on **Bump version** with `Could not find a free release tag after N bumps`:
+
+- `main` was still on an old `appVersionName` while many tags already exist on [Releases](https://github.com/bakhshb/Masroof/releases) (common when the `chore: bump version` commit could not push to protected `main`).
+- Fix: merge a PR that syncs `app/build.gradle.kts` to the next free version, or run **Actions → Release → Run workflow** after that sync.
+
+If **Release** shows green but no new APK:
+
+1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, the resolved tag was already published.
+2. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
 
 ## PR debug APK
 
