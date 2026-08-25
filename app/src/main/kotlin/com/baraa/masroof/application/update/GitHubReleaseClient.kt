@@ -25,7 +25,7 @@ class GitHubReleaseClient(
         val tokenWasProvided = token.isConfigured()
         var best: UpdateManifest? = null
         var page = 1
-        var globalIndex = 0
+        var isFirstVersionedRelease = true
 
         while (page <= MAX_SCAN_PAGES) {
             val pageReleases =
@@ -35,23 +35,21 @@ class GitHubReleaseClient(
             }
 
             for (release in pageReleases) {
-                val hasVersionAsset = releaseHasVersionAsset(release)
-                if (!hasVersionAsset) {
-                    globalIndex++
+                if (!releaseHasVersionAsset(release)) {
                     continue
                 }
 
                 val manifestResult = manifestFromRelease(release, token, tokenWasProvided)
                 if (manifestResult.isFailure) {
-                    if (globalIndex == 0) {
+                    if (isFirstVersionedRelease) {
                         return Result.failure(
                             manifestResult.exceptionOrNull()
                                 ?: IllegalStateException("Could not read latest release manifest"),
                         )
                     }
-                    globalIndex++
                     continue
                 }
+                isFirstVersionedRelease = false
 
                 val manifest = manifestResult.getOrThrow()
                 if (channel.acceptsManifestChannel(manifest.normalizedChannel) &&
@@ -59,7 +57,6 @@ class GitHubReleaseClient(
                 ) {
                     best = UpdateManifestSelector.pickBetter(best, manifest)
                 }
-                globalIndex++
             }
 
             if (pageReleases.size < RELEASES_PAGE_SIZE) {

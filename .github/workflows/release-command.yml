@@ -17,10 +17,10 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       (
-        trim(github.event.comment.body) == '/release' ||
-        startsWith(trim(github.event.comment.body), '/release ') ||
-        trim(github.event.comment.body) == '/rollback' ||
-        startsWith(trim(github.event.comment.body), '/rollback ')
+        github.event.comment.body == '/release' ||
+        startsWith(github.event.comment.body, '/release ') ||
+        github.event.comment.body == '/rollback' ||
+        startsWith(github.event.comment.body, '/rollback ')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45
