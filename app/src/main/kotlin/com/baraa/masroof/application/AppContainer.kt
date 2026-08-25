@@ -25,6 +25,7 @@ import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.GitHubReleaseClient
 import com.baraa.masroof.application.update.PendingUpdateStore
+import com.baraa.masroof.application.update.UpdateChannelPreferencesRepository
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
@@ -42,6 +43,7 @@ import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
 import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
+import com.baraa.masroof.data.preferences.SharedPrefsUpdateChannelPreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
@@ -399,10 +401,19 @@ class AppContainer(
         )
     }
 
+    val updateChannelPreferencesRepository: UpdateChannelPreferencesRepository =
+        SharedPrefsUpdateChannelPreferencesRepository(
+            appContext.getSharedPreferences(
+                SharedPrefsUpdateChannelPreferencesRepository.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+        )
+
     val appUpdateService: AppUpdateService by lazy {
         AppUpdateService(
             context = appContext,
             tokenRepository = githubTokenRepository,
+            channelPreferencesRepository = updateChannelPreferencesRepository,
             releaseClient =
                 GitHubReleaseClient(
                     httpClient = updateHttpClient,

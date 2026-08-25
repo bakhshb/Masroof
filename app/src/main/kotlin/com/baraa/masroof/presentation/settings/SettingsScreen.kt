@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.presentation.common.BackNavigationIcon
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
@@ -99,6 +100,7 @@ fun SettingsRoute(
                 viewModel.setLanguageTag(tag, onLocaleChanged)
             },
             onSelectTheme = viewModel::setThemeMode,
+            onSelectUpdateChannel = viewModel::setUpdateChannel,
             onRequestExport = onRequestExport,
             onRequestImport = onRequestImport,
             onConfirmPendingImport = viewModel::confirmPendingImport,
@@ -148,6 +150,7 @@ fun SettingsRoute(
 
         SettingsDestination.About -> SettingsAboutScreen(
             appVersion = state.appVersion,
+            updateChannel = state.updateChannel,
             githubTokenConfigured = state.githubTokenConfigured,
             updateState = state.updateState,
             updateMessage = state.updateMessage,
@@ -187,6 +190,7 @@ private fun SettingsHubScreen(
     onOpenAppSettings: () -> Unit,
     onSelectLanguage: (String) -> Unit,
     onSelectTheme: (ThemeMode) -> Unit,
+    onSelectUpdateChannel: (UpdateChannel) -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
     onConfirmPendingImport: () -> Unit,
@@ -195,6 +199,7 @@ private fun SettingsHubScreen(
 ) {
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showUpdateChannelDialog by rememberSaveable { mutableStateOf(false) }
 
     if (showLanguageDialog) {
         SettingsLanguageDialog(
@@ -213,6 +218,16 @@ private fun SettingsHubScreen(
             onSelectMode = { mode ->
                 showThemeDialog = false
                 onSelectTheme(mode)
+            },
+        )
+    }
+    if (showUpdateChannelDialog) {
+        SettingsUpdateChannelDialog(
+            selectedChannel = state.updateChannel,
+            onDismiss = { showUpdateChannelDialog = false },
+            onSelectChannel = { channel ->
+                showUpdateChannelDialog = false
+                onSelectUpdateChannel(channel)
             },
         )
     }
@@ -348,6 +363,13 @@ private fun SettingsHubScreen(
                 title = stringResource(R.string.settings_theme_title),
                 subtitle = themeSubtitle(state.themeMode),
                 onClick = { showThemeDialog = true },
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.export,
+                title = stringResource(R.string.settings_update_channel_title),
+                subtitle = updateChannelLabel(state.updateChannel),
+                onClick = { showUpdateChannelDialog = true },
             )
 
             SectionHeader(

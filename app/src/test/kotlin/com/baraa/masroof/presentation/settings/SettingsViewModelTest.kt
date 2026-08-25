@@ -8,6 +8,8 @@ import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.application.update.ApkIntegrityVerifier
 import com.baraa.masroof.application.update.UpdateManifest
+import com.baraa.masroof.application.update.UpdateChannel
+import com.baraa.masroof.application.update.UpdateChannelPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
@@ -89,6 +91,15 @@ class SettingsViewModelTest {
         val vm = viewModel(themeMode = ThemeMode.SYSTEM)
         vm.setThemeMode(ThemeMode.DARK)
         assertEquals(ThemeMode.DARK, vm.uiState.value.themeMode)
+    }
+
+    @Test
+    fun setUpdateChannel_updatesState() = runTest {
+        val channelRepository = FakeUpdateChannelPreferencesRepository(UpdateChannel.STABLE)
+        val vm = viewModel(updateChannelPreferencesRepository = channelRepository)
+        vm.setUpdateChannel(UpdateChannel.NIGHTLY)
+        assertEquals(UpdateChannel.NIGHTLY, vm.uiState.value.updateChannel)
+        assertEquals(UpdateChannel.NIGHTLY, channelRepository.getUpdateChannel())
     }
 
     @Test
@@ -353,6 +364,8 @@ class SettingsViewModelTest {
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
+        updateChannelPreferencesRepository: UpdateChannelPreferencesRepository =
+            FakeUpdateChannelPreferencesRepository(UpdateChannel.STABLE),
         onRefreshReviewQueue: () -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
             SettingsViewModelTestFixtures.appUpdateService(),
@@ -368,6 +381,7 @@ class SettingsViewModelTest {
             ),
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
+            updateChannelPreferencesRepository = updateChannelPreferencesRepository,
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reparseStoredEvents = { 0 },
@@ -398,6 +412,16 @@ class SettingsViewModelTest {
 
         override fun setThemeMode(mode: ThemeMode) {
             this.mode = mode
+        }
+    }
+
+    private class FakeUpdateChannelPreferencesRepository(
+        private var channel: UpdateChannel = UpdateChannel.STABLE,
+    ) : UpdateChannelPreferencesRepository {
+        override fun getUpdateChannel(): UpdateChannel = channel
+
+        override fun setUpdateChannel(channel: UpdateChannel) {
+            this.channel = channel
         }
     }
 

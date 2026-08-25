@@ -17,20 +17,24 @@ class GitHubReleaseClient(
     private val repo: String,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    fun fetchLatestManifest(token: String? = null): Result<UpdateManifest> {
+    fun findBestManifest(
+        channel: UpdateChannel,
+        installedVersionCode: Int,
+        token: String? = null,
+    ): Result<UpdateManifest?> {
         val tokenWasProvided = token.isConfigured()
-        val release = fetchLatestRelease(token, tokenWasProvided).getOrElse { return Result.failure(it) }
-        val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
-        val versionAsset = assets.firstOrNull { asset ->
-            asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
-        }?.jsonObject
-
-        val downloadUrl = versionAsset?.get("url")?.jsonPrimitive?.contentOrNull
-            ?: return Result.failure(IllegalStateException("version.json asset not found in latest release"))
-
-        return downloadText(downloadUrl, token, tokenWasProvided).mapCatching { body ->
-            json.decodeFromString(UpdateManifest.serializer(), body)
+        return listReleaseManifests(token, tokenWasProvided).map { manifests ->
+            UpdateManifestSelector.bestForChannel(channel, installedVersionCode, manifests)
         }
+    }
+
+    fun fetchManifest(
+        releaseTag: String,
+        token: String? = null,
+    ): Result<UpdateManifest> {
+        val tokenWasProvided = token.isConfigured()
+        val release = fetchReleaseByTag(releaseTag, token, tokenWasProvided).getOrElse { return Result.failure(it) }
+        return manifestFromRelease(release, token, tokenWasProvided)
     }
 
     fun downloadReleaseAsset(
@@ -40,7 +44,10 @@ class GitHubReleaseClient(
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit = { _, _ -> },
     ): Result<java.io.File> {
         val tokenWasProvided = token.isConfigured()
-        val release = fetchLatestRelease(token, tokenWasProvided).getOrElse { return Result.failure(it) }
+        val releaseTag =
+            manifest.releaseTag?.takeIf { it.isNotBlank() }
+                ?: return Result.failure(IllegalStateException("Manifest is missing releaseTag"))
+        val release = fetchReleaseByTag(releaseTag, token, tokenWasProvided).getOrElse { return Result.failure(it) }
         val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
         val apkAsset = assets.firstOrNull { asset ->
             asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == manifest.apkFileName
@@ -52,10 +59,72 @@ class GitHubReleaseClient(
         return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
-    private fun fetchLatestRelease(token: String?, tokenWasProvided: Boolean): Result<JsonObject> {
+    private fun listReleaseManifests(token: String?, tokenWasProvided: Boolean): Result<List<UpdateManifest>> {
+        val releases = listReleases(token, tokenWasProvided).getOrElse { return Result.failure(it) }
+        val manifests = mutableListOf<UpdateManifest>()
+        for (release in releases) {
+            manifestFromRelease(release, token, tokenWasProvided)
+                .onSuccess { manifests += it }
+        }
+        return Result.success(manifests)
+    }
+
+    private fun manifestFromRelease(
+        release: JsonObject,
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): Result<UpdateManifest> {
+        val releaseTag =
+            release["tag_name"]?.jsonPrimitive?.contentOrNull
+                ?: return Result.failure(IllegalStateException("Release is missing tag_name"))
+        val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
+        val versionAsset = assets.firstOrNull { asset ->
+            asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == VERSION_JSON_NAME
+        }?.jsonObject
+
+        val downloadUrl = versionAsset?.get("url")?.jsonPrimitive?.contentOrNull
+            ?: return Result.failure(IllegalStateException("version.json asset not found in release $releaseTag"))
+
+        return downloadText(downloadUrl, token, tokenWasProvided).mapCatching { body ->
+            json.decodeFromString(UpdateManifest.serializer(), body)
+                .withReleaseTag(releaseTag)
+        }
+    }
+
+    private fun listReleases(token: String?, tokenWasProvided: Boolean): Result<List<JsonObject>> {
+        val releases = mutableListOf<JsonObject>()
+        var page = 1
+        while (true) {
+            val request =
+                authorizedRequest(token)
+                    .url("https://api.github.com/repos/$owner/$repo/releases?per_page=$RELEASES_PAGE_SIZE&page=$page")
+                    .header("Accept", "application/vnd.github+json")
+                    .get()
+                    .build()
+
+            val pageReleases =
+                executeJsonArray(request, tokenWasProvided).getOrElse { return Result.failure(it) }
+            if (pageReleases.isEmpty()) {
+                break
+            }
+            releases += pageReleases.map { it.jsonObject }
+            if (pageReleases.size < RELEASES_PAGE_SIZE) {
+                break
+            }
+            page++
+        }
+        return Result.success(releases)
+    }
+
+    private fun fetchReleaseByTag(
+        releaseTag: String,
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): Result<JsonObject> {
+        val normalizedTag = if (releaseTag.startsWith("v")) releaseTag else "v$releaseTag"
         val request =
             authorizedRequest(token)
-                .url("https://api.github.com/repos/$owner/$repo/releases/latest")
+                .url("https://api.github.com/repos/$owner/$repo/releases/tags/$normalizedTag")
                 .header("Accept", "application/vnd.github+json")
                 .get()
                 .build()
@@ -127,6 +196,11 @@ class GitHubReleaseClient(
             json.parseToJsonElement(body.string()).jsonObject
         }
 
+    private fun executeJsonArray(request: Request, tokenWasProvided: Boolean): Result<JsonArray> =
+        executeBody(request, tokenWasProvided).mapCatching { body ->
+            json.parseToJsonElement(body.string()).jsonArray
+        }
+
     private fun executeBody(request: Request, tokenWasProvided: Boolean): Result<okhttp3.ResponseBody> {
         val response = httpClient.newCall(request).execute()
         val body = response.body
@@ -172,6 +246,7 @@ class GitHubReleaseClient(
 
     companion object {
         const val VERSION_JSON_NAME: String = "version.json"
+        private const val RELEASES_PAGE_SIZE: Int = 100
 
         fun defaultHttpClient(): OkHttpClient =
             OkHttpClient.Builder()

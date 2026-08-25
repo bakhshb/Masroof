@@ -9,4 +9,16 @@ data class UpdateManifest(
     val apkFileName: String,
     val sha256: String,
     val releaseNotes: String? = null,
-)
+    val channel: String = UpdateChannel.STABLE.storageValue(),
+    val releaseTag: String? = null,
+) {
+    val normalizedChannel: String
+        get() = UpdateChannel.normalizeManifestChannel(channel)
+
+    fun withReleaseTag(tag: String): UpdateManifest =
+        if (releaseTag == tag) {
+            this
+        } else {
+            copy(releaseTag = tag)
+        }
+}

@@ -114,6 +114,12 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_system">System default</string>
+    <string name="settings_update_channel_title">Update channel</string>
+    <string name="settings_update_channel_stable">Stable</string>
+    <string name="settings_update_channel_stable_hint">Stable releases only</string>
+    <string name="settings_update_channel_nightly">Nightly</string>
+    <string name="settings_update_channel_nightly_hint">Stable and nightly builds — highest version wins</string>
+    <string name="settings_about_update_channel">Update channel: %1$s</string>
     <string name="settings_about_section">About</string>
     <string name="settings_app_version_label">App version</string>
     <string name="settings_about_subtitle">Version %1$s</string>

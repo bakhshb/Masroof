@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
@@ -54,6 +55,7 @@ data class SettingsUiState(
     val appVersion: String = "",
     val languageTag: String = "",
     val themeMode: ThemeMode = ThemeMode.DEFAULT,
+    val updateChannel: UpdateChannel = UpdateChannel.DEFAULT,
     val updating: Boolean = false,
     val stopConfirmCardTarget: ManagedCardUi? = null,
     val stopConfirmAccountTarget: ManagedAccountUi? = null,

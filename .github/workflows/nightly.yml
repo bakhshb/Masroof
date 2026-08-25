@@ -1,54 +1,43 @@
-name: Release
+name: Nightly
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.workflow }}
+  group: nightly-${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  nightly:
+    if: >-
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ github.token }}
 
-      - name: Bump stable version (manual dispatch only)
-        id: bump
-        if: github.event_name == 'workflow_dispatch'
+      - name: Resolve nightly version
+        id: version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/bump-stable-release.sh
-          ./scripts/bump-stable-release.sh
-
-      - name: Resolve version and tag
-        id: version
-        run: |
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF_NAME}"
-          else
-            TAG="v${VERSION_NAME}"
-          fi
+          chmod +x scripts/next-version-code.sh scripts/next-nightly-version-name.sh
+          VERSION_NAME=$(./scripts/next-nightly-version-name.sh)
+          VERSION_CODE=$(./scripts/next-version-code.sh)
+          TAG="v${VERSION_NAME}"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
+          echo "Nightly target: ${TAG} (code ${VERSION_CODE})"
 
-      - name: Skip if release already published
+      - name: Skip if nightly release already published
         id: skip
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,26 +83,15 @@ jobs:
           keyPassword=${RELEASE_KEY_PASSWORD}
           EOF
 
-      - name: Build and publish stable release
+      - name: Build and publish nightly release
         if: steps.skip.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           chmod +x scripts/publish-github-release.sh
           ./scripts/publish-github-release.sh \
-            stable \
+            nightly \
             "${{ steps.version.outputs.version_name }}" \
             "${{ steps.version.outputs.version_code }}" \
             "${{ steps.version.outputs.tag }}" \
-            false
-
-      - name: Commit version bump to main (manual dispatch only)
-        if: steps.skip.outputs.skip != 'true' && github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        run: |
-          VERSION_NAME="${{ steps.version.outputs.version_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
-          git commit -m "chore: bump version to ${VERSION_NAME}"
-          git push
+            true
