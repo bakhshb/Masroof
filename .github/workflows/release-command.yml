@@ -17,8 +17,10 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       (
-        startsWith(github.event.comment.body, '/release') ||
-        startsWith(github.event.comment.body, '/rollback')
+        github.event.comment.body == '/release' ||
+        startsWith(github.event.comment.body, '/release ') ||
+        github.event.comment.body == '/rollback' ||
+        startsWith(github.event.comment.body, '/rollback ')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -40,6 +42,10 @@ jobs:
           script: |
             const body = context.payload.comment.body.trim();
             const command = body.split(/\s+/)[0];
+            if (command !== '/release' && command !== '/rollback') {
+              core.setFailed(`Unknown command: ${command}`);
+              return;
+            }
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -59,14 +65,18 @@ jobs:
           ref: ${{ steps.pr.outputs.merge_sha }}
           fetch-depth: 0
 
+      - name: Fetch main for stable version baseline
+        if: steps.pr.outputs.command == '/release'
+        run: git fetch origin main
+
       - name: Resolve stable version (/release)
         id: release_version
         if: steps.pr.outputs.command == '/release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/compute-stable-release-version.sh
-          ./scripts/compute-stable-release-version.sh
+          chmod +x scripts/compute-stable-release-version.sh scripts/gradle-version.sh scripts/next-version-code.sh
+          ./scripts/compute-stable-release-version.sh main
 
       - name: Resolve rollback version (/rollback)
         id: rollback_version
@@ -74,8 +84,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/next-version-code.sh
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          chmod +x scripts/next-version-code.sh scripts/gradle-version.sh
+          # shellcheck source=scripts/gradle-version.sh
+          source scripts/gradle-version.sh
+          VERSION_NAME="$(read_gradle_version_name)"
           VERSION_CODE=$(./scripts/next-version-code.sh)
           TAG="v${VERSION_NAME}-rollback-${VERSION_CODE}"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
@@ -121,6 +133,10 @@ jobs:
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "RELEASE_KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
 
       - name: Create keystore.properties
@@ -159,7 +175,7 @@ jobs:
           git fetch origin main
           git checkout main
           git pull origin main
-          chmod +x scripts/set-version-in-gradle.sh
+          chmod +x scripts/set-version-in-gradle.sh scripts/gradle-version.sh
           ./scripts/set-version-in-gradle.sh \
             "${{ steps.version.outputs.version_name }}" \
             "${{ steps.version.outputs.version_code }}"
@@ -170,11 +186,14 @@ jobs:
           git push
 
       - name: Comment result
-        if: always()
+        if: success() || failure()
         uses: actions/github-script@v7
         with:
           script: |
             const command = '${{ steps.pr.outputs.command }}';
+            if (!command) {
+              return;
+            }
             const tag = '${{ steps.version.outputs.tag }}';
             const skipped = '${{ steps.skip.outputs.skip }}' === 'true';
             const failed = '${{ job.status }}' !== 'success';

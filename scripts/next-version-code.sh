@@ -7,12 +7,12 @@ FILE="${ROOT}/app/build.gradle.kts"
 WORKDIR="${RUNNER_TEMP:-/tmp}/masroof-version-scan"
 MAX_CODE=0
 
-read_gradle_code() {
-  grep 'val appVersionCode' "$FILE" | sed 's/.*= \([0-9]*\).*/\1/'
-}
+# shellcheck source=scripts/gradle-version.sh
+source "${ROOT}/scripts/gradle-version.sh"
+GRADLE_VERSION_FILE="$FILE"
 
 if [[ -f "$FILE" ]]; then
-  GRADLE_CODE="$(read_gradle_code)"
+  GRADLE_CODE="$(read_gradle_version_code)"
   if [[ "$GRADLE_CODE" =~ ^[0-9]+$ ]]; then
     MAX_CODE="$GRADLE_CODE"
   fi

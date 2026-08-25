@@ -44,9 +44,7 @@ class GitHubReleaseClient(
         onProgress: (bytesRead: Long, totalBytes: Long) -> Unit = { _, _ -> },
     ): Result<java.io.File> {
         val tokenWasProvided = token.isConfigured()
-        val releaseTag =
-            manifest.releaseTag?.takeIf { it.isNotBlank() }
-                ?: return Result.failure(IllegalStateException("Manifest is missing releaseTag"))
+        val releaseTag = manifest.resolvedReleaseTag()
         val release = fetchReleaseByTag(releaseTag, token, tokenWasProvided).getOrElse { return Result.failure(it) }
         val assets = release["assets"]?.jsonArray ?: JsonArray(emptyList())
         val apkAsset = assets.firstOrNull { asset ->
@@ -61,10 +59,21 @@ class GitHubReleaseClient(
 
     private fun listReleaseManifests(token: String?, tokenWasProvided: Boolean): Result<List<UpdateManifest>> {
         val releases = listReleases(token, tokenWasProvided).getOrElse { return Result.failure(it) }
+        if (releases.isEmpty()) {
+            return Result.success(emptyList())
+        }
+
         val manifests = mutableListOf<UpdateManifest>()
+        var manifestFailures = 0
         for (release in releases) {
             manifestFromRelease(release, token, tokenWasProvided)
                 .onSuccess { manifests += it }
+                .onFailure { manifestFailures++ }
+        }
+        if (manifests.isEmpty() && manifestFailures > 0) {
+            return Result.failure(
+                IllegalStateException("Could not read version.json from any GitHub release"),
+            )
         }
         return Result.success(manifests)
     }

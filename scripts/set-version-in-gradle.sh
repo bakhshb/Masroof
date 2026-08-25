@@ -9,11 +9,10 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FILE="${ROOT}/app/build.gradle.kts"
-NEW_NAME="$1"
-NEW_CODE="$2"
 
-CURRENT_NAME=$(grep 'val appVersionName' "$FILE" | sed 's/.*"\(.*\)".*/\1/')
-sed -i "s/val appVersionName = \"${CURRENT_NAME}\"/val appVersionName = \"${NEW_NAME}\"/" "$FILE"
-sed -i "s/val appVersionCode = [0-9]*/val appVersionCode = ${NEW_CODE}/" "$FILE"
+# shellcheck source=scripts/gradle-version.sh
+source "${ROOT}/scripts/gradle-version.sh"
+GRADLE_VERSION_FILE="$FILE"
 
-echo "Set Gradle version to ${NEW_NAME} (${NEW_CODE})"
+set_gradle_version "$1" "$2"
+echo "Set Gradle version to $1 ($2)"

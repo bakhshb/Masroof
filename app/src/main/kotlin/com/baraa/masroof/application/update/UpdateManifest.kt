@@ -21,4 +21,10 @@ data class UpdateManifest(
         } else {
             copy(releaseTag = tag)
         }
+
+    fun resolvedReleaseTag(): String {
+        releaseTag?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        val trimmedName = versionName.trim()
+        return if (trimmedName.startsWith("v")) trimmedName else "v$trimmedName"
+    }
 }
