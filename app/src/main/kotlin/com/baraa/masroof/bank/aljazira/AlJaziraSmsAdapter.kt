@@ -1,0 +1,25 @@
+package com.baraa.masroof.bank.aljazira
+
+import com.baraa.masroof.bank.BankSmsAdapter
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.parsing.detector.BankDetector
+import com.baraa.masroof.parsing.model.BankDetectionResult
+import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.SmsParseInput
+import com.baraa.masroof.parsing.parser.SmsParseGateway
+
+/**
+ * Bank AlJazira SMS adapter wrapping the existing detector and parse pipeline.
+ */
+class AlJaziraSmsAdapter(
+    private val detector: BankDetector = AlJaziraBankDetector(),
+    private val pipeline: SmsParseGateway = AlJaziraParsingPipeline(),
+) : BankSmsAdapter {
+    override val bank: Bank = Bank.BANK_ALJAZIRA
+
+    override fun detect(sender: String, body: String): BankDetectionResult =
+        detector.detect(sender, body)
+
+    override fun parse(input: SmsParseInput): ParseResult =
+        pipeline.parse(input)
+}

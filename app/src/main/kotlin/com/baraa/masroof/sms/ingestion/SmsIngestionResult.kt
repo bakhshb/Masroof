@@ -13,7 +13,7 @@ sealed interface SmsIngestionResult {
     /** Already present as RawSms evidence; parsing not re-run. */
     data object Duplicate : SmsIngestionResult
 
-    /** Sender not in current Bank AlJazira scope; nothing persisted. */
+    /** No registered bank adapter matched; nothing persisted. */
     data class NotRelevant(
         val reason: String,
     ) : SmsIngestionResult

@@ -33,8 +33,10 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
 import com.baraa.masroof.data.preferences.SharedPrefsDashboardLayoutPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
 import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepository
@@ -279,16 +281,22 @@ class AppContainer(
             appLogService = appLogService,
         )
 
-    val bankDetector: AlJaziraBankDetector = AlJaziraBankDetector()
+    private val alJaziraSmsAdapter: AlJaziraSmsAdapter =
+        AlJaziraSmsAdapter(
+            detector = AlJaziraBankDetector(),
+            pipeline = AlJaziraParsingPipeline(),
+        )
 
-    val parsingPipeline: AlJaziraParsingPipeline = AlJaziraParsingPipeline()
+    val bankSmsRegistry: BankSmsRegistry =
+        BankSmsRegistry(
+            adapters = listOf(alJaziraSmsAdapter),
+        )
 
     val smsIngestionService: SmsIngestionService =
         SmsIngestionService(
             rawSmsRepository = rawSmsRepository,
             parsedEventRepository = parsedEventRepository,
-            bankDetector = bankDetector,
-            parseGateway = parsingPipeline,
+            bankSmsRegistry = bankSmsRegistry,
             ownershipDiscovery = ownershipDiscoveryService,
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,

@@ -5,8 +5,9 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
-import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
@@ -78,8 +79,7 @@ class SmsIngestionServiceTest {
         service = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = countingGateway,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = countingGateway),
         )
     }
 
@@ -173,8 +173,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = exploding,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
         )
         val raw = aljaziraPurchase(id = "android-sms:fail", deviceId = "fail")
         val result = svc.ingest(raw)
@@ -189,8 +188,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = cancelling,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = cancelling),
         )
         val raw = aljaziraPurchase(id = "android-sms:cancel", deviceId = "cancel")
         try {
@@ -217,8 +215,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = failingParsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = alJaziraSmsRegistry(),
         )
         val raw = aljaziraPurchase(id = "android-sms:save-fail", deviceId = "save-fail")
         val result = svc.ingest(raw)
@@ -331,8 +328,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = alJaziraSmsRegistry(),
             reconciliation = reconciliation,
         )
         val raw = aljaziraPurchase(id = "android-sms:p8-fail", deviceId = "p8-fail")
@@ -387,8 +383,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = alJaziraSmsRegistry(),
             reconciliation = reconciliation,
             reviewQueueUpdater = updater,
         )
@@ -445,8 +440,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = alJaziraSmsRegistry(),
             reconciliation = reconciliation,
             reviewQueueUpdater = updater,
         )
@@ -508,8 +502,7 @@ class SmsIngestionServiceTest {
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = alJaziraSmsRegistry(),
             reconciliation = reconciliation,
         )
         val raw = aljaziraPurchase(id = "android-sms:p8-cancel", deviceId = "p8-cancel")
@@ -591,4 +584,7 @@ class SmsIngestionServiceTest {
         في: 2026-08-01 12:26
         رقم المعاملة: TEST_REFERENCE_1
     """.trimIndent()
+
+    private fun alJaziraSmsRegistry(pipeline: SmsParseGateway = AlJaziraParsingPipeline()): BankSmsRegistry =
+        BankSmsRegistry(listOf(AlJaziraSmsAdapter(pipeline = pipeline)))
 }

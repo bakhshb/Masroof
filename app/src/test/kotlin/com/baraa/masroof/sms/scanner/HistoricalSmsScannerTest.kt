@@ -3,8 +3,9 @@ package com.baraa.masroof.sms.scanner
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -46,8 +47,7 @@ class HistoricalSmsScannerTest {
         ingestion = SmsIngestionService(
             rawSmsRepository = RoomRawSmsRepository(db.rawSmsDao()),
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),
         )
     }
 
@@ -174,8 +174,7 @@ class HistoricalSmsScannerTest {
         val svc = SmsIngestionService(
             rawSmsRepository = failingRawRepo,
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = AlJaziraParsingPipeline(),
+            bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),
         )
         val source = FakeSmsDataSource(
             listOf(
@@ -203,8 +202,7 @@ class HistoricalSmsScannerTest {
         val svc = SmsIngestionService(
             rawSmsRepository = RoomRawSmsRepository(db.rawSmsDao()),
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
-            bankDetector = AlJaziraBankDetector(),
-            parseGateway = exploding,
+            bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter(pipeline = exploding))),
         )
         val source = FakeSmsDataSource(
             listOf(
