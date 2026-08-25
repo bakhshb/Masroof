@@ -9,25 +9,23 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 class GitHubReleaseClientManifestTest {
     private lateinit var server: MockWebServer
     private lateinit var client: GitHubReleaseClient
-    private lateinit var releaseBaseUrl: String
     private lateinit var apiBaseUrl: String
 
     @Before
     fun setUp() {
         server = MockWebServer()
         server.start()
-        releaseBaseUrl = server.url("/").toString().removeSuffix("/")
-        apiBaseUrl = releaseBaseUrl
+        apiBaseUrl = server.url("/").toString().removeSuffix("/")
         client =
             GitHubReleaseClient(
                 httpClient = OkHttpClient.Builder().build(),
                 owner = "o",
                 repo = "r",
-                releaseBaseUrl = releaseBaseUrl,
                 apiBaseUrl = apiBaseUrl,
             )
     }
@@ -38,8 +36,9 @@ class GitHubReleaseClientManifestTest {
     }
 
     @Test
-    fun stableChannel_fetchesLatestManifestOnly() {
-        enqueueManifest(
+    fun stableChannel_fetchesLatestReleaseViaApi() {
+        enqueueRelease(
+            tagName = "v0.2.12",
             versionCode = 12,
             versionName = "0.2.12",
             channel = "stable",
@@ -50,22 +49,20 @@ class GitHubReleaseClientManifestTest {
 
         assertTrue(result.isSuccess)
         assertEquals(12, result.getOrThrow()?.versionCode)
-        assertEquals(1, server.requestCount)
-        assertEquals(
-            "/o/r/releases/latest/download/version.json",
-            server.takeRequest().path,
-        )
+        assertEquals("/repos/o/r/releases/latest", server.takeRequest().path)
     }
 
     @Test
     fun nightlyChannel_fetchesRollingNightlyAndLatestStable() {
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "nightly",
             versionCode = 13,
             versionName = "0.2.12-nightly-1",
             channel = "nightly",
             releaseTag = "nightly",
         )
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "v0.2.12",
             versionCode = 12,
             versionName = "0.2.12",
             channel = "stable",
@@ -76,26 +73,22 @@ class GitHubReleaseClientManifestTest {
 
         assertTrue(result.isSuccess)
         assertEquals(13, result.getOrThrow()?.versionCode)
-        assertEquals(2, server.requestCount)
-        assertEquals(
-            "/o/r/releases/download/nightly/version.json",
-            server.takeRequest().path,
-        )
-        assertEquals(
-            "/o/r/releases/latest/download/version.json",
-            server.takeRequest().path,
-        )
+        val paths = (0 until server.requestCount).map { server.takeRequest().path }
+        assertTrue(paths.contains("/repos/o/r/releases/tags/nightly"))
+        assertTrue(paths.contains("/repos/o/r/releases/latest"))
     }
 
     @Test
     fun nightlyChannel_prefersStableWhenVersionCodeTies() {
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "nightly",
             versionCode = 12,
             versionName = "0.2.12-nightly-2",
             channel = "nightly",
             releaseTag = "nightly",
         )
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "v0.2.12",
             versionCode = 12,
             versionName = "0.2.12",
             channel = "stable",
@@ -108,7 +101,7 @@ class GitHubReleaseClientManifestTest {
     }
 
     @Test
-    fun stableChannel_failsWhenLatestManifestMissing() {
+    fun stableChannel_failsWhenLatestReleaseMissing() {
         server.enqueue(MockResponse().setResponseCode(404))
 
         val result = client.findBestManifest(UpdateChannel.STABLE, installedVersionCode = 1, token = "ghp_test")
@@ -118,7 +111,8 @@ class GitHubReleaseClientManifestTest {
 
     @Test
     fun nightlyChannel_continuesWhenLatestStableMissing() {
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "nightly",
             versionCode = 13,
             versionName = "0.2.12-nightly-1",
             channel = "nightly",
@@ -152,11 +146,11 @@ class GitHubReleaseClientManifestTest {
                 )
                 .addHeader("Content-Type", "application/json"),
         )
-        enqueueManifest(
+        enqueueManifestBody(
             versionCode = 15,
             versionName = "0.2.12-nightly-3",
             channel = "nightly",
-            releaseTag = "v0.2.12-nightly-3",
+            releaseTag = null,
         )
 
         val result = client.findBestManifest(UpdateChannel.NIGHTLY, installedVersionCode = 11, token = "ghp_test")
@@ -167,8 +161,24 @@ class GitHubReleaseClientManifestTest {
     }
 
     @Test
+    fun legacyManifestWithoutReleaseTag_usesReleaseTagNameForDownload() {
+        enqueueRelease(
+            tagName = "v0.2.10",
+            versionCode = 10,
+            versionName = "0.2.10",
+            channel = "stable",
+            releaseTag = null,
+        )
+
+        val result = client.findBestManifest(UpdateChannel.STABLE, installedVersionCode = 9, token = "ghp_test")
+
+        assertEquals("v0.2.10", result.getOrThrow()?.resolvedReleaseTag())
+    }
+
+    @Test
     fun returnsNullWhenAlreadyUpToDate() {
-        enqueueManifest(
+        enqueueRelease(
+            tagName = "v0.2.10",
             versionCode = 10,
             versionName = "0.2.10",
             channel = "stable",
@@ -179,18 +189,6 @@ class GitHubReleaseClientManifestTest {
 
         assertTrue(result.isSuccess)
         assertNull(result.getOrThrow())
-    }
-
-    @Test
-    fun manifestUrls_useConfiguredBase() {
-        assertEquals(
-            "$releaseBaseUrl/o/r/releases/latest/download/version.json",
-            GitHubReleaseClient.stableManifestDownloadUrl("o", "r", releaseBaseUrl),
-        )
-        assertEquals(
-            "$releaseBaseUrl/o/r/releases/download/nightly/version.json",
-            GitHubReleaseClient.nightlyManifestDownloadUrl("o", "r", releaseBaseUrl),
-        )
     }
 
     @Test
@@ -227,7 +225,7 @@ class GitHubReleaseClientManifestTest {
         )
         server.enqueue(MockResponse().setBody("apk-bytes").setResponseCode(200))
 
-        val destination = createTempFile("masroof", ".apk")
+        val destination = File.createTempFile("masroof", ".apk")
         val result = client.downloadReleaseAsset("ghp_test", manifest, destination)
 
         assertTrue(result.isSuccess)
@@ -236,12 +234,42 @@ class GitHubReleaseClientManifestTest {
         destination.delete()
     }
 
-    private fun enqueueManifest(
+    private fun enqueueRelease(
+        tagName: String,
         versionCode: Int,
         versionName: String,
         channel: String,
-        releaseTag: String,
+        releaseTag: String?,
     ) {
+        server.enqueue(
+            MockResponse()
+                .setBody(
+                    """
+                    {
+                      "tag_name": "$tagName",
+                      "assets": [
+                        { "name": "version.json", "url": "$apiBaseUrl/manifest-asset" }
+                      ]
+                    }
+                    """.trimIndent(),
+                )
+                .addHeader("Content-Type", "application/json"),
+        )
+        enqueueManifestBody(versionCode, versionName, channel, releaseTag)
+    }
+
+    private fun enqueueManifestBody(
+        versionCode: Int,
+        versionName: String,
+        channel: String,
+        releaseTag: String?,
+    ) {
+        val releaseTagField =
+            if (releaseTag == null) {
+                ""
+            } else {
+                ""","releaseTag": "$releaseTag""""
+            }
         val body =
             """
             {
@@ -249,8 +277,7 @@ class GitHubReleaseClientManifestTest {
               "versionName": "$versionName",
               "apkFileName": "masroof-$versionName.apk",
               "sha256": "abc",
-              "channel": "$channel",
-              "releaseTag": "$releaseTag"
+              "channel": "$channel"$releaseTagField
             }
             """.trimIndent()
         server.enqueue(MockResponse().setBody(body).setResponseCode(200))

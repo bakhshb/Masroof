@@ -24,7 +24,7 @@ Merges to `main` no longer publish stable releases automatically. Stable release
 
 | Channel | Updates offered |
 |---------|-----------------|
-| **Stable** | Stable releases only (`releases/latest/download/version.json`) |
+| **Stable** | Latest stable GitHub release only |
 | **Nightly** | Rolling `nightly` pre-release plus latest stable — highest `versionCode` wins |
 
 Users choose the channel in **Settings → Update channel** (default: Stable). The About screen shows the active channel under the app version.

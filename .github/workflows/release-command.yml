@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  issues: write
 
 concurrency:
   group: masroof-publish
@@ -17,8 +18,8 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       (
-        matches(github.event.comment.body, '(?s)^\s*/release(\s.*)?$') ||
-        matches(github.event.comment.body, '(?s)^\s*/rollback(\s.*)?$')
+        matches(github.event.comment.body, '^\s*/release\s*$') ||
+        matches(github.event.comment.body, '^\s*/rollback\s*$')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -182,7 +183,7 @@ jobs:
           SOURCE_ROOT: ${{ github.workspace }}/source
           TOOLING_ROOT: ${{ github.workspace }}/tooling
         run: |
-          chmod +x "${TOOLING_ROOT}/scripts/publish-github-release.sh"
+          chmod +x "${TOOLING_ROOT}/scripts/publish-github-release.sh" "${TOOLING_ROOT}/scripts/verify-release-version.sh"
           "${TOOLING_ROOT}/scripts/publish-github-release.sh" \
             stable \
             "${{ steps.version.outputs.version_name }}" \

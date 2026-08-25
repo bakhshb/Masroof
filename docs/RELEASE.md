@@ -59,7 +59,7 @@ To ship code from an older merged PR without reverting git history, comment **`/
 
 | Channel | What you get |
 |---------|----------------|
-| **Stable** (default) | Stable releases only (`releases/latest/download/version.json`) |
+| **Stable** (default) | Latest stable GitHub release only |
 | **Nightly** | Rolling `nightly` pre-release plus latest stable — highest `versionCode` wins |
 
 Choose the channel in **Settings → Update channel**. The About screen shows your current channel under the version number.

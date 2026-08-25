@@ -16,7 +16,6 @@ class GitHubReleaseClient(
     private val owner: String,
     private val repo: String,
     private val json: Json = Json { ignoreUnknownKeys = true },
-    private val releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
     private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
 ) {
     fun findBestManifest(
@@ -29,24 +28,13 @@ class GitHubReleaseClient(
 
         when (channel) {
             UpdateChannel.STABLE -> {
-                fetchManifestFromUrl(
-                    url = stableManifestDownloadUrl(owner, repo, releaseBaseUrl),
-                    fallbackReleaseTag = LATEST_STABLE_RELEASE_TAG,
-                    token = token,
-                    tokenWasProvided = tokenWasProvided,
-                ).fold(
+                fetchLatestStableManifest(token, tokenWasProvided).fold(
                     onSuccess = { manifests.add(it) },
                     onFailure = { return Result.failure(it) },
                 )
             }
             UpdateChannel.NIGHTLY -> {
-                val rollingResult =
-                    fetchManifestFromUrl(
-                        url = nightlyManifestDownloadUrl(owner, repo, releaseBaseUrl),
-                        fallbackReleaseTag = ROLLING_NIGHTLY_TAG,
-                        token = token,
-                        tokenWasProvided = tokenWasProvided,
-                    )
+                val rollingResult = fetchRollingNightlyManifest(token, tokenWasProvided)
                 var rollingMissing = false
                 rollingResult.fold(
                     onSuccess = { manifests.add(it) },
@@ -59,12 +47,7 @@ class GitHubReleaseClient(
                     },
                 )
 
-                fetchManifestFromUrl(
-                    url = stableManifestDownloadUrl(owner, repo, releaseBaseUrl),
-                    fallbackReleaseTag = LATEST_STABLE_RELEASE_TAG,
-                    token = token,
-                    tokenWasProvided = tokenWasProvided,
-                ).onSuccess { manifests.add(it) }
+                fetchLatestStableManifest(token, tokenWasProvided).onSuccess { manifests.add(it) }
 
                 if (rollingMissing) {
                     scanBestImmutableNightlyManifest(installedVersionCode, token, tokenWasProvided)
@@ -118,6 +101,32 @@ class GitHubReleaseClient(
         return downloadBinary(downloadUrl, token, tokenWasProvided, destination, onProgress)
     }
 
+    private fun fetchLatestStableManifest(
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): Result<UpdateManifest> {
+        val request =
+            authorizedRequest(token)
+                .url("$apiBaseUrl/repos/$owner/$repo/releases/latest")
+                .header("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+
+        return executeJson(request, tokenWasProvided).fold(
+            onSuccess = { release -> manifestFromRelease(release, token, tokenWasProvided) },
+            onFailure = { Result.failure(it) },
+        )
+    }
+
+    private fun fetchRollingNightlyManifest(
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): Result<UpdateManifest> =
+        fetchReleaseByTag(ROLLING_NIGHTLY_TAG, token, tokenWasProvided).fold(
+            onSuccess = { release -> manifestFromRelease(release, token, tokenWasProvided) },
+            onFailure = { Result.failure(it) },
+        )
+
     private fun scanBestImmutableNightlyManifest(
         installedVersionCode: Int,
         token: String?,
@@ -163,21 +172,6 @@ class GitHubReleaseClient(
         return best
     }
 
-    private fun fetchManifestFromUrl(
-        url: String,
-        fallbackReleaseTag: String,
-        token: String?,
-        tokenWasProvided: Boolean,
-    ): Result<UpdateManifest> =
-        downloadText(url, token, tokenWasProvided).mapCatching { body ->
-            val manifest = json.decodeFromString(UpdateManifest.serializer(), body)
-            if (manifest.releaseTag.isNullOrBlank()) {
-                manifest.withReleaseTag(fallbackReleaseTag)
-            } else {
-                manifest
-            }
-        }
-
     private fun manifestFromRelease(
         release: JsonObject,
         token: String?,
@@ -195,8 +189,12 @@ class GitHubReleaseClient(
             ?: return Result.failure(IllegalStateException("version.json asset not found in release $releaseTag"))
 
         return downloadText(downloadUrl, token, tokenWasProvided).mapCatching { body ->
-            json.decodeFromString(UpdateManifest.serializer(), body)
-                .withReleaseTag(releaseTag)
+            val manifest = json.decodeFromString(UpdateManifest.serializer(), body)
+            if (manifest.releaseTag.isNullOrBlank()) {
+                manifest.withReleaseTag(releaseTag)
+            } else {
+                manifest
+            }
         }
     }
 
@@ -358,30 +356,14 @@ class GitHubReleaseClient(
     companion object {
         const val VERSION_JSON_NAME: String = "version.json"
         const val ROLLING_NIGHTLY_TAG: String = "nightly"
-        internal const val LATEST_STABLE_RELEASE_TAG: String = "latest"
-        private const val DEFAULT_RELEASE_BASE_URL: String = "https://github.com"
         private const val DEFAULT_API_BASE_URL: String = "https://api.github.com"
         private const val RELEASES_PAGE_SIZE: Int = 100
         private const val MAX_SCAN_PAGES: Int = 2
         private val IMMUTABLE_NIGHTLY_TAG_REGEX = Regex("^v[0-9].*-nightly-")
 
-        fun stableManifestDownloadUrl(
-            owner: String,
-            repo: String,
-            releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
-        ): String =
-            "$releaseBaseUrl/$owner/$repo/releases/latest/download/$VERSION_JSON_NAME"
-
-        fun nightlyManifestDownloadUrl(
-            owner: String,
-            repo: String,
-            releaseBaseUrl: String = DEFAULT_RELEASE_BASE_URL,
-        ): String =
-            "$releaseBaseUrl/$owner/$repo/releases/download/$ROLLING_NIGHTLY_TAG/$VERSION_JSON_NAME"
-
         internal fun normalizeReleaseTagForApi(releaseTag: String): String {
             val trimmed = releaseTag.trim()
-            if (trimmed == ROLLING_NIGHTLY_TAG || trimmed == LATEST_STABLE_RELEASE_TAG) {
+            if (trimmed == ROLLING_NIGHTLY_TAG) {
                 return trimmed
             }
             return if (trimmed.startsWith("v")) trimmed else "v$trimmed"
