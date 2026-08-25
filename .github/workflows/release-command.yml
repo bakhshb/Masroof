@@ -1,0 +1,238 @@
+name: Release command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: masroof-publish
+  cancel-in-progress: false
+
+jobs:
+  release-command:
+    if: >-
+      github.event.issue.pull_request &&
+      (
+        matches(github.event.comment.body, '^\s*/release\s*$') ||
+        matches(github.event.comment.body, '^\s*/rollback\s*$')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Verify release permissions
+        if: >-
+          github.event.comment.author_association != 'OWNER' &&
+          github.event.comment.author_association != 'MEMBER' &&
+          github.event.comment.author_association != 'COLLABORATOR'
+        run: |
+          echo "Only collaborators with write access can run /release or /rollback."
+          exit 1
+
+      - name: Resolve pull request merge commit
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            const command = body.split(/\s+/)[0];
+            if (command !== '/release' && command !== '/rollback') {
+              core.setFailed(`Unknown command: ${command}`);
+              return;
+            }
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.issue.number,
+            });
+            if (!pr.data.merged) {
+              core.setFailed(`PR #${pr.data.number} is not merged yet.`);
+              return;
+            }
+            core.setOutput('command', command);
+            core.setOutput('merge_sha', pr.data.merge_commit_sha);
+            core.setOutput('pr_number', String(pr.data.number));
+
+      - name: Checkout main (tooling)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Checkout merge commit (source)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.merge_sha }}
+          path: source
+          fetch-depth: 0
+
+      - name: Fetch main for stable version baseline
+        if: steps.pr.outputs.command == '/release'
+        working-directory: source
+        run: git fetch origin main
+
+      - name: Resolve stable version (/release)
+        id: release_version
+        if: steps.pr.outputs.command == '/release'
+        working-directory: tooling
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/compute-stable-release-version.sh scripts/gradle-version.sh scripts/next-version-code.sh
+          ./scripts/compute-stable-release-version.sh main
+
+      - name: Resolve rollback version (/rollback)
+        id: rollback_version
+        if: steps.pr.outputs.command == '/rollback'
+        working-directory: tooling
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/next-version-code.sh scripts/gradle-version.sh
+          # shellcheck source=scripts/gradle-version.sh
+          source scripts/gradle-version.sh
+          GRADLE_VERSION_FILE="${GITHUB_WORKSPACE}/source/app/build.gradle.kts"
+          VERSION_NAME="$(read_gradle_version_name)"
+          VERSION_CODE=$(./scripts/next-version-code.sh)
+          TAG="v${VERSION_NAME}-rollback-${VERSION_CODE}"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Select version outputs
+        id: version
+        run: |
+          if [[ "${{ steps.pr.outputs.command }}" == "/release" ]]; then
+            echo "version_name=${{ steps.release_version.outputs.version_name }}" >> "$GITHUB_OUTPUT"
+            echo "version_code=${{ steps.release_version.outputs.version_code }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ steps.release_version.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_name=${{ steps.rollback_version.outputs.version_name }}" >> "$GITHUB_OUTPUT"
+            echo "version_code=${{ steps.rollback_version.outputs.version_code }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ steps.rollback_version.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if release already published
+        id: skip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${TAG} already exists — skipping build."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK 17
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        if: steps.skip.outputs.skip != 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: source
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
+      - name: Decode release keystore
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: source
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "RELEASE_KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
+
+      - name: Create keystore.properties
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: source
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          cat > keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=${RELEASE_KEYSTORE_PASSWORD}
+          keyAlias=${RELEASE_KEY_ALIAS}
+          keyPassword=${RELEASE_KEY_PASSWORD}
+          EOF
+
+      - name: Build and publish stable release
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_ROOT: ${{ github.workspace }}/source
+          TOOLING_ROOT: ${{ github.workspace }}/tooling
+        run: |
+          chmod +x "${TOOLING_ROOT}/scripts/publish-github-release.sh" "${TOOLING_ROOT}/scripts/verify-release-version.sh"
+          "${TOOLING_ROOT}/scripts/publish-github-release.sh" \
+            stable \
+            "${{ steps.version.outputs.version_name }}" \
+            "${{ steps.version.outputs.version_code }}" \
+            "${{ steps.version.outputs.tag }}" \
+            false
+
+      - name: Commit version bump to main (/release only)
+        if: >-
+          steps.skip.outputs.skip != 'true' &&
+          steps.pr.outputs.command == '/release'
+        working-directory: tooling
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull origin main
+          chmod +x scripts/set-version-in-gradle.sh scripts/gradle-version.sh
+          ./scripts/set-version-in-gradle.sh \
+            "${{ steps.version.outputs.version_name }}" \
+            "${{ steps.version.outputs.version_code }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version_name }}"
+          git push
+
+      - name: Comment result
+        if: success() || failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const command = '${{ steps.pr.outputs.command }}';
+            if (!command) {
+              return;
+            }
+            const tag = '${{ steps.version.outputs.tag }}';
+            const skipped = '${{ steps.skip.outputs.skip }}' === 'true';
+            const failed = '${{ job.status }}' !== 'success';
+            let body;
+            if (failed) {
+              body = `${command} failed. See the workflow run for details.`;
+            } else if (skipped) {
+              body = `${command} skipped: ${tag} already exists.`;
+            } else {
+              body = `${command} published ${tag}.`;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body,
+            });
