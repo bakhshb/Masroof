@@ -366,7 +366,11 @@ private fun DashboardCustomizableSections(
                     }
 
                     if (summary.transactionCount == 0) {
-                        Text(stringResource(R.string.dashboard_empty_period))
+                        Text(
+                            stringResource(R.string.dashboard_empty_period),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Spacer(Modifier.height(8.dp))
                         IconTextButton(
                             onClick = onRescan,

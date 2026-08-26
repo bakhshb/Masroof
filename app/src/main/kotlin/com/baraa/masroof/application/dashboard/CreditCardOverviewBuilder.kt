@@ -38,7 +38,13 @@ object CreditCardOverviewBuilder {
         rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
         clock: Clock,
-    ): Instant = resolveGlobalStatementStart(parsedRecords, rawSmsById, zoneId, clock)
+        periodEndExclusive: Instant,
+    ): Instant = resolveGlobalStatementStart(
+        parsedRecords = parsedRecords,
+        rawSmsById = rawSmsById,
+        zoneId = zoneId,
+        periodEndExclusive = periodEndExclusive,
+    )
 
     fun build(
         salaryPeriod: FinancialPeriod,
@@ -82,22 +88,33 @@ object CreditCardOverviewBuilder {
             }
         }
 
-        val globalStatementStart = resolveGlobalStatementStart(parsedRecords, rawSmsById, zoneId, clock)
+        val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(
+            salaryPeriod.endDateExclusive,
+            zoneId,
+        )
+        val globalStatementStart = resolveGlobalStatementStart(
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            zoneId = zoneId,
+            periodEndExclusive = periodEndExclusive,
+        )
         val salaryPeriodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val salaryPeriodLabel = dayMonth.format(salaryPeriod.startDate)
-        val calendarMonthStart = LocalDate.now(clock)
-            .withDayOfMonth(1)
-            .atStartOfDay(zoneId)
-            .toInstant()
-        val calendarMonthLabel = dayMonth.format(LocalDate.now(clock).withDayOfMonth(1))
+        val calendarMonthAnchor = salaryPeriod.displayEndDateInclusive.withDayOfMonth(1)
+        val calendarMonthStart = calendarMonthAnchor.atStartOfDay(zoneId).toInstant()
+        val calendarMonthLabel = dayMonth.format(calendarMonthAnchor)
 
         val latestStatementByCard = snapshotCandidates
-            .filter { it.isStatement }
+            .filter { it.isStatement && it.updatedAt.isBefore(periodEndExclusive) }
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
 
         val latestAvailableByCard = snapshotCandidates
-            .filter { !it.isStatement && it.details.availableBalance != null }
+            .filter {
+                !it.isStatement &&
+                    it.details.availableBalance != null &&
+                    it.updatedAt.isBefore(periodEndExclusive)
+            }
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
 
@@ -115,6 +132,7 @@ object CreditCardOverviewBuilder {
                 transactions = cardTransactions,
                 cardId = cardId,
                 startInclusive = cardStatementStart,
+                endExclusive = periodEndExclusive,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )
@@ -122,6 +140,7 @@ object CreditCardOverviewBuilder {
                 transactions = cardTransactions,
                 cardId = cardId,
                 startInclusive = salaryPeriodStart,
+                endExclusive = periodEndExclusive,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )
@@ -129,6 +148,7 @@ object CreditCardOverviewBuilder {
                 transactions = cardTransactions,
                 cardId = cardId,
                 startInclusive = calendarMonthStart,
+                endExclusive = periodEndExclusive,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )
@@ -148,7 +168,7 @@ object CreditCardOverviewBuilder {
         }.sortedBy { it.last4 }
 
         val latestStatement = snapshotCandidates
-            .filter { it.isStatement }
+            .filter { it.isStatement && it.updatedAt.isBefore(periodEndExclusive) }
             .maxByOrNull { it.updatedAt }
 
         val aggregatePeriodSpending = sumSpending(rows) { it.salaryPeriodSpendingNet }
@@ -192,16 +212,18 @@ object CreditCardOverviewBuilder {
         parsedRecords: List<ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
-        clock: Clock,
+        periodEndExclusive: Instant,
     ): Instant {
         val latestStatement = parsedRecords.mapNotNull { record ->
             val raw = rawSmsById[record.event.rawSmsId] ?: return@mapNotNull null
             if (!CreditCardStatementHeuristics.isStatementSms(raw.body)) return@mapNotNull null
-            record.event.occurredAt ?: raw.receivedAt
+            val at = record.event.occurredAt ?: raw.receivedAt
+            if (!at.isBefore(periodEndExclusive)) return@mapNotNull null
+            at
         }.maxOrNull()
         if (latestStatement != null) return latestStatement
 
-        val anchor = LocalDate.now(clock)
+        val anchor = periodEndExclusive.atZone(zoneId).toLocalDate().minusDays(1)
         val cycleStart = CreditCardStatementPolicy.statementCycleStartOnOrBefore(anchor)
         return cycleStart.atStartOfDay(zoneId).toInstant()
     }
@@ -210,6 +232,7 @@ object CreditCardOverviewBuilder {
         transactions: List<FinancialTransaction>,
         cardId: String,
         startInclusive: Instant,
+        endExclusive: Instant,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
     ): SignedMoneyAmount {
@@ -217,6 +240,7 @@ object CreditCardOverviewBuilder {
         var refund = Money.zero(primaryCurrency)
         for (tx in transactions) {
             if (tx.occurredAt.isBefore(startInclusive)) continue
+            if (!tx.occurredAt.isBefore(endExclusive)) continue
             val amount = when {
                 tx.amount.currency == primaryCurrency -> tx.amount
                 else -> sarEquivalents[tx.id] ?: continue

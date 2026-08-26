@@ -204,6 +204,49 @@ class CreditCardOverviewBuilderTest {
     }
 
     @Test
+    fun salaryPeriodSpending_respectsSelectedPeriodBounds() {
+        val nextPeriod = FinancialPeriodPolicy.next(salaryPeriod)
+        val purchaseAt = Instant.parse("2026-08-11T17:05:00Z")
+        val purchaseSms = rawSms(
+            id = "sms-7271",
+            body = """
+                شراء عبر الانترنت
+                بطاقة ائتمانية: 7271
+                بمبلغ: 75.00 SAR
+                الرصيد المتاح: 14569.09 SAR
+            """.trimIndent(),
+            at = purchaseAt,
+        )
+
+        val txs = listOf(
+            cardExpense("tx-before-period", cardId7271, "50.00", Instant.parse("2026-08-20T10:00:00Z")),
+            cardExpense("tx-in-period", cardId7271, "100.00", Instant.parse("2026-08-28T10:00:00Z")),
+            cardExpense("tx-after-period", cardId7271, "200.00", Instant.parse("2026-10-01T10:00:00Z")),
+        )
+
+        val overview = CreditCardOverviewBuilder.build(
+            salaryPeriod = nextPeriod,
+            cardTransactions = txs,
+            parsedRecords = listOf(
+                ParsedEventRecord(
+                    parsedEvent("pe-7271", purchaseSms, card7271, purchaseAt),
+                    ParsedEventDetails(availableBalance = Money.of("14569.09", Currency.SAR)),
+                ),
+            ),
+            rawSmsById = mapOf(purchaseSms.id to purchaseSms),
+            zoneId = zone,
+            clock = clock,
+        )
+
+        val row = overview.cards.single { it.last4 == "7271" }
+        assertEquals(
+            SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)),
+            row.salaryPeriodSpendingNet,
+        )
+        assertEquals("27 أغسطس", overview.salaryPeriodLabel)
+    }
+
+    @Test
     fun madaPurchase_doesNotFeedCreditCardOverview() {
         val at = Instant.parse("2026-08-01T11:05:00Z")
         val raw = rawSms(
