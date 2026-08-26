@@ -133,23 +133,21 @@ class DashboardProjectionBuilder(
             rawSmsById = rawSmsById,
         )
 
+        val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
             clock = clock,
+            periodEndExclusive = periodEndExclusive,
         )
         val cardQueryStart = minOf(
             FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId),
             statementStart,
         )
-        val cardQueryEndExclusive = LocalDate.now(clock)
-            .plusDays(1)
-            .atStartOfDay(zoneId)
-            .toInstant()
         val cardTransactions = financialTransactionRepository.listOccurredBetween(
             startInclusive = cardQueryStart,
-            endExclusive = cardQueryEndExclusive,
+            endExclusive = periodEndExclusive,
         )
         val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = cardTransactions,

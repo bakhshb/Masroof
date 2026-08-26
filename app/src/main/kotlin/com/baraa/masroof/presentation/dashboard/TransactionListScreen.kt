@@ -154,6 +154,8 @@ fun TransactionListScreen(
             ) {
                 Text(
                     stringResource(R.string.dashboard_empty_period),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxSize(),
                 )
