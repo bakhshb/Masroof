@@ -8,6 +8,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -47,7 +48,7 @@ class OwnershipDiscoveryServiceTest {
             .build()
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        discovery = OwnershipDiscoveryService(accounts, cards)
+        discovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository)
     }
 
     @After

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -41,7 +42,7 @@ class OwnershipResolverAndScenariosTest {
             .build()
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        resolver = OwnershipResolver(accounts, cards)
+        resolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
         confirmation = OwnershipConfirmationService(accounts, cards)
     }
 

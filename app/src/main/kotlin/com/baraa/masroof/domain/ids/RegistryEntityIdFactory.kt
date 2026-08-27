@@ -17,6 +17,8 @@ object RegistryEntityIdFactory {
 
     fun newCreditFacilityId(): String = "freg_${randomToken()}"
 
+    fun newLoanId(): String = "lreg_${randomToken()}"
+
     fun stableAccountId(bankId: String, maskedNumber: String): String =
         stable("areg", bankId, maskedNumber.trim())
 
@@ -25,6 +27,9 @@ object RegistryEntityIdFactory {
 
     fun stableCreditFacilityId(bankId: String, primaryLast4: String): String =
         stable("freg", bankId, primaryLast4.trim())
+
+    fun stableLoanId(bankId: String, loanType: String): String =
+        stable("lreg", bankId, loanType.trim())
 
     private fun stable(prefix: String, vararg parts: String): String {
         val canonical = parts.joinToString(separator = "\u001e")

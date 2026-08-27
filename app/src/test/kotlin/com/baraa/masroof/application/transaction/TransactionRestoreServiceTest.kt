@@ -136,6 +136,7 @@ class TransactionRestoreServiceTest {
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
                     accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
                     cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
+                    loanRegistry = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
                 ),
             ),
             reclassification = TransactionReclassificationService(
@@ -152,6 +153,7 @@ class TransactionRestoreServiceTest {
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
                     accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
                     cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
+                    loanRegistry = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
                 ),
             ),
             clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },

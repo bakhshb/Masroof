@@ -373,6 +373,7 @@
     <string name="dashboard_spending_total_hint">يشمل كل ما خرج من حسابك الجاري في هذه الفترة</string>
     <string name="dashboard_pos_purchases_short">شراء مدى</string>
     <string name="dashboard_fees_short">رسوم</string>
+    <string name="dashboard_loan_repayments">أقساط التمويل</string>
     <string name="dashboard_credit_card_payment">سداد بطاقة ائتمانية</string>
     <string name="dashboard_spending_split_title">ملخص إنفاقك</string>
     <string name="dashboard_spending_from_account">شراء مدى وفواتير</string>
@@ -532,6 +533,7 @@
     <string name="txn_type_refund">استرداد</string>
     <string name="txn_type_cash_withdrawal">سحب نقدي</string>
     <string name="txn_type_bill_payment">سداد فاتورة</string>
+    <string name="txn_type_loan_repayment">قسط تمويل</string>
     <string name="txn_type_fee">رسوم</string>
     <string name="txn_type_adjustment">تسوية</string>
     <string name="txn_type_unknown">غير محدد</string>
@@ -584,6 +586,7 @@
     <string name="review_family_refund">استرداد</string>
     <string name="review_family_withdrawal">سحب نقدي</string>
     <string name="review_family_fee">رسوم</string>
+    <string name="review_family_financing_installment">قسط تمويل</string>
     <string name="review_family_unknown">غير معروف</string>
     <string name="review_reason_transfer_pending_match">حوالة بانتظار مطابقة الطرف الآخر</string>
     <string name="review_reason_bill_payment">سداد فاتورة يحتاج تصنيف يدوي</string>

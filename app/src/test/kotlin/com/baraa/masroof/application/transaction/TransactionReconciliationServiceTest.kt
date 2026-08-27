@@ -30,6 +30,7 @@ import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.ownership.RegistryIdentity
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -80,7 +81,7 @@ class TransactionReconciliationServiceTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
     }
 
@@ -506,7 +507,7 @@ class TransactionReconciliationServiceTest {
         assertFalse(tx.sourceContainerId!!.contains("UNKNOWN"))
         assertFalse(tx.destinationContainerId!!.contains("UNKNOWN"))
         assertNull(accounts.get(AccountReference(Bank.UNKNOWN, "6810")))
-        assertEquals(OwnershipStatus.UNKNOWN, OwnershipResolver(accounts, cards).resolveAccount(AccountReference(Bank.UNKNOWN, "6810")))
+        assertEquals(OwnershipStatus.UNKNOWN, OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository).resolveAccount(AccountReference(Bank.UNKNOWN, "6810")))
         assertEquals(2, accounts.listAll().size)
         assertNull(FinancialContainerIdFactory.accountId(AccountReference(Bank.UNKNOWN, "6810")))
     }

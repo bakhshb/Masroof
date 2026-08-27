@@ -18,6 +18,7 @@ fun transactionTypeLabel(type: FinancialTransactionType): String =
             FinancialTransactionType.REFUND -> R.string.txn_type_refund
             FinancialTransactionType.CASH_WITHDRAWAL -> R.string.txn_type_cash_withdrawal
             FinancialTransactionType.BILL_PAYMENT -> R.string.txn_type_bill_payment
+            FinancialTransactionType.LOAN_REPAYMENT -> R.string.txn_type_loan_repayment
             FinancialTransactionType.FEE -> R.string.txn_type_fee
             FinancialTransactionType.ADJUSTMENT -> R.string.txn_type_adjustment
             FinancialTransactionType.UNKNOWN -> R.string.txn_type_unknown

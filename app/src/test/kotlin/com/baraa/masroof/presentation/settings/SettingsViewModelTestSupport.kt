@@ -8,6 +8,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -31,6 +32,7 @@ internal object SettingsViewModelTestSupport {
                 ownershipResolver = OwnershipResolver(
                     accountRegistry = emptyAccountRegistry(),
                     cardRegistry = emptyCardRegistry(),
+                    loanRegistry = NoOpLoanRegistryRepository,
                 ),
             ),
             reclassification = TransactionReclassificationService(
@@ -47,6 +49,7 @@ internal object SettingsViewModelTestSupport {
                 ownershipResolver = OwnershipResolver(
                     accountRegistry = emptyAccountRegistry(),
                     cardRegistry = emptyCardRegistry(),
+                    loanRegistry = NoOpLoanRegistryRepository,
                 ),
             ),
             clock = InstantClock.System,

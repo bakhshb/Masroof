@@ -6,21 +6,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
-import com.baraa.masroof.data.repository.RoomCardRegistryRepository
-import com.baraa.masroof.domain.ids.CreditFacilityIdFactory
+import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.model.OwnershipStatus
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,22 +26,22 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
-class Migration7To8Test {
+class Migration8To9Test {
     @Test
-    fun migrate7To8_assignsOpaqueEntityIdsAndRemapsFacilityIds() = runBlocking {
-        val schema7 = java.io.File("schemas/com.baraa.masroof.data.room.MasroofDatabase/7.json")
-        assertTrue(schema7.isFile)
+    fun migrate8To9_dedupesLoanRowsAndAssignsStableIds() = runBlocking {
+        val schema8 = java.io.File("schemas/com.baraa.masroof.data.room.MasroofDatabase/8.json")
+        assertTrue(schema8.isFile)
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val dbName = "migration-7-8.db"
+        val dbName = "migration-8-9.db"
         context.deleteDatabase(dbName)
 
         val openHelper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(dbName)
                 .callback(
-                    object : SupportSQLiteOpenHelper.Callback(7) {
+                    object : SupportSQLiteOpenHelper.Callback(8) {
                         override fun onCreate(db: SupportSQLiteDatabase) {
-                            applyExportedSchema(db, schema7, expectedVersion = 7)
+                            applyExportedSchema(db, schema8, expectedVersion = 8)
                         }
 
                         override fun onUpgrade(
@@ -57,31 +54,24 @@ class Migration7To8Test {
                 .build(),
         )
 
-        val legacyFacilityId = "facility:BANK_ALJAZIRA:1111"
+        val duplicateId1 = RegistryEntityIdFactory.newLoanId()
+        val duplicateId2 = RegistryEntityIdFactory.newLoanId()
         openHelper.writableDatabase.use { db ->
             db.execSQL(
                 """
-                INSERT INTO account_registry
-                (bankId, maskedNumber, ownershipStatus, displayName, accountType,
-                 firstSeenRawSmsId, lastSeenRawSmsId)
-                VALUES ('BANK_ALJAZIRA', '****3001', 'OWNED', 'Current', 'CURRENT', 'sms-a', 'sms-a')
+                INSERT INTO loan_registry
+                (id, bankId, loanType, ownershipStatus, displayName, firstSeenRawSmsId, lastSeenRawSmsId)
+                VALUES ('$duplicateId1', 'BANK_ALJAZIRA', 'PERSONAL', 'UNKNOWN', NULL, 'sms-1', 'sms-1')
                 """.trimIndent(),
             )
             db.execSQL(
                 """
-                INSERT INTO credit_facility (id, bankId, primaryLast4)
-                VALUES ('$legacyFacilityId', 'BANK_ALJAZIRA', '1111')
+                INSERT INTO loan_registry
+                (id, bankId, loanType, ownershipStatus, displayName, firstSeenRawSmsId, lastSeenRawSmsId)
+                VALUES ('$duplicateId2', 'BANK_ALJAZIRA', 'PERSONAL', 'OWNED', 'تمويل شخصي', 'sms-2', 'sms-3')
                 """.trimIndent(),
             )
-            db.execSQL(
-                """
-                INSERT INTO card_registry
-                (bankId, last4, ownershipStatus, cardType, cardRole, creditFacilityId,
-                 firstSeenRawSmsId, lastSeenRawSmsId)
-                VALUES ('BANK_ALJAZIRA', '1111', 'OWNED', 'CREDIT', 'PRIMARY', '$legacyFacilityId', 'sms-c', 'sms-c')
-                """.trimIndent(),
-            )
-            assertEquals(7, db.version)
+            assertEquals(8, db.version)
         }
         openHelper.close()
 
@@ -92,28 +82,23 @@ class Migration7To8Test {
         try {
             assertEquals(9, room.openHelper.writableDatabase.version)
 
-            val accountRepo = RoomAccountRegistryRepository.from(room)
-            val cardRepo = RoomCardRegistryRepository.from(room)
+            val loanRepo = RoomLoanRegistryRepository.from(room)
+            val loans = loanRepo.listAll()
+            assertEquals(1, loans.size)
 
-            val account = accountRepo.get(AccountReference(Bank.BANK_ALJAZIRA, "****3001"))!!
-            val expectedAccountId = RegistryEntityIdFactory.stableAccountId(
+            val loan = loans.single()
+            val expectedId = RegistryEntityIdFactory.stableLoanId(
                 Bank.BANK_ALJAZIRA.id,
-                "****3001",
+                LoanType.PERSONAL.name,
             )
-            assertEquals(expectedAccountId, account.id)
-            assertFalse(account.id.contains("3001"))
+            assertEquals(expectedId, loan.id)
+            assertEquals(OwnershipStatus.OWNED, loan.ownership)
+            assertEquals("تمويل شخصي", loan.displayName)
+            assertEquals("sms-1", loan.firstSeenRawSmsId)
+            assertEquals("sms-3", loan.lastSeenRawSmsId)
 
-            val card = cardRepo.get(CardReference(Bank.BANK_ALJAZIRA, "1111"))!!
-            val expectedCardId = RegistryEntityIdFactory.stableCardId(Bank.BANK_ALJAZIRA.id, "1111")
-            assertEquals(expectedCardId, card.id)
-            assertFalse(card.id.contains("1111"))
-
-            val expectedFacilityId = CreditFacilityIdFactory.facilityId(Bank.BANK_ALJAZIRA, "1111")
-            assertEquals(expectedFacilityId, card.creditFacilityId)
-            assertFalse(expectedFacilityId.startsWith("facility:"))
-
-            val facility = room.creditFacilityDao().get(expectedFacilityId)
-            assertTrue(facility != null)
+            val resolved = loanRepo.get(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL))!!
+            assertEquals(expectedId, resolved.id)
         } finally {
             room.close()
             context.deleteDatabase(dbName)

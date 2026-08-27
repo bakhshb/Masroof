@@ -41,6 +41,18 @@ object FinancialContainerIdFactory {
         if (last4.isEmpty()) return null
         return cardId(reference.bank, last4)
     }
+
+    fun loanId(bank: Bank, loanType: com.baraa.masroof.domain.model.LoanType): String {
+        require(bank != Bank.UNKNOWN) {
+            "Bank.UNKNOWN is not a durable financial-container identity"
+        }
+        return "loan:${bank.id}:${loanType.name}"
+    }
+
+    fun loanId(reference: com.baraa.masroof.domain.model.LoanReference): String? {
+        if (reference.bank == Bank.UNKNOWN) return null
+        return loanId(reference.bank, reference.loanType)
+    }
 }
 
 /**

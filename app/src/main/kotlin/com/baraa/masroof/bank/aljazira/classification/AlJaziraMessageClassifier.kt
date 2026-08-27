@@ -89,10 +89,10 @@ class AlJaziraMessageClassifier {
 
             text.contains("قسط تمويل") || text.contains("خصم: قسط") ->
                 return AlJaziraClassification(
-                    family = MessageFamily.UNKNOWN,
+                    family = MessageFamily.FINANCING_INSTALLMENT,
                     direction = MoneyDirection.OUTGOING,
-                    evidence = listOf("financing_installment_unmapped"),
-                    confidence = 0.4,
+                    evidence = listOf("financing_installment"),
+                    confidence = 0.95,
                 )
 
             text.contains("سداد بطاقة") || isCreditCardSettlement(text) ->
