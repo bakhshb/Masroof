@@ -94,7 +94,7 @@ class MadaDebitCardsDashboardVisibilityTest {
     }
 
     @Test
-    fun followedCreditFacilitiesForSummary_includesInferredMadaCards() {
+    fun followedCreditFacilitiesForSummary_excludesInferredMadaCards() {
         val registry = listOf(
             creditCard("1111"),
             ownedMadaWithoutMetadata("8219"),
@@ -125,13 +125,7 @@ class MadaDebitCardsDashboardVisibilityTest {
 
         assertNotNull(followed)
         assertEquals(1, followed!!.facilities.size)
-        assertEquals(
-            listOf("5555", "8219"),
-            followed.debitCards.map { it.last4 }.sorted(),
-        )
-        assertTrue(
-            followed.debitCards.all { CardOwnershipKey.of(it) in CardOwnershipKey.ownedKeys(state.ownedCards) },
-        )
+        assertEquals(emptyList<String>(), followed.debitCards.map { it.last4 })
     }
 
     @Test
