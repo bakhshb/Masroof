@@ -25,7 +25,7 @@ class RoomLoanRegistryRepository(
 
         dao.observeAtomic(
             entity = LoanRegistryEntity(
-                id = RegistryEntityIdFactory.newLoanId(),
+                id = stableId(reference),
                 bankId = reference.bank.id,
                 loanType = reference.loanType.name,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
@@ -40,7 +40,7 @@ class RoomLoanRegistryRepository(
         RegistryIdentity.requireKnownBank(reference.bank, "LoanRegistry.setOwnership")
         dao.setOwnershipAtomic(
             entity = LoanRegistryEntity(
-                id = RegistryEntityIdFactory.newLoanId(),
+                id = stableId(reference),
                 bankId = reference.bank.id,
                 loanType = reference.loanType.name,
                 ownershipStatus = status.name,
@@ -70,6 +70,9 @@ class RoomLoanRegistryRepository(
             displayName?.trim()?.ifEmpty { null },
         )
     }
+
+    private fun stableId(reference: LoanReference): String =
+        RegistryEntityIdFactory.stableLoanId(reference.bank.id, reference.loanType.name)
 
     private suspend fun findRegistryEntry(reference: LoanReference): LoanRegistryEntity? =
         dao.get(reference.bank.id, reference.loanType.name)
