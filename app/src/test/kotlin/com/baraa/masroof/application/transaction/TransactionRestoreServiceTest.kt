@@ -269,6 +269,8 @@ class TransactionRestoreServiceTest {
 
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = true
 
+        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = true
+
         override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
@@ -300,6 +302,8 @@ class TransactionRestoreServiceTest {
         ): Boolean = false
 
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
+
+        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
         override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
@@ -337,6 +341,8 @@ class TransactionRestoreServiceTest {
         ): Boolean = false
 
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = true
+
+        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = true
 
         override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }

@@ -80,6 +80,12 @@ interface FinancialTransactionRepository {
     suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean
 
     /**
+     * Drops one RawSms link from its transaction. Deletes the transaction when no
+     * evidence links remain (e.g. releasing a leg wrongly merged onto another date).
+     */
+    suspend fun unlinkRawSms(rawSmsId: String): Boolean
+
+    /**
      * Attaches an additional RawSms evidence row to an existing transaction when the
      * same transfer was assembled twice from separate bank messages.
      */

@@ -108,6 +108,7 @@ internal object SettingsViewModelTestSupport {
             ) = FinancialTransactionSaveResult.Saved
             override suspend fun update(transaction: com.baraa.masroof.domain.model.FinancialTransaction) = false
             override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+            override suspend fun unlinkRawSms(rawSmsId: String) = false
             override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
             override suspend fun isRawSmsLinked(rawSmsId: String) = false
             override suspend fun updateAppliedExchangeRate(

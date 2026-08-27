@@ -112,6 +112,8 @@ class TransactionReconciliationService(
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
                     // Stale transaction from a prior misclassification (e.g. OTP matched as purchase).
+                } else if (shouldReleaseStaleSelfTransferLink(record)) {
+                    financialTransactionRepository.unlinkRawSms(event.rawSmsId)
                 } else {
                     alreadyLinked++
                     settledRawSmsIds += event.rawSmsId
@@ -573,8 +575,30 @@ class TransactionReconciliationService(
                 existing.type == FinancialTransactionType.SELF_TRANSFER &&
                 existing.sourceContainerId == source &&
                 existing.destinationContainerId == dest &&
-                existing.amount == transaction.amount
+                existing.amount == transaction.amount &&
+                existing.occurredAt == transaction.occurredAt
         }
+    }
+
+    private suspend fun shouldReleaseStaleSelfTransferLink(
+        record: ParsedEventRecord,
+    ): Boolean {
+        val event = record.event
+        if (event.messageFamily != MessageFamily.TRANSFER_IN &&
+            event.messageFamily != MessageFamily.TRANSFER_OUT
+        ) {
+            return false
+        }
+        val linked = financialTransactionRepository.findByRawSmsId(event.rawSmsId) ?: return false
+        if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
+        val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return false
+        val expectedAt = TransactionTiming.effectiveOccurredAt(
+            event = event,
+            occurredAtLocal = record.details.occurredAtLocal,
+            receivedAt = receivedAt,
+            zoneId = zoneId,
+        )
+        return linked.occurredAt != expectedAt
     }
 
     private fun eventShouldNotProduceTransaction(event: ParsedEvent, smsBody: String): Boolean {
