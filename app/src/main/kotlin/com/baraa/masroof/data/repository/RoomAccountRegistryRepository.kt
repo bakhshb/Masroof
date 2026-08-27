@@ -68,9 +68,9 @@ class RoomAccountRegistryRepository(
     }
 
     /**
-     * Exact composite-key lookup first, then a unique same-bank suffix match so SMS
-     * last-4 refs (e.g. 3001) resolve owned registry rows stored as longer masks
-     * (e.g. 1234567890123001).
+     * Exact composite-key lookup first. When the exact row is missing or still
+     * [OwnershipStatus.UNKNOWN], fall back to a unique same-bank last-4 suffix match
+     * so SMS refs like 3001 resolve owned registry rows stored as longer masks.
      */
     private suspend fun findRegistryEntry(reference: AccountReference): AccountRegistryEntity? {
         if (!RegistryIdentity.isKnownBank(reference.bank)) return null
@@ -78,15 +78,41 @@ class RoomAccountRegistryRepository(
         if (masked.isEmpty()) return null
 
         val exact = dao.get(reference.bank.id, masked)
-        if (exact != null) return exact
+        val suffixMatch = findUniqueSuffixMatch(reference.bank.id, masked)
+        val ownedSuffixMatch = findUniqueOwnedSuffixMatch(reference.bank.id, masked)
 
+        if (exact != null) {
+            val exactStatus = OwnershipStatus.valueOf(exact.ownershipStatus)
+            if (exactStatus != OwnershipStatus.UNKNOWN) return exact
+            if (ownedSuffixMatch != null) return ownedSuffixMatch
+            return exact
+        }
+
+        return suffixMatch
+    }
+
+    private suspend fun findUniqueSuffixMatch(
+        bankId: String,
+        masked: String,
+    ): AccountRegistryEntity? = suffixMatches(bankId, masked).singleOrNull()
+
+    private suspend fun findUniqueOwnedSuffixMatch(
+        bankId: String,
+        masked: String,
+    ): AccountRegistryEntity? =
+        suffixMatches(bankId, masked)
+            .filter { OwnershipStatus.valueOf(it.ownershipStatus) == OwnershipStatus.OWNED }
+            .singleOrNull()
+
+    private suspend fun suffixMatches(
+        bankId: String,
+        masked: String,
+    ): List<AccountRegistryEntity> {
         val suffix = masked.takeLast(4)
-        if (suffix.length < 4) return null
-
-        val suffixMatches = dao.listAll().filter { entity ->
-            entity.bankId == reference.bank.id &&
+        if (suffix.length < 4) return emptyList()
+        return dao.listAll().filter { entity ->
+            entity.bankId == bankId &&
                 entity.maskedNumber.trim().takeLast(4) == suffix
         }
-        return suffixMatches.singleOrNull()
     }
 }

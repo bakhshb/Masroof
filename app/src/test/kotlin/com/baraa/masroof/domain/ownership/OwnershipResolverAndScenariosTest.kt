@@ -67,6 +67,16 @@ class OwnershipResolverAndScenariosTest {
     }
 
     @Test
+    fun parsedLast4_unknownShortRow_prefersOwnedLongMask() = runBlocking {
+        accounts.observe(AccountReference(Bank.BANK_ALJAZIRA, "3001"), "sms-transfer-out")
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
+        assertEquals(
+            OwnershipStatus.OWNED,
+            resolver.resolveAccount(AccountReference(Bank.BANK_ALJAZIRA, "3001")),
+        )
+    }
+
+    @Test
     fun parsedLast4_ambiguousSuffix_staysUnknown() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "98765432123001"))
