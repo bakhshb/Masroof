@@ -267,6 +267,7 @@
     <string name="dashboard_accounts_count_label">%1$d accounts</string>
     <string name="dashboard_account_period_in_out">In %1$s · spent %2$s</string>
     <string name="dashboard_account_linked_mada_label">Linked Mada: %1$s</string>
+    <string name="dashboard_account_unlinked_mada_label">Unlinked Mada: %1$s</string>
     <string name="dashboard_account_period_net_label">Period net</string>
     <string name="dashboard_account_detail_unavailable">No period data for this account</string>
     <string name="dashboard_summary_transactions_title">Period transactions (%1$d)</string>

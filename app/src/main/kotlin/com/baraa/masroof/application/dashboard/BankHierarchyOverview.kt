@@ -97,13 +97,14 @@ object BankHierarchyBuilder {
             val bankDebitCards = allDebitCards.filter { it.bank == bank }
 
             val currentNodes = currentEntries.map { entry ->
-            val matchedDebit = bankDebitCards.filter { debit ->
-                debitMatchesAccount(debit, entry.maskedNumber)
-            }.also { matched ->
-                matched.forEach { debit ->
-                    assignedDebitKeys.add(CardTransactionInvolvementResolver.cardKey(bank.id, debit.last4))
+                val matchedDebit = bankDebitCards.filter { debit ->
+                    val cardKey = CardTransactionInvolvementResolver.cardKey(bank.id, debit.last4)
+                    cardKey !in assignedDebitKeys && debitMatchesAccount(debit, entry.maskedNumber)
+                }.also { matched ->
+                    matched.forEach { debit ->
+                        assignedDebitKeys.add(CardTransactionInvolvementResolver.cardKey(bank.id, debit.last4))
+                    }
                 }
-            }
                 CurrentAccountTreeNode(
                     bank = bank,
                     maskedNumber = entry.maskedNumber,

@@ -155,7 +155,7 @@ fun AccountsSummaryScreen(
                         bankTree.unlinkedDebitCards.forEach { debit ->
                             Text(
                                 stringResource(
-                                    R.string.dashboard_account_linked_mada_label,
+                                    R.string.dashboard_account_unlinked_mada_label,
                                     debit.displayLabel,
                                 ),
                                 style = MaterialTheme.typography.bodySmall,

@@ -843,7 +843,10 @@ class SettingsViewModel(
                 followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED },
                 unregisteredAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.UNKNOWN },
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
-                bankTrees = buildBankTrees(cardItems, accountItems),
+                bankTrees = buildBankTrees(
+                    cards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED },
+                    accounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED },
+                ),
                 error = null,
             )
         }
