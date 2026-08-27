@@ -49,7 +49,7 @@ fun CardsSummaryRoute(
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
-    val followedFacilities = state.followedCreditFacilities()
+    val followedFacilities = state.followedCreditFacilitiesForSummary()
     val selectedDebit = selectedCardKey?.let { key ->
         followedFacilities?.debitCards?.find { CardOwnershipKey.of(it) == key }
     }
@@ -132,7 +132,7 @@ fun CardsSummaryScreen(
     onOpenDebit: (DebitCardOverview) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
-    val followedFacilities = state.followedCreditFacilities()
+    val followedFacilities = state.followedCreditFacilitiesForSummary()
     val followedOverview = followedCreditCardsOverview(state)
 
     DashboardSummaryScaffold(

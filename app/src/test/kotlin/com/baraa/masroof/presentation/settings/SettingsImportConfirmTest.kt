@@ -126,5 +126,6 @@ class SettingsImportConfirmTest {
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
         override suspend fun listAll(): List<AccountRegistryEntry> = emptyList()
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+            override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
     }
 }

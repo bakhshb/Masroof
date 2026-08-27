@@ -73,8 +73,8 @@ class TransactionReconciliationServiceTest {
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
-        accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        accounts = RoomAccountRegistryRepository.from(db)
+        cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards)
         reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,

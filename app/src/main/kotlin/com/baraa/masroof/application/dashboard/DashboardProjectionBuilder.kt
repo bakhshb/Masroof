@@ -13,6 +13,7 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -25,6 +26,7 @@ class DashboardProjectionBuilder(
     private val reviewRepository: ReviewRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
+    private val loanRegistryRepository: LoanRegistryRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -199,6 +201,12 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
         )
+        val bankHierarchy = BankHierarchyBuilder.build(
+            ownedAccounts = ownedAccounts,
+            accountsFleet = accountsFleet,
+            creditFacilities = creditFacilities,
+            loans = loanRegistryRepository.listAll(),
+        )
 
         val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
         return DashboardProjection(
@@ -210,6 +218,7 @@ class DashboardProjectionBuilder(
             accountsFleet = accountsFleet,
             perAccount = perAccount,
             creditFacilities = creditFacilities,
+            bankHierarchy = bankHierarchy,
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
             transactionCardInvolvement = transactionCardInvolvement,

@@ -52,21 +52,21 @@ class SettingsViewModelTest {
     @Test
     fun refresh_groupsCardsByOwnership() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "7271",
                 OwnershipStatus.OWNED,
                 firstSeenRawSmsId = "1",
                 lastSeenRawSmsId = "1",
             ),
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "5123",
                 OwnershipStatus.UNKNOWN,
                 firstSeenRawSmsId = "2",
                 lastSeenRawSmsId = "2",
             ),
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "9999",
                 OwnershipStatus.EXTERNAL,
@@ -94,21 +94,21 @@ class SettingsViewModelTest {
     @Test
     fun refresh_groupsAccountsByOwnership() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(
+            AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "3001",
                 OwnershipStatus.OWNED,
                 firstSeenRawSmsId = "1",
                 lastSeenRawSmsId = "1",
             ),
-            AccountRegistryEntry(
+            AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "3002",
                 OwnershipStatus.UNKNOWN,
                 firstSeenRawSmsId = "2",
                 lastSeenRawSmsId = "2",
             ),
-            AccountRegistryEntry(
+            AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "3003",
                 OwnershipStatus.EXTERNAL,
@@ -128,7 +128,7 @@ class SettingsViewModelTest {
     @Test
     fun resumeTracking_marksCardOwned() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "9999",
                 OwnershipStatus.EXTERNAL,
@@ -140,7 +140,17 @@ class SettingsViewModelTest {
         val vm = viewModel(cards = cards, onRefreshReviewQueue = { refreshCalls++ })
         vm.refresh()
         advanceUntilIdle()
-        vm.resumeTracking(ManagedCardUi(Bank.BANK_ALJAZIRA, "9999", OwnershipStatus.EXTERNAL))
+        vm.resumeTracking(
+            ManagedCardUi(
+                id = com.baraa.masroof.domain.ids.RegistryEntityIdFactory.stableCardId(
+                    Bank.BANK_ALJAZIRA.id,
+                    "9999",
+                ),
+                bank = Bank.BANK_ALJAZIRA,
+                last4 = "9999",
+                ownership = OwnershipStatus.EXTERNAL,
+            ),
+        )
         advanceUntilIdle()
 
         assertEquals(OwnershipStatus.OWNED, cards.entries.single().ownership)
@@ -151,7 +161,7 @@ class SettingsViewModelTest {
     @Test
     fun resumeAccountTracking_marksAccountOwned() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(
+            AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "3003",
                 OwnershipStatus.EXTERNAL,
@@ -162,7 +172,17 @@ class SettingsViewModelTest {
         val vm = viewModel(accounts = accounts)
         vm.refresh()
         advanceUntilIdle()
-        vm.resumeAccountTracking(ManagedAccountUi(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.EXTERNAL))
+        vm.resumeAccountTracking(
+            ManagedAccountUi(
+                id = com.baraa.masroof.domain.ids.RegistryEntityIdFactory.stableAccountId(
+                    Bank.BANK_ALJAZIRA.id,
+                    "3003",
+                ),
+                bank = Bank.BANK_ALJAZIRA,
+                maskedNumber = "3003",
+                ownership = OwnershipStatus.EXTERNAL,
+            ),
+        )
         advanceUntilIdle()
 
         assertEquals(OwnershipStatus.OWNED, accounts.entries.single().ownership)
@@ -172,7 +192,7 @@ class SettingsViewModelTest {
     @Test
     fun confirmStopTracking_marksCardExternal() = runTest {
         val cards = FakeCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "7271",
                 OwnershipStatus.OWNED,
@@ -196,7 +216,7 @@ class SettingsViewModelTest {
     @Test
     fun confirmStopAccountTracking_marksAccountExternal() = runTest {
         val accounts = FakeAccountRegistry(
-            AccountRegistryEntry(
+            AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "3001",
                 OwnershipStatus.OWNED,
@@ -220,7 +240,7 @@ class SettingsViewModelTest {
     @Test
     fun markCardAsDebit_clearsRoleAndSetsDebitType() = runTest {
         val cards = TrackingCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 "7271",
                 OwnershipStatus.OWNED,
@@ -527,5 +547,10 @@ class SettingsViewModelTest {
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
 
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+
+        override suspend fun updateAccountType(
+            reference: AccountReference,
+            accountType: com.baraa.masroof.domain.model.AccountType,
+        ) = Unit
     }
 }

@@ -74,7 +74,7 @@ class Migration5To6Test {
             .allowMainThreadQueries()
             .build()
         try {
-            val cardRepo = RoomCardRegistryRepository(room.cardRegistryDao())
+            val cardRepo = RoomCardRegistryRepository.from(room)
             val loaded = cardRepo.get(CardReference(Bank.BANK_ALJAZIRA, "7271"))!!
             assertEquals(OwnershipStatus.OWNED, loaded.ownership)
             assertNull(loaded.displayName)

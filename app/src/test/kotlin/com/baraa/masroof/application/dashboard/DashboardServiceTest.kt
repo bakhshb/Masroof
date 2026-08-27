@@ -15,7 +15,9 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
@@ -152,6 +154,7 @@ class DashboardServiceTest {
         reviewRepo: ReviewRepository,
         accountRepo: AccountRegistryRepository = FakeAccountRepo(),
         cardRepo: CardRegistryRepository = FakeCardRepo(),
+        loanRepo: LoanRegistryRepository = FakeLoanRepo(),
     ): DashboardService =
         DashboardService(
             financialTransactionRepository = ftRepo,
@@ -161,6 +164,7 @@ class DashboardServiceTest {
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
             cardRegistryRepository = cardRepo,
+            loanRegistryRepository = loanRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,
@@ -179,6 +183,11 @@ class DashboardServiceTest {
         override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
         override suspend fun listAll(): List<AccountRegistryEntry> = entries
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+        override suspend fun updateAccountType(reference: AccountReference, accountType: AccountType) = Unit
+    }
+
+    private class FakeLoanRepo : LoanRegistryRepository {
+        override suspend fun listAll(): List<com.baraa.masroof.domain.model.LoanRegistryEntry> = emptyList()
     }
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

@@ -24,7 +24,7 @@ class DebitCardScopeFactoryTest {
         val body = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001"
         val parsedRecords = listOf(parsedRecord("2210", body))
         val rawSmsById = rawSmsMap(parsedRecords)
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
             ownership = OwnershipStatus.OWNED,
@@ -33,7 +33,7 @@ class DebitCardScopeFactoryTest {
             lastSeenRawSmsId = "sms",
         )
         val accounts = listOf(
-            com.baraa.masroof.domain.model.AccountRegistryEntry(
+            com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
                 maskedNumber = "12345678903001",
                 ownership = OwnershipStatus.OWNED,

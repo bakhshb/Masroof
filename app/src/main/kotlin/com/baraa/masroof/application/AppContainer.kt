@@ -43,7 +43,10 @@ import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepo
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
+import com.baraa.masroof.data.repository.RoomBankRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomCreditFacilityRepository
+import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
@@ -55,6 +58,9 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.BankRegistryRepository
+import com.baraa.masroof.domain.repository.CreditFacilityRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
@@ -107,10 +113,19 @@ class AppContainer(
         RoomParsedEventRepository(database.parsedEventDao())
 
     val accountRegistryRepository: AccountRegistryRepository =
-        RoomAccountRegistryRepository(database.accountRegistryDao())
+        RoomAccountRegistryRepository.from(database)
 
     val cardRegistryRepository: CardRegistryRepository =
-        RoomCardRegistryRepository(database.cardRegistryDao())
+        RoomCardRegistryRepository.from(database)
+
+    val bankRegistryRepository: BankRegistryRepository =
+        RoomBankRegistryRepository(database.bankRegistryDao())
+
+    val creditFacilityRepository: CreditFacilityRepository =
+        RoomCreditFacilityRepository(database.creditFacilityDao())
+
+    val loanRegistryRepository: LoanRegistryRepository =
+        RoomLoanRegistryRepository(database.loanRegistryDao())
 
     val financialTransactionRepository: FinancialTransactionRepository =
         RoomFinancialTransactionRepository(
@@ -266,6 +281,7 @@ class AppContainer(
             appLocaleRepository = appLocaleRepository,
             accountRegistryRepository = accountRegistryRepository,
             cardRegistryRepository = cardRegistryRepository,
+            loanRegistryRepository = loanRegistryRepository,
             sarEquivalentResolver = TransactionSarEquivalentResolver(
                 marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
             ),

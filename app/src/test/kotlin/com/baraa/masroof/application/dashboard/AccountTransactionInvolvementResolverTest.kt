@@ -26,7 +26,7 @@ import java.time.Instant
 class AccountTransactionInvolvementResolverTest {
     @Test
     fun smsResolvedWithdrawal_mapsToOwnedAccount() {
-        val owned = AccountRegistryEntry(
+        val owned = AccountRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             maskedNumber = "3001",
             ownership = OwnershipStatus.OWNED,
@@ -70,7 +70,7 @@ class AccountTransactionInvolvementResolverTest {
 
     @Test
     fun cashWithdrawal_hisabRaqam_mapsToOwnedAccount() {
-        val owned = AccountRegistryEntry(
+        val owned = AccountRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             maskedNumber = "3001",
             ownership = OwnershipStatus.OWNED,
@@ -122,7 +122,7 @@ class AccountTransactionInvolvementResolverTest {
 
     @Test
     fun unrelatedTransaction_notMapped() {
-        val owned = AccountRegistryEntry(
+        val owned = AccountRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             maskedNumber = "3002",
             ownership = OwnershipStatus.OWNED,
