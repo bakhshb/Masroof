@@ -56,7 +56,7 @@ object MonthlyFinancialSummaryCalculator {
                     creditCardPayments = creditCardPayments + amount
 
                 FinancialTransactionType.LOAN_REPAYMENT ->
-                    creditCardPayments = creditCardPayments + amount
+                    Unit
 
                 FinancialTransactionType.CASH_WITHDRAWAL ->
                     cashWithdrawals = cashWithdrawals + amount
