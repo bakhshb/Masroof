@@ -405,8 +405,8 @@ class SmsIngestionServiceTest {
 
             override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
-        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
         val reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
@@ -429,8 +429,8 @@ class SmsIngestionServiceTest {
 
     @Test
     fun p9ReviewQueueException_keepsEvidenceAndDoesNotFailIngest() = runBlocking {
-        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(
             db.financialTransactionDao(),
             db.parsedEventDao(),
@@ -486,8 +486,8 @@ class SmsIngestionServiceTest {
 
     @Test
     fun p9ReviewCancellation_propagatesOutOfIngestion() = runBlocking {
-        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(
             db.financialTransactionDao(),
             db.parsedEventDao(),
@@ -580,8 +580,8 @@ class SmsIngestionServiceTest {
 
             override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
-        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
         val reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,

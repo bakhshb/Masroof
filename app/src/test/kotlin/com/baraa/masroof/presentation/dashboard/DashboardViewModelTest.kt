@@ -484,6 +484,7 @@ class DashboardViewModelTest {
 
         override suspend fun listAll() = entries.toList()
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+            override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
     }
 
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
@@ -698,6 +699,10 @@ class DashboardViewModelTest {
                         override suspend fun updateDisplayName(
                             reference: com.baraa.masroof.domain.model.AccountReference,
                             displayName: String?,
+                        ) = Unit
+                        override suspend fun updateAccountType(
+                            reference: com.baraa.masroof.domain.model.AccountReference,
+                            accountType: com.baraa.masroof.domain.model.AccountType,
                         ) = Unit
                     },
                     NoOpCardRegistryRepository(),

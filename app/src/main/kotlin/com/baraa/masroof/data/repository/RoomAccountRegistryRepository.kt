@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.mapper.RegistryMapper
@@ -11,11 +12,16 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 
 class RoomAccountRegistryRepository(
     private val dao: AccountRegistryDao,
+    private val bankRegistryDao: com.baraa.masroof.data.room.dao.BankRegistryDao,
 ) : AccountRegistryRepository {
     override suspend fun observe(reference: AccountReference, rawSmsId: String) {
         if (!RegistryIdentity.isKnownBank(reference.bank)) return
         val masked = reference.maskedNumber?.trim().orEmpty()
         if (masked.isEmpty()) return
+
+        bankRegistryDao.insertIfAbsent(
+            com.baraa.masroof.data.room.entity.BankRegistryEntity(bankId = reference.bank.id),
+        )
 
         // IGNORE-insert as UNKNOWN; never overwrites ownership on conflict.
         dao.observeAtomic(
@@ -23,6 +29,7 @@ class RoomAccountRegistryRepository(
                 bankId = reference.bank.id,
                 maskedNumber = masked,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
+                accountType = com.baraa.masroof.domain.model.AccountType.CURRENT.name,
                 firstSeenRawSmsId = rawSmsId,
                 lastSeenRawSmsId = rawSmsId,
             ),
@@ -65,6 +72,16 @@ class RoomAccountRegistryRepository(
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required" }
         dao.updateDisplayName(reference.bank.id, masked, displayName?.trim()?.ifEmpty { null })
+    }
+
+    override suspend fun updateAccountType(reference: AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) {
+        RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.updateAccountType")
+        val masked = reference.maskedNumber?.trim().orEmpty()
+        require(masked.isNotEmpty()) { "maskedNumber required" }
+        val updated = dao.updateAccountType(reference.bank.id, masked, accountType.name)
+        if (updated == 0) {
+            throw IllegalArgumentException("account_not_found")
+        }
     }
 
     /**
@@ -114,5 +131,13 @@ class RoomAccountRegistryRepository(
             entity.bankId == bankId &&
                 entity.maskedNumber.trim().takeLast(4) == suffix
         }
+    }
+
+    companion object {
+        fun from(database: MasroofDatabase): RoomAccountRegistryRepository =
+            RoomAccountRegistryRepository(
+                dao = database.accountRegistryDao(),
+                bankRegistryDao = database.bankRegistryDao(),
+            )
     }
 }

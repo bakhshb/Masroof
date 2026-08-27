@@ -17,7 +17,7 @@ import java.math.BigDecimal
 
 class DashboardCardFiltersTest {
     @Test
-    fun followedCreditFacilities_keepsOnlyOwnedFacilitiesAndDebits() {
+    fun followedCreditFacilities_keepsOnlyOwnedFacilitiesWithoutDebitTiles() {
         val state = DashboardUiState(
             creditFacilities = CreditFacilitiesOverview(
                 facilities = listOf(
@@ -43,8 +43,7 @@ class DashboardCardFiltersTest {
         assertNotNull(filtered)
         assertEquals(1, filtered!!.facilities.size)
         assertEquals("1111", filtered.facilities.single().primaryLast4)
-        assertEquals(1, filtered.debitCards.size)
-        assertEquals("3333", filtered.debitCards.single().last4)
+        assertEquals(0, filtered.debitCards.size)
     }
 
     @Test

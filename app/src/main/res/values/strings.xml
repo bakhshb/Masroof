@@ -90,6 +90,11 @@
     <string name="settings_rename_card_title">تسمية البطاقة</string>
     <string name="settings_rename_account_title">تسمية الحساب</string>
     <string name="settings_action_rename">تسمية</string>
+    <string name="settings_account_type_title">نوع الحساب</string>
+    <string name="settings_account_type_current">حساب جاري</string>
+    <string name="settings_account_type_savings">حساب توفير</string>
+    <string name="settings_account_type_wallet">محفظة</string>
+    <string name="settings_action_cancel">إلغاء</string>
     <string name="settings_action_network">الشبكة</string>
     <string name="settings_action_role">الدور</string>
     <string name="settings_action_link_account">ربط حساب</string>

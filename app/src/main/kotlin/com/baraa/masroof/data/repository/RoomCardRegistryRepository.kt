@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.mapper.RegistryMapper
@@ -15,11 +16,16 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 
 class RoomCardRegistryRepository(
     private val dao: CardRegistryDao,
+    private val bankRegistryDao: com.baraa.masroof.data.room.dao.BankRegistryDao,
 ) : CardRegistryRepository {
     override suspend fun observe(reference: CardReference, rawSmsId: String) {
         if (!RegistryIdentity.isKnownBank(reference.bank)) return
         val last4 = reference.last4?.trim().orEmpty()
         if (last4.isEmpty()) return
+
+        bankRegistryDao.insertIfAbsent(
+            com.baraa.masroof.data.room.entity.BankRegistryEntity(bankId = reference.bank.id),
+        )
 
         dao.observeAtomic(
             entity = CardRegistryEntity(
@@ -162,5 +168,13 @@ class RoomCardRegistryRepository(
         if (affectedRows == 0) {
             throw IllegalArgumentException("card_update_failed")
         }
+    }
+
+    companion object {
+        fun from(database: MasroofDatabase): RoomCardRegistryRepository =
+            RoomCardRegistryRepository(
+                dao = database.cardRegistryDao(),
+                bankRegistryDao = database.bankRegistryDao(),
+            )
     }
 }

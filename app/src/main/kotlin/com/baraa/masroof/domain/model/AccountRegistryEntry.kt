@@ -10,6 +10,7 @@ data class AccountRegistryEntry(
     val maskedNumber: String,
     val ownership: OwnershipStatus,
     val displayName: String? = null,
+    val accountType: AccountType = AccountType.CURRENT,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
 )

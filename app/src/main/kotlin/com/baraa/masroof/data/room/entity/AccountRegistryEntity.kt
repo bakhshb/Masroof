@@ -15,6 +15,7 @@ data class AccountRegistryEntity(
     val maskedNumber: String,
     val ownershipStatus: String,
     val displayName: String? = null,
+    val accountType: String = "CURRENT",
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
 )

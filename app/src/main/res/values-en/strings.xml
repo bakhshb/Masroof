@@ -85,6 +85,11 @@
     <string name="settings_rename_card_title">Rename card</string>
     <string name="settings_rename_account_title">Rename account</string>
     <string name="settings_action_rename">Rename</string>
+    <string name="settings_account_type_title">Account type</string>
+    <string name="settings_account_type_current">Current account</string>
+    <string name="settings_account_type_savings">Savings account</string>
+    <string name="settings_account_type_wallet">Wallet</string>
+    <string name="settings_action_cancel">Cancel</string>
     <string name="settings_action_network">Network</string>
     <string name="settings_action_role">Role</string>
     <string name="settings_action_link_account">Link account</string>

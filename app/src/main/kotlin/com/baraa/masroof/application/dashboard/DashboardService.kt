@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import java.time.Clock
 import java.time.LocalDate
@@ -23,6 +24,7 @@ data class DashboardOverview(
     val transactions: List<com.baraa.masroof.domain.model.FinancialTransaction>,
     val creditCards: CreditCardsOverview,
     val creditFacilities: CreditFacilitiesOverview? = null,
+    val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,
     val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
     val flowDetailGrouping: CurrentAccountFlowDetailGrouping,
@@ -46,6 +48,7 @@ class DashboardService(
     private val appLocaleRepository: AppLocaleRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
+    private val loanRegistryRepository: LoanRegistryRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -57,6 +60,7 @@ class DashboardService(
             reviewRepository = reviewRepository,
             accountRegistryRepository = accountRegistryRepository,
             cardRegistryRepository = cardRegistryRepository,
+            loanRegistryRepository = loanRegistryRepository,
             appLocaleRepository = appLocaleRepository,
             sarEquivalentResolver = sarEquivalentResolver,
             zoneId = zoneId,
@@ -69,6 +73,7 @@ class DashboardService(
         val projection = loadProjection(period)
         return projection.toOverview().copy(
             creditFacilities = projection.creditFacilities,
+            bankHierarchy = projection.bankHierarchy,
             accountsFleet = projection.accountsFleet,
         )
     }

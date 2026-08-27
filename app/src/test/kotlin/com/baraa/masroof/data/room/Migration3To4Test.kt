@@ -149,7 +149,7 @@ class Migration3To4Test {
         try {
             assertEquals("preserved-p8", room.rawSmsDao().getById("android-sms:1")!!.body)
             assertEquals("PURCHASE", room.parsedEventDao().getById("pe-1")!!.messageFamily)
-            val accountRepo = RoomAccountRegistryRepository(room.accountRegistryDao())
+            val accountRepo = RoomAccountRegistryRepository.from(room)
             assertEquals(
                 OwnershipStatus.OWNED,
                 accountRepo.resolve(AccountReference(Bank.BANK_ALJAZIRA, "3001")),

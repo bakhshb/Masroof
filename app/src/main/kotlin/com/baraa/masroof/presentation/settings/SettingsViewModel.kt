@@ -22,6 +22,7 @@ import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
 import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
@@ -827,6 +828,7 @@ class SettingsViewModel(
                     maskedNumber = it.maskedNumber,
                     ownership = it.ownership,
                     displayName = it.displayName,
+                    accountType = it.accountType,
                 )
             }
             .sortedBy { it.maskedNumber }
@@ -839,8 +841,58 @@ class SettingsViewModel(
                 followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED },
                 unregisteredAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.UNKNOWN },
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
+                bankTrees = buildBankTrees(cardItems, accountItems),
                 error = null,
             )
         }
+    }
+
+    private fun buildBankTrees(
+        cards: List<ManagedCardUi>,
+        accounts: List<ManagedAccountUi>,
+    ): List<SettingsBankTreeUi> {
+        val bankIds = (cards.map { it.bank.id } + accounts.map { it.bank.id }).distinct().sorted()
+        return bankIds.map { bankId ->
+            val bank = Bank(bankId)
+            val bankCards = cards.filter { it.bank.id == bankId }
+            val bankAccounts = accounts.filter { it.bank.id == bankId }
+            SettingsBankTreeUi(
+                bank = bank,
+                currentAccounts = bankAccounts.filter { it.accountType == AccountType.CURRENT },
+                savingsAccounts = bankAccounts.filter { it.accountType == AccountType.SAVINGS },
+                walletAccounts = bankAccounts.filter { it.accountType == AccountType.WALLET },
+                creditCards = bankCards.filter { it.cardType != CardType.DEBIT },
+                debitCards = bankCards.filter { it.cardType == CardType.DEBIT },
+            )
+        }.filter { tree ->
+            tree.currentAccounts.isNotEmpty() ||
+                tree.savingsAccounts.isNotEmpty() ||
+                tree.walletAccounts.isNotEmpty() ||
+                tree.creditCards.isNotEmpty() ||
+                tree.debitCards.isNotEmpty()
+        }
+    }
+
+    fun openAccountTypePicker(account: ManagedAccountUi) {
+        _uiState.update { it.copy(accountTypeTarget = account) }
+    }
+
+    fun dismissAccountTypePicker() {
+        _uiState.update { it.copy(accountTypeTarget = null) }
+    }
+
+    fun setAccountTypeFromPicker(accountType: AccountType) {
+        val account = _uiState.value.accountTypeTarget ?: return
+        setAccountType(account, accountType)
+    }
+
+    fun setAccountType(account: ManagedAccountUi, accountType: AccountType) {
+        updateAccountMetadata(account) {
+            accountRegistryRepository.updateAccountType(
+                AccountReference(account.bank, account.maskedNumber),
+                accountType,
+            )
+        }
+        dismissAccountTypePicker()
     }
 }

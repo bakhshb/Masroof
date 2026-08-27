@@ -21,6 +21,7 @@ data class CardRegistryEntity(
     val linkedAccountMaskedNumber: String? = null,
     val parentCardLast4: String? = null,
     val cardRole: String? = null,
+    val creditFacilityId: String? = null,
     val firstSeenRawSmsId: String?,
     val lastSeenRawSmsId: String?,
 )

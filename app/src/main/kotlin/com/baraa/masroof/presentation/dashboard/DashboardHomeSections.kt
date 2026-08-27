@@ -325,6 +325,7 @@ private fun DashboardQuickCard(
 @Composable
 fun DashboardAccountsSection(
     accounts: List<OwnedAccountUi>,
+    bankHierarchy: com.baraa.masroof.application.dashboard.BankHierarchyOverview? = null,
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
 ) {
@@ -342,14 +343,25 @@ fun DashboardAccountsSection(
                 if (index > 0) {
                     Spacer(Modifier.height(4.dp))
                 }
-                DashboardAccountRow(account = account, index = index)
+                val debitCards = bankHierarchy?.banks
+                    .orEmpty()
+                    .flatMap { bank ->
+                        bank.currentAccounts.filter {
+                            it.bank == account.bank && it.maskedNumber == account.maskedNumber
+                        }.flatMap { it.debitCards }
+                    }
+                DashboardAccountRow(account = account, index = index, debitCards = debitCards)
             }
         }
     }
 }
 
 @Composable
-private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
+private fun DashboardAccountRow(
+    account: OwnedAccountUi,
+    index: Int,
+    debitCards: List<com.baraa.masroof.application.dashboard.DebitCardOverview> = emptyList(),
+) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
     val movement = summary?.cashPosition()
@@ -422,6 +434,28 @@ private fun DashboardAccountRow(account: OwnedAccountUi, index: Int) {
                     }
                 } ?: MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+    if (debitCards.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        debitCards.forEach { debit ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    debit.displayLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }

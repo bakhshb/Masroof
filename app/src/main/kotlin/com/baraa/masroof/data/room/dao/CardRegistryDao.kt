@@ -185,12 +185,15 @@ interface CardRegistryDao {
             detachSupplementariesOfPrimary(bankId, primaryLast4)
         }
         demoteOtherPrimaryCards(bankId, last4)
+        val facilityId = "facility:$bankId:$last4"
+        insertFacilityIfAbsent(facilityId, bankId, last4)
         updateCardRole(
             bankId = bankId,
             last4 = last4,
             cardRole = "PRIMARY",
             parentCardLast4 = null,
         )
+        updateCreditFacilityId(bankId, last4, facilityId)
         updateCardType(bankId, last4, "CREDIT")
     }
 
@@ -200,12 +203,15 @@ interface CardRegistryDao {
         if (existing?.cardRole == "PRIMARY") {
             detachSupplementariesOfPrimary(bankId, last4)
         }
+        val facilityId = "facility:$bankId:$parentLast4"
+        insertFacilityIfAbsent(facilityId, bankId, parentLast4)
         updateCardRole(
             bankId = bankId,
             last4 = last4,
             cardRole = "SUPPLEMENTARY",
             parentCardLast4 = parentLast4,
         )
+        updateCreditFacilityId(bankId, last4, facilityId)
         updateCardType(bankId, last4, "CREDIT")
     }
 
@@ -216,12 +222,15 @@ interface CardRegistryDao {
             detachSupplementariesOfPrimary(bankId, last4)
         }
         clearSupplementaryRole(bankId, last4)
+        val facilityId = "facility:$bankId:$last4"
+        insertFacilityIfAbsent(facilityId, bankId, last4)
         updateCardRole(
             bankId = bankId,
             last4 = last4,
             cardRole = "STANDALONE",
             parentCardLast4 = null,
         )
+        updateCreditFacilityId(bankId, last4, facilityId)
     }
 
     @Transaction
@@ -232,7 +241,7 @@ interface CardRegistryDao {
         linkedAccountMaskedNumber: String,
         defaultMadaWhenNetworkMissing: Boolean,
     ) {
-        clearFacilityRoleAtomic(bankId, last4)
+        clearCreditFacilityRoleOnlyAtomic(bankId, last4)
         updateLinkedAccount(
             bankId = bankId,
             last4 = last4,
@@ -251,10 +260,43 @@ interface CardRegistryDao {
         last4: String,
         defaultMadaWhenNetworkMissing: Boolean,
     ) {
-        clearFacilityRoleAtomic(bankId, last4)
+        clearCreditFacilityRoleOnlyAtomic(bankId, last4)
         updateCardType(bankId, last4, "DEBIT")
         if (defaultMadaWhenNetworkMissing && get(bankId, last4)?.cardNetwork == null) {
             updateCardNetwork(bankId, last4, "MADA")
         }
     }
+
+    @Transaction
+    suspend fun clearCreditFacilityRoleOnlyAtomic(bankId: String, last4: String) {
+        val existing = get(bankId, last4)
+        if (existing?.cardRole == "PRIMARY") {
+            detachSupplementariesOfPrimary(bankId, last4)
+        }
+        clearSupplementaryRole(bankId, last4)
+        updateCardRole(
+            bankId = bankId,
+            last4 = last4,
+            cardRole = null,
+            parentCardLast4 = null,
+        )
+        updateCreditFacilityId(bankId, last4, null)
+    }
+
+    @Query(
+        """
+        INSERT OR IGNORE INTO credit_facility (id, bankId, primaryLast4, displayName)
+        VALUES (:id, :bankId, :primaryLast4, NULL)
+        """,
+    )
+    suspend fun insertFacilityIfAbsent(id: String, bankId: String, primaryLast4: String)
+
+    @Query(
+        """
+        UPDATE card_registry
+        SET creditFacilityId = :facilityId
+        WHERE bankId = :bankId AND last4 = :last4
+        """,
+    )
+    suspend fun updateCreditFacilityId(bankId: String, last4: String, facilityId: String?)
 }

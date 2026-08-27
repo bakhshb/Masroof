@@ -45,8 +45,8 @@ class OwnershipDiscoveryServiceTest {
         db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        accounts = RoomAccountRegistryRepository.from(db)
+        cards = RoomCardRegistryRepository.from(db)
         discovery = OwnershipDiscoveryService(accounts, cards)
     }
 

@@ -527,5 +527,10 @@ class SettingsViewModelTest {
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
 
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+
+        override suspend fun updateAccountType(
+            reference: AccountReference,
+            accountType: com.baraa.masroof.domain.model.AccountType,
+        ) = Unit
     }
 }

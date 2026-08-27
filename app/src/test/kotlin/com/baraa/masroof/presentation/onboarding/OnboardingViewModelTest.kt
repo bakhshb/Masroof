@@ -603,6 +603,7 @@ AccountRegistryEntry(
             entries.firstOrNull { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
         override suspend fun listAll(): List<AccountRegistryEntry> = entries.toList()
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+            override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
         fun addUnknown(maskedNumber: String) {
             entries += AccountRegistryEntry(
                 Bank.BANK_ALJAZIRA,

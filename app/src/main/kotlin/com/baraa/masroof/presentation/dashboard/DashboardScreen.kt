@@ -319,6 +319,7 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
+                        bankHierarchy = state.bankHierarchy,
                         onViewAll = onOpenAccountsSummary,
                     )
                 }
