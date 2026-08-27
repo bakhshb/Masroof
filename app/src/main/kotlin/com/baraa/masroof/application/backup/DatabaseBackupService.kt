@@ -87,6 +87,7 @@ class DatabaseBackupService(
             val importableVersions = mapOf(
                 MasroofDatabase.LEGACY_VERSION_5 to MasroofDatabase.LEGACY_IDENTITY_HASH_5,
                 MasroofDatabase.LEGACY_VERSION_6 to MasroofDatabase.LEGACY_IDENTITY_HASH_6,
+                MasroofDatabase.LEGACY_VERSION_7 to MasroofDatabase.LEGACY_IDENTITY_HASH_7,
                 MasroofDatabase.PREVIOUS_VERSION to MasroofDatabase.PREVIOUS_IDENTITY_HASH,
             )
             if (!BackupPackageCodec.validateManifestForImport(

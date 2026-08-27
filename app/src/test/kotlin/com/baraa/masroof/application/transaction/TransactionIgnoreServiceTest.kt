@@ -74,6 +74,7 @@ class TransactionIgnoreServiceTest {
             ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
                 com.baraa.masroof.data.repository.RoomAccountRegistryRepository.from(db),
                 com.baraa.masroof.data.repository.RoomCardRegistryRepository.from(db),
+                com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
             ),
             reviewRepository = reviewRepo,
         )

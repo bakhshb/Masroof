@@ -156,6 +156,14 @@ class MonthlyFinancialSummaryCalculatorTest {
         assertEquals(0, summary.excludedOtherCurrencyCount)
     }
 
+    @Test
+    fun loanRepayment_notCreditCardPaymentOrSpending() {
+        val summary = summarize(tx(FinancialTransactionType.LOAN_REPAYMENT, "3036.11"))
+        assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
+        assertEquals(Money.zero(Currency.SAR), summary.creditCardPayments)
+        assertEquals(1, summary.transactionCount)
+    }
+
     private fun summarize(vararg transactions: FinancialTransaction): MonthlyFinancialSummary =
         MonthlyFinancialSummaryCalculator.summarize(
             period = period,

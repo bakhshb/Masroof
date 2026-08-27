@@ -100,6 +100,7 @@ fun MessageFamily?.toUiLabelRes(): Int? =
         MessageFamily.REFUND -> com.baraa.masroof.R.string.review_family_refund
         MessageFamily.WITHDRAWAL -> com.baraa.masroof.R.string.review_family_withdrawal
         MessageFamily.FEE -> com.baraa.masroof.R.string.review_family_fee
+        MessageFamily.FINANCING_INSTALLMENT -> com.baraa.masroof.R.string.review_family_financing_installment
         MessageFamily.UNKNOWN -> com.baraa.masroof.R.string.review_family_unknown
         else -> null
     }
@@ -112,6 +113,7 @@ fun FinancialTransactionType.toUiLabelRes(): Int =
         FinancialTransactionType.REFUND -> com.baraa.masroof.R.string.txn_type_refund
         FinancialTransactionType.CASH_WITHDRAWAL -> com.baraa.masroof.R.string.txn_type_cash_withdrawal
         FinancialTransactionType.BILL_PAYMENT -> com.baraa.masroof.R.string.txn_type_bill_payment
+        FinancialTransactionType.LOAN_REPAYMENT -> com.baraa.masroof.R.string.txn_type_loan_repayment
         FinancialTransactionType.FEE -> com.baraa.masroof.R.string.txn_type_fee
         FinancialTransactionType.ADJUSTMENT -> com.baraa.masroof.R.string.txn_type_adjustment
         FinancialTransactionType.SELF_TRANSFER -> com.baraa.masroof.R.string.txn_type_self_transfer

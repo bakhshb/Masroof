@@ -17,6 +17,7 @@ data class AccountOutflow(
     val billPayments: Money,
     val posPurchases: Money,
     val fees: Money,
+    val loanRepayments: Money,
     val selfTransfersOut: Money,
 ) {
     val coreTotal: Money
@@ -25,7 +26,8 @@ data class AccountOutflow(
             cashWithdrawals +
             billPayments +
             posPurchases +
-            fees
+            fees +
+            loanRepayments
 
     val total: Money
         get() = coreTotal + selfTransfersOut
@@ -37,6 +39,7 @@ data class AccountOutflow(
         require(billPayments.currency == currency)
         require(posPurchases.currency == currency)
         require(fees.currency == currency)
+        require(loanRepayments.currency == currency)
         require(selfTransfersOut.currency == currency)
     }
 
@@ -50,6 +53,7 @@ data class AccountOutflow(
                 billPayments = Money.zero(currency),
                 posPurchases = Money.zero(currency),
                 fees = Money.zero(currency),
+                loanRepayments = Money.zero(currency),
                 selfTransfersOut = Money.zero(currency),
             )
 
@@ -69,6 +73,7 @@ data class AccountOutflow(
             billPayments = billPayments + other.billPayments,
             posPurchases = posPurchases + other.posPurchases,
             fees = fees + other.fees,
+            loanRepayments = loanRepayments + other.loanRepayments,
             selfTransfersOut = selfTransfersOut + other.selfTransfersOut,
         )
     }

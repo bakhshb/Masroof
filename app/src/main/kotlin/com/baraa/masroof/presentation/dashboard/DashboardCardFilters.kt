@@ -2,7 +2,6 @@ package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
-import com.baraa.masroof.application.dashboard.DebitCardOverview
 
 fun DashboardUiState.followedCreditCardsOverview(): CreditCardsOverview? {
     val overview = creditCards ?: return null

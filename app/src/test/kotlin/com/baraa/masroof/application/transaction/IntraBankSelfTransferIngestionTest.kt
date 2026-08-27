@@ -28,6 +28,7 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -98,7 +99,7 @@ class IntraBankSelfTransferIngestionTest {
     cards = RoomCardRegistryRepository.from(db)
     confirmation = OwnershipConfirmationService(accounts, cards)
 
-    val ownershipResolver = OwnershipResolver(accounts, cards)
+    val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
     val reconciliation = TransactionReconciliationService(
       parsedEventRepository = parsedRepo,
       rawSmsRepository = rawRepo,
@@ -116,7 +117,7 @@ class IntraBankSelfTransferIngestionTest {
       rawSmsRepository = rawRepo,
       parsedEventRepository = parsedRepo,
       bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),
-      ownershipDiscovery = OwnershipDiscoveryService(accounts, cards),
+      ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository),
       reconciliation = reconciliation,
       reviewQueueUpdater = reviewQueueUpdater,
     )

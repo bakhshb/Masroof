@@ -8,6 +8,7 @@ import com.baraa.masroof.bank.aljazira.extraction.BillerExtractor
 import com.baraa.masroof.bank.aljazira.extraction.CardExtractor
 import com.baraa.masroof.bank.aljazira.extraction.CounterpartyExtractor
 import com.baraa.masroof.bank.aljazira.extraction.DateTimeExtractor
+import com.baraa.masroof.bank.aljazira.extraction.LoanLabelExtractor
 import com.baraa.masroof.bank.aljazira.extraction.MerchantExtractor
 import com.baraa.masroof.bank.aljazira.extraction.ReferenceExtractor
 import com.baraa.masroof.domain.model.Bank
@@ -40,6 +41,7 @@ class AlJaziraMessageParser(
     private val merchantExtractor: MerchantExtractor = MerchantExtractor(),
     private val counterpartyExtractor: CounterpartyExtractor = CounterpartyExtractor(),
     private val billerExtractor: BillerExtractor = BillerExtractor(),
+    private val loanLabelExtractor: LoanLabelExtractor = LoanLabelExtractor(),
     private val referenceExtractor: ReferenceExtractor = ReferenceExtractor(),
     private val dateTimeExtractor: DateTimeExtractor = DateTimeExtractor(),
     private val finalizer: ParseFinalizer = ParseFinalizer(DefaultParsedEventValidator()),
@@ -84,6 +86,7 @@ class AlJaziraMessageParser(
         }
         val counterparty = when (classification.family) {
             MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT -> counterpartyExtractor.extract(normalized)
+            MessageFamily.FINANCING_INSTALLMENT -> loanLabelExtractor.extract(normalized)
             else -> null
         }
 

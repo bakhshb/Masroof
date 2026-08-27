@@ -342,6 +342,7 @@
     <string name="dashboard_spending_total_hint">Includes everything that left your current account in this period</string>
     <string name="dashboard_pos_purchases_short">Mada purchase</string>
     <string name="dashboard_fees_short">Fees</string>
+    <string name="dashboard_loan_repayments">Loan repayments</string>
     <string name="dashboard_credit_card_payment">Credit card payment</string>
     <string name="dashboard_spending_split_title">Spending summary</string>
     <string name="dashboard_spending_from_account">Mada POS &amp; bills</string>
@@ -500,6 +501,7 @@
     <string name="txn_type_refund">Refund</string>
     <string name="txn_type_cash_withdrawal">Cash withdrawal</string>
     <string name="txn_type_bill_payment">Bill payment</string>
+    <string name="txn_type_loan_repayment">Loan repayment</string>
     <string name="txn_type_fee">Fee</string>
     <string name="txn_type_adjustment">Adjustment</string>
     <string name="txn_type_unknown">Unknown</string>
@@ -551,6 +553,7 @@
     <string name="review_family_refund">Refund</string>
     <string name="review_family_withdrawal">Cash withdrawal</string>
     <string name="review_family_fee">Fee</string>
+    <string name="review_family_financing_installment">Loan installment</string>
     <string name="review_family_unknown">Unknown</string>
     <string name="review_reason_transfer_pending_match">Transfer pending counterpart match</string>
     <string name="review_reason_bill_payment">Bill payment needs manual classification</string>
