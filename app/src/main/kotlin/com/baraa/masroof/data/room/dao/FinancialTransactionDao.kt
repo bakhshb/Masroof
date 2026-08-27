@@ -120,6 +120,47 @@ interface FinancialTransactionDao {
         return true
     }
 
+    /**
+     * Atomically removes exclusive stale external rows blocking [links], then saves
+     * [entity]. Rolls back together when pre-checks fail or the write cannot complete.
+     */
+    @Transaction
+    suspend fun replaceExclusiveStaleLinksAtomic(
+        entity: FinancialTransactionEntity,
+        links: List<FinancialTransactionRawSmsLinkEntity>,
+        staleRawSmsIds: List<String>,
+    ): SaveAtomicOutcome {
+        val staleTransactionIds = mutableSetOf<String>()
+        for (rawSmsId in staleRawSmsIds.distinct()) {
+            val link = findLinkByRawSmsId(rawSmsId) ?: continue
+            if (link.transactionId == entity.id) continue
+            val linkedRawSmsIds = listRawSmsIdsForTransaction(link.transactionId)
+            if (linkedRawSmsIds.size != 1 || linkedRawSmsIds.single() != rawSmsId) {
+                return SaveAtomicOutcome.Conflict(rawSmsId, link.transactionId)
+            }
+            staleTransactionIds += link.transactionId
+        }
+
+        for (link in links) {
+            val existing = findLinkByRawSmsId(link.rawSmsId)
+            if (existing != null &&
+                existing.transactionId != entity.id &&
+                existing.transactionId !in staleTransactionIds
+            ) {
+                return SaveAtomicOutcome.Conflict(link.rawSmsId, existing.transactionId)
+            }
+        }
+
+        for (rawSmsId in staleRawSmsIds.distinct()) {
+            val link = findLinkByRawSmsId(rawSmsId) ?: continue
+            if (link.transactionId == entity.id) continue
+            deleteLinkByRawSmsId(rawSmsId)
+            deleteTransactionById(link.transactionId)
+        }
+
+        return saveAtomic(entity, links)
+    }
+
     @Transaction
     suspend fun saveAtomic(
         entity: FinancialTransactionEntity,

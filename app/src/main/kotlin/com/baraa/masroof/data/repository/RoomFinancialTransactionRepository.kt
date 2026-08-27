@@ -18,6 +18,33 @@ class RoomFinancialTransactionRepository(
     override suspend fun save(
         transaction: FinancialTransaction,
         rawSmsIds: Collection<String>,
+    ): FinancialTransactionSaveResult =
+        persist(transaction, rawSmsIds, dao::saveAtomic)
+
+    override suspend fun replaceExclusiveStaleLinks(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+        staleRawSmsIds: Collection<String>,
+    ): FinancialTransactionSaveResult =
+        persist(
+            transaction = transaction,
+            rawSmsIds = rawSmsIds,
+            save = { entity, links ->
+                dao.replaceExclusiveStaleLinksAtomic(
+                    entity = entity,
+                    links = links,
+                    staleRawSmsIds = staleRawSmsIds.map { it.trim() }.filter { it.isNotEmpty() },
+                )
+            },
+        )
+
+    private suspend fun persist(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+        save: suspend (
+            entity: com.baraa.masroof.data.room.entity.FinancialTransactionEntity,
+            links: List<FinancialTransactionRawSmsLinkEntity>,
+        ) -> FinancialTransactionDao.SaveAtomicOutcome,
     ): FinancialTransactionSaveResult {
         val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
         require(ids.isNotEmpty()) { "rawSmsIds required" }
@@ -25,7 +52,7 @@ class RoomFinancialTransactionRepository(
         val entity = FinancialTransactionMapper.toEntity(transaction)
         val links = ids.map { FinancialTransactionRawSmsLinkEntity(it, transaction.id) }
 
-        return when (val outcome = dao.saveAtomic(entity, links)) {
+        return when (val outcome = save(entity, links)) {
             FinancialTransactionDao.SaveAtomicOutcome.Saved ->
                 FinancialTransactionSaveResult.Saved
 

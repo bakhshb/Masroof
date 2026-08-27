@@ -502,15 +502,16 @@ class TransactionReconciliationService(
             PersistOutcome.Failed -> Unit
         }
 
-        val deletedAll = staleRawSmsIds.all { rawSmsId ->
-            financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
-        }
-        if (!deletedAll) return UpgradePersistOutcome.Failed
-
-        return when (persist(transaction, rawSmsIds)) {
-            PersistOutcome.Saved -> UpgradePersistOutcome.Saved
-            PersistOutcome.Already -> UpgradePersistOutcome.Already
-            PersistOutcome.Failed -> UpgradePersistOutcome.Failed
+        return when (
+            financialTransactionRepository.replaceExclusiveStaleLinks(
+                transaction = transaction,
+                rawSmsIds = rawSmsIds,
+                staleRawSmsIds = staleRawSmsIds,
+            )
+        ) {
+            FinancialTransactionSaveResult.Saved -> UpgradePersistOutcome.Saved
+            FinancialTransactionSaveResult.AlreadyExists -> UpgradePersistOutcome.Already
+            is FinancialTransactionSaveResult.Conflict -> UpgradePersistOutcome.Failed
         }
     }
 
