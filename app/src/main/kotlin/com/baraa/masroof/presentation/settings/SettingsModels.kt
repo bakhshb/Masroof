@@ -55,7 +55,12 @@ data class SettingsBankTreeUi(
     val creditCards: List<ManagedCardUi>,
     val unlinkedDebitCards: List<ManagedCardUi> = emptyList(),
     val loans: List<ManagedLoanUi> = emptyList(),
-)
+) {
+    /** All owned debit cards for this bank, including those linked to current accounts. */
+    val allDebitCards: List<ManagedCardUi>
+        get() = (currentAccountNodes.flatMap { it.debitCards } + unlinkedDebitCards)
+            .distinctBy { it.id }
+}
 
 data class SettingsCurrentAccountNodeUi(
     val account: ManagedAccountUi,
