@@ -1,57 +1,51 @@
 package com.baraa.masroof.presentation.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RegistryCategorySubtitleTest {
     @Test
     fun stoppedOnly_whenNoFollowedOrUnregistered() {
-        val subtitle = registryCategorySubtitle(
+        val state = resolveRegistryCategorySubtitle(
             followed = 0,
             unregistered = 0,
             stopped = 2,
-            emptyLabel = "empty",
-            followedUnregisteredLabel = { _, _ -> "unregistered" },
-            followedOnlyLabel = { "followed $it" },
-            stoppedOnlyLabel = { "stopped $it" },
-            followedStoppedLabel = { followed, stopped -> "$followed+$stopped" },
-            stoppedSuffix = { " +$it" },
         )
 
-        assertEquals("stopped 2", subtitle)
+        assertTrue(state is RegistryCategorySubtitleState.StoppedOnly)
+        assertEquals(2, (state as RegistryCategorySubtitleState.StoppedOnly).stopped)
     }
 
     @Test
     fun followedAndStopped_whenBothPresent() {
-        val subtitle = registryCategorySubtitle(
+        val state = resolveRegistryCategorySubtitle(
             followed = 2,
             unregistered = 0,
             stopped = 1,
-            emptyLabel = "empty",
-            followedUnregisteredLabel = { _, _ -> "unregistered" },
-            followedOnlyLabel = { "followed $it" },
-            stoppedOnlyLabel = { "stopped $it" },
-            followedStoppedLabel = { followed, stopped -> "$followed+$stopped" },
-            stoppedSuffix = { " +$it" },
         )
 
-        assertEquals("2+1", subtitle)
+        assertEquals(
+            RegistryCategorySubtitleState.FollowedStopped(followed = 2, stopped = 1),
+            state,
+        )
     }
 
     @Test
-    fun appendsStoppedSuffix_whenUnregisteredAndStopped() {
-        val subtitle = registryCategorySubtitle(
+    fun includesStopped_whenUnregisteredAndStopped() {
+        val state = resolveRegistryCategorySubtitle(
             followed = 1,
             unregistered = 1,
             stopped = 2,
-            emptyLabel = "empty",
-            followedUnregisteredLabel = { followed, unregistered -> "$followed/$unregistered" },
-            followedOnlyLabel = { "followed $it" },
-            stoppedOnlyLabel = { "stopped $it" },
-            followedStoppedLabel = { followed, stopped -> "$followed+$stopped" },
-            stoppedSuffix = { " +$it" },
         )
 
-        assertEquals("1/1 +2", subtitle)
+        assertEquals(
+            RegistryCategorySubtitleState.FollowedUnregistered(
+                followed = 1,
+                unregistered = 1,
+                stopped = 2,
+            ),
+            state,
+        )
     }
 }

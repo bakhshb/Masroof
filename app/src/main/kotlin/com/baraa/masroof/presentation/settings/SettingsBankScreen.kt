@@ -25,47 +25,29 @@ fun SettingsBankScreen(
     onOpenCards: () -> Unit,
     onOpenLoans: () -> Unit,
 ) {
-    val accountsSubtitle = registryCategorySubtitle(
-        followed = summary.followedAccountCount,
-        unregistered = summary.unregisteredAccountCount,
-        stopped = summary.stoppedAccountCount,
+    val accountsSubtitle = formatRegistryCategorySubtitle(
+        state = resolveRegistryCategorySubtitle(
+            followed = summary.followedAccountCount,
+            unregistered = summary.unregisteredAccountCount,
+            stopped = summary.stoppedAccountCount,
+        ),
         emptyLabel = stringResource(R.string.settings_accounts_empty),
-        followedUnregisteredLabel = { followed, unregistered ->
-            stringResource(R.string.settings_hub_accounts_subtitle, followed, unregistered)
-        },
-        followedOnlyLabel = { followed ->
-            stringResource(R.string.settings_hub_accounts_subtitle_followed_only, followed)
-        },
-        stoppedOnlyLabel = { stopped ->
-            stringResource(R.string.settings_hub_accounts_subtitle_stopped_only, stopped)
-        },
-        followedStoppedLabel = { followed, stopped ->
-            stringResource(R.string.settings_hub_accounts_subtitle_followed_stopped, followed, stopped)
-        },
-        stoppedSuffix = { stopped ->
-            stringResource(R.string.settings_bank_category_stopped_suffix, stopped)
-        },
+        followedUnregisteredRes = R.string.settings_hub_accounts_subtitle,
+        followedOnlyRes = R.string.settings_hub_accounts_subtitle_followed_only,
+        stoppedOnlyRes = R.string.settings_hub_accounts_subtitle_stopped_only,
+        followedStoppedRes = R.string.settings_hub_accounts_subtitle_followed_stopped,
     )
-    val cardsSubtitle = registryCategorySubtitle(
-        followed = summary.followedCardCount,
-        unregistered = summary.unregisteredCardCount,
-        stopped = summary.stoppedCardCount,
+    val cardsSubtitle = formatRegistryCategorySubtitle(
+        state = resolveRegistryCategorySubtitle(
+            followed = summary.followedCardCount,
+            unregistered = summary.unregisteredCardCount,
+            stopped = summary.stoppedCardCount,
+        ),
         emptyLabel = stringResource(R.string.settings_cards_empty),
-        followedUnregisteredLabel = { followed, unregistered ->
-            stringResource(R.string.settings_hub_cards_subtitle, followed, unregistered)
-        },
-        followedOnlyLabel = { followed ->
-            stringResource(R.string.settings_hub_cards_subtitle_followed_only, followed)
-        },
-        stoppedOnlyLabel = { stopped ->
-            stringResource(R.string.settings_hub_cards_subtitle_stopped_only, stopped)
-        },
-        followedStoppedLabel = { followed, stopped ->
-            stringResource(R.string.settings_hub_cards_subtitle_followed_stopped, followed, stopped)
-        },
-        stoppedSuffix = { stopped ->
-            stringResource(R.string.settings_bank_category_stopped_suffix, stopped)
-        },
+        followedUnregisteredRes = R.string.settings_hub_cards_subtitle,
+        followedOnlyRes = R.string.settings_hub_cards_subtitle_followed_only,
+        stoppedOnlyRes = R.string.settings_hub_cards_subtitle_stopped_only,
+        followedStoppedRes = R.string.settings_hub_cards_subtitle_followed_stopped,
     )
     val loansSubtitle = if (summary.loanCount > 0) {
         stringResource(R.string.settings_bank_summary_loans, summary.loanCount)
@@ -111,24 +93,87 @@ fun SettingsBankScreen(
     }
 }
 
-internal fun registryCategorySubtitle(
+internal sealed interface RegistryCategorySubtitleState {
+    data object Empty : RegistryCategorySubtitleState
+
+    data class FollowedUnregistered(
+        val followed: Int,
+        val unregistered: Int,
+        val stopped: Int,
+    ) : RegistryCategorySubtitleState
+
+    data class FollowedStopped(
+        val followed: Int,
+        val stopped: Int,
+    ) : RegistryCategorySubtitleState
+
+    data class StoppedOnly(
+        val stopped: Int,
+    ) : RegistryCategorySubtitleState
+
+    data class FollowedOnly(
+        val followed: Int,
+    ) : RegistryCategorySubtitleState
+}
+
+internal fun resolveRegistryCategorySubtitle(
     followed: Int,
     unregistered: Int,
     stopped: Int,
-    emptyLabel: String,
-    followedUnregisteredLabel: (Int, Int) -> String,
-    followedOnlyLabel: (Int) -> String,
-    stoppedOnlyLabel: (Int) -> String,
-    followedStoppedLabel: (Int, Int) -> String,
-    stoppedSuffix: (Int) -> String,
-): String {
+): RegistryCategorySubtitleState {
     val total = followed + unregistered + stopped
-    if (total == 0) return emptyLabel
+    if (total == 0) return RegistryCategorySubtitleState.Empty
     if (unregistered > 0) {
-        val base = followedUnregisteredLabel(followed, unregistered)
-        return if (stopped > 0) base + stoppedSuffix(stopped) else base
+        return RegistryCategorySubtitleState.FollowedUnregistered(
+            followed = followed,
+            unregistered = unregistered,
+            stopped = stopped,
+        )
     }
-    if (followed > 0 && stopped > 0) return followedStoppedLabel(followed, stopped)
-    if (stopped > 0) return stoppedOnlyLabel(stopped)
-    return followedOnlyLabel(followed)
+    if (followed > 0 && stopped > 0) {
+        return RegistryCategorySubtitleState.FollowedStopped(
+            followed = followed,
+            stopped = stopped,
+        )
+    }
+    if (stopped > 0) return RegistryCategorySubtitleState.StoppedOnly(stopped)
+    return RegistryCategorySubtitleState.FollowedOnly(followed)
 }
+
+@Composable
+private fun formatRegistryCategorySubtitle(
+    state: RegistryCategorySubtitleState,
+    emptyLabel: String,
+    followedUnregisteredRes: Int,
+    followedOnlyRes: Int,
+    stoppedOnlyRes: Int,
+    followedStoppedRes: Int,
+): String =
+    when (state) {
+        RegistryCategorySubtitleState.Empty -> emptyLabel
+        is RegistryCategorySubtitleState.FollowedUnregistered -> {
+            val base = stringResource(
+                followedUnregisteredRes,
+                state.followed,
+                state.unregistered,
+            )
+            if (state.stopped > 0) {
+                base + stringResource(R.string.settings_bank_category_stopped_suffix, state.stopped)
+            } else {
+                base
+            }
+        }
+        is RegistryCategorySubtitleState.FollowedStopped -> stringResource(
+            followedStoppedRes,
+            state.followed,
+            state.stopped,
+        )
+        is RegistryCategorySubtitleState.StoppedOnly -> stringResource(
+            stoppedOnlyRes,
+            state.stopped,
+        )
+        is RegistryCategorySubtitleState.FollowedOnly -> stringResource(
+            followedOnlyRes,
+            state.followed,
+        )
+    }
