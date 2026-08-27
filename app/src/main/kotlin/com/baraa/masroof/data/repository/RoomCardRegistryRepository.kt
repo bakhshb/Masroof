@@ -30,7 +30,7 @@ class RoomCardRegistryRepository(
 
         dao.observeAtomic(
             entity = CardRegistryEntity(
-                id = RegistryEntityIdFactory.stableCardId(reference.bank.id, last4),
+                id = RegistryEntityIdFactory.newCardId(),
                 bankId = reference.bank.id,
                 last4 = last4,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
@@ -48,7 +48,7 @@ class RoomCardRegistryRepository(
 
         dao.setOwnershipAtomic(
             entity = CardRegistryEntity(
-                id = RegistryEntityIdFactory.stableCardId(reference.bank.id, last4),
+                id = RegistryEntityIdFactory.newCardId(),
                 bankId = reference.bank.id,
                 last4 = last4,
                 ownershipStatus = status.name,

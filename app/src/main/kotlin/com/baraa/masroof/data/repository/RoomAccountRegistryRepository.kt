@@ -27,7 +27,7 @@ class RoomAccountRegistryRepository(
         // IGNORE-insert as UNKNOWN; never overwrites ownership on conflict.
         dao.observeAtomic(
             entity = AccountRegistryEntity(
-                id = RegistryEntityIdFactory.stableAccountId(reference.bank.id, masked),
+                id = RegistryEntityIdFactory.newAccountId(),
                 bankId = reference.bank.id,
                 maskedNumber = masked,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
@@ -47,7 +47,7 @@ class RoomAccountRegistryRepository(
         // Confirmation-before-observation may create a row with null seen metadata.
         dao.setOwnershipAtomic(
             entity = AccountRegistryEntity(
-                id = RegistryEntityIdFactory.stableAccountId(reference.bank.id, masked),
+                id = RegistryEntityIdFactory.newAccountId(),
                 bankId = reference.bank.id,
                 maskedNumber = masked,
                 ownershipStatus = status.name,

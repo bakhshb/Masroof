@@ -6,6 +6,9 @@ import java.util.UUID
 /**
  * Opaque, stable registry entity ids. Bank-scoped identifiers (masked number, last4)
  * are lookup keys — not canonical identity.
+ *
+ * New rows use random ids ([newAccountId]/[newCardId]). Migrations assign stable ids
+ * for existing rows only. Card uniqueness remains (bankId, last4) in the database.
  */
 object RegistryEntityIdFactory {
     fun newAccountId(): String = "areg_${randomToken()}"

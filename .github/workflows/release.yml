@@ -124,16 +124,3 @@ jobs:
             masroof-*.apk
             version.json
           generate_release_notes: true
-
-      - name: Commit version bump to main
-        if: steps.skip.outputs.skip != 'true' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        run: |
-          chmod +x scripts/bump-version.sh
-          ./scripts/bump-version.sh
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
-          git commit -m "chore: bump version to ${VERSION_NAME}"
-          git push
