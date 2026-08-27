@@ -44,30 +44,16 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
 
-      - name: Verify versionCode beats latest published release
-        if: steps.skip.outputs.skip != 'true'
+      - name: Determine release action
+        id: release_plan
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          chmod +x scripts/ensure-version-code-monotonic.sh
-          ./scripts/ensure-version-code-monotonic.sh
-
-      - name: Skip if release already published
-        id: skip
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${TAG} already exists — skipping build."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "No existing release for ${TAG} — will build."
-          fi
+          chmod +x scripts/resolve-release-action.sh
+          ./scripts/resolve-release-action.sh "${{ steps.version.outputs.tag }}"
 
       - name: Set up JDK 17
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -75,7 +61,7 @@ jobs:
           cache: gradle
 
       - name: Decode release keystore
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
@@ -86,7 +72,7 @@ jobs:
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
 
       - name: Create keystore.properties
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -100,11 +86,11 @@ jobs:
           EOF
 
       - name: Build release APK
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare release artifacts
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
           VERSION_CODE="${{ steps.version.outputs.version_code }}"
@@ -123,7 +109,7 @@ jobs:
           cat version.json
 
       - name: Publish GitHub Release
-        if: steps.skip.outputs.skip != 'true'
+        if: steps.release_plan.outputs.action == 'build'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -132,3 +118,12 @@ jobs:
             masroof-*.apk
             version.json
           generate_release_notes: true
+
+      - name: Release summary
+        if: always()
+        run: |
+          {
+            echo "### Release result"
+            echo ""
+            echo "${{ steps.release_plan.outputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"
