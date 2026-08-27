@@ -23,6 +23,8 @@ enum class FinancialTransactionType {
     REFUND,
     CASH_WITHDRAWAL,
     BILL_PAYMENT,
+    /** Account → loan liability settlement; not ordinary spending (like credit card payment). */
+    LOAN_REPAYMENT,
     FEE,
     ADJUSTMENT,
     UNKNOWN,

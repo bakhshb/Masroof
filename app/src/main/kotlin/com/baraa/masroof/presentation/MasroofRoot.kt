@@ -167,7 +167,7 @@ fun MasroofRoot(
                 viewModel = dashboardViewModel,
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageAccounts = {
-                    pendingSettingsDestination = SettingsDestination.MyAccounts
+                    pendingSettingsDestination = SettingsDestination.Banks
                     homeDestination = HomeDestination.Settings
                 },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
@@ -182,7 +182,7 @@ fun MasroofRoot(
                 viewModel = dashboardViewModel,
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageCards = {
-                    pendingSettingsDestination = SettingsDestination.MyCards
+                    pendingSettingsDestination = SettingsDestination.Banks
                     homeDestination = HomeDestination.Settings
                 },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
@@ -335,8 +335,8 @@ private fun handleNotificationAction(
         NotificationAction.REQUEST_SMS_PERMISSION -> onRequestPermissions()
         NotificationAction.OPEN_APP_SETTINGS -> onOpenAppSettings()
         NotificationAction.OPEN_REVIEW -> onOpenReview()
-        NotificationAction.OPEN_SETTINGS_CARDS -> onOpenSettings(SettingsDestination.MyCards)
-        NotificationAction.OPEN_SETTINGS_ACCOUNTS -> onOpenSettings(SettingsDestination.MyAccounts)
+        NotificationAction.OPEN_SETTINGS_CARDS -> onOpenSettings(SettingsDestination.Banks)
+        NotificationAction.OPEN_SETTINGS_ACCOUNTS -> onOpenSettings(SettingsDestination.Banks)
         NotificationAction.OPEN_SETTINGS_ABOUT -> onOpenSettings(SettingsDestination.About)
         NotificationAction.DISMISS_RESCAN -> onDismissRescanStatus()
         NotificationAction.MARK_READ_ONLY -> Unit

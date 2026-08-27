@@ -27,6 +27,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -69,7 +70,7 @@ class TransactionReclassificationServiceTest {
                 parsedRepo,
                 RoomUserCorrectionRepository(db.userCorrectionDao()),
             ),
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
     }
 

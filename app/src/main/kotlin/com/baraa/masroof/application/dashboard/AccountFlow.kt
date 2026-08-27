@@ -125,7 +125,7 @@ data class AccountFlow(
                 posPurchases = summary.outflow.posPurchases,
                 fees = summary.outflow.fees,
                 internalTransfersOut = summary.outflow.selfTransfersOut,
-                loan = Money.zero(summary.currency),
+                loan = summary.outflow.loanRepayments,
             )
 
         fun sum(flows: Collection<AccountFlow>): AccountFlow {

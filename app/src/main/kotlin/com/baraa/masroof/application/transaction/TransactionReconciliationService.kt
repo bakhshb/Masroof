@@ -9,6 +9,8 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.loan.LoanTypeResolver
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
@@ -135,6 +137,10 @@ class TransactionReconciliationService(
                 ?: OwnershipStatus.UNKNOWN
             val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
                 ?: OwnershipStatus.UNKNOWN
+            val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+            val loanOwn = loanType?.let {
+                ownershipResolver.resolveLoan(LoanReference(event.bank, it))
+            } ?: OwnershipStatus.UNKNOWN
 
             when (event.messageFamily) {
                 MessageFamily.TRANSFER_IN,
@@ -148,6 +154,7 @@ class TransactionReconciliationService(
                             sourceOwnership = sourceOwn,
                             destinationOwnership = destOwn,
                             cardOwnership = cardOwn,
+                            loanOwnership = loanOwn,
                             transactionOccurredAt = transactionOccurredAt,
                         ),
                     )
@@ -208,6 +215,7 @@ class TransactionReconciliationService(
                                 sourceOwnership = sourceOwn,
                                 destinationOwnership = destOwn,
                                 cardOwnership = cardOwn,
+                                loanOwnership = loanOwn,
                                 transactionOccurredAt = transactionOccurredAt,
                             ),
                         )

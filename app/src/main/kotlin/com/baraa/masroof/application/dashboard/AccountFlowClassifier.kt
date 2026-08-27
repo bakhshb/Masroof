@@ -114,6 +114,13 @@ object AccountFlowClassifier {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT))
                 }
 
+            FinancialTransactionType.LOAN_REPAYMENT ->
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                    emptyList()
+                } else {
+                    listOf(FlowAssignment.Expense(FlowExpenseCategory.LOAN_REPAYMENT))
+                }
+
             FinancialTransactionType.EXPENSE -> {
                 if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
                     return emptyList()

@@ -37,6 +37,7 @@ fun SettingsRegistryItemCard(
     bank: Bank,
     title: String,
     modifier: Modifier = Modifier,
+    showBankLabel: Boolean = true,
     endAction: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
 ) {
@@ -63,11 +64,13 @@ fun SettingsRegistryItemCard(
                 )
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text(
-                        settingsBankLabel(bank),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (showBankLabel) {
+                        Text(
+                            settingsBankLabel(bank),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
