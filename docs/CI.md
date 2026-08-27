@@ -14,22 +14,28 @@ There is **no** CI run on every `main` push anymore — only the release job run
 ```text
 Branch → open PR → CI runs (must pass)
        → merge PR → Release runs on main
-       → if version new → APK on GitHub Releases
+       → if version bumped for a new release → APK on GitHub Releases
        → if version unchanged → release skipped (green, no new APK)
 ```
 
-## What you do for each release
+## Day-to-day development
 
-1. Open a PR with your code changes (**do not** edit version in `app/build.gradle.kts`).
-2. Wait for **CI** to pass.
-3. Merge PR to `main`.
-4. **Release** automatically:
-   - bumps `appVersionCode` (+1) and patch `appVersionName` (e.g. `0.2.1` → `0.2.2`)
-   - builds signed APK and publishes GitHub Release
-   - commits the version bump back to `main`
-5. Update on your phone via Settings → About or wait for in-app update check.
+1. Open feature PRs with code changes only — **no version bump required**.
+2. Wait for **CI** to pass → merge to `main`.
+3. **Release** runs and finishes **green** with no new APK when the version in `app/build.gradle.kts` is unchanged.
 
-Every merge to `main` produces a new version. Merge only when you want to ship.
+Merge as many feature PRs as you like before shipping.
+
+## Shipping a new version
+
+When you are ready to publish an APK:
+
+1. Bump **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts` (or run `./scripts/bump-version.sh`).
+2. Open a PR with the version bump (alone or with final changes).
+3. Wait for **CI** to pass → merge to `main`.
+4. **Release** builds the signed APK and publishes a GitHub Release.
+
+Update on your phone via Settings → About or wait for in-app update check.
 
 ## What you do once (already done if you followed RELEASE.md)
 
@@ -54,17 +60,13 @@ Then merges are blocked until tests pass.
 
 Pushing a `v*` tag still triggers Release (optional; not required for normal flow).
 
-## Release did not publish after merge?
+## Release troubleshooting
 
-If **Release** failed on **Bump version** with `Could not find a free release tag after N bumps`:
-
-- `main` was still on an old `appVersionName` while many tags already exist on [Releases](https://github.com/bakhshb/Masroof/releases) (common when the `chore: bump version` commit could not push to protected `main`).
-- Fix: merge a PR that syncs `app/build.gradle.kts` to the next free version, or run **Actions → Release → Run workflow** after that sync.
-
-If **Release** shows green but no new APK:
-
-1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, the resolved tag was already published.
-2. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
+| Symptom | Meaning | Fix |
+|---------|---------|-----|
+| Release **green**, no new APK, summary says “already published” | Version unchanged — expected after feature merges | Bump version when ready to ship |
+| Release **red**, “versionCode … not greater than latest published” | New `versionName` but `versionCode` was not bumped | Bump both in `app/build.gradle.kts` |
+| Release **red** on keystore / build step | Signing or compile failure | Check Actions logs and secrets |
 
 ## PR debug APK
 

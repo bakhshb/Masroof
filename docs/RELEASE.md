@@ -1,6 +1,6 @@
 # Release and in-app updates
 
-Masroof release APKs are built in **GitHub Actions** when you **merge to `main`** (see [CI.md](CI.md)). The app checks for updates using your personal GitHub token and installs APKs without Google Play.
+Masroof release APKs are built in **GitHub Actions** when you **merge to `main`** with a **new version** (see [CI.md](CI.md)). The app checks for updates using your personal GitHub token and installs APKs without Google Play.
 
 ## One-time setup
 
@@ -49,12 +49,25 @@ The token is stored in app-private storage on the device and is never committed 
 
 See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
 
-## Releasing a new version
+## Development vs shipping
 
-1. Open a PR with your changes.
-2. Set **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts`. **`versionCode` must be greater than the latest published release** (check `version.json` on the latest GitHub Release). The Release workflow enforces this.
+### Feature merges (no version bump)
+
+Merge feature PRs without changing `app/build.gradle.kts`. The **Release** workflow still runs on each merge to `main` and finishes **green**, but **skips** building an APK when the version is unchanged.
+
+### Releasing a new version
+
+When you are ready to ship:
+
+1. Bump **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts`, or run:
+   ```bash
+   ./scripts/bump-version.sh
+   ```
+2. Open a PR (version-only or with final changes).
 3. Wait for **CI** to pass → merge to `main`.
-4. **Release** workflow builds the APK, publishes a GitHub Release, and uploads `version.json`.
+4. **Release** publishes a signed APK and `version.json` on GitHub Releases.
+
+**`versionCode` must be greater than the latest published release** (check `version.json` on the latest GitHub Release). If you set a new `versionName` but forget to bump `versionCode`, Release fails with a clear error.
 
 Do not reuse a `versionCode` lower than an already-shipped release — Android will reject the APK as a downgrade and in-app update will report “up to date”.
 
