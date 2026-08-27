@@ -44,6 +44,14 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
 
+      - name: Verify versionCode beats latest published release
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/ensure-version-code-monotonic.sh
+          ./scripts/ensure-version-code-monotonic.sh
+
       - name: Skip if release already published
         id: skip
         env:

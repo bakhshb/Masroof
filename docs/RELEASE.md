@@ -51,11 +51,12 @@ See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
 
 ## Releasing a new version
 
-1. Open a PR with your changes (version bump is **automatic** on merge).
-2. Wait for **CI** to pass → merge to `main`.
-3. **Release** workflow bumps version, builds APK, publishes GitHub Release, and commits the new version to `main`.
+1. Open a PR with your changes.
+2. Set **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts`. **`versionCode` must be greater than the latest published release** (check `version.json` on the latest GitHub Release). The Release workflow enforces this.
+3. Wait for **CI** to pass → merge to `main`.
+4. **Release** workflow builds the APK, publishes a GitHub Release, and uploads `version.json`.
 
-No manual `git tag` or version edit in Gradle is required.
+Do not reuse a `versionCode` lower than an already-shipped release — Android will reject the APK as a downgrade and in-app update will report “up to date”.
 
 ## Updating the app on your phone
 
@@ -79,4 +80,4 @@ Output: `app/build/outputs/apk/release/app-release.apk`
 
 - **Debug APK → release APK**: different signing keys; uninstall the debug build first, then install release.
 - **Private repo**: only devices with a valid read token can fetch updates.
-- **versionCode** increases automatically on each merge to `main` (committed back by Release workflow).
+- **versionCode** must strictly increase on every store/release APK. Published `v0.2.50` used code `53`; any new release must use `54` or higher.
