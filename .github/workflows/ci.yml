@@ -31,8 +31,8 @@ jobs:
       - name: Configure local SDK path
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
-      - name: Build, lint, and test
-        run: ./gradlew assembleDebug lintDebug test --stacktrace
+      - name: Build, lint, detekt, and test
+        run: ./gradlew assembleDebug lintDebug detekt test --stacktrace
 
       - name: Upload debug APK
         if: github.event_name == 'pull_request'
