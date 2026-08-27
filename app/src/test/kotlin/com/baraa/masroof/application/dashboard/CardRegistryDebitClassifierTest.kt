@@ -98,6 +98,45 @@ class CardRegistryDebitClassifierTest {
         assertTrue(CardRegistryDebitClassifier.isCreditRegistryEntry(entry))
     }
 
+    @Test
+    fun untypedWithCreditSmsAtRamadanMerchant_isCredit_notDebit() {
+        val entry = card(last4 = "7271")
+        val body = """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة ائتمانية: 7271
+            لدى: Ramadan Gifts
+            بمبلغ: 75.00 SAR
+            الرصيد المتاح: 14569.09 SAR
+            إجمالي المبلغ المستحق:3921.11 SAR
+        """.trimIndent()
+        val parsed = parsedRecord(last4 = "7271", body = body)
+        val rawSmsById = mapOf(
+            parsed.event.rawSmsId to RawSms(
+                id = parsed.event.rawSmsId,
+                sender = "AlJazira",
+                body = body,
+                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
+                deviceMessageId = "1",
+                bodyHash = "h",
+            ),
+        )
+
+        assertFalse(
+            CardRegistryDebitClassifier.isDebitRegistryEntry(
+                entry,
+                parsedRecords = listOf(parsed),
+                rawSmsById = rawSmsById,
+            ),
+        )
+        assertTrue(
+            CardRegistryDebitClassifier.isCreditRegistryEntry(
+                entry,
+                parsedRecords = listOf(parsed),
+                rawSmsById = rawSmsById,
+            ),
+        )
+    }
+
     private fun card(
         last4: String = "5555",
         cardType: CardType? = null,
