@@ -4,7 +4,6 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
