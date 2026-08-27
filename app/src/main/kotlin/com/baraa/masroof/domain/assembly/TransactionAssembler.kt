@@ -2,6 +2,8 @@ package com.baraa.masroof.domain.assembly
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.domain.matching.TransactionMatcher
+import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
@@ -154,11 +156,13 @@ object TransactionAssembler {
      * Self-transfer (owned → owned) is unchanged. Local side not OWNED stays pending.
      */
     fun assembleUnmatchedOwnedTransfer(
-        event: ParsedEvent,
-        receivedAt: Instant,
-        sourceOwnership: OwnershipStatus,
-        destinationOwnership: OwnershipStatus,
+        candidate: TransferMatchCandidate,
+        pendingCounterparts: List<TransferMatchCandidate> = emptyList(),
     ): Outcome {
+        val event = candidate.event
+        val receivedAt = candidate.receivedAt
+        val sourceOwnership = candidate.sourceOwnership
+        val destinationOwnership = candidate.destinationOwnership
         when (event.messageFamily) {
             MessageFamily.TRANSFER_OUT,
             MessageFamily.TRANSFER_IN,
@@ -186,6 +190,11 @@ object TransactionAssembler {
                 if (sourceOwnership != OwnershipStatus.OWNED) {
                     return Outcome.PendingMatch
                 }
+                if (pendingCounterparts.isNotEmpty() &&
+                    TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pendingCounterparts)
+                ) {
+                    return Outcome.PendingMatch
+                }
                 val sourceRef = event.sourceAccountRef
                     ?: return Outcome.NeedsReview(listOf("missing_source"))
                 val sourceId = FinancialContainerIdFactory.accountId(sourceRef)
@@ -205,6 +214,11 @@ object TransactionAssembler {
 
             MessageFamily.TRANSFER_IN -> {
                 if (destinationOwnership != OwnershipStatus.OWNED) {
+                    return Outcome.PendingMatch
+                }
+                if (pendingCounterparts.isNotEmpty() &&
+                    TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pendingCounterparts)
+                ) {
                     return Outcome.PendingMatch
                 }
                 val destRef = event.destinationAccountRef

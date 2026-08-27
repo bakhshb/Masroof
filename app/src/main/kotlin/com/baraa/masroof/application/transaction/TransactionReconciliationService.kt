@@ -4,6 +4,8 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.matching.TransferMatchPair
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -301,10 +303,10 @@ class TransactionReconciliationService(
             if (financialTransactionRepository.isRawSmsLinked(candidate.event.rawSmsId)) continue
             when (
                 val unmatched = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-                    event = candidate.event,
-                    receivedAt = candidate.receivedAt,
-                    sourceOwnership = candidate.sourceOwnership,
-                    destinationOwnership = candidate.destinationOwnership,
+                    candidate = candidate,
+                    pendingCounterparts = stillOpen.filter {
+                        it.event.rawSmsId != candidate.event.rawSmsId
+                    },
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {
@@ -341,6 +343,13 @@ class TransactionReconciliationService(
             }
         }
 
+        val upgraded = upgradeStaleIntraBankExternalPairs(records)
+        matchedPairs += upgraded.matchedPairs
+        assembledSingle += upgraded.assembledSingle
+        alreadyLinked += upgraded.alreadyLinked
+        failed += upgraded.failed
+        settledRawSmsIds += upgraded.settledRawSmsIds
+
         val summary = ReconciliationSummary(
             assembledSingle = assembledSingle,
             matchedPairs = matchedPairs,
@@ -365,6 +374,136 @@ class TransactionReconciliationService(
             settledRawSmsIds = settledRawSmsIds,
         )
     }
+
+    private suspend fun upgradeStaleIntraBankExternalPairs(
+        records: List<ParsedEventRecord>,
+    ): UpgradePassResult {
+        val parsedById = records.associateBy { it.event.id }
+        val all = financialTransactionRepository.listAll()
+        val outs = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }
+        val ins = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN }
+        if (outs.isEmpty() || ins.isEmpty()) return UpgradePassResult()
+
+        data class StaleLeg(
+            val transaction: FinancialTransaction,
+            val event: ParsedEvent,
+            val record: ParsedEventRecord?,
+        )
+
+        fun staleLegs(
+            transactions: List<FinancialTransaction>,
+            family: MessageFamily,
+        ): List<StaleLeg> =
+            transactions.mapNotNull { transaction ->
+                val event = transaction.linkedParsedEventIds
+                    .mapNotNull { parsedById[it]?.event }
+                    .firstOrNull { it.messageFamily == family }
+                    ?: return@mapNotNull null
+                if (event.bankNetworkType != BankNetworkType.INTRA_BANK) return@mapNotNull null
+                StaleLeg(
+                    transaction = transaction,
+                    event = event,
+                    record = records.find { it.event.id == event.id },
+                )
+            }
+
+        val outLegs = staleLegs(outs, MessageFamily.TRANSFER_OUT)
+        val inLegs = staleLegs(ins, MessageFamily.TRANSFER_IN)
+        val outByEventId = outLegs.associateBy { it.event.id }
+        val inByEventId = inLegs.associateBy { it.event.id }
+
+        val candidates = buildList {
+            for (leg in outLegs + inLegs) {
+                val sourceOwn = leg.event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
+                    ?: OwnershipStatus.UNKNOWN
+                val destOwn = leg.event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
+                    ?: OwnershipStatus.UNKNOWN
+                add(
+                    TransferMatchCandidate(
+                        event = leg.event,
+                        transactionReference = leg.record?.details?.transactionReference,
+                        occurredAtLocal = leg.record?.details?.occurredAtLocal,
+                        receivedAt = rawSmsRepository.getById(leg.event.rawSmsId)?.receivedAt
+                            ?: leg.transaction.occurredAt,
+                        sourceOwnership = sourceOwn,
+                        destinationOwnership = destOwn,
+                    ),
+                )
+            }
+        }
+        val pairs = TransactionMatcher.findMutuallyUniquePairs(candidates)
+            .filter { pair ->
+                pair.outgoing.sourceOwnership == OwnershipStatus.OWNED &&
+                    pair.incoming.destinationOwnership == OwnershipStatus.OWNED
+            }
+
+        var matchedPairs = 0
+        var assembledSingle = 0
+        var alreadyLinked = 0
+        var failed = 0
+        val settledRawSmsIds = linkedSetOf<String>()
+
+        for (pair in pairs) {
+            val outLeg = outByEventId[pair.outgoing.event.id] ?: continue
+            val inLeg = inByEventId[pair.incoming.event.id] ?: continue
+            val sourceOwn = pair.outgoing.sourceOwnership
+            val destOwn = pair.incoming.destinationOwnership
+
+            when (
+                val outcome = TransactionAssembler.assembleMatchedPair(
+                    pair = pair,
+                    outgoingSourceOwnership = sourceOwn,
+                    incomingDestinationOwnership = destOwn,
+                )
+            ) {
+                is TransactionAssembler.Outcome.Assembled -> {
+                    val rawSmsIds = listOf(outLeg.event.rawSmsId, inLeg.event.rawSmsId)
+                        .distinct()
+                        .sorted()
+                    val deletedAll = rawSmsIds.all { rawSmsId ->
+                        financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
+                    }
+                    if (!deletedAll) {
+                        failed++
+                        continue
+                    }
+
+                    when (persist(outcome.transaction, outcome.rawSmsIds)) {
+                        PersistOutcome.Saved -> {
+                            matchedPairs++
+                            assembledSingle++
+                            settledRawSmsIds += rawSmsIds
+                        }
+
+                        PersistOutcome.Already -> {
+                            alreadyLinked += 2
+                            settledRawSmsIds += rawSmsIds
+                        }
+
+                        PersistOutcome.Failed -> failed++
+                    }
+                }
+
+                else -> failed++
+            }
+        }
+
+        return UpgradePassResult(
+            matchedPairs = matchedPairs,
+            assembledSingle = assembledSingle,
+            alreadyLinked = alreadyLinked,
+            failed = failed,
+            settledRawSmsIds = settledRawSmsIds,
+        )
+    }
+
+    private data class UpgradePassResult(
+        val matchedPairs: Int = 0,
+        val assembledSingle: Int = 0,
+        val alreadyLinked: Int = 0,
+        val failed: Int = 0,
+        val settledRawSmsIds: Set<String> = emptySet(),
+    )
 
     private suspend fun persist(
         transaction: FinancialTransaction,

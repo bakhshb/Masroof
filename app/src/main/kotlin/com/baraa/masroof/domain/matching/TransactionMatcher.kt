@@ -2,6 +2,7 @@ package com.baraa.masroof.domain.matching
 
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -132,6 +133,8 @@ object TransactionMatcher {
         val inRef = incoming.transactionReference?.trim().orEmpty()
         if (outRef.isNotEmpty() && outRef == inRef) return true
 
+        if (hasIntraBankAccountBridge(outgoing, incoming)) return true
+
         // UNKNOWN-side suffix bridge: outgoing UNKNOWN dest masked ↔ incoming known dest masked
         val outDest = outgoing.event.destinationAccountRef ?: return false
         val inDest = incoming.event.destinationAccountRef ?: return false
@@ -141,6 +144,75 @@ object TransactionMatcher {
         val inSuffix = inDest.maskedNumber?.trim().orEmpty()
         if (outSuffix.isEmpty() || inSuffix.isEmpty()) return false
         return outSuffix == inSuffix
+    }
+
+    /**
+     * True when an OUT leg and an IN leg describe the same intra-bank movement
+     * (matching source/destination account suffixes on known-bank refs).
+     */
+    fun hasIntraBankAccountBridge(
+        outgoing: TransferMatchCandidate,
+        incoming: TransferMatchCandidate,
+    ): Boolean = hasIntraBankAccountBridge(outgoing.event, incoming.event)
+
+    fun hasIntraBankAccountBridge(
+        outgoing: ParsedEvent,
+        incoming: ParsedEvent,
+    ): Boolean {
+        if (outgoing.messageFamily != MessageFamily.TRANSFER_OUT) return false
+        if (incoming.messageFamily != MessageFamily.TRANSFER_IN) return false
+        if (outgoing.bankNetworkType != BankNetworkType.INTRA_BANK) {
+            return false
+        }
+        if (incoming.bankNetworkType != BankNetworkType.INTRA_BANK) {
+            return false
+        }
+
+        val outSource = outgoing.sourceAccountRef ?: return false
+        val outDest = outgoing.destinationAccountRef ?: return false
+        val inSource = incoming.sourceAccountRef ?: return false
+        val inDest = incoming.destinationAccountRef ?: return false
+
+        if (outSource.bank == Bank.UNKNOWN || outDest.bank == Bank.UNKNOWN) return false
+        if (inSource.bank == Bank.UNKNOWN || inDest.bank == Bank.UNKNOWN) return false
+
+        val outSourceSuffix = outSource.maskedNumber?.trim().orEmpty()
+        val outDestSuffix = outDest.maskedNumber?.trim().orEmpty()
+        val inSourceSuffix = inSource.maskedNumber?.trim().orEmpty()
+        val inDestSuffix = inDest.maskedNumber?.trim().orEmpty()
+        if (outSourceSuffix.isEmpty() || outDestSuffix.isEmpty()) return false
+        if (inSourceSuffix.isEmpty() || inDestSuffix.isEmpty()) return false
+
+        return outSourceSuffix == inSourceSuffix && outDestSuffix == inDestSuffix
+    }
+
+    /**
+     * Whether [candidate] has a pending opposite-leg intra-bank counterpart in [pending].
+     * Used to defer single-leg external posting until ownership can confirm self-transfer.
+     */
+    fun hasPendingIntraBankCounterpart(
+        candidate: TransferMatchCandidate,
+        pending: List<TransferMatchCandidate>,
+    ): Boolean {
+        val amount = candidate.event.amount ?: return false
+        return pending.any { other ->
+            if (other.event.id == candidate.event.id) return@any false
+            if (other.event.rawSmsId == candidate.event.rawSmsId) return@any false
+            if (other.event.amount != amount) return@any false
+            if (!withinWindow(candidate, other)) return@any false
+
+            when (candidate.event.messageFamily) {
+                MessageFamily.TRANSFER_OUT ->
+                    other.event.messageFamily == MessageFamily.TRANSFER_IN &&
+                        hasIntraBankAccountBridge(candidate.event, other.event)
+
+                MessageFamily.TRANSFER_IN ->
+                    other.event.messageFamily == MessageFamily.TRANSFER_OUT &&
+                        hasIntraBankAccountBridge(other.event, candidate.event)
+
+                else -> false
+            }
+        }
     }
 
     private fun moneyKey(money: Money): String =
