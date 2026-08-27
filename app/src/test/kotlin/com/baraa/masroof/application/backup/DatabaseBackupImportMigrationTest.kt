@@ -35,7 +35,7 @@ import java.util.zip.ZipOutputStream
 @Config(sdk = [28])
 class DatabaseBackupImportMigrationTest {
     @Test
-    fun importV5Backup_migratesToV6OnNextOpen() = runBlocking {
+    fun importV5Backup_migratesToV7OnNextOpen() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(MasroofDatabase.NAME)
 
@@ -67,8 +67,8 @@ class DatabaseBackupImportMigrationTest {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(6, migrated.openHelper.writableDatabase.version)
-            val cardRepo = RoomCardRegistryRepository(migrated.cardRegistryDao())
+            assertEquals(8, migrated.openHelper.writableDatabase.version)
+            val cardRepo = RoomCardRegistryRepository.from(migrated)
             val loaded = cardRepo.get(CardReference(Bank.BANK_ALJAZIRA, "7271"))!!
             assertEquals(OwnershipStatus.OWNED, loaded.ownership)
         } finally {
@@ -125,8 +125,8 @@ class DatabaseBackupImportMigrationTest {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
             appVersionName = "test",
-            roomVersion = MasroofDatabase.PREVIOUS_VERSION,
-            identityHash = MasroofDatabase.PREVIOUS_IDENTITY_HASH,
+            roomVersion = MasroofDatabase.LEGACY_VERSION_5,
+            identityHash = MasroofDatabase.LEGACY_IDENTITY_HASH_5,
             exportedAtEpochMillis = 1_700_000_000_000L,
         )
         val preferences = BackupPreferencesSnapshot(

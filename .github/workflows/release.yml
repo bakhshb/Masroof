@@ -29,16 +29,6 @@ jobs:
         with:
           token: ${{ github.token }}
 
-      - name: Bump version (main / manual dispatch only)
-        id: bump
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          chmod +x scripts/bump-version.sh scripts/ensure-unique-release-tag.sh
-          ./scripts/bump-version.sh
-          ./scripts/ensure-unique-release-tag.sh
-
       - name: Resolve version and tag
         id: version
         run: |
@@ -53,6 +43,14 @@ jobs:
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
+
+      - name: Verify versionCode beats latest published release
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x scripts/ensure-version-code-monotonic.sh
+          ./scripts/ensure-version-code-monotonic.sh
 
       - name: Skip if release already published
         id: skip
@@ -134,14 +132,3 @@ jobs:
             masroof-*.apk
             version.json
           generate_release_notes: true
-
-      - name: Commit version bump to main
-        if: steps.skip.outputs.skip != 'true' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        run: |
-          VERSION_NAME="${{ steps.version.outputs.version_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
-          git commit -m "chore: bump version to ${VERSION_NAME}"
-          git push

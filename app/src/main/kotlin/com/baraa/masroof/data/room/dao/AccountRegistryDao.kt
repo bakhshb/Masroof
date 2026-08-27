@@ -94,4 +94,17 @@ interface AccountRegistryDao {
         maskedNumber: String,
         displayName: String?,
     ): Int
+
+    @Query(
+        """
+        UPDATE account_registry
+        SET accountType = :accountType
+        WHERE bankId = :bankId AND maskedNumber = :maskedNumber
+        """,
+    )
+    suspend fun updateAccountType(
+        bankId: String,
+        maskedNumber: String,
+        accountType: String,
+    ): Int
 }

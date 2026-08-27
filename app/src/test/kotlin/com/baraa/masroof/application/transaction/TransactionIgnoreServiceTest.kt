@@ -72,8 +72,8 @@ class TransactionIgnoreServiceTest {
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
-                com.baraa.masroof.data.repository.RoomAccountRegistryRepository(db.accountRegistryDao()),
-                com.baraa.masroof.data.repository.RoomCardRegistryRepository(db.cardRegistryDao()),
+                com.baraa.masroof.data.repository.RoomAccountRegistryRepository.from(db),
+                com.baraa.masroof.data.repository.RoomCardRegistryRepository.from(db),
             ),
             reviewRepository = reviewRepo,
         )

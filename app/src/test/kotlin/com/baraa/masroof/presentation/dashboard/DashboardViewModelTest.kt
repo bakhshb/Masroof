@@ -344,7 +344,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val registry = FakeCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
                 last4 = "5123",
                 ownership = OwnershipStatus.UNKNOWN,
@@ -484,6 +484,7 @@ class DashboardViewModelTest {
 
         override suspend fun listAll() = entries.toList()
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
+            override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
     }
 
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
@@ -698,6 +699,10 @@ class DashboardViewModelTest {
                         override suspend fun updateDisplayName(
                             reference: com.baraa.masroof.domain.model.AccountReference,
                             displayName: String?,
+                        ) = Unit
+                        override suspend fun updateAccountType(
+                            reference: com.baraa.masroof.domain.model.AccountReference,
+                            accountType: com.baraa.masroof.domain.model.AccountType,
                         ) = Unit
                     },
                     NoOpCardRegistryRepository(),

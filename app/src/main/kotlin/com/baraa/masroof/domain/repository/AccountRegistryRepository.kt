@@ -2,6 +2,7 @@ package com.baraa.masroof.domain.repository
 
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
+import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.OwnershipStatus
 
 /**
@@ -26,4 +27,6 @@ interface AccountRegistryRepository {
     suspend fun listAll(): List<AccountRegistryEntry>
 
     suspend fun updateDisplayName(reference: AccountReference, displayName: String?)
+
+    suspend fun updateAccountType(reference: AccountReference, accountType: AccountType)
 }

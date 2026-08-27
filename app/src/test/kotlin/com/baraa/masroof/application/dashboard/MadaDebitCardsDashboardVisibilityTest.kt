@@ -18,7 +18,7 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.presentation.dashboard.CardOwnershipKey
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.OwnedCardUi
-import com.baraa.masroof.presentation.dashboard.followedCreditFacilities
+import com.baraa.masroof.presentation.dashboard.followedCreditFacilitiesForSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -94,7 +94,7 @@ class MadaDebitCardsDashboardVisibilityTest {
     }
 
     @Test
-    fun followedCreditFacilities_includesInferredMadaCards() {
+    fun followedCreditFacilitiesForSummary_includesInferredMadaCards() {
         val registry = listOf(
             creditCard("1111"),
             ownedMadaWithoutMetadata("8219"),
@@ -121,7 +121,7 @@ class MadaDebitCardsDashboardVisibilityTest {
             },
         )
 
-        val followed = state.followedCreditFacilities()
+        val followed = state.followedCreditFacilitiesForSummary()
 
         assertNotNull(followed)
         assertEquals(1, followed!!.facilities.size)
@@ -141,8 +141,8 @@ class MadaDebitCardsDashboardVisibilityTest {
         val rawSmsById = mapOf("sms-8219" to rawSms("sms-8219", googlePayBody))
 
         assertTrue(
-            DebitCardRegistryInferrer.isDebitCard(
-                entry = entry,
+            CardRegistryDebitClassifier.isDebitRegistryEntry(
+                entry,
                 parsedRecords = parsedRecords,
                 rawSmsById = rawSmsById,
             ),
@@ -164,8 +164,8 @@ class MadaDebitCardsDashboardVisibilityTest {
         val rawSmsById = mapOf("sms-7271" to rawSms("sms-7271", ramadanCreditBody))
 
         assertFalse(
-            DebitCardRegistryInferrer.isDebitCard(
-                entry = entry,
+            CardRegistryDebitClassifier.isDebitRegistryEntry(
+                entry,
                 parsedRecords = parsedRecords,
                 rawSmsById = rawSmsById,
             ),
@@ -173,7 +173,7 @@ class MadaDebitCardsDashboardVisibilityTest {
     }
 
     private fun creditCard(last4: String): CardRegistryEntry =
-        CardRegistryEntry(
+        CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,
@@ -184,7 +184,7 @@ class MadaDebitCardsDashboardVisibilityTest {
         )
 
     private fun ownedMadaWithoutMetadata(last4: String): CardRegistryEntry =
-        CardRegistryEntry(
+        CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,

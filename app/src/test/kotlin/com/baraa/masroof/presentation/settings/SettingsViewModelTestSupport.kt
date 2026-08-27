@@ -150,6 +150,10 @@ internal object SettingsViewModelTestSupport {
                 reference: com.baraa.masroof.domain.model.AccountReference,
                 displayName: String?,
             ) = Unit
+            override suspend fun updateAccountType(
+                reference: com.baraa.masroof.domain.model.AccountReference,
+                accountType: com.baraa.masroof.domain.model.AccountType,
+            ) = Unit
         }
 
     internal fun emptyCardRegistry(): CardRegistryRepository = NoOpCardRegistryRepository()

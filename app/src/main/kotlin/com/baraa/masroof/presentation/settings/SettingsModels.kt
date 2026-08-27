@@ -6,9 +6,11 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.OwnershipStatus
 
 data class ManagedCardUi(
+    val id: String,
     val bank: Bank,
     val last4: String,
     val ownership: OwnershipStatus,
@@ -33,15 +35,40 @@ data class ManagedCardUi(
 }
 
 data class ManagedAccountUi(
+    val id: String,
     val bank: Bank,
     val maskedNumber: String,
     val ownership: OwnershipStatus,
     val displayName: String? = null,
+    val accountType: AccountType = AccountType.CURRENT,
 ) {
     val displayLabel: String
         get() = displayName?.trim()?.takeIf { it.isNotEmpty() }
             ?: "Account ••${maskedNumber.takeLast(4)}"
 }
+
+data class SettingsBankTreeUi(
+    val bank: Bank,
+    val currentAccountNodes: List<SettingsCurrentAccountNodeUi> = emptyList(),
+    val savingsAccounts: List<ManagedAccountUi>,
+    val walletAccounts: List<ManagedAccountUi>,
+    val creditCards: List<ManagedCardUi>,
+    val unlinkedDebitCards: List<ManagedCardUi> = emptyList(),
+    val loans: List<ManagedLoanUi> = emptyList(),
+)
+
+data class SettingsCurrentAccountNodeUi(
+    val account: ManagedAccountUi,
+    val debitCards: List<ManagedCardUi>,
+)
+
+data class ManagedLoanUi(
+    val id: String,
+    val bank: Bank,
+    val loanType: com.baraa.masroof.domain.model.LoanType,
+    val ownership: OwnershipStatus,
+    val displayName: String? = null,
+)
 
 data class SettingsUiState(
     val loading: Boolean = true,
@@ -51,6 +78,7 @@ data class SettingsUiState(
     val followedAccounts: List<ManagedAccountUi> = emptyList(),
     val unregisteredAccounts: List<ManagedAccountUi> = emptyList(),
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
+    val bankTrees: List<SettingsBankTreeUi> = emptyList(),
     val appVersion: String = "",
     val languageTag: String = "",
     val themeMode: ThemeMode = ThemeMode.DEFAULT,
@@ -59,6 +87,7 @@ data class SettingsUiState(
     val stopConfirmAccountTarget: ManagedAccountUi? = null,
     val renameCardTarget: ManagedCardUi? = null,
     val renameAccountTarget: ManagedAccountUi? = null,
+    val accountTypeTarget: ManagedAccountUi? = null,
     val cardNetworkTarget: ManagedCardUi? = null,
     val cardRoleTarget: ManagedCardUi? = null,
     val linkDebitTarget: ManagedCardUi? = null,

@@ -94,8 +94,8 @@ class IntraBankSelfTransferIngestionTest {
     parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
     ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
     reviewRepo = RoomReviewRepository(db.reviewItemDao())
-    accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-    cards = RoomCardRegistryRepository(db.cardRegistryDao())
+    accounts = RoomAccountRegistryRepository.from(db)
+    cards = RoomCardRegistryRepository.from(db)
     confirmation = OwnershipConfirmationService(accounts, cards)
 
     val ownershipResolver = OwnershipResolver(accounts, cards)

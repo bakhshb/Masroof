@@ -161,7 +161,7 @@ class Migration1To2Test {
             assertTrue(schema2.readText().contains("account_registry"))
             assertTrue(!schema2.readText().contains("evidenceCount"))
 
-            val accountRepo = RoomAccountRegistryRepository(roomDb.accountRegistryDao())
+            val accountRepo = RoomAccountRegistryRepository.from(roomDb)
             val ref = AccountReference(Bank.BANK_ALJAZIRA, "3001")
             accountRepo.observe(ref, "android-sms:1")
             assertEquals(OwnershipStatus.UNKNOWN, accountRepo.resolve(ref))

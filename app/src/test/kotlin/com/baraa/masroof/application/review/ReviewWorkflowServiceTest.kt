@@ -84,8 +84,8 @@ class ReviewWorkflowServiceTest {
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
-        val accounts = RoomAccountRegistryRepository(db.accountRegistryDao())
-        val cards = RoomCardRegistryRepository(db.cardRegistryDao())
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards)
         val ownershipResolver = OwnershipResolver(accounts, cards)
         val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
@@ -447,7 +447,7 @@ class ReviewWorkflowServiceTest {
         assertEquals(ReviewStatus.RESOLVED, result.review.status)
         assertEquals(ReviewResolutionKind.USER_EXTERNAL_TRANSFER, result.review.resolutionKind)
         assertNull(
-            RoomAccountRegistryRepository(db.accountRegistryDao())
+            RoomAccountRegistryRepository.from(db)
                 .get(AccountReference(Bank.UNKNOWN, "6810")),
         )
     }
@@ -541,7 +541,7 @@ class ReviewWorkflowServiceTest {
         assertEquals(ReviewStatus.RESOLVED, result.pairedReview!!.status)
         assertEquals(ReviewResolutionKind.USER_SELF_TRANSFER_PAIR, result.review.resolutionKind)
         assertNull(
-            RoomAccountRegistryRepository(db.accountRegistryDao())
+            RoomAccountRegistryRepository.from(db)
                 .get(AccountReference(Bank.UNKNOWN, "9999")),
         )
     }

@@ -144,6 +144,9 @@ fun SettingsRoute(
             onRenameAccount = viewModel::openRenameAccount,
             onDismissRenameAccount = viewModel::dismissRenameAccount,
             onSaveAccountName = viewModel::saveAccountDisplayName,
+            onPickAccountType = viewModel::openAccountTypePicker,
+            onDismissAccountType = viewModel::dismissAccountTypePicker,
+            onSelectAccountType = viewModel::setAccountTypeFromPicker,
         )
 
         SettingsDestination.About -> SettingsAboutScreen(

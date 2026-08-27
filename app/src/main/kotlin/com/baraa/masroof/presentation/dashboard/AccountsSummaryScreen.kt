@@ -31,7 +31,9 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
 import com.baraa.masroof.application.dashboard.cashPosition
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -119,18 +121,58 @@ fun AccountsSummaryScreen(
                 onManageAccounts = onManageAccounts,
             )
 
-            if (state.ownedAccounts.isEmpty()) {
-                Text(
-                    stringResource(R.string.dashboard_accounts_summary_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                state.ownedAccounts.forEach { account ->
-                    AccountsSummaryAccountCard(
-                        account = account,
-                        onClick = { onOpenAccount(account) },
+            val hierarchy = state.bankHierarchy
+            when {
+                state.ownedAccounts.isEmpty() -> {
+                    Text(
+                        stringResource(R.string.dashboard_accounts_summary_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+
+                hierarchy != null && hierarchy.hasContent -> {
+                    hierarchy.banks.forEach { bankTree ->
+                        bankTree.savingsAccounts.forEach { node ->
+                            resolveOwnedAccountUi(state.ownedAccounts, node.bank, node.maskedNumber)?.let { account ->
+                                AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) })
+                            }
+                        }
+                        bankTree.walletAccounts.forEach { node ->
+                            resolveOwnedAccountUi(state.ownedAccounts, node.bank, node.maskedNumber)?.let { account ->
+                                AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) })
+                            }
+                        }
+                        bankTree.currentAccounts.forEach { node ->
+                            resolveOwnedAccountUi(state.ownedAccounts, node.bank, node.maskedNumber)?.let { account ->
+                                AccountsSummaryAccountCard(
+                                    account = account,
+                                    debitCards = node.debitCards,
+                                    onClick = { onOpenAccount(account) },
+                                )
+                            }
+                        }
+                        bankTree.unlinkedDebitCards.forEach { debit ->
+                            Text(
+                                stringResource(
+                                    R.string.dashboard_account_unlinked_mada_label,
+                                    debit.displayLabel,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    state.ownedAccounts.forEach { account ->
+                        AccountsSummaryAccountCard(
+                            account = account,
+                            onClick = { onOpenAccount(account) },
+                        )
+                    }
                 }
             }
         }
@@ -190,9 +232,16 @@ private fun AccountsSummaryHeader(
     }
 }
 
+private fun resolveOwnedAccountUi(
+    ownedAccounts: List<OwnedAccountUi>,
+    bank: Bank,
+    maskedNumber: String,
+): OwnedAccountUi? = ownedAccounts.find { it.bank == bank && it.maskedNumber == maskedNumber }
+
 @Composable
 private fun AccountsSummaryAccountCard(
     account: OwnedAccountUi,
+    debitCards: List<DebitCardOverview> = emptyList(),
     onClick: () -> Unit,
 ) {
     val extended = MasroofThemeExtras.extendedColors
@@ -246,6 +295,17 @@ private fun AccountsSummaryAccountCard(
                             R.string.dashboard_account_period_in_out,
                             formatLocalizedMoney(periodInflow),
                             formatLocalizedMoney(periodOutflow),
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                debitCards.forEach { debit ->
+                    Text(
+                        stringResource(
+                            R.string.dashboard_account_linked_mada_label,
+                            debit.displayLabel,
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

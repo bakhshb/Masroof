@@ -123,7 +123,7 @@ class CreditFacilityOverviewBuilderTest {
             currency = Currency.SAR,
         )
         val registryAccounts = listOf(
-            com.baraa.masroof.domain.model.AccountRegistryEntry(
+            com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
                 maskedNumber = "1234567890",
                 ownership = OwnershipStatus.OWNED,
@@ -191,7 +191,7 @@ class CreditFacilityOverviewBuilderTest {
             ),
         )
         val registryAccounts = listOf(
-            com.baraa.masroof.domain.model.AccountRegistryEntry(
+            com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
                 maskedNumber = "12345678903001",
                 ownership = OwnershipStatus.OWNED,
@@ -204,7 +204,7 @@ class CreditFacilityOverviewBuilderTest {
         val facilities = CreditFacilityOverviewBuilder.build(
             overview = overview,
             registryCards = listOf(
-                CardRegistryEntry(
+                CardRegistryEntry.forTest(
                     bank = Bank.BANK_ALJAZIRA,
                     last4 = "9999",
                     ownership = OwnershipStatus.OWNED,
@@ -240,7 +240,7 @@ class CreditFacilityOverviewBuilderTest {
         cardType: CardType = CardType.CREDIT,
         parent: String? = null,
     ): CardRegistryEntry =
-        CardRegistryEntry(
+        CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,
@@ -252,7 +252,7 @@ class CreditFacilityOverviewBuilderTest {
         )
 
     private fun debit(last4: String): CardRegistryEntry =
-        CardRegistryEntry(
+        CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,

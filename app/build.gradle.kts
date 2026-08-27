@@ -14,8 +14,8 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val appVersionName = "0.2.29"
-val appVersionCode = 32
+val appVersionName = "0.3.3"
+val appVersionCode = 56
 val githubOwner = "bakhshb"
 val githubRepo = "Masroof"
 

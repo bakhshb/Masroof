@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -141,38 +142,46 @@ fun SettingsMyCardsScreen(
 
             if (state.followedCards.isNotEmpty()) {
                 SettingsCardGroupTitle(stringResource(R.string.settings_cards_followed))
-                state.followedCards.forEach { card ->
-                    SettingsRegistryItemCard(
-                        icon = MasroofIcons.cardPayment,
-                        bank = card.bank,
-                        title = card.displayLabel,
-                        endAction = {
-                            SettingsStopTrackingButton(
-                                onClick = { onRequestStopTracking(card) },
-                                enabled = !state.updating,
-                                contentDescription = stringResource(R.string.ownership_action_stop_tracking),
-                            )
-                        },
-                        footer = {
-                            cardSubtitle(card)?.let { subtitle ->
-                                Text(
-                                    subtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                )
-                            }
-                            SettingsCardMetadataActions(
+                if (state.bankTrees.isNotEmpty()) {
+                    state.bankTrees.forEach { tree ->
+                        tree.creditCards.forEach { card ->
+                            SettingsRegistryCardRow(
                                 card = card,
-                                enabled = !state.updating,
-                                onRename = { onRenameCard(card) },
-                                onPickNetwork = { onPickCardNetwork(card) },
-                                onPickRole = { onPickCardRole(card) },
-                                onLinkDebit = { onLinkDebitCard(card) },
-                                onMarkDebit = { onMarkDebit(card) },
+                                updating = state.updating,
+                                onRequestStopTracking = onRequestStopTracking,
+                                onRenameCard = onRenameCard,
+                                onPickCardNetwork = onPickCardNetwork,
+                                onPickCardRole = onPickCardRole,
+                                onLinkDebitCard = onLinkDebitCard,
+                                onMarkDebit = onMarkDebit,
                             )
-                        },
-                    )
+                        }
+                        tree.unlinkedDebitCards.forEach { card ->
+                            SettingsRegistryCardRow(
+                                card = card,
+                                updating = state.updating,
+                                onRequestStopTracking = onRequestStopTracking,
+                                onRenameCard = onRenameCard,
+                                onPickCardNetwork = onPickCardNetwork,
+                                onPickCardRole = onPickCardRole,
+                                onLinkDebitCard = onLinkDebitCard,
+                                onMarkDebit = onMarkDebit,
+                            )
+                        }
+                    }
+                } else {
+                    state.followedCards.forEach { card ->
+                        SettingsRegistryCardRow(
+                            card = card,
+                            updating = state.updating,
+                            onRequestStopTracking = onRequestStopTracking,
+                            onRenameCard = onRenameCard,
+                            onPickCardNetwork = onPickCardNetwork,
+                            onPickCardRole = onPickCardRole,
+                            onLinkDebitCard = onLinkDebitCard,
+                            onMarkDebit = onMarkDebit,
+                        )
+                    }
                 }
             }
 
@@ -202,6 +211,50 @@ fun SettingsMyCardsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SettingsRegistryCardRow(
+    card: ManagedCardUi,
+    updating: Boolean,
+    onRequestStopTracking: (ManagedCardUi) -> Unit,
+    onRenameCard: (ManagedCardUi) -> Unit,
+    onPickCardNetwork: (ManagedCardUi) -> Unit,
+    onPickCardRole: (ManagedCardUi) -> Unit,
+    onLinkDebitCard: (ManagedCardUi) -> Unit,
+    onMarkDebit: (ManagedCardUi) -> Unit,
+) {
+    SettingsRegistryItemCard(
+        icon = MasroofIcons.cardPayment,
+        bank = card.bank,
+        title = card.displayLabel,
+        endAction = {
+            SettingsStopTrackingButton(
+                onClick = { onRequestStopTracking(card) },
+                enabled = !updating,
+                contentDescription = stringResource(R.string.ownership_action_stop_tracking),
+            )
+        },
+        footer = {
+            cardSubtitle(card)?.let { subtitle ->
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            SettingsCardMetadataActions(
+                card = card,
+                enabled = !updating,
+                onRename = { onRenameCard(card) },
+                onPickNetwork = { onPickCardNetwork(card) },
+                onPickRole = { onPickCardRole(card) },
+                onLinkDebit = { onLinkDebitCard(card) },
+                onMarkDebit = { onMarkDebit(card) },
+            )
+        },
+    )
 }
 
 @Composable

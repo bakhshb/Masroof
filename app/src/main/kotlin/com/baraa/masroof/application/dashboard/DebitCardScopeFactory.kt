@@ -22,8 +22,8 @@ object DebitCardScopeFactory {
     ): DebitCardScopeFacts {
         val ownedDebit = cards.filter {
             it.ownership == OwnershipStatus.OWNED &&
-                DebitCardRegistryInferrer.isDebitCard(
-                    entry = it,
+                CardRegistryDebitClassifier.isDebitRegistryEntry(
+                    it,
                     parsedRecords = parsedRecords,
                     rawSmsById = rawSmsById,
                 )
