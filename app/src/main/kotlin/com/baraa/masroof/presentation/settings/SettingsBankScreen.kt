@@ -27,32 +27,26 @@ fun SettingsBankScreen(
 ) {
     val accountsSubtitle = when {
         summary.accountCount == 0 -> stringResource(R.string.settings_accounts_empty)
-        summary.unregisteredAccountCount > 0 -> {
-            val followed = (summary.accountCount - summary.unregisteredAccountCount).coerceAtLeast(0)
-            stringResource(
-                R.string.settings_hub_accounts_subtitle,
-                followed,
-                summary.unregisteredAccountCount,
-            )
-        }
+        summary.unregisteredAccountCount > 0 -> stringResource(
+            R.string.settings_hub_accounts_subtitle,
+            summary.followedAccountCount,
+            summary.unregisteredAccountCount,
+        )
         else -> stringResource(
             R.string.settings_hub_accounts_subtitle_followed_only,
-            summary.accountCount,
+            summary.followedAccountCount,
         )
     }
     val cardsSubtitle = when {
         summary.cardCount == 0 -> stringResource(R.string.settings_cards_empty)
-        summary.unregisteredCardCount > 0 -> {
-            val followed = (summary.cardCount - summary.unregisteredCardCount).coerceAtLeast(0)
-            stringResource(
-                R.string.settings_hub_cards_subtitle,
-                followed,
-                summary.unregisteredCardCount,
-            )
-        }
+        summary.unregisteredCardCount > 0 -> stringResource(
+            R.string.settings_hub_cards_subtitle,
+            summary.followedCardCount,
+            summary.unregisteredCardCount,
+        )
         else -> stringResource(
             R.string.settings_hub_cards_subtitle_followed_only,
-            summary.cardCount,
+            summary.followedCardCount,
         )
     }
     val loansSubtitle = if (summary.loanCount > 0) {

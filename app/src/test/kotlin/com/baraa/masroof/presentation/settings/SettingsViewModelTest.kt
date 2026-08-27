@@ -408,10 +408,12 @@ class SettingsViewModelTest {
 
         val summary = vm.uiState.value.bankSummaries.single()
         assertEquals(Bank.BANK_ALJAZIRA, summary.bank)
+        assertEquals(0, summary.followedAccountCount)
+        assertEquals(1, summary.unregisteredAccountCount)
+        assertEquals(1, summary.followedCardCount)
         assertEquals(1, summary.accountCount)
         assertEquals(1, summary.cardCount)
         assertEquals(1, summary.loanCount)
-        assertEquals(1, summary.unregisteredAccountCount)
 
         val tree = vm.uiState.value.bankTrees.single()
         assertEquals(1, tree.loans.size)

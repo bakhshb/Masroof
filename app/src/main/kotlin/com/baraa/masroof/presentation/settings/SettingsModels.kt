@@ -77,12 +77,20 @@ data class ManagedLoanUi(
 
 data class SettingsBankSummaryUi(
     val bank: Bank,
-    val accountCount: Int,
-    val cardCount: Int,
-    val loanCount: Int,
+    val followedAccountCount: Int,
     val unregisteredAccountCount: Int,
+    val stoppedAccountCount: Int,
+    val followedCardCount: Int,
     val unregisteredCardCount: Int,
+    val stoppedCardCount: Int,
+    val loanCount: Int,
 ) {
+    val accountCount: Int
+        get() = followedAccountCount + unregisteredAccountCount + stoppedAccountCount
+
+    val cardCount: Int
+        get() = followedCardCount + unregisteredCardCount + stoppedCardCount
+
     val hasContent: Boolean
         get() = accountCount > 0 || cardCount > 0 || loanCount > 0
 
@@ -248,12 +256,13 @@ fun decodeSettingsDestination(encoded: String): SettingsDestination {
     return SettingsDestination.Hub
 }
 
-fun SettingsDestination.parent(): SettingsDestination =
+fun SettingsDestination.parent(skippedBanksList: Boolean = false): SettingsDestination =
     when (this) {
         is SettingsDestination.BankAccounts -> SettingsDestination.BankHub(bankId)
         is SettingsDestination.BankCards -> SettingsDestination.BankHub(bankId)
         is SettingsDestination.BankLoans -> SettingsDestination.BankHub(bankId)
-        is SettingsDestination.BankHub -> SettingsDestination.Banks
+        is SettingsDestination.BankHub ->
+            if (skippedBanksList) SettingsDestination.Hub else SettingsDestination.Banks
         SettingsDestination.Banks -> SettingsDestination.Hub
         SettingsDestination.Logs -> SettingsDestination.About
         SettingsDestination.About,

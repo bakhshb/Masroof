@@ -901,11 +901,13 @@ class SettingsViewModel(
             }
             SettingsBankSummaryUi(
                 bank = Bank(bankId),
-                accountCount = bankAccounts.size,
-                cardCount = bankCards.size,
-                loanCount = bankLoans.size,
+                followedAccountCount = bankAccounts.count { it.ownership == OwnershipStatus.OWNED },
                 unregisteredAccountCount = bankAccounts.count { it.ownership == OwnershipStatus.UNKNOWN },
+                stoppedAccountCount = bankAccounts.count { it.ownership == OwnershipStatus.EXTERNAL },
+                followedCardCount = bankCards.count { it.ownership == OwnershipStatus.OWNED },
                 unregisteredCardCount = bankCards.count { it.ownership == OwnershipStatus.UNKNOWN },
+                stoppedCardCount = bankCards.count { it.ownership == OwnershipStatus.EXTERNAL },
+                loanCount = bankLoans.size,
             )
         }
     }

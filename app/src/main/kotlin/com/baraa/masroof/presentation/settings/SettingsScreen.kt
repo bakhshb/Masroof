@@ -55,17 +55,36 @@ fun SettingsRoute(
     }
     val state by viewModel.uiState.collectAsState()
     var destinationRoute by rememberSaveable { mutableStateOf(SettingsDestination.Hub.encode()) }
+    var skippedBanksList by rememberSaveable { mutableStateOf(false) }
     val destination = decodeSettingsDestination(destinationRoute)
 
-    fun navigateTo(next: SettingsDestination) {
+    fun bankHubBack(): SettingsDestination = destination.parent(skippedBanksList)
+
+    fun navigateTo(next: SettingsDestination, skipBanksList: Boolean = false) {
         destinationRoute = next.encode()
+        skippedBanksList = when {
+            skipBanksList -> true
+            next == SettingsDestination.Banks || next == SettingsDestination.Hub -> false
+            else -> skippedBanksList
+        }
     }
 
-    LaunchedEffect(pendingDestination) {
-        if (pendingDestination != null) {
-            navigateTo(resolvePendingDestination(pendingDestination, state))
-            onPendingDestinationConsumed()
+    fun openBanksEntry() {
+        val entry = resolveBanksEntry(state)
+        navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
+    }
+
+    LaunchedEffect(pendingDestination, state.loading, state.bankSummaries) {
+        if (pendingDestination == null) return@LaunchedEffect
+        if (pendingDestination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
+        when (pendingDestination) {
+            SettingsDestination.Banks -> {
+                val entry = resolveBanksEntry(state)
+                navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
+            }
+            else -> navigateTo(resolvePendingDestination(pendingDestination, state))
         }
+        onPendingDestinationConsumed()
     }
 
     LaunchedEffect(destination) {
@@ -75,7 +94,7 @@ fun SettingsRoute(
     }
 
     BackHandler(enabled = destination != SettingsDestination.Hub) {
-        navigateTo(destination.parent())
+        navigateTo(destination.parent(skippedBanksList))
     }
 
     val logEntries by viewModel.logEntries.collectAsState()
@@ -86,7 +105,7 @@ fun SettingsRoute(
             state = state,
             reviewRequiredCount = reviewRequiredCount,
             onBack = onBack,
-            onOpenBanks = { navigateTo(resolveBanksEntry(state)) },
+            onOpenBanks = { openBanksEntry() },
             onOpenReview = onOpenReview,
             onOpenAbout = { navigateTo(SettingsDestination.About) },
             onReparseStored = viewModel::reparseStoredMessages,
@@ -114,15 +133,30 @@ fun SettingsRoute(
         is SettingsDestination.BankHub -> {
             val bank = Bank(current.bankId)
             val summary = state.bankSummary(current.bankId)
-            if (summary != null) {
-                SettingsBankScreen(
+            when {
+                summary != null -> SettingsBankScreen(
                     bank = bank,
                     summary = summary,
-                    onBack = { navigateTo(SettingsDestination.Banks) },
+                    onBack = { navigateTo(bankHubBack()) },
                     onOpenAccounts = { navigateTo(SettingsDestination.BankAccounts(current.bankId)) },
                     onOpenCards = { navigateTo(SettingsDestination.BankCards(current.bankId)) },
                     onOpenLoans = { navigateTo(SettingsDestination.BankLoans(current.bankId)) },
                 )
+
+                state.loading -> SettingsBankHubLoadingScreen(
+                    bank = bank,
+                    onBack = { navigateTo(bankHubBack()) },
+                )
+
+                else -> {
+                    LaunchedEffect(current.bankId) {
+                        navigateTo(SettingsDestination.Banks)
+                    }
+                    SettingsBankHubLoadingScreen(
+                        bank = bank,
+                        onBack = { navigateTo(bankHubBack()) },
+                    )
+                }
             }
         }
 
@@ -201,11 +235,22 @@ fun SettingsRoute(
     }
 }
 
-private fun resolveBanksEntry(state: SettingsUiState): SettingsDestination =
+private data class BanksNavigation(
+    val destination: SettingsDestination,
+    val skipBanksList: Boolean,
+)
+
+private fun resolveBanksEntry(state: SettingsUiState): BanksNavigation =
     if (state.bankSummaries.size == 1) {
-        SettingsDestination.BankHub(state.bankSummaries.single().bank.id)
+        BanksNavigation(
+            destination = SettingsDestination.BankHub(state.bankSummaries.single().bank.id),
+            skipBanksList = true,
+        )
     } else {
-        SettingsDestination.Banks
+        BanksNavigation(
+            destination = SettingsDestination.Banks,
+            skipBanksList = false,
+        )
     }
 
 private fun resolvePendingDestination(
@@ -213,7 +258,7 @@ private fun resolvePendingDestination(
     state: SettingsUiState,
 ): SettingsDestination =
     when (pending) {
-        SettingsDestination.Banks -> resolveBanksEntry(state)
+        SettingsDestination.Banks -> resolveBanksEntry(state).destination
         is SettingsDestination.BankAccounts,
         is SettingsDestination.BankCards,
         is SettingsDestination.BankLoans,
@@ -225,6 +270,27 @@ private fun resolvePendingDestination(
         SettingsDestination.Logs,
         -> pending
     }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsBankHubLoadingScreen(
+    bank: Bank,
+    onBack: () -> Unit,
+) {
+    MasroofSecondaryScaffold(
+        title = settingsBankLabel(bank),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.settings_back),
+    ) { contentModifier ->
+        Column(
+            modifier = contentModifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator()
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
