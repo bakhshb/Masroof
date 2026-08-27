@@ -18,6 +18,35 @@ interface FinancialTransactionRepository {
         rawSmsIds: Collection<String>,
     ): FinancialTransactionSaveResult
 
+    /**
+     * Saves [transaction] after removing exclusive stale rows that block the same
+     * [rawSmsIds]. Production Room implementation is atomic; the default falls back
+     * to delete-then-save for in-memory test doubles.
+     */
+    suspend fun replaceExclusiveStaleLinks(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+        staleRawSmsIds: Collection<String>,
+    ): FinancialTransactionSaveResult {
+        val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
+        require(ids.isNotEmpty()) { "rawSmsIds required" }
+        when (val first = save(transaction, ids)) {
+            FinancialTransactionSaveResult.Saved,
+            FinancialTransactionSaveResult.AlreadyExists,
+            -> return first
+            is FinancialTransactionSaveResult.Conflict -> Unit
+        }
+        for (rawSmsId in staleRawSmsIds.distinct()) {
+            if (!deleteIfExclusiveRawSmsLink(rawSmsId)) {
+                return FinancialTransactionSaveResult.Conflict(
+                    rawSmsId = rawSmsId,
+                    existingTransactionId = findByRawSmsId(rawSmsId)?.id ?: "stale_delete_failed",
+                )
+            }
+        }
+        return save(transaction, ids)
+    }
+
     suspend fun getById(id: String): FinancialTransaction?
 
     suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction?

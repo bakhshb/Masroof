@@ -153,6 +153,38 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
+    fun bothOwned_registryLongMasked_singleSelfTransfer() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123002"))
+        persistParsed("sms-out", outgoingBody)
+        persistParsed("sms-in", incomingBody)
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in", "sms-out"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
+    fun bothOwned_unknownShortRowsOwnedLongMasks_singleSelfTransfer() = runBlocking {
+        accounts.observe(AccountReference(Bank.BANK_ALJAZIRA, "3001"), "seed-out")
+        accounts.observe(AccountReference(Bank.BANK_ALJAZIRA, "3002"), "seed-in")
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123002"))
+        persistParsed("sms-out", outgoingBody)
+        persistParsed("sms-in", incomingBody)
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in", "sms-out"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
     fun confirmSourceFirst_thenDestination_upgradesToSelfTransfer() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         persistParsed("sms-out", outgoingBody)

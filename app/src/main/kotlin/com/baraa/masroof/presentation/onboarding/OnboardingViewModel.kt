@@ -279,6 +279,7 @@ class OnboardingViewModel(
                 } else {
                     ownershipConfirmationService.markAccountExternal(ref)
                 }
+                refreshReviewQueue()
                 loadCandidatesAndCounts()
             } catch (_: Exception) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
@@ -295,6 +296,7 @@ class OnboardingViewModel(
                 } else {
                     ownershipConfirmationService.markCardExternal(ref)
                 }
+                refreshReviewQueue()
                 loadCandidatesAndCounts()
             } catch (_: Exception) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
