@@ -1,7 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction

@@ -33,5 +33,5 @@ jobs:
       - name: Configure local SDK path
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
-      - name: Lint and test
-        run: ./gradlew testDebugUnitTest lintDebug --stacktrace
+      - name: Lint, detekt, and test
+        run: ./gradlew testDebugUnitTest lintDebug detekt --stacktrace

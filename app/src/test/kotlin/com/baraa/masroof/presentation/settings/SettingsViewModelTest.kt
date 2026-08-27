@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -611,6 +612,17 @@ class SettingsViewModelTest {
     ) : LoanRegistryRepository {
         private val entries = initial.toList()
 
+        override suspend fun observe(reference: LoanReference, rawSmsId: String) = Unit
+
+        override suspend fun setOwnership(reference: LoanReference, status: OwnershipStatus) = Unit
+
+        override suspend fun resolve(reference: LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
+
+        override suspend fun get(reference: LoanReference): LoanRegistryEntry? =
+            entries.find { it.bank == reference.bank && it.loanType == reference.loanType }
+
         override suspend fun listAll(): List<LoanRegistryEntry> = entries
+
+        override suspend fun updateDisplayName(reference: LoanReference, displayName: String?) = Unit
     }
 }

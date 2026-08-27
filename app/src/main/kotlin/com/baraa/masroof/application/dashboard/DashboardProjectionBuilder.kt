@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -140,7 +139,6 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
-            clock = clock,
             periodEndExclusive = periodEndExclusive,
         )
         val cardQueryStart = minOf(
@@ -174,7 +172,6 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
             zoneId = zoneId,
-            clock = clock,
             primaryCurrency = primaryCurrency,
             sarEquivalents = cardSarEquivalents,
             displayLocale = displayLocale,

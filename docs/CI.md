@@ -4,7 +4,7 @@ Masroof uses two GitHub Actions workflows:
 
 | Workflow | When | What |
 |----------|------|------|
-| **CI** | Pull request → `main` | `testDebugUnitTest`, `lintDebug` |
+| **CI** | Pull request → `main` | `testDebugUnitTest`, `lintDebug`, `detekt` |
 | **Release** | Push to `main` (after merge) | Signed `assembleRelease` + GitHub Release |
 
 There is **no** CI run on every `main` push anymore — only the release job runs after merge.

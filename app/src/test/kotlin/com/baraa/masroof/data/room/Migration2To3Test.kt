@@ -152,8 +152,6 @@ class Migration2To3Test {
             ftRepo.save(tx, listOf("android-sms:1"))
             assertEquals(tx.id, ftRepo.findByRawSmsId("android-sms:1")!!.id)
 
-            val schema3 = File("schemas/com.baraa.masroof.data.room.MasroofDatabase/3.json")
-            // May not exist until ksp runs — assert after build; here check tables exist.
             val tables = room.openHelper.readableDatabase.query(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'financial_%'",
             )

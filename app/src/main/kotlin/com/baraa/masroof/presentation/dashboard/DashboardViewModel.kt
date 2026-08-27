@@ -29,7 +29,6 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.sms.scanner.SmsScanFailure
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
 import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper

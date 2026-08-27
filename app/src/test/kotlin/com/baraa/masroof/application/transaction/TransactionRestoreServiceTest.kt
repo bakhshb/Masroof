@@ -11,7 +11,7 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.presentation.settings.SettingsViewModelTestSupport
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

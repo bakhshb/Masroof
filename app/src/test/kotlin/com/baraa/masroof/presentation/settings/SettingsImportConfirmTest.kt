@@ -14,6 +14,7 @@ import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -81,9 +82,7 @@ class SettingsImportConfirmTest {
         SettingsViewModel(
             cardRegistryRepository = EmptyCards(),
             accountRegistryRepository = EmptyAccounts(),
-            loanRegistryRepository = object : com.baraa.masroof.domain.repository.LoanRegistryRepository {
-                override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.LoanRegistryEntry>()
-            },
+            loanRegistryRepository = NoOpLoanRegistryRepository,
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = EmptyAccounts(),
                 cardRegistry = EmptyCards(),
