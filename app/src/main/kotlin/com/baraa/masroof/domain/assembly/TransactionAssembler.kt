@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -19,6 +20,7 @@ import com.baraa.masroof.domain.rules.ContainerKind
 import com.baraa.masroof.domain.rules.ResolvedContainerFacts
 import com.baraa.masroof.domain.rules.TransactionClassifier
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Pure assembly of [FinancialTransaction] from validated evidence + ownership.
@@ -57,6 +59,7 @@ object TransactionAssembler {
         sourceOwnership: OwnershipStatus,
         destinationOwnership: OwnershipStatus,
         cardOwnership: OwnershipStatus,
+        transactionOccurredAt: Instant = receivedAt,
     ): Outcome {
         when (event.messageFamily) {
             MessageFamily.OTP,
@@ -111,10 +114,13 @@ object TransactionAssembler {
 
         return when (classification) {
             is ClassificationResult.Classified -> {
+                if (shouldDeferIntraBankExternal(event, classification.transactionType)) {
+                    return Outcome.PendingMatch
+                }
                 val tx = buildTransaction(
                     type = classification.transactionType,
                     amount = amount,
-                    occurredAt = event.occurredAt ?: receivedAt,
+                    occurredAt = transactionOccurredAt,
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
@@ -130,7 +136,7 @@ object TransactionAssembler {
                     val tx = buildTransaction(
                         type = FinancialTransactionType.EXPENSE,
                         amount = amount,
-                        occurredAt = event.occurredAt ?: receivedAt,
+                        occurredAt = transactionOccurredAt,
                         event = event,
                         linkedEventIds = listOf(event.id),
                         rawSmsIds = listOf(event.rawSmsId),
@@ -176,14 +182,18 @@ object TransactionAssembler {
         if (sourceOwnership == OwnershipStatus.OWNED &&
             destinationOwnership == OwnershipStatus.OWNED
         ) {
+            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, ZoneId.systemDefault())
             return assembleSingle(
                 event = event,
                 receivedAt = receivedAt,
                 sourceOwnership = sourceOwnership,
                 destinationOwnership = destinationOwnership,
                 cardOwnership = OwnershipStatus.UNKNOWN,
+                transactionOccurredAt = transactionOccurredAt,
             )
         }
+
+        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, ZoneId.systemDefault())
 
         return when (event.messageFamily) {
             MessageFamily.TRANSFER_OUT -> {
@@ -202,7 +212,7 @@ object TransactionAssembler {
                 val built = buildTransaction(
                     type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                     amount = amount,
-                    occurredAt = event.occurredAt ?: receivedAt,
+                    occurredAt = transactionOccurredAt,
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
@@ -228,7 +238,7 @@ object TransactionAssembler {
                 val built = buildTransaction(
                     type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                     amount = amount,
-                    occurredAt = event.occurredAt ?: receivedAt,
+                    occurredAt = transactionOccurredAt,
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
@@ -301,6 +311,10 @@ object TransactionAssembler {
         }
 
         val occurredAt = listOfNotNull(out.occurredAt, inn.occurredAt).minOrNull()
+            ?: TransactionTiming.earliestEffectiveOccurredAt(
+                candidates = listOf(pair.outgoing, pair.incoming),
+                zoneId = ZoneId.systemDefault(),
+            )
             ?: minOf(pair.outgoing.receivedAt, pair.incoming.receivedAt)
 
         val rawSmsIds = listOf(out.rawSmsId, inn.rawSmsId).sorted()
@@ -323,6 +337,18 @@ object TransactionAssembler {
     private fun hasUnknownBankSide(event: ParsedEvent): Boolean =
         event.sourceAccountRef?.bank == Bank.UNKNOWN ||
             event.destinationAccountRef?.bank == Bank.UNKNOWN
+
+    private fun shouldDeferIntraBankExternal(
+        event: ParsedEvent,
+        transactionType: FinancialTransactionType,
+    ): Boolean =
+        (event.messageFamily == MessageFamily.TRANSFER_IN ||
+            event.messageFamily == MessageFamily.TRANSFER_OUT) &&
+            event.bankNetworkType == BankNetworkType.INTRA_BANK &&
+            (
+                transactionType == FinancialTransactionType.EXTERNAL_TRANSFER_IN ||
+                    transactionType == FinancialTransactionType.EXTERNAL_TRANSFER_OUT
+            )
 
     private fun accountFacts(
         ref: AccountReference?,

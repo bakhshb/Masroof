@@ -2,6 +2,7 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.assembly.TransactionAssembler
+import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
@@ -22,6 +23,7 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import java.time.ZoneId
 
 /**
  * Operational summary of a reconciliation pass.
@@ -49,6 +51,7 @@ class TransactionReconciliationService(
     private val ownershipResolver: OwnershipResolver,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider? = null,
     private val reviewRepository: ReviewRepository? = null,
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun reconcileStoredEvents(): ReconciliationSummary =
         reconcileStoredEventsDetailed().summary
@@ -118,6 +121,12 @@ class TransactionReconciliationService(
 
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt
                 ?: continue
+            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(
+                event = event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = receivedAt,
+                zoneId = zoneId,
+            )
 
             val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
                 ?: OwnershipStatus.UNKNOWN
@@ -138,6 +147,7 @@ class TransactionReconciliationService(
                             sourceOwnership = sourceOwn,
                             destinationOwnership = destOwn,
                             cardOwnership = cardOwn,
+                            transactionOccurredAt = transactionOccurredAt,
                         ),
                     )
                     when (single) {
@@ -197,6 +207,7 @@ class TransactionReconciliationService(
                                 sourceOwnership = sourceOwn,
                                 destinationOwnership = destOwn,
                                 cardOwnership = cardOwn,
+                                transactionOccurredAt = transactionOccurredAt,
                             ),
                         )
                     ) {

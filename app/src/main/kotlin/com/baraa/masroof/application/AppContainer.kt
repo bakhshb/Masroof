@@ -311,6 +311,10 @@ class AppContainer(
             dataSource = smsDataSource,
             ingestionService = smsIngestionService,
             appLogService = appLogService,
+            onScanComplete = {
+                reconcileStoredEvents()
+                refreshReviewQueue()
+            },
         )
 
     /**
