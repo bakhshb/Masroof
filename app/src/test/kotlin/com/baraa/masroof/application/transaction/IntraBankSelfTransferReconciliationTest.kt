@@ -196,16 +196,92 @@ class IntraBankSelfTransferReconciliationTest {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
         persistParsed("sms-out", outgoingBody)
         persistParsed("sms-in", incomingBody)
+        seedStaleExternalPair("sms-out", "sms-in")
 
-        val outParsed = parsedRepo.listAll().first { it.event.rawSmsId == "sms-out" }
-        val inParsed = parsedRepo.listAll().first { it.event.rawSmsId == "sms-in" }
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in", "sms-out"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
+    fun upgrade_staleExternalPair_outsideTimeWindow_staysExternal() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+
+        val outBodyLate =
+            """
+            حوالة صادرة الى حسابك الجاري
+            من: 3001
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            في: 2026-08-27 08:00
+            """.trimIndent()
+        val inBodyEarly =
+            """
+            حوالة واردة داخلية
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            اسم المرسل: براء بخش
+            رقم حساب المرسل: 3001
+            البنك المرسل: بنك الجزيرة
+            في: 2026-08-27 07:36
+            """.trimIndent()
+
+        persistParsed("sms-out", outBodyLate)
+        persistParsed("sms-in", inBodyEarly)
+        seedStaleExternalPair("sms-out", "sms-in")
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(2, ftRepo.listAll().size)
+        assertTrue(
+            ftRepo.listAll().all {
+                it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+                    it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
+            },
+        )
+    }
+
+    @Test
+    fun upgrade_ambiguousSameTimestamp_doesNotMergeWrongLegs() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+
+        persistParsed("sms-out-a", outgoingBody, Instant.parse("2026-08-27T04:36:00Z"))
+        persistParsed("sms-out-b", outgoingBody, Instant.parse("2026-08-27T04:37:00Z"))
+        persistParsed("sms-in-a", incomingBody, Instant.parse("2026-08-27T04:36:30Z"))
+        persistParsed("sms-in-b", incomingBody, Instant.parse("2026-08-27T04:37:30Z"))
+        seedStaleExternalPair("sms-out-a", "sms-in-a", idSuffix = "a")
+        seedStaleExternalPair("sms-out-b", "sms-in-b", idSuffix = "b")
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(4, ftRepo.listAll().size)
+        assertTrue(
+            ftRepo.listAll().all {
+                it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+                    it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
+            },
+        )
+    }
+
+    private suspend fun seedStaleExternalPair(
+        outSmsId: String,
+        inSmsId: String,
+        idSuffix: String = "",
+    ) {
+        val outParsed = parsedRepo.listAll().first { it.event.rawSmsId == outSmsId }
+        val inParsed = parsedRepo.listAll().first { it.event.rawSmsId == inSmsId }
         val amount = Money.of("5500.00", Currency.SAR)
         val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
         val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
 
         ftRepo.save(
             com.baraa.masroof.domain.model.FinancialTransaction(
-                id = "tx-stale-out",
+                id = "tx-stale-out$idSuffix",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 amount = amount,
                 occurredAt = Instant.parse("2026-08-27T04:36:00Z"),
@@ -216,11 +292,11 @@ class IntraBankSelfTransferReconciliationTest {
                 categoryId = null,
                 linkedParsedEventIds = listOf(outParsed.event.id),
             ),
-            listOf("sms-out"),
+            listOf(outSmsId),
         )
         ftRepo.save(
             com.baraa.masroof.domain.model.FinancialTransaction(
-                id = "tx-stale-in",
+                id = "tx-stale-in$idSuffix",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                 amount = amount,
                 occurredAt = Instant.parse("2026-08-27T04:36:00Z"),
@@ -231,29 +307,30 @@ class IntraBankSelfTransferReconciliationTest {
                 categoryId = null,
                 linkedParsedEventIds = listOf(inParsed.event.id),
             ),
-            listOf("sms-in"),
+            listOf(inSmsId),
         )
-
-        reconciliation.reconcileStoredEvents()
-
-        assertEquals(1, ftRepo.listAll().size)
-        val tx = ftRepo.listAll().single()
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
-        assertEquals(setOf("sms-in", "sms-out"), ftRepo.listRawSmsIds(tx.id).toSet())
     }
 
-    private fun parseSms(rawSmsId: String, body: String): ParseResult =
+    private fun parseSms(
+        rawSmsId: String,
+        body: String,
+        receivedAt: Instant = Instant.parse("2026-08-27T04:36:00Z"),
+    ): ParseResult =
         pipeline.parse(
             SmsParseInput(
                 rawSmsId = rawSmsId,
                 sender = "AlJazira",
                 body = body,
-                receivedAt = Instant.parse("2026-08-27T04:36:00Z"),
+                receivedAt = receivedAt,
             ),
         )
 
-    private suspend fun persistParsed(rawSmsId: String, body: String) {
-        val result = parseSms(rawSmsId, body)
+    private suspend fun persistParsed(
+        rawSmsId: String,
+        body: String,
+        receivedAt: Instant = Instant.parse("2026-08-27T04:36:00Z"),
+    ) {
+        val result = parseSms(rawSmsId, body, receivedAt)
         assertTrue(result is ParseResult.Success)
         val success = result as ParseResult.Success
         assertEquals(ParseStatus.SUCCESS, success.event.parseStatus)
@@ -262,7 +339,7 @@ class IntraBankSelfTransferReconciliationTest {
                 id = rawSmsId,
                 sender = "AlJazira",
                 body = body,
-                receivedAt = Instant.parse("2026-08-27T04:36:00Z"),
+                receivedAt = receivedAt,
                 deviceMessageId = rawSmsId,
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             ),
