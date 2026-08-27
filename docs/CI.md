@@ -4,7 +4,7 @@ Masroof uses two GitHub Actions workflows:
 
 | Workflow | When | What |
 |----------|------|------|
-| **CI** | Pull request → `main` | `test`, `lint`, `assembleDebug` |
+| **CI** | Pull request → `main` | `testDebugUnitTest`, `lintDebug` |
 | **Release** | Push to `main` (after merge) | Signed `assembleRelease` + GitHub Release |
 
 There is **no** CI run on every `main` push anymore — only the release job runs after merge.
@@ -66,6 +66,6 @@ If **Release** shows green but no new APK:
 1. Open the workflow run → check **Skip if release already published**. If it says `Release vX.Y.Z already exists — skipping build`, the resolved tag was already published.
 2. Allow **github-actions[bot]** to bypass branch rules for `main` (Rules → `main` → Bypass list), or the `chore: bump version` commit will fail even when the APK publishes.
 
-## PR debug APK
+## PR artifacts
 
-Each PR uploads `masroof-debug-apk-pr-<number>` under **Actions → run → Artifacts** (unsigned debug build for quick testing).
+PR CI does not build or upload a debug APK. Installable builds come from **Release** after merge to `main`, or run **Actions → Release → Run workflow** manually.
