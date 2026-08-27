@@ -460,27 +460,19 @@ class TransactionReconciliationService(
                     val rawSmsIds = listOf(outLeg.event.rawSmsId, inLeg.event.rawSmsId)
                         .distinct()
                         .sorted()
-                    val deletedAll = rawSmsIds.all { rawSmsId ->
-                        financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
-                    }
-                    if (!deletedAll) {
-                        failed++
-                        continue
-                    }
-
-                    when (persist(outcome.transaction, outcome.rawSmsIds)) {
-                        PersistOutcome.Saved -> {
+                    when (upgradePersist(outcome.transaction, outcome.rawSmsIds, rawSmsIds)) {
+                        UpgradePersistOutcome.Saved -> {
                             matchedPairs++
                             assembledSingle++
                             settledRawSmsIds += rawSmsIds
                         }
 
-                        PersistOutcome.Already -> {
+                        UpgradePersistOutcome.Already -> {
                             alreadyLinked += 2
                             settledRawSmsIds += rawSmsIds
                         }
 
-                        PersistOutcome.Failed -> failed++
+                        UpgradePersistOutcome.Failed -> failed++
                     }
                 }
 
@@ -495,6 +487,31 @@ class TransactionReconciliationService(
             failed = failed,
             settledRawSmsIds = settledRawSmsIds,
         )
+    }
+
+    private enum class UpgradePersistOutcome { Saved, Already, Failed }
+
+    private suspend fun upgradePersist(
+        transaction: FinancialTransaction,
+        rawSmsIds: List<String>,
+        staleRawSmsIds: List<String>,
+    ): UpgradePersistOutcome {
+        when (persist(transaction, rawSmsIds)) {
+            PersistOutcome.Saved -> return UpgradePersistOutcome.Saved
+            PersistOutcome.Already -> return UpgradePersistOutcome.Already
+            PersistOutcome.Failed -> Unit
+        }
+
+        val deletedAll = staleRawSmsIds.all { rawSmsId ->
+            financialTransactionRepository.deleteIfExclusiveRawSmsLink(rawSmsId)
+        }
+        if (!deletedAll) return UpgradePersistOutcome.Failed
+
+        return when (persist(transaction, rawSmsIds)) {
+            PersistOutcome.Saved -> UpgradePersistOutcome.Saved
+            PersistOutcome.Already -> UpgradePersistOutcome.Already
+            PersistOutcome.Failed -> UpgradePersistOutcome.Failed
+        }
     }
 
     private data class UpgradePassResult(

@@ -58,6 +58,25 @@ class OwnershipResolverAndScenariosTest {
     }
 
     @Test
+    fun parsedLast4_resolvesOwnedRegistryLongMasked() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
+        assertEquals(
+            OwnershipStatus.OWNED,
+            resolver.resolveAccount(AccountReference(Bank.BANK_ALJAZIRA, "3001")),
+        )
+    }
+
+    @Test
+    fun parsedLast4_ambiguousSuffix_staysUnknown() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "1234567890123001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "98765432123001"))
+        assertEquals(
+            OwnershipStatus.UNKNOWN,
+            resolver.resolveAccount(AccountReference(Bank.BANK_ALJAZIRA, "3001")),
+        )
+    }
+
+    @Test
     fun exactExternalReference_resolvesExternal() = runBlocking {
         val ref = AccountReference(Bank.BANK_ALJAZIRA, "3001")
         confirmation.markAccountExternal(ref)
