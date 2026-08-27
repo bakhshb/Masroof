@@ -45,6 +45,7 @@ object DebitCardRegistryInferrer {
             if (event.bank != bank) continue
             if (event.cardRef?.last4 != cardLast4) continue
             val body = rawSmsById[event.rawSmsId]?.body ?: continue
+            if (CreditCardMessageHeuristics.isCreditCardSms(body)) continue
             if (CreditCardMessageHeuristics.isDebitCardSms(body)) return true
         }
         return false

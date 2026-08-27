@@ -20,6 +20,7 @@ import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.OwnedCardUi
 import com.baraa.masroof.presentation.dashboard.followedCreditFacilities
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -140,6 +141,29 @@ class MadaDebitCardsDashboardVisibilityTest {
         val rawSmsById = mapOf("sms-8219" to rawSms("sms-8219", googlePayBody))
 
         assertTrue(
+            DebitCardRegistryInferrer.isDebitCard(
+                entry = entry,
+                parsedRecords = parsedRecords,
+                rawSmsById = rawSmsById,
+            ),
+        )
+    }
+
+    @Test
+    fun debitCardRegistryInferrer_ignoresCreditSmsAtRamadanMerchant() {
+        val entry = ownedMadaWithoutMetadata("7271")
+        val ramadanCreditBody = """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة ائتمانية: 7271
+            لدى: Ramadan Gifts
+            بمبلغ: 75.00 SAR
+            الرصيد المتاح: 14569.09 SAR
+            إجمالي المبلغ المستحق:3921.11 SAR
+        """.trimIndent()
+        val parsedRecords = listOf(parsedMadaPurchase("evt-7271", "sms-7271", "7271"))
+        val rawSmsById = mapOf("sms-7271" to rawSms("sms-7271", ramadanCreditBody))
+
+        assertFalse(
             DebitCardRegistryInferrer.isDebitCard(
                 entry = entry,
                 parsedRecords = parsedRecords,
