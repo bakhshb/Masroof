@@ -37,11 +37,15 @@ object AccountFlowClassifier {
         scope: CurrentAccountTransactionScope,
         context: AccountFlowClassificationContext,
     ): List<FlowAssignment> {
-        val amount = TransactionAmountResolver.effectiveAmount(
-            tx = tx,
-            primaryCurrency = context.primaryCurrency,
-            sarEquivalents = context.sarEquivalents,
-        ) ?: return emptyList()
+        if (
+            TransactionAmountResolver.effectiveAmount(
+                tx = tx,
+                primaryCurrency = context.primaryCurrency,
+                sarEquivalents = context.sarEquivalents,
+            ) == null
+        ) {
+            return emptyList()
+        }
 
         return classifyWithAmount(tx, scope, context)
     }
