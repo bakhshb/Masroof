@@ -113,7 +113,7 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
             }
         }
 
-        fun isCredit(card: CardRow): Boolean = card.cardType != "DEBIT"
+        fun isCredit(card: CardRow): Boolean = card.cardType == "CREDIT"
 
         val creditCards = cards.filter { isCredit(it) }
         val primaryEntries = creditCards.filter { it.cardRole == "PRIMARY" }
@@ -144,7 +144,9 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
         for (primary in primaryEntries) {
             insertFacility(primary.bankId, primary.last4)
             setCardFacility(primary.bankId, primary.last4, primary.last4)
-            for (supplement in supplementaryEntries.filter { it.parentCardLast4 == primary.last4 }) {
+            for (supplement in supplementaryEntries.filter {
+                it.bankId == primary.bankId && it.parentCardLast4 == primary.last4
+            }) {
                 setCardFacility(supplement.bankId, supplement.last4, primary.last4)
             }
         }
@@ -154,8 +156,14 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
             setCardFacility(standalone.bankId, standalone.last4, standalone.last4)
         }
 
-        val groupedLast4s = (primaryEntries.map { it.last4 } + standaloneEntries.map { it.last4 }).toSet()
-        val orphanSupplements = supplementaryEntries.filter { it.parentCardLast4 !in groupedLast4s }
+        val groupedKeys = (
+            primaryEntries.map { it.bankId to it.last4 } +
+                standaloneEntries.map { it.bankId to it.last4 }
+        ).toSet()
+        val orphanSupplements = supplementaryEntries.filter { entry ->
+            val parentKey = entry.bankId to entry.parentCardLast4.orEmpty()
+            parentKey !in groupedKeys
+        }
         for (orphan in orphanSupplements) {
             insertFacility(orphan.bankId, orphan.last4)
             setCardFacility(orphan.bankId, orphan.last4, orphan.last4)

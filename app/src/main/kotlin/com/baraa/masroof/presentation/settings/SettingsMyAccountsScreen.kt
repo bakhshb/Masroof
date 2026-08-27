@@ -112,35 +112,47 @@ fun SettingsMyAccountsScreen(
 
             if (state.followedAccounts.isNotEmpty()) {
                 SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_followed))
-                state.followedAccounts.forEach { account ->
-                    SettingsRegistryItemCard(
-                        icon = MasroofIcons.externalIn,
-                        bank = account.bank,
-                        title = account.displayLabel,
-                        endAction = {
-                            SettingsStopTrackingButton(
-                                onClick = { onRequestStopTracking(account) },
-                                enabled = !state.updating,
-                                contentDescription = stringResource(R.string.settings_stop_account_tracking),
+                if (state.bankTrees.isNotEmpty()) {
+                    state.bankTrees.forEach { tree ->
+                        tree.currentAccountNodes.forEach { node ->
+                            SettingsRegistryAccountRow(
+                                account = node.account,
+                                debitCards = node.debitCards,
+                                updating = state.updating,
+                                onRequestStopTracking = onRequestStopTracking,
+                                onRenameAccount = onRenameAccount,
+                                onPickAccountType = onPickAccountType,
                             )
-                        },
-                        footer = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(
-                                    onClick = { onRenameAccount(account) },
-                                    enabled = !state.updating,
-                                ) {
-                                    Text(stringResource(R.string.settings_action_rename))
-                                }
-                                TextButton(
-                                    onClick = { onPickAccountType(account) },
-                                    enabled = !state.updating,
-                                ) {
-                                    Text(accountTypeLabel(account.accountType))
-                                }
-                            }
-                        },
-                    )
+                        }
+                        tree.savingsAccounts.forEach { account ->
+                            SettingsRegistryAccountRow(
+                                account = account,
+                                updating = state.updating,
+                                onRequestStopTracking = onRequestStopTracking,
+                                onRenameAccount = onRenameAccount,
+                                onPickAccountType = onPickAccountType,
+                            )
+                        }
+                        tree.walletAccounts.forEach { account ->
+                            SettingsRegistryAccountRow(
+                                account = account,
+                                updating = state.updating,
+                                onRequestStopTracking = onRequestStopTracking,
+                                onRenameAccount = onRenameAccount,
+                                onPickAccountType = onPickAccountType,
+                            )
+                        }
+                    }
+                } else {
+                    state.followedAccounts.forEach { account ->
+                        SettingsRegistryAccountRow(
+                            account = account,
+                            updating = state.updating,
+                            onRequestStopTracking = onRequestStopTracking,
+                            onRenameAccount = onRenameAccount,
+                            onPickAccountType = onPickAccountType,
+                        )
+                    }
                 }
             }
 
@@ -207,6 +219,53 @@ fun SettingsAccountTypeDialog(
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !updating) {
                 Text(stringResource(R.string.settings_action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun SettingsRegistryAccountRow(
+    account: ManagedAccountUi,
+    debitCards: List<ManagedCardUi> = emptyList(),
+    updating: Boolean,
+    onRequestStopTracking: (ManagedAccountUi) -> Unit,
+    onRenameAccount: (ManagedAccountUi) -> Unit,
+    onPickAccountType: (ManagedAccountUi) -> Unit,
+) {
+    SettingsRegistryItemCard(
+        icon = MasroofIcons.externalIn,
+        bank = account.bank,
+        title = account.displayLabel,
+        endAction = {
+            SettingsStopTrackingButton(
+                onClick = { onRequestStopTracking(account) },
+                enabled = !updating,
+                contentDescription = stringResource(R.string.settings_stop_account_tracking),
+            )
+        },
+        footer = {
+            debitCards.forEach { debit ->
+                Text(
+                    stringResource(R.string.dashboard_account_linked_mada_label, debit.displayLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = { onRenameAccount(account) },
+                    enabled = !updating,
+                ) {
+                    Text(stringResource(R.string.settings_action_rename))
+                }
+                TextButton(
+                    onClick = { onPickAccountType(account) },
+                    enabled = !updating,
+                ) {
+                    Text(accountTypeLabel(account.accountType))
+                }
             }
         },
     )

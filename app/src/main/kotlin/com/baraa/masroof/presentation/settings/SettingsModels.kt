@@ -10,6 +10,7 @@ import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.OwnershipStatus
 
 data class ManagedCardUi(
+    val id: String,
     val bank: Bank,
     val last4: String,
     val ownership: OwnershipStatus,
@@ -34,6 +35,7 @@ data class ManagedCardUi(
 }
 
 data class ManagedAccountUi(
+    val id: String,
     val bank: Bank,
     val maskedNumber: String,
     val ownership: OwnershipStatus,
@@ -47,12 +49,17 @@ data class ManagedAccountUi(
 
 data class SettingsBankTreeUi(
     val bank: Bank,
-    val currentAccounts: List<ManagedAccountUi>,
+    val currentAccountNodes: List<SettingsCurrentAccountNodeUi> = emptyList(),
     val savingsAccounts: List<ManagedAccountUi>,
     val walletAccounts: List<ManagedAccountUi>,
     val creditCards: List<ManagedCardUi>,
-    val debitCards: List<ManagedCardUi>,
+    val unlinkedDebitCards: List<ManagedCardUi> = emptyList(),
     val loans: List<ManagedLoanUi> = emptyList(),
+)
+
+data class SettingsCurrentAccountNodeUi(
+    val account: ManagedAccountUi,
+    val debitCards: List<ManagedCardUi>,
 )
 
 data class ManagedLoanUi(

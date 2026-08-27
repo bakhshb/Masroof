@@ -4,6 +4,7 @@ import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.mapper.RegistryMapper
+import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
@@ -29,6 +30,7 @@ class RoomCardRegistryRepository(
 
         dao.observeAtomic(
             entity = CardRegistryEntity(
+                id = RegistryEntityIdFactory.stableCardId(reference.bank.id, last4),
                 bankId = reference.bank.id,
                 last4 = last4,
                 ownershipStatus = OwnershipStatus.UNKNOWN.name,
@@ -46,6 +48,7 @@ class RoomCardRegistryRepository(
 
         dao.setOwnershipAtomic(
             entity = CardRegistryEntity(
+                id = RegistryEntityIdFactory.stableCardId(reference.bank.id, last4),
                 bankId = reference.bank.id,
                 last4 = last4,
                 ownershipStatus = status.name,

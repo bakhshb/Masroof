@@ -337,14 +337,14 @@ class OnboardingViewModelTest {
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-AccountRegistryEntry(
+AccountRegistryEntry.forTest(
                     Bank.BANK_ALJAZIRA,
                     "3001",
                     OwnershipStatus.UNKNOWN,
                     firstSeenRawSmsId = null,
                     lastSeenRawSmsId = null,
                 ),
-                AccountRegistryEntry(
+                AccountRegistryEntry.forTest(
                     Bank.UNKNOWN,
                     "9999",
                     OwnershipStatus.UNKNOWN,
@@ -353,7 +353,7 @@ AccountRegistryEntry(
                 ),
             ),
             cards = mutableListOf(
-                CardRegistryEntry(
+                CardRegistryEntry.forTest(
                     Bank.BANK_ALJAZIRA,
                     "7271",
                     OwnershipStatus.UNKNOWN,
@@ -376,7 +376,7 @@ AccountRegistryEntry(
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-                AccountRegistryEntry(
+                AccountRegistryEntry.forTest(
                     Bank.BANK_ALJAZIRA,
                     "3001",
                     OwnershipStatus.UNKNOWN,
@@ -403,7 +403,7 @@ AccountRegistryEntry(
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(
-                AccountRegistryEntry(
+                AccountRegistryEntry.forTest(
                     Bank.BANK_ALJAZIRA,
                     "3001",
                     OwnershipStatus.UNKNOWN,
@@ -588,7 +588,7 @@ AccountRegistryEntry(
         override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
             val idx = entries.indexOfFirst { it.bank == reference.bank && it.maskedNumber == reference.maskedNumber }
             if (idx >= 0) entries[idx] = entries[idx].copy(ownership = status)
-            else entries += AccountRegistryEntry(
+            else entries += AccountRegistryEntry.forTest(
                 reference.bank,
                 reference.maskedNumber ?: "",
                 status,
@@ -605,7 +605,7 @@ AccountRegistryEntry(
         override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
             override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
         fun addUnknown(maskedNumber: String) {
-            entries += AccountRegistryEntry(
+            entries += AccountRegistryEntry.forTest(
                 Bank.BANK_ALJAZIRA,
                 maskedNumber,
                 OwnershipStatus.UNKNOWN,
@@ -622,7 +622,7 @@ AccountRegistryEntry(
         override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
             val idx = entries.indexOfFirst { it.bank == reference.bank && it.last4 == reference.last4 }
             if (idx >= 0) entries[idx] = entries[idx].copy(ownership = status)
-            else entries += CardRegistryEntry(
+            else entries += CardRegistryEntry.forTest(
                 reference.bank,
                 reference.last4 ?: "",
                 status,

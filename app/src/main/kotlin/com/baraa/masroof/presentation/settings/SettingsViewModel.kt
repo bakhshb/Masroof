@@ -808,6 +808,7 @@ class SettingsViewModel(
             .filter { it.bank != Bank.UNKNOWN }
             .map {
                 ManagedCardUi(
+                    id = it.id,
                     bank = it.bank,
                     last4 = it.last4,
                     ownership = it.ownership,
@@ -824,6 +825,7 @@ class SettingsViewModel(
             .filter { it.bank != Bank.UNKNOWN }
             .map {
                 ManagedAccountUi(
+                    id = it.id,
                     bank = it.bank,
                     maskedNumber = it.maskedNumber,
                     ownership = it.ownership,
@@ -856,21 +858,42 @@ class SettingsViewModel(
             val bank = Bank(bankId)
             val bankCards = cards.filter { it.bank.id == bankId }
             val bankAccounts = accounts.filter { it.bank.id == bankId }
+            val currentAccounts = bankAccounts.filter { it.accountType == AccountType.CURRENT }
+            val debitCards = bankCards.filter { it.cardType == CardType.DEBIT }
+            val assignedDebitLast4s = mutableSetOf<String>()
+            val currentNodes = currentAccounts.map { account ->
+                val matchedDebit = debitCards.filter { debit ->
+                    debitMatchesAccount(debit, account)
+                }
+                matchedDebit.forEach { assignedDebitLast4s.add(it.last4) }
+                SettingsCurrentAccountNodeUi(account = account, debitCards = matchedDebit)
+            }
+            val unlinkedDebit = debitCards.filter { it.last4 !in assignedDebitLast4s }
             SettingsBankTreeUi(
                 bank = bank,
-                currentAccounts = bankAccounts.filter { it.accountType == AccountType.CURRENT },
+                currentAccountNodes = currentNodes,
                 savingsAccounts = bankAccounts.filter { it.accountType == AccountType.SAVINGS },
                 walletAccounts = bankAccounts.filter { it.accountType == AccountType.WALLET },
-                creditCards = bankCards.filter { it.cardType != CardType.DEBIT },
-                debitCards = bankCards.filter { it.cardType == CardType.DEBIT },
+                creditCards = bankCards.filter { it.cardType == CardType.CREDIT },
+                unlinkedDebitCards = unlinkedDebit,
             )
         }.filter { tree ->
-            tree.currentAccounts.isNotEmpty() ||
+            tree.currentAccountNodes.isNotEmpty() ||
                 tree.savingsAccounts.isNotEmpty() ||
                 tree.walletAccounts.isNotEmpty() ||
                 tree.creditCards.isNotEmpty() ||
-                tree.debitCards.isNotEmpty()
+                tree.unlinkedDebitCards.isNotEmpty()
         }
+    }
+
+    private fun debitMatchesAccount(debit: ManagedCardUi, account: ManagedAccountUi): Boolean {
+        val linked = debit.linkedAccountMaskedNumber
+        if (linked != null) {
+            return account.maskedNumber == linked ||
+                account.maskedNumber.endsWith(linked) ||
+                linked.endsWith(account.maskedNumber.takeLast(4))
+        }
+        return false
     }
 
     fun openAccountTypePicker(account: ManagedAccountUi) {

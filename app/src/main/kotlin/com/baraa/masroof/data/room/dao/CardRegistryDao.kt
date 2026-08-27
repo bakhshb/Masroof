@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
+import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 
 @Dao
 interface CardRegistryDao {
@@ -185,7 +186,7 @@ interface CardRegistryDao {
             detachSupplementariesOfPrimary(bankId, primaryLast4)
         }
         demoteOtherPrimaryCards(bankId, last4)
-        val facilityId = "facility:$bankId:$last4"
+        val facilityId = RegistryEntityIdFactory.stableCreditFacilityId(bankId, last4)
         insertFacilityIfAbsent(facilityId, bankId, last4)
         updateCardRole(
             bankId = bankId,
@@ -203,7 +204,7 @@ interface CardRegistryDao {
         if (existing?.cardRole == "PRIMARY") {
             detachSupplementariesOfPrimary(bankId, last4)
         }
-        val facilityId = "facility:$bankId:$parentLast4"
+        val facilityId = RegistryEntityIdFactory.stableCreditFacilityId(bankId, parentLast4)
         insertFacilityIfAbsent(facilityId, bankId, parentLast4)
         updateCardRole(
             bankId = bankId,
@@ -222,7 +223,7 @@ interface CardRegistryDao {
             detachSupplementariesOfPrimary(bankId, last4)
         }
         clearSupplementaryRole(bankId, last4)
-        val facilityId = "facility:$bankId:$last4"
+        val facilityId = RegistryEntityIdFactory.stableCreditFacilityId(bankId, last4)
         insertFacilityIfAbsent(facilityId, bankId, last4)
         updateCardRole(
             bankId = bankId,

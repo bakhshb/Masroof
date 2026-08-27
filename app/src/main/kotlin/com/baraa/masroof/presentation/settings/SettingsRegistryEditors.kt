@@ -240,7 +240,7 @@ fun SettingsCardMetadataActions(
     onLinkDebit: () -> Unit,
     onMarkDebit: () -> Unit,
 ) {
-    val isCreditCard = card.cardType != CardType.DEBIT
+    val isCreditCard = card.cardType == CardType.CREDIT
     val canLinkDebit = card.cardType == CardType.DEBIT ||
         card.cardNetwork == CardNetwork.MADA ||
         card.cardType == null

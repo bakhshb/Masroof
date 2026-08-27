@@ -65,7 +65,7 @@ class BankHierarchyBuilderTest {
     }
 
     private fun account(masked: String): AccountRegistryEntry =
-        AccountRegistryEntry(
+        AccountRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             maskedNumber = masked,
             ownership = OwnershipStatus.OWNED,

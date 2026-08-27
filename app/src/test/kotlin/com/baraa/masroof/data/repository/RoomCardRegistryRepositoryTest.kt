@@ -192,7 +192,7 @@ class RoomCardRegistryRepositoryTest {
 
         val cards = repository.listAll().associateBy { it.last4 }
         assertEquals(CardType.DEBIT, cards.getValue("1111").cardType)
-        assertEquals(CardRole.STANDALONE, cards.getValue("1111").cardRole)
+        assertEquals(null, cards.getValue("1111").cardRole)
         assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
         assertEquals(com.baraa.masroof.domain.model.CardNetwork.MADA, cards.getValue("1111").cardNetwork)
     }

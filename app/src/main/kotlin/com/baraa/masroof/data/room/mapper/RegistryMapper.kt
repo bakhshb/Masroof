@@ -14,6 +14,7 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 object RegistryMapper {
     fun toAccountEntry(entity: AccountRegistryEntity): AccountRegistryEntry =
         AccountRegistryEntry(
+            id = entity.id,
             bank = Bank(entity.bankId),
             maskedNumber = entity.maskedNumber,
             ownership = OwnershipStatus.valueOf(entity.ownershipStatus),
@@ -25,6 +26,7 @@ object RegistryMapper {
 
     fun toCardEntry(entity: CardRegistryEntity): CardRegistryEntry =
         CardRegistryEntry(
+            id = entity.id,
             bank = Bank(entity.bankId),
             last4 = entity.last4,
             ownership = OwnershipStatus.valueOf(entity.ownershipStatus),

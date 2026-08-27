@@ -344,7 +344,7 @@ class DashboardViewModelTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
         val registry = FakeCardRegistry(
-            CardRegistryEntry(
+            CardRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
                 last4 = "5123",
                 ownership = OwnershipStatus.UNKNOWN,

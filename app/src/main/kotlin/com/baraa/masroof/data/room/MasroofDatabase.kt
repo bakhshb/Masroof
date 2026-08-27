@@ -29,13 +29,15 @@ import com.baraa.masroof.data.room.migration.MIGRATION_3_4
 import com.baraa.masroof.data.room.migration.MIGRATION_4_5
 import com.baraa.masroof.data.room.migration.MIGRATION_5_6
 import com.baraa.masroof.data.room.migration.MIGRATION_6_7
+import com.baraa.masroof.data.room.migration.MIGRATION_7_8
 
 /**
  * Clean rewrite persistence schema — version 4 (P9 review + user corrections).
  *
  * Migrations: 1→2 ownership registries; 2→3 financial transactions; 3→4 review workflow;
  * 4→5 exchange rates; 5→6 registry display names and card relationships;
- * 6→7 bank hierarchy (bank_registry, credit_facility, loan_registry, account types).
+ * 6→7 bank hierarchy (bank_registry, credit_facility, loan_registry, account types);
+ * 7→8 opaque registry entity ids.
  * Does not use destructive migration.
  */
 @Database(
@@ -52,7 +54,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_6_7
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -78,22 +80,28 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 7
+        const val VERSION: Int = 8
 
-        /** Must match app/schemas/.../7.json identityHash — updated after schema export. */
-        const val IDENTITY_HASH: String = "5b63e94003a7d853d7896f020bbec1ec"
+        /** Must match app/schemas/.../8.json identityHash — updated after schema export. */
+        const val IDENTITY_HASH: String = "051d1cf4633e66c7ae6b851428871ab4"
 
-        /** Previous production schema (main before v7 bank hierarchy). */
-        const val PREVIOUS_VERSION: Int = 6
+        /** Previous production schema (v7 bank hierarchy). */
+        const val PREVIOUS_VERSION: Int = 7
 
-        /** Must match app/schemas/.../6.json identityHash. */
-        const val PREVIOUS_IDENTITY_HASH: String = "bae309478a1209a31e06cfcbde30b56f"
+        /** Must match app/schemas/.../7.json identityHash. */
+        const val PREVIOUS_IDENTITY_HASH: String = "5b63e94003a7d853d7896f020bbec1ec"
 
         /** Legacy v5 backups (pre card registry metadata). */
         const val LEGACY_VERSION_5: Int = 5
 
         /** Must match app/schemas/.../5.json identityHash. */
         const val LEGACY_IDENTITY_HASH_5: String = "d192ca81655b31f5e6c203239148ad42"
+
+        /** Legacy v6 backups (pre bank hierarchy). */
+        const val LEGACY_VERSION_6: Int = 6
+
+        /** Must match app/schemas/.../6.json identityHash. */
+        const val LEGACY_IDENTITY_HASH_6: String = "bae309478a1209a31e06cfcbde30b56f"
 
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
@@ -102,6 +110,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
     }
 }

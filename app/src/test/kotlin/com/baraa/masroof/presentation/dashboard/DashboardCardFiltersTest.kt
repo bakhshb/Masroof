@@ -86,6 +86,27 @@ class DashboardCardFiltersTest {
         assertNull(state.followedCreditFacilities())
     }
 
+    @Test
+    fun followedCreditFacilitiesForSummary_includesOwnedDebitTiles() {
+        val state = DashboardUiState(
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = listOf(facility("1111", emptyList())),
+                debitCards = listOf(debit("5555"), debit("8888")),
+                legacyFlat = emptyOverview(),
+                currency = Currency.SAR,
+            ),
+            ownedCards = listOf(
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "1111"),
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "5555"),
+            ),
+        )
+
+        val filtered = state.followedCreditFacilitiesForSummary()
+        assertNotNull(filtered)
+        assertEquals(1, filtered!!.facilities.size)
+        assertEquals(listOf("5555"), filtered.debitCards.map { it.last4 })
+    }
+
     private fun facility(
         primary: String,
         supplementaries: List<String>,

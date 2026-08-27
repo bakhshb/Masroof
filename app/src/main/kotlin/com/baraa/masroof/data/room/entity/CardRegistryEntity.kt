@@ -8,9 +8,11 @@ import androidx.room.Index
     primaryKeys = ["bankId", "last4"],
     indices = [
         Index(value = ["bankId", "last4"], unique = true),
+        Index(value = ["id"], unique = true),
     ],
 )
 data class CardRegistryEntity(
+    val id: String,
     val bankId: String,
     val last4: String,
     val ownershipStatus: String,

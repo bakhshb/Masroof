@@ -75,7 +75,7 @@ class DebitCardOverviewBuilderTest {
                 bodyHash = record.event.id,
             )
         }
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
             ownership = OwnershipStatus.OWNED,
@@ -148,7 +148,7 @@ class DebitCardOverviewBuilderTest {
                 bodyHash = record.event.id,
             )
         }
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
             ownership = OwnershipStatus.OWNED,
@@ -213,7 +213,7 @@ class DebitCardOverviewBuilderTest {
                 bodyHash = record.event.id,
             )
         }
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
             ownership = OwnershipStatus.OWNED,
@@ -270,7 +270,7 @@ class DebitCardOverviewBuilderTest {
                 bodyHash = record.event.id,
             )
         }
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
             ownership = OwnershipStatus.OWNED,

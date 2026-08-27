@@ -60,7 +60,7 @@ object CreditFacilityOverviewBuilder {
         rawSmsById: Map<String, RawSms> = emptyMap(),
     ): CreditFacilitiesOverview {
         val ownedCredit = registryCards.filter {
-            it.cardType != CardType.DEBIT && it.ownership.isOwned()
+            it.cardType == CardType.CREDIT && it.ownership.isOwned()
         }
         val debitCards = registryCards
             .filter { it.cardType == CardType.DEBIT && it.ownership.isOwned() }
@@ -101,7 +101,9 @@ object CreditFacilityOverviewBuilder {
             for (primaryEntry in primaryEntries) {
                 val primaryRow = rowByLast4[primaryEntry.last4] ?: placeholderRow(primaryEntry, overview)
                 val supplements = supplementaryEntries
-                    .filter { it.parentCardLast4 == primaryEntry.last4 }
+                    .filter {
+                        it.bank == primaryEntry.bank && it.parentCardLast4 == primaryEntry.last4
+                    }
                     .mapNotNull { rowByLast4[it.last4] ?: placeholderRow(it, overview) }
                 add(buildFacility(overview, primaryRow, supplements))
             }
@@ -109,8 +111,14 @@ object CreditFacilityOverviewBuilder {
                 val row = rowByLast4[standalone.last4] ?: placeholderRow(standalone, overview)
                 add(buildFacility(overview, row, emptyList()))
             }
-            val groupedLast4s = (primaryEntries.map { it.last4 } + standaloneEntries.map { it.last4 }).toSet()
-            val orphanSupplements = supplementaryEntries.filter { it.parentCardLast4 !in groupedLast4s }
+            val groupedKeys = (
+                primaryEntries.map { it.bank to it.last4 } +
+                    standaloneEntries.map { it.bank to it.last4 }
+            ).toSet()
+            val orphanSupplements = supplementaryEntries.filter { entry ->
+                val parentKey = entry.bank to entry.parentCardLast4.orEmpty()
+                parentKey !in groupedKeys
+            }
             for (orphan in orphanSupplements) {
                 val row = rowByLast4[orphan.last4] ?: placeholderRow(orphan, overview)
                 add(buildFacility(overview, row, emptyList()))
@@ -204,7 +212,7 @@ object CreditFacilityOverviewBuilder {
         val accountEntry = registryAccounts.find {
             it.bank == entry.bank &&
                 (it.maskedNumber == masked || it.maskedNumber.endsWith(masked))
-        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry(
+        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
             bank = entry.bank,
             maskedNumber = masked,
             ownership = entry.ownership,

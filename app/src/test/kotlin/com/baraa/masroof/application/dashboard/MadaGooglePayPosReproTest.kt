@@ -116,7 +116,7 @@ class MadaGooglePayPosReproTest {
                 bodyHash = "h",
             ),
         )
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
             ownership = OwnershipStatus.OWNED,
@@ -184,7 +184,7 @@ class MadaGooglePayPosReproTest {
                 bodyHash = "h",
             ),
         )
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
             ownership = OwnershipStatus.OWNED,
@@ -253,7 +253,7 @@ class MadaGooglePayPosReproTest {
                 bodyHash = "h2",
             ),
         )
-        val debit = CardRegistryEntry(
+        val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
             ownership = OwnershipStatus.OWNED,

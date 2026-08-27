@@ -1,0 +1,36 @@
+package com.baraa.masroof.domain.ids
+
+import java.security.MessageDigest
+import java.util.UUID
+
+/**
+ * Opaque, stable registry entity ids. Bank-scoped identifiers (masked number, last4)
+ * are lookup keys — not canonical identity.
+ */
+object RegistryEntityIdFactory {
+    fun newAccountId(): String = "areg_${randomToken()}"
+
+    fun newCardId(): String = "creg_${randomToken()}"
+
+    fun newCreditFacilityId(): String = "freg_${randomToken()}"
+
+    fun stableAccountId(bankId: String, maskedNumber: String): String =
+        stable("areg", bankId, maskedNumber.trim())
+
+    fun stableCardId(bankId: String, last4: String): String =
+        stable("creg", bankId, last4.trim())
+
+    fun stableCreditFacilityId(bankId: String, primaryLast4: String): String =
+        stable("freg", bankId, primaryLast4.trim())
+
+    private fun stable(prefix: String, vararg parts: String): String {
+        val canonical = parts.joinToString(separator = "\u001e")
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+        val hex = digest.take(16).joinToString(separator = "") { byte -> "%02x".format(byte) }
+        return "${prefix}_$hex"
+    }
+
+    private fun randomToken(): String =
+        UUID.randomUUID().toString().replace("-", "")
+}
