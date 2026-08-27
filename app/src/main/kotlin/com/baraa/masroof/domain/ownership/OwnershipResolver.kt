@@ -2,9 +2,11 @@ package com.baraa.masroof.domain.ownership
 
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 
 /**
  * Exact bank-scoped ownership lookup against the registry.
@@ -16,10 +18,14 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 class OwnershipResolver(
     private val accountRegistry: AccountRegistryRepository,
     private val cardRegistry: CardRegistryRepository,
+    private val loanRegistry: LoanRegistryRepository,
 ) {
     suspend fun resolveAccount(reference: AccountReference): OwnershipStatus =
         accountRegistry.resolve(reference)
 
     suspend fun resolveCard(reference: CardReference): OwnershipStatus =
         cardRegistry.resolve(reference)
+
+    suspend fun resolveLoan(reference: LoanReference): OwnershipStatus =
+        loanRegistry.resolve(reference)
 }

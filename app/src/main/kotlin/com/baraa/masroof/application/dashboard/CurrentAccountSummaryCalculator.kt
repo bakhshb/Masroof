@@ -45,6 +45,7 @@ object CurrentAccountSummaryCalculator {
         var cashWithdrawals = Money.zero(primaryCurrency)
         var posPurchases = Money.zero(primaryCurrency)
         var fees = Money.zero(primaryCurrency)
+        var loanRepayments = Money.zero(primaryCurrency)
 
         for (tx in transactions) {
             val amount = TransactionAmountResolver.effectiveAmount(
@@ -69,6 +70,7 @@ object CurrentAccountSummaryCalculator {
                         FlowExpenseCategory.BILL_PAYMENT -> billPayments += amount
                         FlowExpenseCategory.POS_PURCHASE -> posPurchases += amount
                         FlowExpenseCategory.FEE -> fees += amount
+                        FlowExpenseCategory.LOAN_REPAYMENT -> loanRepayments += amount
                     }
 
                     is FlowAssignment.SelfTransfer -> when (assignment.leg) {
@@ -85,13 +87,14 @@ object CurrentAccountSummaryCalculator {
             otherIncome = otherIncome,
             externalTransfersIn = externalTransfersIn,
             selfTransfersIn = selfTransfersIn,
-            selfTransfersOut = selfTransfersOut,
             creditCardPayments = creditCardPayments,
             billPayments = billPayments,
             externalTransfersOut = externalTransfersOut,
             cashWithdrawals = cashWithdrawals,
             posPurchases = posPurchases,
             fees = fees,
+            loanRepayments = loanRepayments,
+            selfTransfersOut = selfTransfersOut,
         )
     }
 

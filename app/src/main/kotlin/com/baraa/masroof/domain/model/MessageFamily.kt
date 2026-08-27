@@ -12,6 +12,8 @@ enum class MessageFamily {
     TRANSFER_OUT,
     CARD_PAYMENT,
     BILL_PAYMENT,
+    /** Loan/financing installment debited from a current account (قسط تمويل). */
+    FINANCING_INSTALLMENT,
     WITHDRAWAL,
     REFUND,
     FEE,

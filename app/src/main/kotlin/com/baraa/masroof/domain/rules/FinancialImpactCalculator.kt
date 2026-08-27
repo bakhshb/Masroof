@@ -24,6 +24,14 @@ object FinancialImpactCalculator {
                     netWorthEffect = NetWorthEffect.ZERO,
                 )
 
+            FinancialTransactionType.LOAN_REPAYMENT ->
+                FinancialImpact(
+                    countsAsExpense = false,
+                    countsAsIncome = false,
+                    // Cash down, loan principal down — net worth unchanged.
+                    netWorthEffect = NetWorthEffect.ZERO,
+                )
+
             FinancialTransactionType.EXPENSE ->
                 FinancialImpact(
                     countsAsExpense = true,

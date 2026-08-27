@@ -17,4 +17,5 @@ data class ClassificationEvidence(
     val instrument: ResolvedContainerFacts? = null,
     val purchaseChannel: PurchaseChannel? = null,
     val bankNetworkType: BankNetworkType? = null,
+    val loanType: com.baraa.masroof.domain.model.LoanType? = null,
 )

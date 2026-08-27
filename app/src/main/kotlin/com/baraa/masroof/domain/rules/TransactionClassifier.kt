@@ -2,6 +2,7 @@ package com.baraa.masroof.domain.rules
 
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.TransferOwnershipType
@@ -76,6 +77,9 @@ object TransactionClassifier {
                     reasons = listOf("message_family_bill_payment"),
                 )
 
+            MessageFamily.FINANCING_INSTALLMENT ->
+                classifyLoanRepayment(evidence)
+
             MessageFamily.PURCHASE ->
                 classifyPurchase(evidence)
 
@@ -142,6 +146,55 @@ object TransactionClassifier {
             tentativeType = FinancialTransactionType.EXPENSE,
             transferOwnership = null,
             reasons = listOf("purchase_without_resolved_owned_instrument"),
+        )
+    }
+
+    private fun classifyLoanRepayment(evidence: ClassificationEvidence): ClassificationResult {
+        val source = evidence.source
+        val destination = evidence.destination
+        val loanType = evidence.loanType
+
+        if (source == null || destination == null || loanType == null) {
+            return needsReview(
+                tentativeType = FinancialTransactionType.LOAN_REPAYMENT,
+                transferOwnership = null,
+                reasons = listOf("loan_repayment_missing_containers_or_type"),
+            )
+        }
+
+        if (source.kind != ContainerKind.ACCOUNT || destination.kind != ContainerKind.LOAN) {
+            return needsReview(
+                tentativeType = FinancialTransactionType.LOAN_REPAYMENT,
+                transferOwnership = null,
+                reasons = listOf("loan_repayment_invalid_container_shape"),
+            )
+        }
+
+        val ownership = TransferOwnershipResolver.resolve(source.ownership, destination.ownership)
+        if (ownership == TransferOwnershipType.UNKNOWN) {
+            return needsReview(
+                tentativeType = FinancialTransactionType.LOAN_REPAYMENT,
+                transferOwnership = ownership,
+                reasons = listOf("loan_repayment_ownership_unresolved"),
+            )
+        }
+
+        if (source.ownership == OwnershipStatus.OWNED && destination.ownership == OwnershipStatus.OWNED) {
+            return classified(
+                type = FinancialTransactionType.LOAN_REPAYMENT,
+                transferOwnership = ownership,
+                reasons = listOf(
+                    "owned_account_to_owned_loan",
+                    "not_a_new_expense",
+                    "loan_type_$loanType",
+                ),
+            )
+        }
+
+        return needsReview(
+            tentativeType = FinancialTransactionType.LOAN_REPAYMENT,
+            transferOwnership = ownership,
+            reasons = listOf("loan_repayment_family_without_owned_account_to_loan_shape"),
         )
     }
 

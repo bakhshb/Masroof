@@ -4,7 +4,7 @@ Masroof uses two GitHub Actions workflows:
 
 | Workflow | When | What |
 |----------|------|------|
-| **CI** | Pull request → `main` | `test`, `lint`, `assembleDebug` |
+| **CI** | Pull request → `main` | `testDebugUnitTest`, `lintDebug` |
 | **Release** | Push to `main` (after merge) | Signed `assembleRelease` + GitHub Release |
 
 There is **no** CI run on every `main` push anymore — only the release job runs after merge.
@@ -68,6 +68,6 @@ Pushing a `v*` tag still triggers Release (optional; not required for normal flo
 | Release **red**, “versionCode … not greater than latest published” | New `versionName` but `versionCode` was not bumped | Bump both in `app/build.gradle.kts` |
 | Release **red** on keystore / build step | Signing or compile failure | Check Actions logs and secrets |
 
-## PR debug APK
+## PR artifacts
 
-Each PR uploads `masroof-debug-apk-pr-<number>` under **Actions → run → Artifacts** (unsigned debug build for quick testing).
+PR CI does not build or upload a debug APK. Installable builds come from **Release** after merge to `main`, or run **Actions → Release → Run workflow** manually.

@@ -5,9 +5,10 @@ import androidx.room.Index
 
 @Entity(
     tableName = "loan_registry",
-    primaryKeys = ["id"],
+    primaryKeys = ["bankId", "loanType"],
     indices = [
-        Index(value = ["bankId"]),
+        Index(value = ["bankId", "loanType"], unique = true),
+        Index(value = ["id"], unique = true),
     ],
 )
 data class LoanRegistryEntity(

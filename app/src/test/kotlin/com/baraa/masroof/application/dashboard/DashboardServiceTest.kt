@@ -187,7 +187,12 @@ class DashboardServiceTest {
     }
 
     private class FakeLoanRepo : LoanRegistryRepository {
+        override suspend fun observe(reference: com.baraa.masroof.domain.model.LoanReference, rawSmsId: String) = Unit
+        override suspend fun setOwnership(reference: com.baraa.masroof.domain.model.LoanReference, status: OwnershipStatus) = Unit
+        override suspend fun resolve(reference: com.baraa.masroof.domain.model.LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
+        override suspend fun get(reference: com.baraa.masroof.domain.model.LoanReference): com.baraa.masroof.domain.model.LoanRegistryEntry? = null
         override suspend fun listAll(): List<com.baraa.masroof.domain.model.LoanRegistryEntry> = emptyList()
+        override suspend fun updateDisplayName(reference: com.baraa.masroof.domain.model.LoanReference, displayName: String?) = Unit
     }
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

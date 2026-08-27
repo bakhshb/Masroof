@@ -157,6 +157,7 @@ object TransactionTypePresentation {
             FinancialTransactionType.CREDIT_CARD_PAYMENT,
             FinancialTransactionType.CASH_WITHDRAWAL,
             FinancialTransactionType.BILL_PAYMENT,
+            FinancialTransactionType.LOAN_REPAYMENT,
             -> TransactionDirectionUi.OUTWARD
 
             FinancialTransactionType.INCOME,
