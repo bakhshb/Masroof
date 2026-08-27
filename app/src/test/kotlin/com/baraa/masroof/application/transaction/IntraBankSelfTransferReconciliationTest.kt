@@ -38,6 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -72,6 +73,7 @@ class IntraBankSelfTransferReconciliationTest {
     private lateinit var confirmation: OwnershipConfirmationService
     private lateinit var reconciliation: TransactionReconciliationService
     private val pipeline = AlJaziraParsingPipeline()
+    private val zoneId = ZoneId.of("Asia/Riyadh")
 
     @Before
     fun setUp() {
@@ -90,6 +92,7 @@ class IntraBankSelfTransferReconciliationTest {
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards),
+            zoneId = zoneId,
         )
     }
 
@@ -298,6 +301,74 @@ class IntraBankSelfTransferReconciliationTest {
                     it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
             },
         )
+    }
+
+    @Test
+    fun twoSameAmountSelfTransfersDifferentDates_bothPersist() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+
+        val julyOut =
+            """
+            حوالة صادرة الى حسابك الجاري
+            من: 3001
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            في: 2026-07-15 10:00
+            """.trimIndent()
+        val julyIn =
+            """
+            حوالة واردة داخلية
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            اسم المرسل: براء بخش
+            رقم حساب المرسل: 3001
+            البنك المرسل: بنك الجزيرة
+            في: 2026-07-15 10:00
+            """.trimIndent()
+
+        persistParsed("sms-july-out", julyOut, Instant.parse("2026-07-15T07:00:00Z"))
+        persistParsed("sms-july-in", julyIn, Instant.parse("2026-07-15T07:00:00Z"))
+        persistParsed("sms-aug-out", outgoingBody)
+        persistParsed("sms-aug-in", incomingBody)
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(2, ftRepo.listAll().size)
+        val txs = ftRepo.listAll().filter { it.type == FinancialTransactionType.SELF_TRANSFER }
+        assertEquals(2, txs.size)
+        assertEquals(
+            setOf(
+                Instant.parse("2026-07-15T07:00:00Z"),
+                Instant.parse("2026-08-27T04:36:00Z"),
+            ),
+            txs.map { it.occurredAt }.toSet(),
+        )
+    }
+
+    @Test
+    fun wronglyMergedSelfTransferLink_releasedOnReconcile() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+
+        persistParsed("sms-july-out", outgoingBody.replace("2026-08-27", "2026-07-15"), Instant.parse("2026-07-15T07:00:00Z"))
+        persistParsed("sms-july-in", incomingBody.replace("2026-08-27", "2026-07-15"), Instant.parse("2026-07-15T07:00:00Z"))
+        reconciliation.reconcileStoredEvents()
+        val julyTx = ftRepo.listAll().single()
+
+        persistParsed("sms-aug-out", outgoingBody)
+        persistParsed("sms-aug-in", incomingBody)
+        ftRepo.linkRawSmsIfAbsent(julyTx.id, "sms-aug-out")
+        ftRepo.linkRawSmsIfAbsent(julyTx.id, "sms-aug-in")
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(2, ftRepo.listAll().size)
+        val augTx = ftRepo.findByRawSmsId("sms-aug-out")!!
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, augTx.type)
+        assertEquals(Instant.parse("2026-08-27T04:36:00Z"), augTx.occurredAt)
+        assertEquals(setOf("sms-july-out", "sms-july-in"), ftRepo.listRawSmsIds(julyTx.id).toSet())
+        assertEquals(setOf("sms-aug-out", "sms-aug-in"), ftRepo.listRawSmsIds(augTx.id).toSet())
     }
 
     private suspend fun seedStaleExternalPair(

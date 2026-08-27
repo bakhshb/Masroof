@@ -120,6 +120,17 @@ interface FinancialTransactionDao {
         return true
     }
 
+    /** Removes one evidence link; deletes the transaction when it has no links left. */
+    @Transaction
+    suspend fun unlinkRawSms(rawSmsId: String): Boolean {
+        val link = findLinkByRawSmsId(rawSmsId) ?: return false
+        deleteLinkByRawSmsId(rawSmsId)
+        if (listRawSmsIdsForTransaction(link.transactionId).isEmpty()) {
+            deleteTransactionById(link.transactionId)
+        }
+        return true
+    }
+
     /**
      * Atomically removes exclusive stale external rows blocking [links], then saves
      * [entity]. Rolls back together when pre-checks fail or the write cannot complete.

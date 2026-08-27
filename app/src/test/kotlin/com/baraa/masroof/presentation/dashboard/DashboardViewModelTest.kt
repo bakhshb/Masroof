@@ -613,6 +613,7 @@ class DashboardViewModelTest {
                     source: com.baraa.masroof.domain.model.ExchangeRateSource,
                 ) = false
                 override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+                override suspend fun unlinkRawSms(rawSmsId: String) = false
 
                 override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
             },
@@ -665,6 +666,7 @@ class DashboardViewModelTest {
                         source: com.baraa.masroof.domain.model.ExchangeRateSource,
                     ) = false
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+                override suspend fun unlinkRawSms(rawSmsId: String) = false
 
                 override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },
@@ -725,6 +727,7 @@ class DashboardViewModelTest {
                         source: com.baraa.masroof.domain.model.ExchangeRateSource,
                     ) = false
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+                override suspend fun unlinkRawSms(rawSmsId: String) = false
 
                 override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },

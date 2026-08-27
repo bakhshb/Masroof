@@ -127,6 +127,9 @@ class RoomFinancialTransactionRepository(
     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
         dao.deleteIfExclusiveRawSmsLink(rawSmsId)
 
+    override suspend fun unlinkRawSms(rawSmsId: String): Boolean =
+        dao.unlinkRawSms(rawSmsId)
+
     override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean {
         if (dao.findLinkByRawSmsId(rawSmsId) != null) return false
         return dao.insertLinkIfAbsent(
