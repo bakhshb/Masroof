@@ -40,7 +40,11 @@ object DebitCardOverviewBuilder {
         displayLocale: Locale = Locale.forLanguageTag(AppLocale.TAG_AR),
     ): DebitCardSpendBuildResult {
         val ownedDebit = debitCards.filter {
-            it.cardType == CardType.DEBIT && it.ownership == OwnershipStatus.OWNED
+            DebitCardRegistryInferrer.isDebitCard(
+                entry = it,
+                parsedRecords = parsedRecords,
+                rawSmsById = rawSmsById,
+            ) && it.ownership == OwnershipStatus.OWNED
         }
         if (ownedDebit.isEmpty()) {
             return DebitCardSpendBuildResult(
