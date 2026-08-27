@@ -221,6 +221,46 @@ class IntraBankSelfTransferIngestionTest {
     assertEquals(FinancialTransactionType.SELF_TRANSFER, ftRepo.listAll().single().type)
   }
 
+  @Test
+  fun ingest_bareDateTimeInSmsBody_bothOwned_selfTransferInSalaryPeriod() = runBlocking {
+    confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+    confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+
+    val outgoingBare =
+      """
+      حوالة صادرة الى حسابك الجاري
+      من: 3001
+      مبلغ: SAR 5,500.00
+      إلى: 3002
+      07:36 27-08-2026
+      """.trimIndent()
+
+    val incomingBare =
+      """
+      حوالة واردة داخلية
+      مبلغ: SAR 5,500.00
+      إلى: 3002
+      اسم المرسل: براء بخش
+      رقم حساب المرسل: 3001
+      البنك المرسل: بنك الجزيرة
+      07:36 27-08-2026
+      """.trimIndent()
+
+    val receivedAt = Instant.parse("2026-08-26T20:00:00Z")
+    ingest("sms-out-bare", outgoingBare, receivedAt)
+    ingest("sms-in-bare", incomingBare, receivedAt)
+
+    assertEquals(1, ftRepo.listAll().size)
+    val tx = ftRepo.listAll().single()
+    assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+    assertEquals(Instant.parse("2026-08-27T04:36:00Z"), tx.occurredAt)
+
+    val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-27"), 27)
+    val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId)
+    val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
+    assertEquals(1, ftRepo.listOccurredBetween(start, end).size)
+  }
+
   private suspend fun ingest(id: String, body: String, receivedAt: Instant = Instant.parse("2026-08-27T04:36:00Z")) {
     val result = ingestion.ingest(rawSms(id, body, receivedAt))
     assertTrue(result is SmsIngestionResult.Parsed)

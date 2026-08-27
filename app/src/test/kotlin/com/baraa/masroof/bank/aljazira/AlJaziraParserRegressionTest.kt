@@ -678,6 +678,36 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun intraTransfer_bareDmyDateTime_extractsOccurredAt() {
+        val result = parse(
+            """
+            حوالة واردة داخلية
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            اسم المرسل: براء بخش
+            رقم حساب المرسل: 3001
+            البنك المرسل: بنك الجزيرة
+            07:36 27-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(java.time.LocalDateTime.parse("2026-08-27T07:36"), result.details.occurredAtLocal)
+    }
+
+    @Test
+    fun intraTransferOut_bareDmyDateTime_extractsOccurredAt() {
+        val result = parse(
+            """
+            حوالة صادرة الى حسابك الجاري
+            من: 3001
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            07:36 27-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(java.time.LocalDateTime.parse("2026-08-27T07:36"), result.details.occurredAtLocal)
+    }
+
+    @Test
     fun unrecognizedSender_isUnsupported() {
         val result = pipeline.parse(
             SmsParseInput(
