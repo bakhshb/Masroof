@@ -125,7 +125,7 @@ class AppContainer(
         RoomCreditFacilityRepository(database.creditFacilityDao())
 
     val loanRegistryRepository: LoanRegistryRepository =
-        RoomLoanRegistryRepository(database.loanRegistryDao())
+        RoomLoanRegistryRepository.from(database)
 
     val financialTransactionRepository: FinancialTransactionRepository =
         RoomFinancialTransactionRepository(
@@ -196,12 +196,14 @@ class AppContainer(
         OwnershipDiscoveryService(
             accountRegistry = accountRegistryRepository,
             cardRegistry = cardRegistryRepository,
+            loanRegistry = loanRegistryRepository,
         )
 
     val ownershipResolver: OwnershipResolver =
         OwnershipResolver(
             accountRegistry = accountRegistryRepository,
             cardRegistry = cardRegistryRepository,
+            loanRegistry = loanRegistryRepository,
         )
 
     val ownershipConfirmationService: OwnershipConfirmationService =

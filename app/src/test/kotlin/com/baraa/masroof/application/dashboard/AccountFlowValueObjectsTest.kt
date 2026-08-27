@@ -21,7 +21,7 @@ class AccountFlowValueObjectsTest {
     }
 
     @Test
-    fun accountOutflow_coreTotal_sumsSixStandardCategories() {
+    fun accountOutflow_coreTotal_sumsStandardCategories() {
         val currency = Currency.SAR
         val outflow = AccountOutflow(
             currency = currency,
@@ -31,10 +31,11 @@ class AccountFlowValueObjectsTest {
             billPayments = Money.of("40", currency),
             posPurchases = Money.of("60", currency),
             fees = Money.of("10", currency),
+            loanRepayments = Money.of("25", currency),
             selfTransfersOut = Money.of("200", currency),
         )
-        assertEquals(Money.of("290.00", currency), outflow.coreTotal)
-        assertEquals(Money.of("490.00", currency), outflow.total)
+        assertEquals(Money.of("315.00", currency), outflow.coreTotal)
+        assertEquals(Money.of("515.00", currency), outflow.total)
     }
 
     @Test

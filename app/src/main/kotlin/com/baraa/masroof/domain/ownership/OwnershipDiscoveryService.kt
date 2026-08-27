@@ -1,12 +1,15 @@
 package com.baraa.masroof.domain.ownership
 
+import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 
 /**
  * Role-aware discovery of user-container *candidates* from [ParsedEvent]s.
@@ -21,6 +24,7 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 class OwnershipDiscoveryService(
     private val accountRegistry: AccountRegistryRepository,
     private val cardRegistry: CardRegistryRepository,
+    private val loanRegistry: LoanRegistryRepository,
 ) {
     /**
      * Observe user-side container candidates from one parsed event.
@@ -28,6 +32,7 @@ class OwnershipDiscoveryService(
     suspend fun observe(event: ParsedEvent) {
         val accounts = mutableListOf<AccountReference>()
         val cards = mutableListOf<CardReference>()
+        val loans = mutableListOf<LoanReference>()
 
         when (event.messageFamily) {
             MessageFamily.TRANSFER_OUT -> {
@@ -47,6 +52,13 @@ class OwnershipDiscoveryService(
 
             MessageFamily.BILL_PAYMENT -> {
                 event.sourceAccountRef?.let(accounts::add)
+            }
+
+            MessageFamily.FINANCING_INSTALLMENT -> {
+                event.sourceAccountRef?.let(accounts::add)
+                LoanTypeResolver.fromLabel(event.counterparty)?.let { loanType ->
+                    loans += LoanReference(event.bank, loanType)
+                }
             }
 
             MessageFamily.CARD_PAYMENT -> {
@@ -92,7 +104,14 @@ class OwnershipDiscoveryService(
                 cardRegistry.observe(ref, event.rawSmsId)
             }
         }
+        for (ref in loans) {
+            if (isDiscoverableLoan(ref)) {
+                loanRegistry.observe(ref, event.rawSmsId)
+            }
+        }
     }
+
+    private fun isDiscoverableLoan(ref: LoanReference): Boolean = ref.bank != Bank.UNKNOWN
 
     private fun isDiscoverableAccount(ref: AccountReference): Boolean {
         val masked = ref.maskedNumber?.trim().orEmpty()

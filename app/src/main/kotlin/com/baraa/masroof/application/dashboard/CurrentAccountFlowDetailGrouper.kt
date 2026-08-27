@@ -13,6 +13,7 @@ enum class FlowExpenseCategory {
     BILL_PAYMENT,
     POS_PURCHASE,
     FEE,
+    LOAN_REPAYMENT,
 }
 
 enum class FlowIncomeCategory {
@@ -35,6 +36,7 @@ data class CurrentAccountFlowDetailGrouping(
             FlowExpenseCategory.BILL_PAYMENT,
             FlowExpenseCategory.POS_PURCHASE,
             FlowExpenseCategory.FEE,
+            FlowExpenseCategory.LOAN_REPAYMENT,
         )
 
         val INCOME_DISPLAY_ORDER = listOf(

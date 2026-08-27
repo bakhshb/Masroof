@@ -37,6 +37,7 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
@@ -87,7 +88,7 @@ class ReviewWorkflowServiceTest {
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards)
-        val ownershipResolver = OwnershipResolver(accounts, cards)
+        val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
         val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
         val reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,

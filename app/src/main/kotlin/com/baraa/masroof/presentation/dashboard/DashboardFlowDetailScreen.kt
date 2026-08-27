@@ -253,6 +253,7 @@ private fun expenseAmount(summary: CurrentAccountSummary, category: FlowExpenseC
         FlowExpenseCategory.BILL_PAYMENT -> summary.outflow.billPayments
         FlowExpenseCategory.POS_PURCHASE -> summary.outflow.posPurchases
         FlowExpenseCategory.FEE -> summary.outflow.fees
+        FlowExpenseCategory.LOAN_REPAYMENT -> summary.outflow.loanRepayments
     }
 
 private fun incomeAmount(summary: CurrentAccountSummary, category: FlowIncomeCategory): Money =
@@ -270,6 +271,7 @@ private fun expenseCategoryLabelRes(category: FlowExpenseCategory): Int =
         FlowExpenseCategory.BILL_PAYMENT -> R.string.dashboard_bill_payments
         FlowExpenseCategory.POS_PURCHASE -> R.string.dashboard_pos_purchases_short
         FlowExpenseCategory.FEE -> R.string.dashboard_fees_short
+        FlowExpenseCategory.LOAN_REPAYMENT -> R.string.dashboard_loan_repayments
     }
 
 private fun incomeCategoryLabelRes(category: FlowIncomeCategory): Int =

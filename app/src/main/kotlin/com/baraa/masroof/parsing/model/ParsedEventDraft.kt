@@ -91,6 +91,7 @@ data class ParsedEventDraft(
             MessageFamily.TRANSFER_OUT,
             MessageFamily.CARD_PAYMENT,
             MessageFamily.BILL_PAYMENT,
+            MessageFamily.FINANCING_INSTALLMENT,
             MessageFamily.WITHDRAWAL,
             MessageFamily.REFUND,
             MessageFamily.FEE,
