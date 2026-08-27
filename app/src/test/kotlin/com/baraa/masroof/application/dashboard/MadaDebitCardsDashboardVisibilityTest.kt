@@ -15,7 +15,6 @@ import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import com.baraa.masroof.presentation.dashboard.CardOwnershipKey
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.OwnedCardUi
 import com.baraa.masroof.presentation.dashboard.followedCreditFacilitiesForSummary
