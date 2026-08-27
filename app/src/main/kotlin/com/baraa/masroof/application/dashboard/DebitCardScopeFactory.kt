@@ -21,7 +21,12 @@ object DebitCardScopeFactory {
         registryAccounts: List<AccountRegistryEntry> = emptyList(),
     ): DebitCardScopeFacts {
         val ownedDebit = cards.filter {
-            it.cardType == CardType.DEBIT && it.ownership == OwnershipStatus.OWNED
+            it.ownership == OwnershipStatus.OWNED &&
+                CardRegistryDebitClassifier.isDebitRegistryEntry(
+                    it,
+                    parsedRecords = parsedRecords,
+                    rawSmsById = rawSmsById,
+                )
         }
         val ownedDebitCardContainerIds = ownedDebit.mapNotNull { entry ->
             FinancialContainerIdFactory.cardId(entry.bank, entry.last4)

@@ -60,10 +60,22 @@ object CreditFacilityOverviewBuilder {
         rawSmsById: Map<String, RawSms> = emptyMap(),
     ): CreditFacilitiesOverview {
         val ownedCredit = registryCards.filter {
-            (it.cardType == CardType.CREDIT || it.cardType == null) && it.ownership.isOwned()
+            it.ownership.isOwned() &&
+                CardRegistryDebitClassifier.isCreditRegistryEntry(
+                    it,
+                    parsedRecords = parsedRecords,
+                    rawSmsById = rawSmsById,
+                )
         }
         val debitCards = registryCards
-            .filter { it.cardType == CardType.DEBIT && it.ownership.isOwned() }
+            .filter {
+                it.ownership.isOwned() &&
+                    CardRegistryDebitClassifier.isDebitRegistryEntry(
+                        it,
+                        parsedRecords = parsedRecords,
+                        rawSmsById = rawSmsById,
+                    )
+            }
             .map { entry ->
                 val cardKey = CardTransactionInvolvementResolver.cardKey(entry.bank.id, entry.last4)
                 DebitCardOverview(
