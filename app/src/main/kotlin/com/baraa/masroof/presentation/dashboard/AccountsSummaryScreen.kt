@@ -201,14 +201,13 @@ fun AccountsSummaryScreen(
                             }
                         }
                         bankTree.unlinkedDebitCards.forEach { debit ->
-                            Text(
-                                stringResource(
+                            AccountsSummaryDebitBranchRow(
+                                label = stringResource(
                                     R.string.dashboard_account_unlinked_mada_label,
                                     debit.displayLabel,
                                 ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp),
+                                debit = debit,
+                                onOpenDebit = onOpenDebit,
                             )
                         }
                     }
@@ -372,38 +371,53 @@ private fun AccountsSummaryAccountCard(
         if (debitCards.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             debitCards.forEach { debit ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onOpenDebit(debit) }
-                        .padding(start = 48.dp, top = 4.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        debit.displayLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            formatLocalizedMoney(debit.salaryPeriodSpendingNet),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Icon(
-                            imageVector = MasroofIcons.periodNext,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = extended.account,
-                        )
-                    }
-                }
+                AccountsSummaryDebitBranchRow(
+                    label = debit.displayLabel,
+                    debit = debit,
+                    onOpenDebit = onOpenDebit,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountsSummaryDebitBranchRow(
+    label: String,
+    debit: DebitCardOverview,
+    onOpenDebit: (DebitCardOverview) -> Unit,
+) {
+    val extended = MasroofThemeExtras.extendedColors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onOpenDebit(debit) }
+            .padding(start = 48.dp, top = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Icon(
+                imageVector = MasroofIcons.periodNext,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = extended.account,
+            )
         }
     }
 }
