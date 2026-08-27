@@ -17,7 +17,6 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -37,7 +36,6 @@ object CreditCardOverviewBuilder {
         parsedRecords: List<ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
-        clock: Clock,
         periodEndExclusive: Instant,
     ): Instant = resolveGlobalStatementStart(
         parsedRecords = parsedRecords,
@@ -52,7 +50,6 @@ object CreditCardOverviewBuilder {
         parsedRecords: List<ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
-        clock: Clock,
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         displayLocale: Locale = Locale.forLanguageTag(AppLocale.TAG_AR),

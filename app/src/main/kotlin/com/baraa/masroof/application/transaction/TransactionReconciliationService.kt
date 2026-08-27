@@ -5,7 +5,6 @@ import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
-import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -68,7 +67,7 @@ class TransactionReconciliationService(
     suspend fun reconcileAfterParsedEvent(event: ParsedEvent): ReconciliationSummary =
         reconcileAfterParsedEventDetailed(event).summary
 
-    suspend fun reconcileAfterParsedEventDetailed(event: ParsedEvent): ReconciliationReport {
+    suspend fun reconcileAfterParsedEventDetailed(_event: ParsedEvent): ReconciliationReport {
         // Full backlog reconcile keeps pair matching correct after live ingest.
         val records = loadRecords()
         return reconcileRecordsDetailed(records)

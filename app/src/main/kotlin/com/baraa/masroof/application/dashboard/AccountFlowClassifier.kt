@@ -43,14 +43,13 @@ object AccountFlowClassifier {
             sarEquivalents = context.sarEquivalents,
         ) ?: return emptyList()
 
-        return classifyWithAmount(tx, scope, context, amount)
+        return classifyWithAmount(tx, scope, context)
     }
 
     internal fun classifyWithAmount(
         tx: FinancialTransaction,
         scope: CurrentAccountTransactionScope,
         context: AccountFlowClassificationContext,
-        amount: Money,
     ): List<FlowAssignment> {
         val parsedRecordsById = context.parsedRecordsById
         val rawSmsById = context.rawSmsById

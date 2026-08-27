@@ -7,8 +7,6 @@ import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import java.time.Instant
-import java.time.LocalDate
 
 data class CreditFacilityOverview(
     val bank: Bank,

@@ -7,7 +7,6 @@ import com.baraa.masroof.core.money.Money
 import java.math.BigDecimal
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
-import java.util.Locale
 
 object MoneyUiFormatter {
     fun format(money: Money): String = format(money, AppLocale.DEFAULT_TAG)
