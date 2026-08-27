@@ -862,7 +862,7 @@ class SettingsViewModel(
             val bankCards = cards.filter { it.bank.id == bankId }
             val bankAccounts = accounts.filter { it.bank.id == bankId }
             val currentAccounts = bankAccounts.filter { it.accountType == AccountType.CURRENT }
-            val debitCards = bankCards.filter { it.cardType == CardType.DEBIT }
+            val debitCards = bankCards.filter { it.isDebitRegistryCard() }
             val assignedDebitLast4s = mutableSetOf<String>()
             val currentNodes = currentAccounts.map { account ->
                 val matchedDebit = debitCards.filter { debit ->
@@ -877,7 +877,7 @@ class SettingsViewModel(
                 currentAccountNodes = currentNodes,
                 savingsAccounts = bankAccounts.filter { it.accountType == AccountType.SAVINGS },
                 walletAccounts = bankAccounts.filter { it.accountType == AccountType.WALLET },
-                creditCards = bankCards.filter { it.cardType == CardType.CREDIT || it.cardType == null },
+                creditCards = bankCards.filter { !it.isDebitRegistryCard() },
                 unlinkedDebitCards = unlinkedDebit,
             )
         }.filter { tree ->
@@ -888,6 +888,13 @@ class SettingsViewModel(
                 tree.unlinkedDebitCards.isNotEmpty()
         }
     }
+
+    private fun ManagedCardUi.isDebitRegistryCard(): Boolean =
+        when (cardType) {
+            CardType.DEBIT -> true
+            CardType.CREDIT -> false
+            null -> cardNetwork == CardNetwork.MADA || linkedAccountMaskedNumber != null
+        }
 
     private fun debitMatchesAccount(debit: ManagedCardUi, account: ManagedAccountUi): Boolean {
         val linked = debit.linkedAccountMaskedNumber
