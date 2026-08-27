@@ -14,10 +14,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.theme.ThemeMode
-import com.baraa.masroof.presentation.common.BackNavigationIcon
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
@@ -56,13 +54,37 @@ fun SettingsRoute(
         viewModel.refresh()
     }
     val state by viewModel.uiState.collectAsState()
-    var destination by rememberSaveable { mutableStateOf(SettingsDestination.Hub) }
+    var destinationRoute by rememberSaveable { mutableStateOf(SettingsDestination.Hub.encode()) }
+    var skippedBanksList by rememberSaveable { mutableStateOf(false) }
+    val destination = decodeSettingsDestination(destinationRoute)
 
-    LaunchedEffect(pendingDestination) {
-        if (pendingDestination != null) {
-            destination = pendingDestination
-            onPendingDestinationConsumed()
+    fun bankHubBack(): SettingsDestination = destination.parent(skippedBanksList)
+
+    fun navigateTo(next: SettingsDestination, skipBanksList: Boolean = false) {
+        destinationRoute = next.encode()
+        skippedBanksList = when {
+            skipBanksList -> true
+            next == SettingsDestination.Banks || next == SettingsDestination.Hub -> false
+            else -> skippedBanksList
         }
+    }
+
+    fun openBanksEntry() {
+        val entry = resolveBanksEntry(state)
+        navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
+    }
+
+    LaunchedEffect(pendingDestination, state.loading, state.bankSummaries) {
+        if (pendingDestination == null) return@LaunchedEffect
+        if (pendingDestination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
+        when (pendingDestination) {
+            SettingsDestination.Banks -> {
+                val entry = resolveBanksEntry(state)
+                navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
+            }
+            else -> navigateTo(resolvePendingDestination(pendingDestination, state))
+        }
+        onPendingDestinationConsumed()
     }
 
     LaunchedEffect(destination) {
@@ -72,24 +94,20 @@ fun SettingsRoute(
     }
 
     BackHandler(enabled = destination != SettingsDestination.Hub) {
-        destination = when (destination) {
-            SettingsDestination.Logs -> SettingsDestination.About
-            else -> SettingsDestination.Hub
-        }
+        navigateTo(destination.parent(skippedBanksList))
     }
 
     val logEntries by viewModel.logEntries.collectAsState()
     val logErrorCount = logEntries.count { it.level == com.baraa.masroof.application.logging.AppLogLevel.ERROR }
 
-    when (destination) {
+    when (val current = destination) {
         SettingsDestination.Hub -> SettingsHubScreen(
             state = state,
             reviewRequiredCount = reviewRequiredCount,
             onBack = onBack,
-            onOpenMyCards = { destination = SettingsDestination.MyCards },
-            onOpenMyAccounts = { destination = SettingsDestination.MyAccounts },
+            onOpenBanks = { openBanksEntry() },
             onOpenReview = onOpenReview,
-            onOpenAbout = { destination = SettingsDestination.About },
+            onOpenAbout = { navigateTo(SettingsDestination.About) },
             onReparseStored = viewModel::reparseStoredMessages,
             onImportSms = viewModel::importSmsFromPhone,
             onClearSmsImportMessage = viewModel::clearSmsImportMessage,
@@ -106,9 +124,64 @@ fun SettingsRoute(
             onClearBackupMessage = viewModel::clearBackupMessage,
         )
 
-        SettingsDestination.MyCards -> SettingsMyCardsScreen(
+        SettingsDestination.Banks -> SettingsBanksScreen(
             state = state,
-            onBack = { destination = SettingsDestination.Hub },
+            onBack = { navigateTo(SettingsDestination.Hub) },
+            onOpenBank = { summary -> navigateTo(SettingsDestination.BankHub(summary.bank.id)) },
+        )
+
+        is SettingsDestination.BankHub -> {
+            val bank = Bank(current.bankId)
+            val summary = state.bankSummary(current.bankId)
+            when {
+                summary != null -> SettingsBankScreen(
+                    bank = bank,
+                    summary = summary,
+                    onBack = { navigateTo(bankHubBack()) },
+                    onOpenAccounts = { navigateTo(SettingsDestination.BankAccounts(current.bankId)) },
+                    onOpenCards = { navigateTo(SettingsDestination.BankCards(current.bankId)) },
+                    onOpenLoans = { navigateTo(SettingsDestination.BankLoans(current.bankId)) },
+                )
+
+                state.loading -> SettingsBankHubLoadingScreen(
+                    bank = bank,
+                    onBack = { navigateTo(bankHubBack()) },
+                )
+
+                else -> {
+                    LaunchedEffect(current.bankId) {
+                        navigateTo(SettingsDestination.Banks)
+                    }
+                    SettingsBankHubLoadingScreen(
+                        bank = bank,
+                        onBack = { navigateTo(bankHubBack()) },
+                    )
+                }
+            }
+        }
+
+        is SettingsDestination.BankAccounts -> SettingsBankAccountsScreen(
+            bank = Bank(current.bankId),
+            state = state,
+            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
+            onConfirmOwned = viewModel::confirmAccountOwned,
+            onMarkExternal = viewModel::markAccountExternal,
+            onRequestStopTracking = viewModel::requestStopAccountTracking,
+            onResumeTracking = viewModel::resumeAccountTracking,
+            onDismissStopConfirm = viewModel::dismissStopConfirm,
+            onConfirmStopTracking = viewModel::confirmStopAccountTracking,
+            onRenameAccount = viewModel::openRenameAccount,
+            onDismissRenameAccount = viewModel::dismissRenameAccount,
+            onSaveAccountName = viewModel::saveAccountDisplayName,
+            onPickAccountType = viewModel::openAccountTypePicker,
+            onDismissAccountType = viewModel::dismissAccountTypePicker,
+            onSelectAccountType = viewModel::setAccountTypeFromPicker,
+        )
+
+        is SettingsDestination.BankCards -> SettingsBankCardsScreen(
+            bank = Bank(current.bankId),
+            state = state,
+            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
             onConfirmOwned = viewModel::confirmCardOwned,
             onMarkExternal = viewModel::markCardExternal,
             onRequestStopTracking = viewModel::requestStopTracking,
@@ -132,21 +205,10 @@ fun SettingsRoute(
             onMarkDebit = viewModel::markCardAsDebit,
         )
 
-        SettingsDestination.MyAccounts -> SettingsMyAccountsScreen(
+        is SettingsDestination.BankLoans -> SettingsBankLoansScreen(
+            bank = Bank(current.bankId),
             state = state,
-            onBack = { destination = SettingsDestination.Hub },
-            onConfirmOwned = viewModel::confirmAccountOwned,
-            onMarkExternal = viewModel::markAccountExternal,
-            onRequestStopTracking = viewModel::requestStopAccountTracking,
-            onResumeTracking = viewModel::resumeAccountTracking,
-            onDismissStopConfirm = viewModel::dismissStopConfirm,
-            onConfirmStopTracking = viewModel::confirmStopAccountTracking,
-            onRenameAccount = viewModel::openRenameAccount,
-            onDismissRenameAccount = viewModel::dismissRenameAccount,
-            onSaveAccountName = viewModel::saveAccountDisplayName,
-            onPickAccountType = viewModel::openAccountTypePicker,
-            onDismissAccountType = viewModel::dismissAccountTypePicker,
-            onSelectAccountType = viewModel::setAccountTypeFromPicker,
+            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
         )
 
         SettingsDestination.About -> SettingsAboutScreen(
@@ -155,8 +217,8 @@ fun SettingsRoute(
             updateState = state.updateState,
             updateMessage = state.updateMessage,
             logErrorCount = logErrorCount,
-            onBack = { destination = SettingsDestination.Hub },
-            onOpenLogs = { destination = SettingsDestination.Logs },
+            onBack = { navigateTo(SettingsDestination.Hub) },
+            onOpenLogs = { navigateTo(SettingsDestination.Logs) },
             onSaveGithubToken = viewModel::saveGithubToken,
             onClearGithubToken = viewModel::clearGithubToken,
             onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
@@ -167,9 +229,66 @@ fun SettingsRoute(
 
         SettingsDestination.Logs -> SettingsLogsScreen(
             viewModel = viewModel,
-            onBack = { destination = SettingsDestination.About },
+            onBack = { navigateTo(SettingsDestination.About) },
             onRequestExport = onRequestExportLogs,
         )
+    }
+}
+
+private data class BanksNavigation(
+    val destination: SettingsDestination,
+    val skipBanksList: Boolean,
+)
+
+private fun resolveBanksEntry(state: SettingsUiState): BanksNavigation =
+    if (state.bankSummaries.size == 1) {
+        BanksNavigation(
+            destination = SettingsDestination.BankHub(state.bankSummaries.single().bank.id),
+            skipBanksList = true,
+        )
+    } else {
+        BanksNavigation(
+            destination = SettingsDestination.Banks,
+            skipBanksList = false,
+        )
+    }
+
+private fun resolvePendingDestination(
+    pending: SettingsDestination,
+    state: SettingsUiState,
+): SettingsDestination =
+    when (pending) {
+        SettingsDestination.Banks -> resolveBanksEntry(state).destination
+        is SettingsDestination.BankAccounts,
+        is SettingsDestination.BankCards,
+        is SettingsDestination.BankLoans,
+        is SettingsDestination.BankHub,
+        -> pending
+
+        SettingsDestination.Hub,
+        SettingsDestination.About,
+        SettingsDestination.Logs,
+        -> pending
+    }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsBankHubLoadingScreen(
+    bank: Bank,
+    onBack: () -> Unit,
+) {
+    MasroofSecondaryScaffold(
+        title = settingsBankLabel(bank),
+        onBack = onBack,
+        backContentDescription = stringResource(R.string.settings_back),
+    ) { contentModifier ->
+        Column(
+            modifier = contentModifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator()
+        }
     }
 }
 
@@ -179,8 +298,7 @@ private fun SettingsHubScreen(
     state: SettingsUiState,
     reviewRequiredCount: Int,
     onBack: () -> Unit,
-    onOpenMyCards: () -> Unit,
-    onOpenMyAccounts: () -> Unit,
+    onOpenBanks: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenAbout: () -> Unit,
     onReparseStored: () -> Unit,
@@ -318,17 +436,10 @@ private fun SettingsHubScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SettingsNavRow(
-                icon = MasroofIcons.cardPayment,
-                title = stringResource(R.string.settings_cards_section),
-                subtitle = cardsHubSubtitle(state),
-                onClick = onOpenMyCards,
-            )
-
-            SettingsNavRow(
-                icon = MasroofIcons.externalIn,
-                title = stringResource(R.string.settings_accounts_section),
-                subtitle = accountsHubSubtitle(state),
-                onClick = onOpenMyAccounts,
+                icon = MasroofIcons.moneyMovement,
+                title = stringResource(R.string.settings_banks_section),
+                subtitle = banksHubSubtitle(state),
+                onClick = onOpenBanks,
             )
 
             SettingsNavRow(
@@ -449,36 +560,13 @@ private fun themeSubtitle(mode: ThemeMode): String =
     }
 
 @Composable
-private fun cardsHubSubtitle(state: SettingsUiState): String {
-    val followed = state.followedCards.size
-    val unregistered = state.unregisteredCards.size
-    val stopped = state.stoppedCards.size
+private fun banksHubSubtitle(state: SettingsUiState): String {
+    val bankCount = state.bankSummaries.size
+    val unregistered = state.bankSummaries.sumOf { it.unregisteredCount }
     return when {
-        followed == 0 && unregistered == 0 && stopped == 0 ->
-            stringResource(R.string.settings_hub_cards_subtitle_none)
-
-        unregistered > 0 ->
-            stringResource(R.string.settings_hub_cards_subtitle, followed, unregistered)
-
-        else ->
-            stringResource(R.string.settings_hub_cards_subtitle_followed_only, followed)
-    }
-}
-
-@Composable
-private fun accountsHubSubtitle(state: SettingsUiState): String {
-    val followed = state.followedAccounts.size
-    val unregistered = state.unregisteredAccounts.size
-    val stopped = state.stoppedAccounts.size
-    return when {
-        followed == 0 && unregistered == 0 && stopped == 0 ->
-            stringResource(R.string.settings_hub_accounts_subtitle_none)
-
-        unregistered > 0 ->
-            stringResource(R.string.settings_hub_accounts_subtitle, followed, unregistered)
-
-        else ->
-            stringResource(R.string.settings_hub_accounts_subtitle_followed_only, followed)
+        bankCount == 0 -> stringResource(R.string.settings_hub_banks_subtitle_none)
+        unregistered > 0 -> stringResource(R.string.settings_hub_banks_subtitle, bankCount, unregistered)
+        else -> stringResource(R.string.settings_hub_banks_subtitle_banks_only, bankCount)
     }
 }
 
