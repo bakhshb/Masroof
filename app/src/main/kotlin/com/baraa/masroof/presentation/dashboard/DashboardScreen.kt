@@ -334,6 +334,7 @@ private fun DashboardCustomizableSections(
                             zoneId = ZoneId.systemDefault(),
                             ownedCards = state.ownedCards,
                             onViewAll = onOpenCardsSummary,
+                            onOpenDebit = { onOpenCardsSummary() },
                         )
                     } else {
                         state.followedCreditCardsOverview()?.let { followedOverview ->

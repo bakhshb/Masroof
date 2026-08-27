@@ -30,7 +30,6 @@ import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository

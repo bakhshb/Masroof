@@ -48,6 +48,7 @@ object CardRegistryDebitClassifier {
             if (event.bank != entry.bank) continue
             if (event.cardRef?.last4 != entry.last4) continue
             val body = rawSmsById[event.rawSmsId]?.body ?: continue
+            if (CreditCardMessageHeuristics.isCreditCardSms(body)) continue
             if (CreditCardMessageHeuristics.isDebitCardSms(body)) return true
         }
         return false

@@ -86,4 +86,25 @@ class CreditCardMessageHeuristicsTest {
         assertFalse(CreditCardMessageHeuristics.isDebitCardSms(body))
         assertTrue(CreditCardMessageHeuristics.isCreditCardSms(body))
     }
+
+    @Test
+    fun creditCardAtRamadanMerchant_isCredit_notDebit() {
+        val body = """
+            شراء عبر نقاط البيع (Google Pay)
+            بطاقة ائتمانية: 7271
+            لدى: Ramadan Gifts
+            بمبلغ: 75.00 SAR
+            الرصيد المتاح: 14569.09 SAR
+            إجمالي المبلغ المستحق:3921.11 SAR
+        """.trimIndent()
+        assertTrue(CreditCardMessageHeuristics.isCreditCardSms(body))
+        assertFalse(CreditCardMessageHeuristics.isDebitCardSms(body))
+    }
+
+    @Test
+    fun englishMadaCard_isDebitCardSms() {
+        val body = "POS Purchase MADA: 8219 at STORE amount 50.00 SAR"
+        assertTrue(CreditCardMessageHeuristics.isDebitCardSms(body))
+        assertFalse(CreditCardMessageHeuristics.isCreditCardSms(body))
+    }
 }

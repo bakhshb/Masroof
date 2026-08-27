@@ -85,6 +85,15 @@ fun CreditFacilitiesSection(
                         modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
                     )
                 }
+                items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->
+                    DebitCardSummaryTile(
+                        debit = debit,
+                        network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
+                        modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        onClick = onOpenDebit?.let { open -> { open(debit) } },
+                        presentation = DebitCardTilePresentation.Carousel,
+                    )
+                }
             }
         }
     }

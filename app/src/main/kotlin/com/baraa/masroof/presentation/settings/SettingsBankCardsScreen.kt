@@ -160,7 +160,7 @@ fun SettingsBankCardsScreen(
                             onMarkDebit = onMarkDebit,
                         )
                     }
-                    bankTree.unlinkedDebitCards.forEach { card ->
+                    bankTree.allDebitCards.forEach { card ->
                         SettingsRegistryCardRow(
                             card = card,
                             updating = state.updating,
