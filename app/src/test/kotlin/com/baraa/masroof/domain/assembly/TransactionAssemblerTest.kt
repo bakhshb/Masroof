@@ -3,6 +3,7 @@ package com.baraa.masroof.domain.assembly
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -190,15 +191,16 @@ class TransactionAssemblerTest {
     @Test
     fun unmatchedOutgoing_ownedSource_unknownDest_externalOut() {
         val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-            event = event(
-                family = MessageFamily.TRANSFER_OUT,
-                amount = money("500.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-                destination = AccountReference(Bank.UNKNOWN, "0593"),
+            candidate = transferCandidate(
+                event = event(
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("500.00"),
+                    source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    destination = AccountReference(Bank.UNKNOWN, "0593"),
+                ),
+                sourceOwnership = OwnershipStatus.OWNED,
+                destinationOwnership = OwnershipStatus.UNKNOWN,
             ),
-            receivedAt = receivedAt,
-            sourceOwnership = OwnershipStatus.OWNED,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
         ) as TransactionAssembler.Outcome.Assembled
 
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, outcome.transaction.type)
@@ -213,15 +215,16 @@ class TransactionAssemblerTest {
     @Test
     fun unmatchedIncoming_ownedDest_unknownSource_externalIn() {
         val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-            event = event(
-                family = MessageFamily.TRANSFER_IN,
-                amount = money("200.00"),
-                source = AccountReference(Bank.UNKNOWN, "9999"),
-                destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            candidate = transferCandidate(
+                event = event(
+                    family = MessageFamily.TRANSFER_IN,
+                    amount = money("200.00"),
+                    source = AccountReference(Bank.UNKNOWN, "9999"),
+                    destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                ),
+                sourceOwnership = OwnershipStatus.UNKNOWN,
+                destinationOwnership = OwnershipStatus.OWNED,
             ),
-            receivedAt = receivedAt,
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.OWNED,
         ) as TransactionAssembler.Outcome.Assembled
 
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, outcome.transaction.type)
@@ -236,15 +239,16 @@ class TransactionAssemblerTest {
     @Test
     fun unmatchedOutgoing_unownedSource_staysPending() {
         val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-            event = event(
-                family = MessageFamily.TRANSFER_OUT,
-                amount = money("500.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-                destination = AccountReference(Bank.UNKNOWN, "0593"),
+            candidate = transferCandidate(
+                event = event(
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("500.00"),
+                    source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    destination = AccountReference(Bank.UNKNOWN, "0593"),
+                ),
+                sourceOwnership = OwnershipStatus.UNKNOWN,
+                destinationOwnership = OwnershipStatus.UNKNOWN,
             ),
-            receivedAt = receivedAt,
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
         )
         assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
     }
@@ -274,6 +278,19 @@ class TransactionAssemblerTest {
     }
 
     private fun money(v: String) = Money.of(BigDecimal(v), Currency.SAR)
+
+    private fun transferCandidate(
+        event: ParsedEvent,
+        sourceOwnership: OwnershipStatus,
+        destinationOwnership: OwnershipStatus,
+    ) = TransferMatchCandidate(
+        event = event,
+        transactionReference = null,
+        occurredAtLocal = null,
+        receivedAt = receivedAt,
+        sourceOwnership = sourceOwnership,
+        destinationOwnership = destinationOwnership,
+    )
 
     private fun event(
         family: MessageFamily,
