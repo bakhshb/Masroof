@@ -4,27 +4,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsMyCardsScreen(
+fun SettingsBankCardsScreen(
+    bank: Bank,
     state: SettingsUiState,
     onBack: () -> Unit,
     onConfirmOwned: (ManagedCardUi) -> Unit,
@@ -49,6 +47,11 @@ fun SettingsMyCardsScreen(
     onConfirmLinkDebit: (ManagedCardUi, ManagedAccountUi) -> Unit,
     onMarkDebit: (ManagedCardUi) -> Unit,
 ) {
+    val unregisteredCards = state.unregisteredCards.filter { it.bank == bank }
+    val followedCards = state.followedCards.filter { it.bank == bank }
+    val stoppedCards = state.stoppedCards.filter { it.bank == bank }
+    val bankTree = state.bankTree(bank.id)
+
     SettingsStopConfirmDialog(
         target = state.stopConfirmCardTarget,
         updating = state.updating,
@@ -94,7 +97,7 @@ fun SettingsMyCardsScreen(
     )
 
     MasroofSecondaryScaffold(
-        title = stringResource(R.string.settings_cards_section),
+        title = stringResource(R.string.settings_bank_cards_title),
         onBack = onBack,
         backContentDescription = stringResource(R.string.settings_back),
     ) { contentModifier ->
@@ -105,16 +108,17 @@ fun SettingsMyCardsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
+                settingsBankLabel(bank),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
                 stringResource(R.string.settings_cards_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (
-                state.followedCards.isEmpty() &&
-                state.unregisteredCards.isEmpty() &&
-                state.stoppedCards.isEmpty()
-            ) {
+            if (followedCards.isEmpty() && unregisteredCards.isEmpty() && stoppedCards.isEmpty()) {
                 Text(
                     stringResource(R.string.settings_cards_empty),
                     style = MaterialTheme.typography.bodyMedium,
@@ -122,13 +126,14 @@ fun SettingsMyCardsScreen(
                 )
             }
 
-            if (state.unregisteredCards.isNotEmpty()) {
+            if (unregisteredCards.isNotEmpty()) {
                 SettingsCardGroupTitle(stringResource(R.string.settings_cards_unregistered))
-                state.unregisteredCards.forEach { card ->
+                unregisteredCards.forEach { card ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
                         title = card.displayLabel,
+                        showBankLabel = false,
                         footer = {
                             CardOwnershipInlinePrompt(
                                 enabled = !state.updating,
@@ -140,37 +145,35 @@ fun SettingsMyCardsScreen(
                 }
             }
 
-            if (state.followedCards.isNotEmpty()) {
+            if (followedCards.isNotEmpty()) {
                 SettingsCardGroupTitle(stringResource(R.string.settings_cards_followed))
-                if (state.bankTrees.isNotEmpty()) {
-                    state.bankTrees.forEach { tree ->
-                        tree.creditCards.forEach { card ->
-                            SettingsRegistryCardRow(
-                                card = card,
-                                updating = state.updating,
-                                onRequestStopTracking = onRequestStopTracking,
-                                onRenameCard = onRenameCard,
-                                onPickCardNetwork = onPickCardNetwork,
-                                onPickCardRole = onPickCardRole,
-                                onLinkDebitCard = onLinkDebitCard,
-                                onMarkDebit = onMarkDebit,
-                            )
-                        }
-                        tree.unlinkedDebitCards.forEach { card ->
-                            SettingsRegistryCardRow(
-                                card = card,
-                                updating = state.updating,
-                                onRequestStopTracking = onRequestStopTracking,
-                                onRenameCard = onRenameCard,
-                                onPickCardNetwork = onPickCardNetwork,
-                                onPickCardRole = onPickCardRole,
-                                onLinkDebitCard = onLinkDebitCard,
-                                onMarkDebit = onMarkDebit,
-                            )
-                        }
+                if (bankTree != null) {
+                    bankTree.creditCards.forEach { card ->
+                        SettingsRegistryCardRow(
+                            card = card,
+                            updating = state.updating,
+                            onRequestStopTracking = onRequestStopTracking,
+                            onRenameCard = onRenameCard,
+                            onPickCardNetwork = onPickCardNetwork,
+                            onPickCardRole = onPickCardRole,
+                            onLinkDebitCard = onLinkDebitCard,
+                            onMarkDebit = onMarkDebit,
+                        )
+                    }
+                    bankTree.unlinkedDebitCards.forEach { card ->
+                        SettingsRegistryCardRow(
+                            card = card,
+                            updating = state.updating,
+                            onRequestStopTracking = onRequestStopTracking,
+                            onRenameCard = onRenameCard,
+                            onPickCardNetwork = onPickCardNetwork,
+                            onPickCardRole = onPickCardRole,
+                            onLinkDebitCard = onLinkDebitCard,
+                            onMarkDebit = onMarkDebit,
+                        )
                     }
                 } else {
-                    state.followedCards.forEach { card ->
+                    followedCards.forEach { card ->
                         SettingsRegistryCardRow(
                             card = card,
                             updating = state.updating,
@@ -185,13 +188,14 @@ fun SettingsMyCardsScreen(
                 }
             }
 
-            if (state.stoppedCards.isNotEmpty()) {
+            if (stoppedCards.isNotEmpty()) {
                 SettingsCardGroupTitle(stringResource(R.string.settings_cards_stopped))
-                state.stoppedCards.forEach { card ->
+                stoppedCards.forEach { card ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
                         title = card.displayLabel,
+                        showBankLabel = false,
                         endAction = {
                             SettingsResumeTrackingButton(
                                 onClick = { onResumeTracking(card) },
@@ -214,7 +218,7 @@ fun SettingsMyCardsScreen(
 }
 
 @Composable
-private fun SettingsRegistryCardRow(
+internal fun SettingsRegistryCardRow(
     card: ManagedCardUi,
     updating: Boolean,
     onRequestStopTracking: (ManagedCardUi) -> Unit,
@@ -228,6 +232,7 @@ private fun SettingsRegistryCardRow(
         icon = MasroofIcons.cardPayment,
         bank = card.bank,
         title = card.displayLabel,
+        showBankLabel = false,
         endAction = {
             SettingsStopTrackingButton(
                 onClick = { onRequestStopTracking(card) },
@@ -270,6 +275,6 @@ private fun cardSubtitle(card: ManagedCardUi): String? {
 }
 
 @Composable
-private fun SettingsCardGroupTitle(title: String) {
+internal fun SettingsCardGroupTitle(title: String) {
     Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 }

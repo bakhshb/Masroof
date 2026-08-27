@@ -81,6 +81,9 @@ class SettingsImportConfirmTest {
         SettingsViewModel(
             cardRegistryRepository = EmptyCards(),
             accountRegistryRepository = EmptyAccounts(),
+            loanRegistryRepository = object : com.baraa.masroof.domain.repository.LoanRegistryRepository {
+                override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.LoanRegistryEntry>()
+            },
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = EmptyAccounts(),
                 cardRegistry = EmptyCards(),

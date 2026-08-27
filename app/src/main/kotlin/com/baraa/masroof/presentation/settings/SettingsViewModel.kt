@@ -30,8 +30,10 @@ import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +46,7 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
+    private val loanRegistryRepository: LoanRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
@@ -94,6 +97,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
             } catch (ce: CancellationException) {
                 throw ce
@@ -274,6 +278,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
                 _uiState.update { it.copy(reparsingStored = false) }
@@ -303,6 +308,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 appLogService.info(
                     AppLogCategories.SETTINGS,
@@ -661,6 +667,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -681,6 +688,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -706,6 +714,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -731,6 +740,7 @@ class SettingsViewModel(
                 applyRegistries(
                     cards = cardRegistryRepository.listAll(),
                     accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -803,6 +813,7 @@ class SettingsViewModel(
     private fun applyRegistries(
         cards: List<com.baraa.masroof.domain.model.CardRegistryEntry>,
         accounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
+        loans: List<com.baraa.masroof.domain.model.LoanRegistryEntry>,
     ) {
         val cardItems = cards
             .filter { it.bank != Bank.UNKNOWN }
@@ -834,20 +845,68 @@ class SettingsViewModel(
                 )
             }
             .sortedBy { it.maskedNumber }
+        val loanItems = loans
+            .filter { it.bank != Bank.UNKNOWN }
+            .map {
+                ManagedLoanUi(
+                    id = it.id,
+                    bank = it.bank,
+                    loanType = it.loanType,
+                    ownership = it.ownership,
+                    displayName = it.displayName,
+                )
+            }
+        val followedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED }
+        val followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED }
         _uiState.update {
             it.copy(
                 loading = false,
-                followedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED },
+                followedCards = followedCards,
                 unregisteredCards = cardItems.filter { card -> card.ownership == OwnershipStatus.UNKNOWN },
                 stoppedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.EXTERNAL },
-                followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED },
+                followedAccounts = followedAccounts,
                 unregisteredAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.UNKNOWN },
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
+                loans = loanItems,
                 bankTrees = buildBankTrees(
-                    cards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED },
-                    accounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED },
+                    cards = followedCards,
+                    accounts = followedAccounts,
+                    loans = loanItems,
+                ),
+                bankSummaries = buildBankSummaries(
+                    accounts = accountItems,
+                    cards = cardItems,
+                    loans = loanItems,
                 ),
                 error = null,
+            )
+        }
+    }
+
+    private fun buildBankSummaries(
+        accounts: List<ManagedAccountUi>,
+        cards: List<ManagedCardUi>,
+        loans: List<ManagedLoanUi>,
+    ): List<SettingsBankSummaryUi> {
+        val bankIds = (
+            accounts.map { it.bank.id } +
+                cards.map { it.bank.id } +
+                loans.map { it.bank.id }
+        ).distinct().sorted()
+        return bankIds.mapNotNull { bankId ->
+            val bankAccounts = accounts.filter { it.bank.id == bankId }
+            val bankCards = cards.filter { it.bank.id == bankId }
+            val bankLoans = loans.filter { it.bank.id == bankId }
+            if (bankAccounts.isEmpty() && bankCards.isEmpty() && bankLoans.isEmpty()) {
+                return@mapNotNull null
+            }
+            SettingsBankSummaryUi(
+                bank = Bank(bankId),
+                accountCount = bankAccounts.size,
+                cardCount = bankCards.size,
+                loanCount = bankLoans.size,
+                unregisteredAccountCount = bankAccounts.count { it.ownership == OwnershipStatus.UNKNOWN },
+                unregisteredCardCount = bankCards.count { it.ownership == OwnershipStatus.UNKNOWN },
             )
         }
     }
@@ -855,8 +914,13 @@ class SettingsViewModel(
     private fun buildBankTrees(
         cards: List<ManagedCardUi>,
         accounts: List<ManagedAccountUi>,
+        loans: List<ManagedLoanUi>,
     ): List<SettingsBankTreeUi> {
-        val bankIds = (cards.map { it.bank.id } + accounts.map { it.bank.id }).distinct().sorted()
+        val bankIds = (
+            cards.map { it.bank.id } +
+                accounts.map { it.bank.id } +
+                loans.map { it.bank.id }
+        ).distinct().sorted()
         return bankIds.map { bankId ->
             val bank = Bank(bankId)
             val bankCards = cards.filter { it.bank.id == bankId }
@@ -879,13 +943,15 @@ class SettingsViewModel(
                 walletAccounts = bankAccounts.filter { it.accountType == AccountType.WALLET },
                 creditCards = bankCards.filter { !it.isDebitRegistryCard() },
                 unlinkedDebitCards = unlinkedDebit,
+                loans = loans.filter { it.bank.id == bankId },
             )
         }.filter { tree ->
             tree.currentAccountNodes.isNotEmpty() ||
                 tree.savingsAccounts.isNotEmpty() ||
                 tree.walletAccounts.isNotEmpty() ||
                 tree.creditCards.isNotEmpty() ||
-                tree.unlinkedDebitCards.isNotEmpty()
+                tree.unlinkedDebitCards.isNotEmpty() ||
+                tree.loans.isNotEmpty()
         }
     }
 

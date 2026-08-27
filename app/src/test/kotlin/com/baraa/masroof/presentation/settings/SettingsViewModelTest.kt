@@ -15,8 +15,11 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.model.LoanRegistryEntry
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -369,9 +372,55 @@ class SettingsViewModelTest {
         assertEquals(manifest, pendingUpdateStore.readAvailable())
     }
 
+    @Test
+    fun refresh_buildsBankSummariesAndLoanTrees() = runTest {
+        val loans = FakeLoanRegistry(
+            LoanRegistryEntry(
+                id = "lreg_1",
+                bank = Bank.BANK_ALJAZIRA,
+                loanType = LoanType.PERSONAL,
+                ownership = OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
+        )
+        val cards = FakeCardRegistry(
+            CardRegistryEntry.forTest(
+                Bank.BANK_ALJAZIRA,
+                "7271",
+                OwnershipStatus.OWNED,
+                firstSeenRawSmsId = "1",
+                lastSeenRawSmsId = "1",
+            ),
+        )
+        val accounts = FakeAccountRegistry(
+            AccountRegistryEntry.forTest(
+                Bank.BANK_ALJAZIRA,
+                "3001",
+                OwnershipStatus.UNKNOWN,
+                firstSeenRawSmsId = "2",
+                lastSeenRawSmsId = "2",
+            ),
+        )
+        val vm = viewModel(cards = cards, accounts = accounts, loans = loans)
+        vm.refresh()
+        advanceUntilIdle()
+
+        val summary = vm.uiState.value.bankSummaries.single()
+        assertEquals(Bank.BANK_ALJAZIRA, summary.bank)
+        assertEquals(1, summary.accountCount)
+        assertEquals(1, summary.cardCount)
+        assertEquals(1, summary.loanCount)
+        assertEquals(1, summary.unregisteredAccountCount)
+
+        val tree = vm.uiState.value.bankTrees.single()
+        assertEquals(1, tree.loans.size)
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
+        loans: LoanRegistryRepository = FakeLoanRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
@@ -382,6 +431,7 @@ class SettingsViewModelTest {
         SettingsViewModel(
             cardRegistryRepository = cards,
             accountRegistryRepository = accounts,
+            loanRegistryRepository = loans,
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = accounts,
                 cardRegistry = cards,
@@ -552,5 +602,13 @@ class SettingsViewModelTest {
             reference: AccountReference,
             accountType: com.baraa.masroof.domain.model.AccountType,
         ) = Unit
+    }
+
+    private class FakeLoanRegistry(
+        vararg initial: LoanRegistryEntry,
+    ) : LoanRegistryRepository {
+        private val entries = initial.toList()
+
+        override suspend fun listAll(): List<LoanRegistryEntry> = entries
     }
 }

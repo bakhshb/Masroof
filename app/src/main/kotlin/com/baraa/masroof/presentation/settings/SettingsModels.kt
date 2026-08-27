@@ -70,6 +70,21 @@ data class ManagedLoanUi(
     val displayName: String? = null,
 )
 
+data class SettingsBankSummaryUi(
+    val bank: Bank,
+    val accountCount: Int,
+    val cardCount: Int,
+    val loanCount: Int,
+    val unregisteredAccountCount: Int,
+    val unregisteredCardCount: Int,
+) {
+    val hasContent: Boolean
+        get() = accountCount > 0 || cardCount > 0 || loanCount > 0
+
+    val unregisteredCount: Int
+        get() = unregisteredAccountCount + unregisteredCardCount
+}
+
 data class SettingsUiState(
     val loading: Boolean = true,
     val followedCards: List<ManagedCardUi> = emptyList(),
@@ -78,7 +93,9 @@ data class SettingsUiState(
     val followedAccounts: List<ManagedAccountUi> = emptyList(),
     val unregisteredAccounts: List<ManagedAccountUi> = emptyList(),
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
+    val loans: List<ManagedLoanUi> = emptyList(),
     val bankTrees: List<SettingsBankTreeUi> = emptyList(),
+    val bankSummaries: List<SettingsBankSummaryUi> = emptyList(),
     val appVersion: String = "",
     val languageTag: String = "",
     val themeMode: ThemeMode = ThemeMode.DEFAULT,
@@ -170,10 +187,77 @@ sealed interface AppUpdateUiState {
     ) : AppUpdateUiState
 }
 
-enum class SettingsDestination {
-    Hub,
-    MyCards,
-    MyAccounts,
-    About,
-    Logs,
+sealed interface SettingsDestination {
+    data object Hub : SettingsDestination
+
+    data object Banks : SettingsDestination
+
+    data class BankHub(
+        val bankId: String,
+    ) : SettingsDestination
+
+    data class BankAccounts(
+        val bankId: String,
+    ) : SettingsDestination
+
+    data class BankCards(
+        val bankId: String,
+    ) : SettingsDestination
+
+    data class BankLoans(
+        val bankId: String,
+    ) : SettingsDestination
+
+    data object About : SettingsDestination
+
+    data object Logs : SettingsDestination
 }
+
+fun SettingsDestination.encode(): String =
+    when (this) {
+        SettingsDestination.Hub -> "hub"
+        SettingsDestination.Banks -> "banks"
+        is SettingsDestination.BankHub -> "bank:$bankId"
+        is SettingsDestination.BankAccounts -> "bank:$bankId:accounts"
+        is SettingsDestination.BankCards -> "bank:$bankId:cards"
+        is SettingsDestination.BankLoans -> "bank:$bankId:loans"
+        SettingsDestination.About -> "about"
+        SettingsDestination.Logs -> "logs"
+    }
+
+fun decodeSettingsDestination(encoded: String): SettingsDestination {
+    if (encoded == "hub") return SettingsDestination.Hub
+    if (encoded == "banks") return SettingsDestination.Banks
+    if (encoded == "about") return SettingsDestination.About
+    if (encoded == "logs") return SettingsDestination.Logs
+    if (encoded.startsWith("bank:")) {
+        val parts = encoded.removePrefix("bank:").split(":")
+        val bankId = parts.firstOrNull().orEmpty()
+        return when (parts.getOrNull(1)) {
+            "accounts" -> SettingsDestination.BankAccounts(bankId)
+            "cards" -> SettingsDestination.BankCards(bankId)
+            "loans" -> SettingsDestination.BankLoans(bankId)
+            else -> SettingsDestination.BankHub(bankId)
+        }
+    }
+    return SettingsDestination.Hub
+}
+
+fun SettingsDestination.parent(): SettingsDestination =
+    when (this) {
+        is SettingsDestination.BankAccounts -> SettingsDestination.BankHub(bankId)
+        is SettingsDestination.BankCards -> SettingsDestination.BankHub(bankId)
+        is SettingsDestination.BankLoans -> SettingsDestination.BankHub(bankId)
+        is SettingsDestination.BankHub -> SettingsDestination.Banks
+        SettingsDestination.Banks -> SettingsDestination.Hub
+        SettingsDestination.Logs -> SettingsDestination.About
+        SettingsDestination.About,
+        SettingsDestination.Hub,
+        -> SettingsDestination.Hub
+    }
+
+fun SettingsUiState.bankSummary(bankId: String): SettingsBankSummaryUi? =
+    bankSummaries.firstOrNull { it.bank.id == bankId }
+
+fun SettingsUiState.bankTree(bankId: String): SettingsBankTreeUi? =
+    bankTrees.firstOrNull { it.bank.id == bankId }
