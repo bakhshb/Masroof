@@ -866,7 +866,7 @@ class SettingsViewModel(
             val assignedDebitLast4s = mutableSetOf<String>()
             val currentNodes = currentAccounts.map { account ->
                 val matchedDebit = debitCards.filter { debit ->
-                    debitMatchesAccount(debit, account)
+                    debit.last4 !in assignedDebitLast4s && debitMatchesAccount(debit, account)
                 }
                 matchedDebit.forEach { assignedDebitLast4s.add(it.last4) }
                 SettingsCurrentAccountNodeUi(account = account, debitCards = matchedDebit)
@@ -877,7 +877,7 @@ class SettingsViewModel(
                 currentAccountNodes = currentNodes,
                 savingsAccounts = bankAccounts.filter { it.accountType == AccountType.SAVINGS },
                 walletAccounts = bankAccounts.filter { it.accountType == AccountType.WALLET },
-                creditCards = bankCards.filter { it.cardType == CardType.CREDIT },
+                creditCards = bankCards.filter { it.cardType == CardType.CREDIT || it.cardType == null },
                 unlinkedDebitCards = unlinkedDebit,
             )
         }.filter { tree ->
