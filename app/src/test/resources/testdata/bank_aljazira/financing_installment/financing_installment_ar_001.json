@@ -1,0 +1,17 @@
+{
+  "id": "financing_installment_ar_001",
+  "sender": "AlJazira",
+  "body": "خصم: قسط تمويل\nمن: 3001\nالقسط: SAR 3,036.11\nالمبلغ المتبقي: SAR 33,397.25\nلـ: تمويل شخصي\nفي: 2026-08-27 01:10",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "FINANCING_INSTALLMENT",
+    "direction": "OUTGOING",
+    "amount": "3036.11",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "counterparty": "تمويل شخصي",
+    "occurredAt": "2026-08-27T01:10:00",
+    "parseStatus": "SUCCESS",
+    "outstandingBalance": "33397.25"
+  }
+}

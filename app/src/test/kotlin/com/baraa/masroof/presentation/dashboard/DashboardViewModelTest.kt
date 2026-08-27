@@ -706,6 +706,7 @@ class DashboardViewModelTest {
                         ) = Unit
                     },
                     NoOpCardRegistryRepository(),
+                    com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
                 ),
             ),
             ignoreService = TransactionIgnoreService(

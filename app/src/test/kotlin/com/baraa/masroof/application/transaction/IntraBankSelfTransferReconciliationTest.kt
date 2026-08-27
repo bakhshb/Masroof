@@ -22,6 +22,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -91,7 +92,7 @@ class IntraBankSelfTransferReconciliationTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             zoneId = zoneId,
         )
     }

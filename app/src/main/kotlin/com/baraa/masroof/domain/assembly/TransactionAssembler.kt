@@ -5,6 +5,7 @@ import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
+import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -59,6 +60,7 @@ object TransactionAssembler {
         sourceOwnership: OwnershipStatus,
         destinationOwnership: OwnershipStatus,
         cardOwnership: OwnershipStatus,
+        loanOwnership: OwnershipStatus = OwnershipStatus.UNKNOWN,
         transactionOccurredAt: Instant = receivedAt,
     ): Outcome {
         when (event.messageFamily) {
@@ -85,11 +87,15 @@ object TransactionAssembler {
             }
         }
 
+        val loanType = LoanTypeResolver.fromLabel(event.counterparty)
         val sourceFacts = accountFacts(event.sourceAccountRef, sourceOwnership)
         val destinationFacts = when (event.messageFamily) {
             MessageFamily.CARD_PAYMENT ->
                 cardFacts(event.cardRef, cardOwnership)
                     ?: accountFacts(event.destinationAccountRef, destinationOwnership)
+
+            MessageFamily.FINANCING_INSTALLMENT ->
+                loanFacts(event.bank, loanType, loanOwnership)
 
             else -> accountFacts(event.destinationAccountRef, destinationOwnership)
         }
@@ -109,6 +115,7 @@ object TransactionAssembler {
                 instrument = instrumentFacts,
                 purchaseChannel = event.purchaseChannel,
                 bankNetworkType = event.bankNetworkType,
+                loanType = loanType,
             ),
         )
 
@@ -364,6 +371,19 @@ object TransactionAssembler {
         )
     }
 
+    private fun loanFacts(
+        bank: Bank,
+        loanType: com.baraa.masroof.domain.model.LoanType?,
+        ownership: OwnershipStatus,
+    ): ResolvedContainerFacts? {
+        if (loanType == null || bank == Bank.UNKNOWN) return null
+        return ResolvedContainerFacts(
+            kind = ContainerKind.LOAN,
+            ownership = ownership,
+            knownLoanType = loanType,
+        )
+    }
+
     private fun cardFacts(
         ref: CardReference?,
         ownership: OwnershipStatus,
@@ -404,6 +424,13 @@ object TransactionAssembler {
 
             MessageFamily.CARD_PAYMENT ->
                 durableSourceAccountId to durableCardId
+
+            MessageFamily.FINANCING_INSTALLMENT -> {
+                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+                durableSourceAccountId to loanType?.let {
+                    FinancialContainerIdFactory.loanId(event.bank, it)
+                }
+            }
 
             MessageFamily.REFUND ->
                 // Incoming value to the user's container — never put the receiver in source.

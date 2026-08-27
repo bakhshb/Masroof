@@ -41,6 +41,7 @@ data class CurrentAccountSummary(
             cashWithdrawals: Money,
             posPurchases: Money,
             fees: Money,
+            loanRepayments: Money = Money.zero(currency),
             selfTransfersOut: Money,
         ): CurrentAccountSummary =
             CurrentAccountSummary(
@@ -59,6 +60,7 @@ data class CurrentAccountSummary(
                     billPayments = billPayments,
                     posPurchases = posPurchases,
                     fees = fees,
+                    loanRepayments = loanRepayments,
                     selfTransfersOut = selfTransfersOut,
                 ),
             )

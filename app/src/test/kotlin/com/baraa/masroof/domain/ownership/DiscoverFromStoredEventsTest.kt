@@ -10,6 +10,7 @@ import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -54,7 +55,7 @@ class DiscoverFromStoredEventsTest {
             .build()
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        discovery = OwnershipDiscoveryService(accounts, cards)
+        discovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository)
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
     }

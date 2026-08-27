@@ -13,16 +13,21 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 enum class ContainerKind {
     ACCOUNT,
     CARD,
+    LOAN,
 }
 
 data class ResolvedContainerFacts(
     val kind: ContainerKind,
     val ownership: OwnershipStatus,
     val knownCardType: CardType? = null,
+    val knownLoanType: com.baraa.masroof.domain.model.LoanType? = null,
 ) {
     init {
         require(kind == ContainerKind.CARD || knownCardType == null) {
             "knownCardType is only meaningful for CARD containers"
+        }
+        require(kind == ContainerKind.LOAN || knownLoanType == null) {
+            "knownLoanType is only meaningful for LOAN containers"
         }
     }
 

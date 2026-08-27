@@ -25,7 +25,8 @@ class AlJaziraFixtureCorpusTest {
     fun everyFixture_hasValidStructuredMetadata() {
         val allowedFamilies = setOf(
             "PURCHASE", "TRANSFER_IN", "TRANSFER_OUT", "CARD_PAYMENT", "BILL_PAYMENT",
-            "WITHDRAWAL", "REFUND", "FEE", "BALANCE_NOTICE", "OTP", "NON_FINANCIAL", "UNKNOWN",
+            "FINANCING_INSTALLMENT", "WITHDRAWAL", "REFUND", "FEE", "BALANCE_NOTICE", "OTP",
+            "NON_FINANCIAL", "UNKNOWN",
         )
         val allowedStatuses = setOf(
             "SUCCESS", "PARTIAL", "REVIEW_REQUIRED", "NON_FINANCIAL", "UNSUPPORTED", "INVALID",
@@ -122,6 +123,7 @@ class AlJaziraFixtureCorpusTest {
                     "TRANSFER_OUT" -> assertTrue(relative.startsWith("transfer_out/"))
                     "CARD_PAYMENT" -> assertTrue(relative.startsWith("card_payment/"))
                     "BILL_PAYMENT" -> assertTrue(relative.startsWith("bill_payment/"))
+                    "FINANCING_INSTALLMENT" -> assertTrue(relative.startsWith("financing_installment/"))
                     "REFUND" -> assertTrue(relative.startsWith("refund/"))
                     "WITHDRAWAL" -> assertTrue(relative.startsWith("withdrawal/"))
                     "FEE" -> assertTrue(relative.startsWith("fee/"))

@@ -29,6 +29,7 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -411,7 +412,7 @@ class SmsIngestionServiceTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = throwingFtRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
@@ -439,7 +440,7 @@ class SmsIngestionServiceTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
         val throwingReviews = object : ReviewRepository {
             override suspend fun getById(id: String): ReviewItem? = null
@@ -496,7 +497,7 @@ class SmsIngestionServiceTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
         val cancellingReviews = object : ReviewRepository {
             override suspend fun getById(id: String): ReviewItem? = null
@@ -586,7 +587,7 @@ class SmsIngestionServiceTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = cancellingFtRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards),
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
         val svc = SmsIngestionService(
             rawSmsRepository = rawRepo,
