@@ -223,6 +223,7 @@ class OnboardingViewModel(
                     is ImportState.Completed -> {
                         try {
                             discoverFromStoredEvents()
+                            refreshReviewQueue()
                             loadCandidatesAndCounts()
                             onboardingPrefs.setHistoricalImportCompleted(true)
                             _uiState.update { it.copy(step = OnboardingStep.OWNERSHIP) }

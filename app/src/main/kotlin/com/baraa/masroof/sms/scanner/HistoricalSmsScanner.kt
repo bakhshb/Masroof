@@ -51,6 +51,7 @@ class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
     private val ingestionService: SmsIngestionService,
     private val appLogService: AppLogService? = null,
+    private val onScanComplete: (suspend () -> Unit)? = null,
 ) {
     suspend fun scan(receivedAfter: Instant? = null): SmsScanResult {
         appLogService?.info(
@@ -147,6 +148,9 @@ class HistoricalSmsScanner(
         }
 
         val result = snapshot(failure = null)
+        if (result.failure == null) {
+            onScanComplete?.invoke()
+        }
         logScanFinished(result)
         return result
     }
