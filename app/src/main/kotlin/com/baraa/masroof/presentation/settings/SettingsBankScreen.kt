@@ -25,30 +25,48 @@ fun SettingsBankScreen(
     onOpenCards: () -> Unit,
     onOpenLoans: () -> Unit,
 ) {
-    val accountsSubtitle = when {
-        summary.accountCount == 0 -> stringResource(R.string.settings_accounts_empty)
-        summary.unregisteredAccountCount > 0 -> stringResource(
-            R.string.settings_hub_accounts_subtitle,
-            summary.followedAccountCount,
-            summary.unregisteredAccountCount,
-        )
-        else -> stringResource(
-            R.string.settings_hub_accounts_subtitle_followed_only,
-            summary.followedAccountCount,
-        )
-    }
-    val cardsSubtitle = when {
-        summary.cardCount == 0 -> stringResource(R.string.settings_cards_empty)
-        summary.unregisteredCardCount > 0 -> stringResource(
-            R.string.settings_hub_cards_subtitle,
-            summary.followedCardCount,
-            summary.unregisteredCardCount,
-        )
-        else -> stringResource(
-            R.string.settings_hub_cards_subtitle_followed_only,
-            summary.followedCardCount,
-        )
-    }
+    val accountsSubtitle = registryCategorySubtitle(
+        followed = summary.followedAccountCount,
+        unregistered = summary.unregisteredAccountCount,
+        stopped = summary.stoppedAccountCount,
+        emptyLabel = stringResource(R.string.settings_accounts_empty),
+        followedUnregisteredLabel = { followed, unregistered ->
+            stringResource(R.string.settings_hub_accounts_subtitle, followed, unregistered)
+        },
+        followedOnlyLabel = { followed ->
+            stringResource(R.string.settings_hub_accounts_subtitle_followed_only, followed)
+        },
+        stoppedOnlyLabel = { stopped ->
+            stringResource(R.string.settings_hub_accounts_subtitle_stopped_only, stopped)
+        },
+        followedStoppedLabel = { followed, stopped ->
+            stringResource(R.string.settings_hub_accounts_subtitle_followed_stopped, followed, stopped)
+        },
+        stoppedSuffix = { stopped ->
+            stringResource(R.string.settings_bank_category_stopped_suffix, stopped)
+        },
+    )
+    val cardsSubtitle = registryCategorySubtitle(
+        followed = summary.followedCardCount,
+        unregistered = summary.unregisteredCardCount,
+        stopped = summary.stoppedCardCount,
+        emptyLabel = stringResource(R.string.settings_cards_empty),
+        followedUnregisteredLabel = { followed, unregistered ->
+            stringResource(R.string.settings_hub_cards_subtitle, followed, unregistered)
+        },
+        followedOnlyLabel = { followed ->
+            stringResource(R.string.settings_hub_cards_subtitle_followed_only, followed)
+        },
+        stoppedOnlyLabel = { stopped ->
+            stringResource(R.string.settings_hub_cards_subtitle_stopped_only, stopped)
+        },
+        followedStoppedLabel = { followed, stopped ->
+            stringResource(R.string.settings_hub_cards_subtitle_followed_stopped, followed, stopped)
+        },
+        stoppedSuffix = { stopped ->
+            stringResource(R.string.settings_bank_category_stopped_suffix, stopped)
+        },
+    )
     val loansSubtitle = if (summary.loanCount > 0) {
         stringResource(R.string.settings_bank_summary_loans, summary.loanCount)
     } else {
@@ -91,4 +109,26 @@ fun SettingsBankScreen(
             )
         }
     }
+}
+
+internal fun registryCategorySubtitle(
+    followed: Int,
+    unregistered: Int,
+    stopped: Int,
+    emptyLabel: String,
+    followedUnregisteredLabel: (Int, Int) -> String,
+    followedOnlyLabel: (Int) -> String,
+    stoppedOnlyLabel: (Int) -> String,
+    followedStoppedLabel: (Int, Int) -> String,
+    stoppedSuffix: (Int) -> String,
+): String {
+    val total = followed + unregistered + stopped
+    if (total == 0) return emptyLabel
+    if (unregistered > 0) {
+        val base = followedUnregisteredLabel(followed, unregistered)
+        return if (stopped > 0) base + stoppedSuffix(stopped) else base
+    }
+    if (followed > 0 && stopped > 0) return followedStoppedLabel(followed, stopped)
+    if (stopped > 0) return stoppedOnlyLabel(stopped)
+    return followedOnlyLabel(followed)
 }
