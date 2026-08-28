@@ -17,6 +17,7 @@ private fun masroofTextStyle(
 )
 
 val MasroofTypography = Typography(
+    headlineSmall = masroofTextStyle(FontWeight.Bold, 18, 24),
     headlineMedium = masroofTextStyle(FontWeight.Bold, 22, 28),
     titleMedium = masroofTextStyle(FontWeight.Bold, 16, 22),
     titleSmall = masroofTextStyle(FontWeight.SemiBold, 14, 20),

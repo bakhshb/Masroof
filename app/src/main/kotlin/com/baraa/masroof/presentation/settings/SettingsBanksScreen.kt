@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
+import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,11 +33,11 @@ fun SettingsBanksScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
             Text(
                 stringResource(R.string.settings_banks_hint),
-                style = MaterialTheme.typography.bodySmall,
+                style = MasroofTextStyles.hint,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 

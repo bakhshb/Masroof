@@ -41,6 +41,9 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.dashboard.DashboardAmountRole
+import com.baraa.masroof.presentation.dashboard.DashboardAmountText
+import com.baraa.masroof.presentation.review.ReviewReasonLabels
 
 @Composable
 fun ReviewRoute(
@@ -350,10 +353,9 @@ private fun ReviewDetailScreen(
                     )
                 }
                 detail.amountLabel?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    DashboardAmountText(
+                        amount = it,
+                        role = DashboardAmountRole.Hero,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }

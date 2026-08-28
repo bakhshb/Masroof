@@ -78,7 +78,7 @@ fun SettingsAboutScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
             ) {
             MasroofLogo(
                 size = 72.dp,

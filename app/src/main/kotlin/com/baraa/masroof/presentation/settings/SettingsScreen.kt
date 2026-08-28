@@ -32,7 +32,8 @@ import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 @Composable
 fun SettingsRoute(
@@ -438,7 +439,7 @@ private fun SettingsHubScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
             SettingsNavRow(
                 icon = MasroofIcons.moneyMovement,
@@ -469,7 +470,7 @@ private fun SettingsHubScreen(
                 onClick = { showThemeDialog = true },
             )
 
-            SectionHeader(
+            MasroofSectionHeader(
                 title = stringResource(R.string.settings_data_section),
                 icon = MasroofIcons.rescan,
             )

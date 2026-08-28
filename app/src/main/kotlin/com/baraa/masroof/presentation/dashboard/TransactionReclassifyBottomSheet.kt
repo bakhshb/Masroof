@@ -57,7 +57,7 @@ fun TransactionReclassifyBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp),
+                .padding(bottom = DashboardSpacing.bottomSheetBottom),
         ) {
             Row(
                 modifier = Modifier

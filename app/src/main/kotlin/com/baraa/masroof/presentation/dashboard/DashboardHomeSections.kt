@@ -1,7 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,10 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
@@ -37,8 +32,8 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.common.MasroofCompactCard
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.LocalDate
@@ -67,16 +62,14 @@ fun DashboardHeroCard(
     MasroofCard(modifier = modifier) {
         Text(
             stringResource(R.string.dashboard_hero_remaining_title),
-            style = MaterialTheme.typography.bodySmall,
+            style = DashboardTextStyles.hint,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            formatLocalizedMoney(remaining),
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = remainingColor,
-                fontSize = MaterialTheme.typography.headlineMedium.fontSize * heroAmountStyleScale(size),
-            ),
+        DashboardAmountText(
+            amount = formatLocalizedMoney(remaining),
+            role = DashboardAmountRole.Hero,
+            color = remainingColor,
+            heroScale = heroAmountStyleScale(size),
             modifier = Modifier.padding(top = 6.dp),
         )
 
@@ -192,9 +185,9 @@ fun DashboardQuickSummaryRow(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap),
     ) {
-        DashboardQuickCard(
+        MasroofCompactCard(
             label = stringResource(R.string.dashboard_quick_net_remaining),
             value = formatLocalizedMoney(remaining),
             valueColor = when {
@@ -209,7 +202,7 @@ fun DashboardQuickSummaryRow(
             modifier = Modifier.weight(1f),
         )
         if (showExpense) {
-            DashboardQuickCard(
+            MasroofCompactCard(
                 label = stringResource(R.string.dashboard_quick_total_expense),
                 value = formatLocalizedMoney(totalOutflow),
                 valueColor = extended.outflow,
@@ -223,7 +216,7 @@ fun DashboardQuickSummaryRow(
             )
         }
         if (showIncome) {
-            DashboardQuickCard(
+            MasroofCompactCard(
                 label = stringResource(R.string.dashboard_quick_total_income),
                 value = formatLocalizedMoney(totalInflow),
                 valueColor = extended.inflow,
@@ -240,87 +233,6 @@ fun DashboardQuickSummaryRow(
 }
 
 @Composable
-private fun DashboardQuickCard(
-    label: String,
-    value: String,
-    valueColor: Color,
-    icon: ImageVector,
-    iconBackground: Color,
-    iconTint: Color,
-    contentPadding: androidx.compose.ui.unit.Dp = 10.dp,
-    modifier: Modifier = Modifier,
-    clickable: Boolean = false,
-    onClick: (() -> Unit)? = null,
-) {
-    Surface(
-        modifier = modifier
-            .heightIn(min = 118.dp)
-            .then(
-                if (clickable && onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-            ),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shadowElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = contentPadding, vertical = contentPadding + 2.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(14.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                if (clickable) {
-                    Icon(
-                        imageVector = MasroofIcons.periodNext,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(iconBackground),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = iconTint,
-                )
-            }
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = valueColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-@Composable
 fun DashboardAccountsSection(
     accounts: List<OwnedAccountUi>,
     bankHierarchy: com.baraa.masroof.application.dashboard.BankHierarchyOverview? = null,
@@ -329,8 +241,8 @@ fun DashboardAccountsSection(
 ) {
     if (accounts.isEmpty()) return
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(DashboardSpacing.sectionHeaderGap)) {
+        DashboardSectionHeader(
             title = stringResource(R.string.dashboard_accounts_summary_title),
             icon = MasroofIcons.moneyMovement,
             onViewAll = onViewAll,
@@ -339,7 +251,7 @@ fun DashboardAccountsSection(
         MasroofCard {
             accounts.forEachIndexed { index, account ->
                 if (index > 0) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(DashboardSpacing.listItemGap))
                 }
                 val debitCards = bankHierarchy?.banks
                     .orEmpty()
@@ -382,8 +294,8 @@ private fun DashboardAccountRow(
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .size(DashboardSpacing.entityIconSize)
+                .clip(RoundedCornerShape(DashboardSpacing.entityIconRadius))
                 .background(iconBg),
             contentAlignment = Alignment.Center,
         ) {
@@ -397,7 +309,7 @@ private fun DashboardAccountRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 account.displayLabel(),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = DashboardTextStyles.cardTitle,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -420,10 +332,10 @@ private fun DashboardAccountRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                remaining?.let { formatLocalizedMoney(it) }
+            DashboardAmountText(
+                amount = remaining?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                role = DashboardAmountRole.Card,
                 color = remaining?.let { value ->
                     when {
                         value.amount.signum() > 0 -> extended.inflow
