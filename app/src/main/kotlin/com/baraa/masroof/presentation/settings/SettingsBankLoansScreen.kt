@@ -57,17 +57,11 @@ fun SettingsBankLoansScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
-            Text(
-                settingsBankLabel(bank),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                stringResource(R.string.settings_loans_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SettingsScreenHeader(
+                bank = bank,
+                hint = stringResource(R.string.settings_loans_hint),
             )
 
             if (bankLoans.isEmpty()) {
@@ -79,7 +73,7 @@ fun SettingsBankLoansScreen(
             }
 
             if (unregisteredLoans.isNotEmpty()) {
-                SettingsLoanGroupTitle(stringResource(R.string.settings_loans_unregistered))
+                SettingsGroupTitle(stringResource(R.string.settings_loans_unregistered))
                 unregisteredLoans.forEach { loan ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.moneyMovement,
@@ -99,7 +93,7 @@ fun SettingsBankLoansScreen(
             }
 
             if (followedLoans.isNotEmpty()) {
-                SettingsLoanGroupTitle(stringResource(R.string.settings_loans_followed))
+                SettingsGroupTitle(stringResource(R.string.settings_loans_followed))
                 followedLoans.forEach { loan ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.moneyMovement,
@@ -118,7 +112,7 @@ fun SettingsBankLoansScreen(
             }
 
             if (stoppedLoans.isNotEmpty()) {
-                SettingsLoanGroupTitle(stringResource(R.string.settings_loans_stopped))
+                SettingsGroupTitle(stringResource(R.string.settings_loans_stopped))
                 stoppedLoans.forEach { loan ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.moneyMovement,
@@ -182,15 +176,6 @@ private fun SettingsLoanStopConfirmDialog(
                 Text(stringResource(R.string.settings_cancel))
             }
         },
-    )
-}
-
-@Composable
-private fun SettingsLoanGroupTitle(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
