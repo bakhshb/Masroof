@@ -130,7 +130,7 @@
     <string name="settings_hub_cards_subtitle_stopped_only">%1$d stopped card(s)</string>
     <string name="settings_hub_cards_subtitle_followed_stopped">%1$d card(s) • %2$d stopped</string>
     <string name="settings_bank_category_stopped_suffix"> • %1$d stopped</string>
-    <string name="settings_banks_section">My banks</string>
+    <string name="settings_banks_section">Banks</string>
     <string name="settings_banks_hint">Choose a bank to manage its accounts, cards, and loans.</string>
     <string name="settings_banks_empty">No banks detected yet.</string>
     <string name="settings_hub_banks_subtitle_none">No banks yet</string>

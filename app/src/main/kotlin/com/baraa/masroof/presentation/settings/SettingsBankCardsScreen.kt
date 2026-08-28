@@ -105,17 +105,11 @@ fun SettingsBankCardsScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
-            Text(
-                settingsBankLabel(bank),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                stringResource(R.string.settings_cards_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SettingsScreenHeader(
+                bank = bank,
+                hint = stringResource(R.string.settings_cards_hint),
             )
 
             if (followedCards.isEmpty() && unregisteredCards.isEmpty() && stoppedCards.isEmpty()) {
@@ -127,7 +121,7 @@ fun SettingsBankCardsScreen(
             }
 
             if (unregisteredCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_unregistered))
+                SettingsGroupTitle(stringResource(R.string.settings_cards_unregistered))
                 unregisteredCards.forEach { card ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
@@ -146,7 +140,7 @@ fun SettingsBankCardsScreen(
             }
 
             if (followedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_followed))
+                SettingsGroupTitle(stringResource(R.string.settings_cards_followed))
                 if (bankTree != null) {
                     bankTree.creditCards.forEach { card ->
                         SettingsRegistryCardRow(
@@ -189,7 +183,7 @@ fun SettingsBankCardsScreen(
             }
 
             if (stoppedCards.isNotEmpty()) {
-                SettingsCardGroupTitle(stringResource(R.string.settings_cards_stopped))
+                SettingsGroupTitle(stringResource(R.string.settings_cards_stopped))
                 stoppedCards.forEach { card ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
@@ -272,9 +266,4 @@ private fun cardSubtitle(card: ManagedCardUi): String? {
         }
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
-}
-
-@Composable
-internal fun SettingsCardGroupTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 }

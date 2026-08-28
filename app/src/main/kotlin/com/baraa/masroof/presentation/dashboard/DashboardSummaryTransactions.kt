@@ -121,22 +121,17 @@ fun DashboardSummaryTransactionsSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DashboardSpacing.listItemGap),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            MasroofSectionTitle(
-                title = stringResource(R.string.dashboard_summary_transactions_title, transactions.size),
-            )
-            if (onViewAll != null && transactions.isNotEmpty()) {
-                TextButton(onClick = onViewAll) {
-                    Text(stringResource(R.string.dashboard_summary_view_all_transactions))
-                }
-            }
-        }
+        DashboardSectionHeader(
+            title = stringResource(R.string.dashboard_summary_transactions_title, transactions.size),
+            onViewAll = if (onViewAll != null && transactions.isNotEmpty()) onViewAll else null,
+            viewAllLabel = if (onViewAll != null && transactions.isNotEmpty()) {
+                stringResource(R.string.dashboard_summary_view_all_transactions)
+            } else {
+                null
+            },
+        )
         if (transactions.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_summary_transactions_empty),

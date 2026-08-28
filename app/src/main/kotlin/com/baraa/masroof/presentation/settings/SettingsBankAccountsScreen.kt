@@ -74,17 +74,11 @@ fun SettingsBankAccountsScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
-            Text(
-                settingsBankLabel(bank),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                stringResource(R.string.settings_accounts_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SettingsScreenHeader(
+                bank = bank,
+                hint = stringResource(R.string.settings_accounts_hint),
             )
 
             if (followedAccounts.isEmpty() && unregisteredAccounts.isEmpty() && stoppedAccounts.isEmpty()) {
@@ -96,7 +90,7 @@ fun SettingsBankAccountsScreen(
             }
 
             if (unregisteredAccounts.isNotEmpty()) {
-                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_unregistered))
+                SettingsGroupTitle(stringResource(R.string.settings_accounts_unregistered))
                 unregisteredAccounts.forEach { account ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.externalIn,
@@ -115,7 +109,7 @@ fun SettingsBankAccountsScreen(
             }
 
             if (followedAccounts.isNotEmpty()) {
-                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_followed))
+                SettingsGroupTitle(stringResource(R.string.settings_accounts_followed))
                 if (bankTree != null) {
                     bankTree.currentAccountNodes.forEach { node ->
                         SettingsRegistryAccountRow(
@@ -159,7 +153,7 @@ fun SettingsBankAccountsScreen(
             }
 
             if (stoppedAccounts.isNotEmpty()) {
-                SettingsAccountGroupTitle(stringResource(R.string.settings_accounts_stopped))
+                SettingsGroupTitle(stringResource(R.string.settings_accounts_stopped))
                 stoppedAccounts.forEach { account ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.externalIn,
@@ -233,11 +227,6 @@ internal fun SettingsRegistryAccountRow(
             }
         },
     )
-}
-
-@Composable
-internal fun SettingsAccountGroupTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 }
 
 @Composable

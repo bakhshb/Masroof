@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -183,18 +182,11 @@ private fun AccountsSummaryHeader(
     accountCount: Int,
     onManageAccounts: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        MasroofSectionTitle(
-            title = stringResource(R.string.dashboard_accounts_count_label, accountCount),
-        )
-        TextButton(onClick = onManageAccounts) {
-            Text(stringResource(R.string.dashboard_manage_accounts))
-        }
-    }
+    DashboardSectionHeader(
+        title = stringResource(R.string.dashboard_accounts_count_label, accountCount),
+        trailingLabel = stringResource(R.string.dashboard_manage_accounts),
+        onTrailingClick = onManageAccounts,
+    )
 }
 
 private fun resolveOwnedAccountUi(
@@ -229,8 +221,8 @@ private fun AccountsSummaryAccountCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(DashboardSpacing.entityIconSize)
+                    .clip(RoundedCornerShape(DashboardSpacing.entityIconRadius))
                     .background(extended.accountSoft),
                 contentAlignment = Alignment.Center,
             ) {
@@ -244,7 +236,7 @@ private fun AccountsSummaryAccountCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     account.displayLabel(),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    style = DashboardTextStyles.cardTitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -272,10 +264,10 @@ private fun AccountsSummaryAccountCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    remaining?.let { formatLocalizedMoney(it) }
+                DashboardAmountText(
+                    amount = remaining?.let { formatLocalizedMoney(it) }
                         ?: stringResource(R.string.dashboard_value_unavailable),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    role = DashboardAmountRole.Card,
                     color = remainingColor,
                     modifier = Modifier.padding(top = 2.dp),
                 )

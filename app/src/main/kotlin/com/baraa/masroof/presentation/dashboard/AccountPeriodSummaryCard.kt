@@ -49,7 +49,7 @@ fun AccountPeriodSummaryCard(
 
         Text(
             stringResource(R.string.dashboard_account_remaining_calculated_hint),
-            style = MaterialTheme.typography.bodySmall,
+            style = DashboardTextStyles.hint,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -161,10 +161,8 @@ fun AccountPeriodSummaryCard(
                     direction = TransactionDirectionUi.NEUTRAL,
                 )
             }
-            Text(
-                stringResource(R.string.dashboard_self_transfers_included_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SelfTransfersHint(
+                style = SelfTransfersHintStyle.IncludedInTotals,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }

@@ -27,6 +27,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 /**
  * Registry row for Arabic RTL: identity on the right (start), action on the left (end).
@@ -67,11 +68,11 @@ fun SettingsRegistryItemCard(
                     if (showBankLabel) {
                         Text(
                             settingsBankLabel(bank),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MasroofTextStyles.breakdownLabel,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text(title, style = MasroofTextStyles.cardTitle, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             endAction?.let { action ->

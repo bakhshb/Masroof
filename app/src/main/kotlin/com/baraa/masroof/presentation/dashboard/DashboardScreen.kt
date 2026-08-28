@@ -149,7 +149,7 @@ private fun DashboardScreen(
         DashboardFlowDetailScreen(
             mode = flowDetailMode!!,
             summary = state.currentAccount,
-            periodRangeLabel = periodRangeLabel,
+            state = state,
             transactions = state.allTransactions,
             grouping = state.flowDetailGrouping ?: CurrentAccountFlowDetailGrouping.empty(),
             onBack = { flowDetailMode = null },
@@ -418,7 +418,7 @@ private fun DashboardCustomizableSections(
                                 ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(DashboardSpacing.listItemGap))
                         }
                     }
                 }

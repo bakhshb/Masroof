@@ -195,16 +195,9 @@ private fun CardsSummaryHeader(
     cardCount: Int,
     onManageCards: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        MasroofSectionTitle(
-            title = stringResource(R.string.dashboard_cards_count_label, cardCount),
-        )
-        TextButton(onClick = onManageCards) {
-            Text(stringResource(R.string.dashboard_manage_cards))
-        }
-    }
+    DashboardSectionHeader(
+        title = stringResource(R.string.dashboard_cards_count_label, cardCount),
+        trailingLabel = stringResource(R.string.dashboard_manage_cards),
+        onTrailingClick = onManageCards,
+    )
 }

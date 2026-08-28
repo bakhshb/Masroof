@@ -41,6 +41,8 @@ import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.common.ShareActionIcon
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
+import com.baraa.masroof.presentation.dashboard.DashboardAmountRole
+import com.baraa.masroof.presentation.dashboard.DashboardAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
@@ -225,9 +227,9 @@ fun TransactionDetailScreen(
                     transaction.title ?: transactionTypeLabel(transaction.typeLabelResHint),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(
-                    formatLocalizedMoney(transaction.amount),
-                    style = MaterialTheme.typography.headlineMedium,
+                DashboardAmountText(
+                    amount = formatLocalizedMoney(transaction.amount),
+                    role = DashboardAmountRole.Hero,
                     color = when (transaction.direction) {
                         TransactionDirectionUi.INCOME,
                         TransactionDirectionUi.INWARD,

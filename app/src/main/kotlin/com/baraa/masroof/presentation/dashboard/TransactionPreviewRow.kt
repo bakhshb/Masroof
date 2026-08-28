@@ -94,7 +94,7 @@ fun TransactionPreviewRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    style = DashboardTextStyles.cardTitle,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -127,9 +127,9 @@ fun TransactionPreviewRow(
                         color = badge.third,
                     )
                 }
-                Text(
-                    formatLocalizedMoney(row.amount),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                DashboardAmountText(
+                    amount = formatLocalizedMoney(row.amount),
+                    role = DashboardAmountRole.List,
                     color = amountColor,
                     modifier = Modifier.padding(top = 2.dp),
                 )

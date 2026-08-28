@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.presentation.common.MasroofNavCard
+import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 @Composable
 fun SettingsNavRow(
@@ -55,14 +56,14 @@ fun SettingsNavRow(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MasroofTextStyles.cardTitle,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start,
                 )
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MasroofTextStyles.hint,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start,
@@ -116,10 +117,10 @@ fun SettingsReparseRow(
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(title, style = MasroofTextStyles.cardTitle, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MasroofTextStyles.hint,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 detail?.let {

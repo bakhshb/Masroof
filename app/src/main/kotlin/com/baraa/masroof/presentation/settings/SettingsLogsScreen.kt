@@ -11,16 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -50,6 +46,7 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
+import com.baraa.masroof.presentation.common.MasroofTextStyles
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -134,31 +131,15 @@ fun SettingsLogsScreen(
             title = stringResource(R.string.settings_logs_title),
             onBack = onBack,
             backContentDescription = stringResource(R.string.settings_back),
-            actions = {
-                IconButton(
-                    onClick = { showClearConfirm = true },
-                    enabled = entries.isNotEmpty() && !state.exportingLogs,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DeleteOutline,
-                        contentDescription = stringResource(R.string.settings_logs_clear),
-                        tint = if (entries.isNotEmpty()) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-            },
         ) { contentModifier ->
             Column(
                 modifier = contentModifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsSpacing.groupGap)) {
                     Text(
                         stringResource(R.string.settings_logs_hint),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MasroofTextStyles.hint,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Surface(
@@ -186,7 +167,7 @@ fun SettingsLogsScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(SettingsSpacing.groupGap),
                 ) {
                     Button(
                         onClick = onRequestExport,
@@ -222,7 +203,7 @@ fun SettingsLogsScreen(
                     else -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.groupGap),
                         ) {
                             items(
                                 items = listItems,
@@ -237,7 +218,7 @@ fun SettingsLogsScreen(
                                     is SettingsLogListItem.DayHeader ->
                                         Text(
                                             item.label,
-                                            style = MaterialTheme.typography.labelLarge,
+                                            style = MasroofTextStyles.sectionTitle,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
                                         )

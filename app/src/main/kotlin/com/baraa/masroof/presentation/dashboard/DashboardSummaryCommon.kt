@@ -36,7 +36,7 @@ fun DashboardSummaryScaffold(
             modifier = contentModifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(DashboardSpacing.sectionGap),
         ) {
             MasroofPeriodDisplay(label = periodRangeLabel)
 

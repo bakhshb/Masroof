@@ -64,7 +64,7 @@ fun SettingsBankScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
             SettingsNavRow(
                 icon = MasroofIcons.externalIn,

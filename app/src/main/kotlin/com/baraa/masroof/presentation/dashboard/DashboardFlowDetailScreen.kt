@@ -2,12 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -24,8 +19,6 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
-import com.baraa.masroof.presentation.common.MasroofPeriodDisplay
-import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 enum class DashboardFlowDetailMode {
@@ -37,7 +30,7 @@ enum class DashboardFlowDetailMode {
 fun DashboardFlowDetailScreen(
     mode: DashboardFlowDetailMode,
     summary: CurrentAccountSummary,
-    periodRangeLabel: String,
+    state: DashboardUiState,
     transactions: List<TransactionPreviewUi>,
     grouping: CurrentAccountFlowDetailGrouping,
     onBack: () -> Unit,
@@ -64,20 +57,15 @@ fun DashboardFlowDetailScreen(
     val formattedTotal = formatLocalizedMoney(presentation.total)
     val previewsById = remember(transactions) { transactions.associateBy { it.id } }
 
-    MasroofSecondaryScaffold(
+    DashboardSummaryScaffold(
         title = stringResource(presentation.titleRes),
+        state = state,
         onBack = onBack,
-        backContentDescription = stringResource(R.string.dashboard_flow_detail_back),
-        modifier = modifier,
     ) { contentModifier ->
         Column(
-            modifier = contentModifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = contentModifier,
+            verticalArrangement = Arrangement.spacedBy(DashboardSpacing.sectionGap),
         ) {
-            MasroofPeriodDisplay(label = periodRangeLabel)
-
             MasroofCard(
                 accent = when (mode) {
                     DashboardFlowDetailMode.Expense -> MasroofCardAccent.Outflow
@@ -123,7 +111,7 @@ private data class FlowDetailPresentation(
 
 @Composable
 private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap)) {
         DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreExpenseSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
@@ -142,18 +130,14 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
                 amount = summary.outflow.selfTransfersOut,
                 direction = TransactionDirectionUi.NEUTRAL,
             )
-            Text(
-                stringResource(R.string.dashboard_self_transfers_neutral_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SelfTransfersHint(style = SelfTransfersHintStyle.NeutralExcluded)
         }
     }
 }
 
 @Composable
 private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap)) {
         DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreIncomeSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
@@ -172,11 +156,7 @@ private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
                 amount = summary.inflow.selfTransfersIn,
                 direction = TransactionDirectionUi.NEUTRAL,
             )
-            Text(
-                stringResource(R.string.dashboard_self_transfers_neutral_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SelfTransfersHint(style = SelfTransfersHintStyle.NeutralExcluded)
         }
     }
 }
