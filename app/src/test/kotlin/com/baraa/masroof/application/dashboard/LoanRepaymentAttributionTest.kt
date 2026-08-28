@@ -16,6 +16,8 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -89,6 +91,28 @@ class LoanRepaymentAttributionTest {
                 loanType = LoanType.PERSONAL,
             ),
         )
+    }
+
+    @Test
+    fun isLoanRepayment_falseAfterReclassifyToExpense() {
+        val parsedRecordsById = mapOf(
+            "evt-loan" to financingRecord(counterparty = "تمويل شخصي"),
+        )
+        val tx = FinancialTransaction(
+            id = "expense-loan",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("3036.11", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+
+        assertFalse(LoanRepaymentAttribution.isLoanRepayment(tx, parsedRecordsById))
+        assertNull(LoanRepaymentAttribution.loanContainerId(tx, parsedRecordsById))
     }
 
     @Test

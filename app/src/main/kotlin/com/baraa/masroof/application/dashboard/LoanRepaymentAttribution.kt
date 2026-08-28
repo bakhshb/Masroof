@@ -13,7 +13,9 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
  * Canonical SMS-driven loan repayment detection.
  *
  * A transaction repays a loan when stored as [FinancialTransactionType.LOAN_REPAYMENT],
- * or when linked SMS is [MessageFamily.FINANCING_INSTALLMENT] (even if still stored as [FinancialTransactionType.FEE]).
+ * or when still stored as [FinancialTransactionType.FEE] with linked
+ * [MessageFamily.FINANCING_INSTALLMENT] SMS. Explicit reclassification to any other
+ * stored type overrides SMS evidence.
  */
 object LoanRepaymentAttribution {
     fun isLoanRepayment(
@@ -30,9 +32,23 @@ object LoanRepaymentAttribution {
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,
     ): String? {
-        if (tx.type == FinancialTransactionType.LOAN_REPAYMENT) {
-            tx.destinationContainerId?.let { return it }
+        when (tx.type) {
+            FinancialTransactionType.LOAN_REPAYMENT -> {
+                tx.destinationContainerId?.let { return it }
+                return loanContainerIdFromFinancingSms(tx, parsedRecordsById)
+            }
+
+            FinancialTransactionType.FEE ->
+                return loanContainerIdFromFinancingSms(tx, parsedRecordsById)
+
+            else -> return null
         }
+    }
+
+    private fun loanContainerIdFromFinancingSms(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+    ): String? {
         financingInstallmentRecords(tx, parsedRecordsById).forEach { record ->
             val loanType = LoanTypeResolver.fromLabel(record.event.counterparty) ?: return@forEach
             return FinancialContainerIdFactory.loanId(record.event.bank, loanType)

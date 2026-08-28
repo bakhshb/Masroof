@@ -59,6 +59,25 @@ class TransactionEffectiveTypeTest {
         assertEquals(FinancialTransactionType.FEE, TransactionEffectiveType.resolve(tx, emptyList()))
     }
 
+    @Test
+    fun resolve_reclassifiedExpense_returnsStoredType() {
+        val parsedRecords = listOf(financingRecord())
+        val tx = FinancialTransaction(
+            id = "expense-loan",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("3036.11", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+
+        assertEquals(FinancialTransactionType.EXPENSE, TransactionEffectiveType.resolve(tx, parsedRecords))
+    }
+
     private fun financingRecord(): ParsedEventRecord =
         ParsedEventRecord(
             event = ParsedEvent(
