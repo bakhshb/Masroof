@@ -1,6 +1,5 @@
 package com.baraa.masroof.presentation.theme
 
-import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,10 +11,12 @@ class MasroofExtendedColorsTest {
         val dark = darkExtendedColors()
 
         assertNotEquals(light.cardSurface, dark.cardSurface)
+        assertNotEquals(light.navCardSurface, dark.navCardSurface)
         assertNotEquals(light.miniBackground, dark.miniBackground)
         assertNotEquals(light.backgroundGradientTop, dark.backgroundGradientTop)
 
         assertTrue(isDark(dark.cardSurface))
+        assertTrue(isDark(dark.navCardSurface))
         assertTrue(isDark(dark.miniBackground))
         assertTrue(isLight(light.cardSurface))
     }
@@ -27,13 +28,23 @@ class MasroofExtendedColorsTest {
         assertTrue(dark.outflow.red + dark.outflow.green + dark.outflow.blue > 0.5f)
     }
 
-    private fun isDark(color: Color): Boolean {
+    @Test
+    fun darkNavCardSurface_isHigherThanCardSurface() {
+        val dark = darkExtendedColors()
+        assertTrue(relativeLuminance(dark.navCardSurface) > relativeLuminance(dark.cardSurface))
+    }
+
+    private fun isDark(color: androidx.compose.ui.graphics.Color): Boolean {
         val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
         return luminance < 0.5f
     }
 
-    private fun isLight(color: Color): Boolean {
+    private fun isLight(color: androidx.compose.ui.graphics.Color): Boolean {
         val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
         return luminance > 0.8f
+    }
+
+    private fun relativeLuminance(color: androidx.compose.ui.graphics.Color): Float {
+        return 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
     }
 }

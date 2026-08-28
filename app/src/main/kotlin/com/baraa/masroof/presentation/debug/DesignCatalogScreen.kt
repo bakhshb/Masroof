@@ -107,7 +107,10 @@ private fun ColorSection() {
         MasroofCard {
             Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
                 ColorSwatch("primary", MaterialTheme.colorScheme.primary)
+                ColorSwatch("primaryContainer", MaterialTheme.colorScheme.primaryContainer)
                 ColorSwatch("surface", MaterialTheme.colorScheme.surface)
+                ColorSwatch("surfaceContainer", MaterialTheme.colorScheme.surfaceContainer)
+                ColorSwatch("surfaceContainerHigh", MaterialTheme.colorScheme.surfaceContainerHigh)
                 ColorSwatch("account", extended.account)
                 ColorSwatch("card", extended.card)
                 ColorSwatch("liability", extended.liability)
