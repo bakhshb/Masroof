@@ -22,15 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
-import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
-import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
-import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
-import com.baraa.masroof.application.dashboard.aggregateFacilityDue
-import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun CardsSummaryRoute(
@@ -101,6 +94,7 @@ fun CardsSummaryScreen(
 ) {
     val followedFacilities = state.followedCreditFacilitiesForSummary()
     val followedOverview = followedCreditCardsOverview(state)
+    val locale = LocalConfiguration.current.locales[0]
 
     DashboardSummaryScaffold(
         title = stringResource(R.string.dashboard_cards_summary_screen_title),
@@ -113,7 +107,12 @@ fun CardsSummaryScreen(
         ) {
             when {
                 followedFacilities != null && followedFacilities.hasContent -> {
-                    FacilitiesSummaryHeroCard(overview = followedFacilities)
+                    DashboardSummaryHeroCard(
+                        spec = creditFacilitiesSummaryHeroSpec(
+                            overview = followedFacilities,
+                            locale = locale,
+                        ),
+                    )
                     CardsSummaryHeader(
                         cardCount = followedFacilities.facilities.size,
                         onManageCards = onManageCards,
@@ -131,7 +130,12 @@ fun CardsSummaryScreen(
                 }
 
                 followedOverview != null -> {
-                    CardsSummaryHeroCard(overview = followedOverview)
+                    DashboardSummaryHeroCard(
+                        spec = creditCardsSummaryHeroSpec(
+                            overview = followedOverview,
+                            locale = locale,
+                        ),
+                    )
                     CardsSummaryHeader(
                         cardCount = followedOverview.cards.size,
                         onManageCards = onManageCards,
@@ -164,127 +168,6 @@ fun CardsSummaryScreen(
             }
         }
     }
-}
-
-@Composable
-private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
-    val aggregateDue = overview.aggregateFacilityDue()
-    val due = aggregateDue?.amount
-    val creditPeriodSpending = overview.aggregateCreditSalaryPeriodSpending()
-    val creditStatementSpending = overview.aggregateCreditStatementSpending()
-    val aggregateStatementLabel = overview.facilities.firstOrNull()?.aggregateStatementPeriodLabel
-    val salaryPeriodLabel = overview.facilities.firstOrNull()?.salaryPeriodLabel
-    val locale = LocalConfiguration.current.locales[0]
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
-    val dueDateHint = aggregateDue?.dueDate?.let { dueDate ->
-        stringResource(
-            R.string.dashboard_credit_card_due_date,
-            dateFormatter.format(dueDate),
-        )
-    }
-
-    val metrics = buildList {
-        add(
-            DashboardSummaryMetricItem(
-                title = stringResource(R.string.dashboard_credit_card_aggregate_due),
-                amount = due?.let { formatLocalizedMoney(it) }
-                    ?: stringResource(R.string.dashboard_value_unavailable),
-                tone = DashboardMetricTone.Liability,
-                hint = dueDateHint,
-            ),
-        )
-        add(
-            DashboardSummaryMetricItem(
-                title = if (salaryPeriodLabel != null) {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
-                },
-                amount = formatLocalizedMoney(creditPeriodSpending),
-                tone = spendingMetricTone(creditPeriodSpending),
-            ),
-        )
-        add(
-            DashboardSummaryMetricItem(
-                title = if (aggregateStatementLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_cards_aggregate_statement_spending,
-                        aggregateStatementLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
-                },
-                amount = formatLocalizedMoney(creditStatementSpending),
-                tone = spendingMetricTone(creditStatementSpending),
-            ),
-        )
-    }
-
-    DashboardSummaryMetricsCard(
-        metrics = metrics,
-        accent = MasroofCardAccent.Credit,
-    )
-}
-
-@Composable
-private fun CardsSummaryHeroCard(overview: CreditCardsOverview) {
-    val aggregateDue = overview.aggregateDueAmount
-    val periodSpending = overview.aggregatePeriodSpendingNet
-    val statementSpending = overview.aggregateStatementSpendingNet
-    val locale = LocalConfiguration.current.locales[0]
-    val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
-
-    val dueDateHint = overview.aggregateDueDate?.let { dueDate ->
-        stringResource(
-            R.string.dashboard_credit_card_due_date,
-            dateFormatter.format(dueDate),
-        )
-    }
-
-    val metrics = buildList {
-        add(
-            DashboardSummaryMetricItem(
-                title = stringResource(R.string.dashboard_credit_card_aggregate_due),
-                amount = aggregateDue?.let { formatLocalizedMoney(it) }
-                    ?: stringResource(R.string.dashboard_value_unavailable),
-                tone = DashboardMetricTone.Liability,
-                hint = dueDateHint,
-            ),
-        )
-        add(
-            DashboardSummaryMetricItem(
-                title = if (overview.salaryPeriodLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_cards_aggregate_period_spending,
-                        overview.salaryPeriodLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
-                },
-                amount = formatLocalizedMoney(periodSpending),
-                tone = spendingMetricTone(periodSpending),
-            ),
-        )
-        add(
-            DashboardSummaryMetricItem(
-                title = if (overview.aggregateStatementPeriodLabel != null) {
-                    stringResource(
-                        R.string.dashboard_credit_cards_aggregate_statement_spending,
-                        overview.aggregateStatementPeriodLabel,
-                    )
-                } else {
-                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
-                },
-                amount = formatLocalizedMoney(statementSpending),
-                tone = spendingMetricTone(statementSpending),
-            ),
-        )
-    }
-
-    DashboardSummaryMetricsCard(
-        metrics = metrics,
-        accent = MasroofCardAccent.Credit,
-    )
 }
 
 @Composable

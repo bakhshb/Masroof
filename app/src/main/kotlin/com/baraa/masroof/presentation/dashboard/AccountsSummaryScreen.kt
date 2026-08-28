@@ -150,9 +150,13 @@ fun AccountsSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AccountsSummaryHeroCard(
-                ownedAccounts = state.ownedAccounts,
-                fleet = state.accountsFleet,
+            DashboardSummaryHeroCard(
+                spec = accountsSummaryHeroSpec(
+                    fleet = resolveDashboardAccountsFleet(
+                        ownedAccounts = state.ownedAccounts,
+                        fleet = state.accountsFleet,
+                    ),
+                ),
             )
 
             AccountsSummaryHeader(
@@ -225,40 +229,6 @@ fun AccountsSummaryScreen(
             }
         }
     }
-}
-
-@Composable
-private fun AccountsSummaryHeroCard(
-    ownedAccounts: List<OwnedAccountUi>,
-    fleet: com.baraa.masroof.application.dashboard.AccountsSummary? = null,
-) {
-    val resolvedFleet = resolveDashboardAccountsFleet(
-        ownedAccounts = ownedAccounts,
-        fleet = fleet,
-    )
-    val totalRemaining = resolvedFleet.totalRemaining
-    val totalInflow = resolvedFleet.totalInflow
-    val totalOutflow = resolvedFleet.totalOutflow
-    val formulaHint = if (totalInflow != null && totalOutflow != null) {
-        stringResource(
-            R.string.dashboard_remaining_formula,
-            formatLocalizedMoney(totalInflow),
-            formatLocalizedMoney(totalOutflow),
-        )
-    } else {
-        null
-    }
-
-    DashboardSummaryMetricCard(
-        title = stringResource(R.string.dashboard_accounts_remaining_total_title),
-        amount = totalRemaining?.let { formatLocalizedMoney(it) }
-            ?: stringResource(R.string.dashboard_value_unavailable),
-        tone = DashboardMetricTone.Signed,
-        signedAmount = totalRemaining?.amount,
-        accent = MasroofCardAccent.Account,
-        hint = listOfNotNull(formulaHint, stringResource(R.string.dashboard_accounts_fleet_total_hint))
-            .joinToString("\n"),
-    )
 }
 
 @Composable
