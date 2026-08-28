@@ -56,8 +56,8 @@ fun TransactionListFilterBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(bottom = DashboardSpacing.bottomSheetBottom),
+            verticalArrangement = Arrangement.spacedBy(DashboardSpacing.bottomSheetSectionGap),
         ) {
             Row(
                 modifier = Modifier

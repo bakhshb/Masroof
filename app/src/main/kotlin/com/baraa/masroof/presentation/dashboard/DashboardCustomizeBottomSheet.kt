@@ -62,7 +62,7 @@ fun DashboardCustomizeBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp),
+                .padding(bottom = DashboardSpacing.bottomSheetBottom),
         ) {
             Text(
                 stringResource(R.string.dashboard_customize_sheet_title),

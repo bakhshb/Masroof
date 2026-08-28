@@ -19,15 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.presentation.theme.MasroofShapes
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.math.BigDecimal
 
-internal val dashboardSummaryMetricTileHeight = 76.dp
+internal val dashboardSummaryMetricTileHeight = DashboardSpacing.metricTileHeight
 
 @Composable
 fun DashboardSummaryPrimaryMetric(
@@ -40,24 +39,22 @@ fun DashboardSummaryPrimaryMetric(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap),
     ) {
         Text(
             title,
-            style = MaterialTheme.typography.labelMedium,
+            style = DashboardTextStyles.breakdownLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            amount,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = resolveMetricToneColor(tone, signedAmount),
-            ),
+        DashboardAmountText(
+            amount = amount,
+            role = DashboardAmountRole.Hero,
+            color = resolveMetricToneColor(tone, signedAmount),
         )
         hint?.let {
             Text(
                 it,
-                style = MaterialTheme.typography.bodySmall,
+                style = DashboardTextStyles.hint,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -73,12 +70,12 @@ fun DashboardSummaryMetricGrid(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap),
     ) {
         metrics.chunked(2).forEach { rowMetrics ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap),
             ) {
                 rowMetrics.forEach { metric ->
                     DashboardSummaryMetricTile(
@@ -110,19 +107,19 @@ fun DashboardSummaryMetricTile(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MasroofShapes.small,
         color = extended.miniBackground,
         border = BorderStroke(1.dp, extended.cardBorder),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(DashboardSpacing.cardInnerGap),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
+                style = DashboardTextStyles.metricTileLabel,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 minLines = 2,
@@ -130,11 +127,7 @@ fun DashboardSummaryMetricTile(
             )
             Text(
                 value,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    lineHeight = 16.sp,
-                ),
+                style = DashboardTextStyles.metricTileAmount,
                 color = valueColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -151,7 +144,7 @@ fun DashboardSummaryBreakdownHeader(
     Text(
         title,
         modifier = modifier,
-        style = MaterialTheme.typography.labelMedium,
+        style = DashboardTextStyles.breakdownLabel,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
@@ -170,10 +163,10 @@ fun DashboardSummaryTotalRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(label, style = DashboardTextStyles.breakdownLabel, color = MaterialTheme.colorScheme.onSurface)
         Text(
             com.baraa.masroof.presentation.locale.formatLocalizedMoney(amount),
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            style = DashboardTextStyles.breakdownTotal,
             color = amountColor,
         )
     }
@@ -184,7 +177,7 @@ fun DashboardSummaryCardDivider(
     modifier: Modifier = Modifier,
 ) {
     HorizontalDivider(
-        modifier = modifier.padding(vertical = 8.dp),
+        modifier = modifier.padding(vertical = DashboardSpacing.cardInnerGap),
         color = MaterialTheme.colorScheme.outlineVariant,
     )
 }

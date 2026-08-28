@@ -35,7 +35,7 @@ fun DashboardSummaryHeroCard(
         spec.footerHint?.let { hint ->
             Text(
                 hint,
-                style = MaterialTheme.typography.bodySmall,
+                style = DashboardTextStyles.hint,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
