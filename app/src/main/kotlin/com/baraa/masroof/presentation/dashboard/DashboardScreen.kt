@@ -28,8 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
+import com.baraa.masroof.application.dashboard.LoanOverview
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
+import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.presentation.common.IconTextButton
@@ -57,6 +58,8 @@ fun DashboardRoute(
     onOpenSettings: () -> Unit = {},
     onOpenAccountsSummary: () -> Unit = onOpenSettings,
     onOpenCardsSummary: () -> Unit = onOpenSettings,
+    onOpenLoansSummary: () -> Unit = onOpenSettings,
+    onOpenLoanDetail: (LoanOverview) -> Unit = { onOpenLoansSummary() },
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -78,6 +81,8 @@ fun DashboardRoute(
         onOpenSettings = onOpenSettings,
         onOpenAccountsSummary = onOpenAccountsSummary,
         onOpenCardsSummary = onOpenCardsSummary,
+        onOpenLoansSummary = onOpenLoansSummary,
+        onOpenLoanDetail = onOpenLoanDetail,
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
@@ -108,6 +113,8 @@ private fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
+    onOpenLoansSummary: () -> Unit,
+    onOpenLoanDetail: (LoanOverview) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
@@ -248,6 +255,8 @@ private fun DashboardScreen(
                                 onOpenSettings = onOpenSettings,
                                 onOpenAccountsSummary = onOpenAccountsSummary,
                                 onOpenCardsSummary = onOpenCardsSummary,
+                                onOpenLoansSummary = onOpenLoansSummary,
+                                onOpenLoanDetail = onOpenLoanDetail,
                                 onOpenAllTransactions = onOpenAllTransactions,
                                 onOpenTransaction = onOpenTransaction,
                                 onRescan = onRescan,
@@ -280,6 +289,8 @@ private fun DashboardCustomizableSections(
     onOpenSettings: () -> Unit,
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
+    onOpenLoansSummary: () -> Unit,
+    onOpenLoanDetail: (LoanOverview) -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onRescan: () -> Unit,
@@ -353,8 +364,8 @@ private fun DashboardCustomizableSections(
                         followedLoans?.let { loans ->
                             LoansSection(
                                 overview = loans,
-                                onViewAll = onOpenCardsSummary,
-                                onOpenLoan = { onOpenCardsSummary() },
+                                onViewAll = onOpenLoansSummary,
+                                onOpenLoan = onOpenLoanDetail,
                             )
                         }
                     }

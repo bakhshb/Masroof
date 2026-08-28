@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,9 +28,9 @@ import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.SectionHeader
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
-import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
-private val dashboardLoanTileMinHeight = 200.dp
+private val dashboardLoanTileMinHeight = 235.dp
+private val dashboardLoanTileWidth = 288.dp
 
 @Composable
 fun LoansSection(
@@ -39,7 +39,7 @@ fun LoansSection(
     onViewAll: (() -> Unit)? = null,
     onOpenLoan: ((LoanOverview) -> Unit)? = null,
     tileModifier: Modifier = Modifier
-        .fillMaxWidth()
+        .width(dashboardLoanTileWidth)
         .heightIn(min = dashboardLoanTileMinHeight),
 ) {
     if (!overview.hasContent) return
@@ -47,7 +47,7 @@ fun LoansSection(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(
             title = stringResource(R.string.dashboard_loans_summary_title),
-            icon = MasroofIcons.moneyMovement,
+            icon = MasroofIcons.savings,
             onViewAll = onViewAll,
             viewAllLabel = stringResource(R.string.dashboard_view_all),
         )
@@ -76,66 +76,33 @@ fun LoansSection(
 fun LoanSummaryTile(
     loan: LoanOverview,
     modifier: Modifier = Modifier,
-    showNavigationIcon: Boolean = true,
 ) {
-    val extended = MasroofThemeExtras.extendedColors
-    val remainingLabel = stringResource(R.string.dashboard_loan_remaining)
-    val paymentLabel = if (loan.salaryPeriodLabel != null) {
-        stringResource(R.string.dashboard_loan_period_payment, loan.salaryPeriodLabel)
-    } else {
-        stringResource(R.string.dashboard_loan_period_payment_fallback)
-    }
-
     MasroofCard(modifier = modifier.fillMaxHeight(), accent = MasroofCardAccent.Credit) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.dashboard_loan_type_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    loan.displayLabel,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                )
+        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        loan.displayLabel,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.dashboard_loan_type_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            if (showNavigationIcon) {
-                Icon(
-                    imageVector = MasroofIcons.periodNext,
-                    contentDescription = null,
-                    tint = extended.liability,
-                )
-            }
+
+            DashboardSummaryMetricGrid(
+                metrics = buildLoanSummaryMetrics(loan),
+                modifier = Modifier.padding(top = 12.dp),
+            )
         }
-
-        Text(
-            remainingLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text(
-            loan.remainingBalance?.let { formatLocalizedMoney(it) }
-                ?: stringResource(R.string.dashboard_value_unavailable),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = extended.liability,
-        )
-
-        Text(
-            paymentLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            formatLocalizedMoney(loan.salaryPeriodPayment),
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 
@@ -144,36 +111,34 @@ fun LoanDetailSummaryCard(
     loan: LoanOverview,
     modifier: Modifier = Modifier,
 ) {
-    val metrics = buildList {
-        add(
-            DashboardSummaryMetricItem(
-                title = stringResource(R.string.dashboard_loan_remaining),
-                amount = loan.remainingBalance?.let { formatLocalizedMoney(it) }
-                    ?: stringResource(R.string.dashboard_value_unavailable),
-                tone = DashboardMetricTone.Liability,
-            ),
-        )
-        add(
-            DashboardSummaryMetricItem(
-                title = if (loan.salaryPeriodLabel != null) {
-                    stringResource(R.string.dashboard_loan_period_payment, loan.salaryPeriodLabel)
-                } else {
-                    stringResource(R.string.dashboard_loan_period_payment_fallback)
-                },
-                amount = formatLocalizedMoney(loan.salaryPeriodPayment),
-                tone = spendingMetricTone(loan.salaryPeriodPayment),
-            ),
-        )
-    }
-
     MasroofCard(modifier = modifier, accent = MasroofCardAccent.Credit) {
         Text(
             loan.displayLabel,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         )
         DashboardSummaryMetricGrid(
-            metrics = metrics,
+            metrics = buildLoanSummaryMetrics(loan),
             modifier = Modifier.padding(top = 12.dp),
         )
     }
 }
+
+@Composable
+private fun buildLoanSummaryMetrics(loan: LoanOverview): List<DashboardSummaryMetricItem> =
+    listOf(
+        DashboardSummaryMetricItem(
+            title = stringResource(R.string.dashboard_loan_remaining),
+            amount = loan.remainingBalance?.let { formatLocalizedMoney(it) }
+                ?: stringResource(R.string.dashboard_value_unavailable),
+            tone = DashboardMetricTone.Liability,
+        ),
+        DashboardSummaryMetricItem(
+            title = if (loan.salaryPeriodLabel != null) {
+                stringResource(R.string.dashboard_loan_period_payment, loan.salaryPeriodLabel)
+            } else {
+                stringResource(R.string.dashboard_loan_period_payment_fallback)
+            },
+            amount = formatLocalizedMoney(loan.salaryPeriodPayment),
+            tone = spendingMetricTone(loan.salaryPeriodPayment),
+        ),
+    )

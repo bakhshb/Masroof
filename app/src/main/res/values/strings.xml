@@ -348,6 +348,13 @@
     <string name="dashboard_loan_period_payment">قسط منذ %1$s</string>
     <string name="dashboard_loan_period_payment_fallback">قسط الفترة</string>
     <string name="dashboard_loan_type_label">قرض</string>
+    <string name="dashboard_loans_summary_screen_title">ملخص القروض</string>
+    <string name="dashboard_loans_count_label">%1$d قروض</string>
+    <string name="dashboard_manage_loans">إدارة القروض</string>
+    <string name="dashboard_loans_remaining_total_title">إجمالي المتبقي</string>
+    <string name="dashboard_loans_aggregate_period_payment">أقساط منذ %1$s</string>
+    <string name="dashboard_loans_aggregate_period_payment_fallback">أقساط الفترة</string>
+    <string name="dashboard_loans_summary_empty">لا توجد قروض متابعة</string>
     <string name="dashboard_credit_card_payment">سداد بطاقة ائتمانية</string>
 <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>

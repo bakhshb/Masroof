@@ -30,10 +30,13 @@ class DashboardRedesignResourcesTest {
         assertEquals("View all ›", context.getString(R.string.dashboard_view_all))
         assertEquals("Accounts summary", context.getString(R.string.dashboard_accounts_summary_screen_title))
         assertEquals("Cards summary", context.getString(R.string.dashboard_cards_summary_screen_title))
+        assertEquals("Loans summary", context.getString(R.string.dashboard_loans_summary_screen_title))
         assertEquals("Manage accounts", context.getString(R.string.dashboard_manage_accounts))
         assertEquals("Manage cards", context.getString(R.string.dashboard_manage_cards))
+        assertEquals("Manage loans", context.getString(R.string.dashboard_manage_loans))
         assertEquals("3 accounts", context.getString(R.string.dashboard_accounts_count_label, 3))
         assertEquals("2 cards", context.getString(R.string.dashboard_cards_count_label, 2))
+        assertEquals("2 loans", context.getString(R.string.dashboard_loans_count_label, 2))
         assertEquals(
             "Period transactions (4)",
             context.getString(R.string.dashboard_summary_transactions_title, 4),

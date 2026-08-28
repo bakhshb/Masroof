@@ -342,6 +342,13 @@
     <string name="dashboard_loan_period_payment">Installment since %1$s</string>
     <string name="dashboard_loan_period_payment_fallback">Period installment</string>
     <string name="dashboard_loan_type_label">Loan</string>
+    <string name="dashboard_loans_summary_screen_title">Loans summary</string>
+    <string name="dashboard_loans_count_label">%1$d loans</string>
+    <string name="dashboard_manage_loans">Manage loans</string>
+    <string name="dashboard_loans_remaining_total_title">Total remaining</string>
+    <string name="dashboard_loans_aggregate_period_payment">Installments since %1$s</string>
+    <string name="dashboard_loans_aggregate_period_payment_fallback">Period installments</string>
+    <string name="dashboard_loans_summary_empty">No followed loans</string>
     <string name="dashboard_credit_card_payment">Credit card payment</string>
 <string name="dashboard_salary_period_label">Salary period: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">Started on the 26th because the 27th is Friday</string>
