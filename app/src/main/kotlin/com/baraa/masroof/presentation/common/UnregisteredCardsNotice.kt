@@ -20,7 +20,7 @@ import com.baraa.masroof.R
 fun UnregisteredCardsNotice(
     firstLast4: String,
     extraCount: Int,
-    onOpenSettings: () -> Unit,
+    onManageCards: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val displayLast4 = formatCardLast4(firstLast4)
@@ -52,7 +52,7 @@ fun UnregisteredCardsNotice(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconTextButtonOutlined(
-                onClick = onOpenSettings,
+                onClick = onManageCards,
                 icon = MasroofIcons.settings,
                 text = stringResource(R.string.dashboard_manage_cards_in_settings),
                 modifier = Modifier.fillMaxWidth(),

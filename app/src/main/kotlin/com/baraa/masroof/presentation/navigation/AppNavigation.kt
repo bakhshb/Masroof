@@ -1,7 +1,10 @@
 package com.baraa.masroof.presentation.navigation
 
 import com.baraa.masroof.application.notification.NotificationAction
+import com.baraa.masroof.presentation.settings.SettingsRegistryCategory
 import com.baraa.masroof.presentation.settings.SettingsUiState
+import com.baraa.masroof.presentation.settings.listDestination
+import com.baraa.masroof.presentation.settings.singleBankDirectDestination
 
 internal enum class HomeDestination {
     Dashboard,
@@ -30,11 +33,11 @@ data class SettingsLaunchRequest(
     val destination: SettingsDestination,
 )
 
-internal fun resolveBanksEntry(state: SettingsUiState): SettingsDestination =
-    if (state.bankSummaries.size == 1) {
-        SettingsDestination.BankHub(state.bankSummaries.single().bank.id)
-    } else {
-        SettingsDestination.Banks
+internal fun ManageSettingsTarget.toRegistryCategory(): SettingsRegistryCategory =
+    when (this) {
+        ManageSettingsTarget.Accounts -> SettingsRegistryCategory.Accounts
+        ManageSettingsTarget.Cards -> SettingsRegistryCategory.Cards
+        ManageSettingsTarget.Loans -> SettingsRegistryCategory.Loans
     }
 
 internal fun resolvePendingDestination(
@@ -42,13 +45,16 @@ internal fun resolvePendingDestination(
     state: SettingsUiState,
 ): SettingsDestination =
     when (pending) {
-        SettingsDestination.Banks -> resolveBanksEntry(state)
+        SettingsDestination.Banks -> SettingsDestination.MyAccounts
+        SettingsDestination.MyAccounts,
+        SettingsDestination.MyCards,
+        SettingsDestination.MyLoans,
         is SettingsDestination.BankAccounts,
         is SettingsDestination.BankCards,
         is SettingsDestination.BankLoans,
         is SettingsDestination.BankHub,
-        -> pending
-
+        SettingsDestination.App,
+        SettingsDestination.DataBackup,
         SettingsDestination.Hub,
         SettingsDestination.About,
         SettingsDestination.Logs,
@@ -60,16 +66,11 @@ internal fun resolveManageSettingsLaunch(
     state: SettingsUiState,
     target: ManageSettingsTarget,
 ): SettingsLaunchRequest {
-    if (state.bankSummaries.size == 1) {
-        val bankId = state.bankSummaries.single().bank.id
-        val destination = when (target) {
-            ManageSettingsTarget.Accounts -> SettingsDestination.BankAccounts(bankId)
-            ManageSettingsTarget.Cards -> SettingsDestination.BankCards(bankId)
-            ManageSettingsTarget.Loans -> SettingsDestination.BankLoans(bankId)
-        }
-        return SettingsLaunchRequest(destination)
+    val category = target.toRegistryCategory()
+    category.singleBankDirectDestination(state)?.let { direct ->
+        return SettingsLaunchRequest(direct)
     }
-    return SettingsLaunchRequest(SettingsDestination.Banks)
+    return SettingsLaunchRequest(category.listDestination())
 }
 
 internal fun resolveNotificationSettingsLaunch(
@@ -86,5 +87,13 @@ internal fun resolveNotificationSettingsLaunch(
         NotificationAction.OPEN_SETTINGS_ABOUT ->
             SettingsLaunchRequest(SettingsDestination.About)
 
+        else -> null
+    }
+
+internal fun SettingsDestination.recoverRegistryListDestination(): SettingsDestination? =
+    when (this) {
+        is SettingsDestination.BankAccounts -> SettingsDestination.MyAccounts
+        is SettingsDestination.BankCards -> SettingsDestination.MyCards
+        is SettingsDestination.BankLoans -> SettingsDestination.MyLoans
         else -> null
     }

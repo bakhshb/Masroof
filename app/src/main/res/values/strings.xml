@@ -135,6 +135,17 @@
     <string name="settings_hub_cards_subtitle_stopped_only">%1$d بطاقة متوقفة</string>
     <string name="settings_hub_cards_subtitle_followed_stopped">%1$d بطاقة • %2$d متوقفة</string>
     <string name="settings_bank_category_stopped_suffix"> • %1$d متوقف</string>
+    <string name="settings_my_finances_section">مالي</string>
+    <string name="settings_app_section">التطبيق</string>
+    <string name="settings_app_hub_subtitle">%1$s • %2$s</string>
+    <string name="settings_data_backup_section">البيانات والنسخ الاحتياطي</string>
+    <string name="settings_data_backup_hub_subtitle">استيراد الرسائل، إعادة التحليل، والنسخ الاحتياطي</string>
+    <string name="settings_registry_accounts_hint">اختر بنكًا لإدارة حساباته.</string>
+    <string name="settings_registry_cards_hint">اختر بنكًا لإدارة بطاقاته.</string>
+    <string name="settings_registry_loans_hint">اختر بنكًا لإدارة قروضه.</string>
+    <string name="settings_hub_loans_subtitle">%1$d قرض</string>
+    <string name="settings_hub_loans_subtitle_only">%1$d قرض</string>
+    <string name="settings_hub_loans_subtitle_none">لا توجد قروض بعد</string>
     <string name="settings_banks_section">البنوك</string>
     <string name="settings_banks_hint">اختر بنكًا لإدارة حساباته وبطاقاته وقروضه.</string>
     <string name="settings_banks_empty">لم يُكتشف أي بنك بعد.</string>

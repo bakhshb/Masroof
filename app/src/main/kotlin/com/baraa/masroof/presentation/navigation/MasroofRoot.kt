@@ -182,6 +182,14 @@ fun MasroofRoot(
                 onOpenAllTransactions = { openTransactionList() },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { openSettings() },
+                onManageCardsInSettings = {
+                    openSettings(
+                        launch = resolveManageSettingsLaunch(
+                            state = settingsState,
+                            target = ManageSettingsTarget.Cards,
+                        ),
+                    )
+                },
                 onOpenAccountsSummary = {
                     homeDestination = HomeDestination.AccountsSummary
                 },
