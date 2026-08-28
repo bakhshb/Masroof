@@ -205,6 +205,13 @@
     <string name="settings_updates_check_failed">تعذّر التحقق من التحديثات</string>
     <string name="settings_logs_title">سجل التشخيص</string>
     <string name="settings_logs_subtitle">مسار الرسائل والتحديثات والأخطاء</string>
+    <string name="settings_design_catalog_title">كتالوج التصميم</string>
+    <string name="settings_design_catalog_subtitle">معاينة الرموز والمكوّنات المشتركة (تطوير فقط)</string>
+    <string name="settings_design_catalog_typography">الخطوط</string>
+    <string name="settings_design_catalog_colors">الألوان</string>
+    <string name="settings_design_catalog_spacing">المسافات</string>
+    <string name="settings_design_catalog_icons">أحجام الأيقونات</string>
+    <string name="settings_design_catalog_components">المكوّنات</string>
     <string name="settings_logs_hint">الأحداث هنا محلية على جهازك. لا يُسجَّل نص الرسائل أو رموز OTP أو الرموز المميزة أو المبالغ.</string>
     <string name="settings_logs_status">%1$d / %2$d · %3$d يومًا</string>
     <string name="settings_logs_filter_all">الكل</string>

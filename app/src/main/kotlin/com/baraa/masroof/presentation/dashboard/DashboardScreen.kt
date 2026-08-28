@@ -42,11 +42,12 @@ import com.baraa.masroof.presentation.common.MasroofAppBar
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofPeriodPill
 import com.baraa.masroof.presentation.common.ReviewNotificationIconButton
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.SmsPermissionNotice
 import com.baraa.masroof.presentation.common.SmsRescanStatusNotice
 import com.baraa.masroof.presentation.common.UnregisteredCardsNotice
 import com.baraa.masroof.presentation.common.ForeignCurrencyNotice
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -187,9 +188,9 @@ private fun DashboardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp)
-                    .padding(bottom = 16.dp),
+                    .padding(horizontal = MasroofSpacing.screenHorizontal)
+                    .padding(top = MasroofSpacing.screenVertical)
+                    .padding(bottom = MasroofSpacing.screenVertical),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 MasroofPeriodPill(
@@ -372,7 +373,7 @@ private fun DashboardCustomizableSections(
                 }
 
                 DashboardSectionId.TRANSACTIONS -> {
-                    SectionHeader(
+                    MasroofSectionHeader(
                         title = stringResource(R.string.dashboard_recent_title),
                         icon = MasroofIcons.recentTransactions,
                         onViewAll = onOpenAllTransactions,
@@ -418,7 +419,7 @@ private fun DashboardCustomizableSections(
                                 ownedCards = state.ownedCards,
                                 onClick = { onOpenTransaction(row.id) },
                             )
-                            Spacer(Modifier.height(DashboardSpacing.listItemGap))
+                            Spacer(Modifier.height(MasroofSpacing.listItemGap))
                         }
                     }
                 }

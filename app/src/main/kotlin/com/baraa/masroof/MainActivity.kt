@@ -22,7 +22,7 @@ import androidx.core.content.ContextCompat
 import com.baraa.masroof.application.backup.BackupPackageFormat
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.update.InstallPermissionHelper
-import com.baraa.masroof.presentation.MasroofRoot
+import com.baraa.masroof.presentation.navigation.MasroofRoot
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
 import com.baraa.masroof.presentation.dashboard.DashboardViewModelFactory
 import com.baraa.masroof.presentation.onboarding.OnboardingPermissionPolicy

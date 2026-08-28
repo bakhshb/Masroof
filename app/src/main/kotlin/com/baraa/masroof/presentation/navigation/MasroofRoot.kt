@@ -1,4 +1,4 @@
-package com.baraa.masroof.presentation
+package com.baraa.masroof.presentation.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -37,7 +37,6 @@ import com.baraa.masroof.presentation.onboarding.OnboardingStep
 import com.baraa.masroof.presentation.onboarding.OnboardingViewModel
 import com.baraa.masroof.presentation.review.ReviewRoute
 import com.baraa.masroof.presentation.review.ReviewViewModel
-import com.baraa.masroof.presentation.settings.SettingsDestination
 import com.baraa.masroof.presentation.settings.SettingsRoute
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 

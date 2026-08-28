@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -64,7 +66,7 @@ fun DashboardFlowDetailScreen(
     ) { contentModifier ->
         Column(
             modifier = contentModifier,
-            verticalArrangement = Arrangement.spacedBy(DashboardSpacing.sectionGap),
+            verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap),
         ) {
             MasroofCard(
                 accent = when (mode) {
@@ -111,7 +113,7 @@ private data class FlowDetailPresentation(
 
 @Composable
 private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
         DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreExpenseSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(
@@ -137,7 +139,7 @@ private fun FlowDetailExpenseSummarySection(summary: CurrentAccountSummary) {
 
 @Composable
 private fun FlowDetailIncomeSummarySection(summary: CurrentAccountSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
         DashboardSummaryBreakdownHeader(title = stringResource(R.string.dashboard_flow_detail_breakdown_title))
         coreIncomeSummaryRows(summary).forEach { row ->
             FlowDetailSummaryRow(

@@ -1,5 +1,11 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+
+import com.baraa.masroof.presentation.common.MasroofAmountText
+
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -94,7 +100,7 @@ fun TransactionPreviewRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = DashboardTextStyles.cardTitle,
+                    style = MasroofTextStyles.cardTitle,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -127,9 +133,9 @@ fun TransactionPreviewRow(
                         color = badge.third,
                     )
                 }
-                DashboardAmountText(
+                MasroofAmountText(
                     amount = formatLocalizedMoney(row.amount),
-                    role = DashboardAmountRole.List,
+                    role = MasroofAmountRole.List,
                     color = amountColor,
                     modifier = Modifier.padding(top = 2.dp),
                 )

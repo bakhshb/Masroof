@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -204,7 +206,7 @@ private fun CardsSummaryHeader(
     cardCount: Int,
     onManageCards: () -> Unit,
 ) {
-    DashboardSectionHeader(
+    MasroofSectionHeader(
         title = stringResource(R.string.dashboard_cards_count_label, cardCount),
         trailingLabel = stringResource(R.string.dashboard_manage_cards),
         onTrailingClick = onManageCards,

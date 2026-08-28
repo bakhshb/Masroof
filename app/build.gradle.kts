@@ -15,8 +15,8 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val appVersionName = "0.3.9"
-val appVersionCode = 62
+val appVersionName = "0.3.10"
+val appVersionCode = 63
 val githubOwner = "bakhshb"
 val githubRepo = "Masroof"
 
@@ -33,6 +33,7 @@ android {
 
         buildConfigField("String", "GITHUB_OWNER", "\"$githubOwner\"")
         buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
+        buildConfigField("boolean", "ENABLE_DESIGN_CATALOG", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -51,6 +52,7 @@ android {
     buildTypes {
         debug {
             versionNameSuffix = "-debug"
+            buildConfigField("boolean", "ENABLE_DESIGN_CATALOG", "true")
         }
         release {
             isMinifyEnabled = false

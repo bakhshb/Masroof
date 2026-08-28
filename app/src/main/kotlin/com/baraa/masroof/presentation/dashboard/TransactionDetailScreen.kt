@@ -29,21 +29,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.ShareActionIcon
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
-import com.baraa.masroof.presentation.dashboard.DashboardAmountRole
-import com.baraa.masroof.presentation.dashboard.DashboardAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +95,7 @@ fun TransactionDetailScreen(
             },
             title = { Text(stringResource(R.string.transaction_detail_ignore_confirm_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
                     transaction.title?.let { title ->
                         Text(title, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -140,7 +141,7 @@ fun TransactionDetailScreen(
             },
             title = { Text(stringResource(R.string.transaction_reclassify_confirm_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
                     transaction.title?.let { title ->
                         Text(title, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -220,16 +221,16 @@ fun TransactionDetailScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(MasroofSpacing.screenVertical),
         ) {
             MasroofCard {
                 Text(
                     transaction.title ?: transactionTypeLabel(transaction.typeLabelResHint),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                DashboardAmountText(
+                MasroofAmountText(
                     amount = formatLocalizedMoney(transaction.amount),
-                    role = DashboardAmountRole.Hero,
+                    role = MasroofAmountRole.Hero,
                     color = when (transaction.direction) {
                         TransactionDirectionUi.INCOME,
                         TransactionDirectionUi.INWARD,
@@ -238,16 +239,16 @@ fun TransactionDetailScreen(
                         TransactionDirectionUi.OUTWARD -> extended.outflow
                         else -> MaterialTheme.colorScheme.onSurface
                     },
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = MasroofSpacing.sectionHeaderGap),
                 )
             }
 
-            SectionHeader(
+            MasroofSectionHeader(
                 title = stringResource(R.string.transaction_detail_info_section),
                 icon = MasroofIcons.recentTransactions,
             )
             MasroofCard {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.carouselGap)) {
                     IconLabelRow(
                         icon = MasroofIcons.transactionType(transaction.typeLabelResHint),
                         label = stringResource(R.string.transaction_detail_type),
@@ -313,7 +314,7 @@ fun TransactionDetailScreen(
             if (smsLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else if (smsEvidence.isNotEmpty()) {
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.transaction_detail_sms_section),
                     icon = MasroofIcons.sms,
                 )
@@ -356,9 +357,9 @@ fun TransactionDetailScreen(
                 Icon(
                     imageVector = MasroofIcons.reviewQueue,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(MasroofIconSizes.md),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
                 Text(stringResource(R.string.transaction_detail_edit_category))
             }
 

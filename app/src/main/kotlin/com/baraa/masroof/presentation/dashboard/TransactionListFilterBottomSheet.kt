@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,8 +58,8 @@ fun TransactionListFilterBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = DashboardSpacing.bottomSheetBottom),
-            verticalArrangement = Arrangement.spacedBy(DashboardSpacing.bottomSheetSectionGap),
+                .padding(bottom = MasroofSpacing.bottomSheetBottom),
+            verticalArrangement = Arrangement.spacedBy(MasroofSpacing.bottomSheetSectionGap),
         ) {
             Row(
                 modifier = Modifier

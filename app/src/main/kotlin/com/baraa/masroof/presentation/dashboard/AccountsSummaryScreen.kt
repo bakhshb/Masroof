@@ -1,5 +1,15 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+
+import com.baraa.masroof.presentation.common.MasroofAmountText
+
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -182,7 +192,7 @@ private fun AccountsSummaryHeader(
     accountCount: Int,
     onManageAccounts: () -> Unit,
 ) {
-    DashboardSectionHeader(
+    MasroofSectionHeader(
         title = stringResource(R.string.dashboard_accounts_count_label, accountCount),
         trailingLabel = stringResource(R.string.dashboard_manage_accounts),
         onTrailingClick = onManageAccounts,
@@ -221,8 +231,8 @@ private fun AccountsSummaryAccountCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(DashboardSpacing.entityIconSize)
-                    .clip(RoundedCornerShape(DashboardSpacing.entityIconRadius))
+                    .size(MasroofSpacing.entityIconSize)
+                    .clip(RoundedCornerShape(MasroofSpacing.entityIconRadius))
                     .background(extended.accountSoft),
                 contentAlignment = Alignment.Center,
             ) {
@@ -236,7 +246,7 @@ private fun AccountsSummaryAccountCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     account.displayLabel(),
-                    style = DashboardTextStyles.cardTitle,
+                    style = MasroofTextStyles.cardTitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -264,10 +274,10 @@ private fun AccountsSummaryAccountCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                DashboardAmountText(
+                MasroofAmountText(
                     amount = remaining?.let { formatLocalizedMoney(it) }
                         ?: stringResource(R.string.dashboard_value_unavailable),
-                    role = DashboardAmountRole.Card,
+                    role = MasroofAmountRole.Card,
                     color = remainingColor,
                     modifier = Modifier.padding(top = 2.dp),
                 )
