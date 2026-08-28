@@ -20,6 +20,7 @@ fun LoanDetailScreen(
         transactions = state.allTransactions,
         bank = loan.bank,
         loanType = loan.loanType,
+        involvementByTransactionId = state.transactionLoanInvolvement,
     )
 
     DashboardSummaryScaffold(

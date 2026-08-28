@@ -435,6 +435,7 @@ class DashboardViewModel(
                         flowDetailGrouping = null,
                         transactionAccountInvolvement = emptyMap(),
                         transactionCardInvolvement = emptyMap(),
+                        transactionLoanInvolvement = emptyMap(),
                         transactionDebitSpendInvolvement = emptyMap(),
                     )
                 }
@@ -475,6 +476,7 @@ class DashboardViewModel(
                         flowDetailGrouping = overview.flowDetailGrouping,
                         transactionAccountInvolvement = overview.transactionAccountInvolvement,
                         transactionCardInvolvement = overview.transactionCardInvolvement,
+                        transactionLoanInvolvement = overview.transactionLoanInvolvement,
                         transactionDebitSpendInvolvement = overview.transactionDebitSpendInvolvement,
                         isCurrentPeriod = overview.isCurrentPeriod,
                         error = null,
@@ -519,6 +521,7 @@ class DashboardViewModel(
                             flowDetailGrouping = null,
                             transactionAccountInvolvement = emptyMap(),
                             transactionCardInvolvement = emptyMap(),
+                            transactionLoanInvolvement = emptyMap(),
                             transactionDebitSpendInvolvement = emptyMap(),
                         )
                     }

@@ -104,6 +104,72 @@ class LoanOverviewBuilderTest {
     }
 
     @Test
+    fun build_countsLegacyFeeFinancingInstallmentInPeriodPayment() {
+        val loan = LoanRegistryEntry(
+            id = "loan-1",
+            bank = Bank.BANK_ALJAZIRA,
+            loanType = LoanType.PERSONAL,
+            ownership = OwnershipStatus.OWNED,
+            displayName = "Personal loan",
+            firstSeenRawSmsId = "sms-loan",
+            lastSeenRawSmsId = "sms-loan",
+        )
+        val parsedRecords = listOf(
+            ParsedEventRecord(
+                event = ParsedEvent(
+                    id = "evt-loan",
+                    rawSmsId = "sms-loan",
+                    bank = Bank.BANK_ALJAZIRA,
+                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
+                    direction = MoneyDirection.OUTGOING,
+                    amount = Money.of("3036.11", Currency.SAR),
+                    purchaseChannel = null,
+                    cardRef = null,
+                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
+                        Bank.BANK_ALJAZIRA,
+                        "3001",
+                    ),
+                    destinationAccountRef = null,
+                    merchant = null,
+                    counterparty = "تمويل شخصي",
+                    occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                    bankNetworkType = null,
+                    confidence = Confidence(1.0),
+                    parseStatus = ParseStatus.SUCCESS,
+                ),
+                details = ParsedEventDetails(),
+            ),
+        )
+        val transactions = listOf(
+            FinancialTransaction(
+                id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
+                type = FinancialTransactionType.FEE,
+                amount = Money.of("3036.11", Currency.SAR),
+                occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                destinationContainerId = null,
+                merchant = null,
+                counterparty = "تمويل شخصي",
+                categoryId = null,
+                linkedParsedEventIds = listOf("evt-loan"),
+            ),
+        )
+
+        val overview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(loan),
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T01:10:00Z"))),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+
+        assertEquals(BigDecimal("3036.11"), overview.loans.single().salaryPeriodPayment.amount)
+    }
+
+    @Test
     fun build_usesOccurredAtLocalWhenParsedEventOccurredAtNull() {
         val zoneId = ZoneId.of("Asia/Riyadh")
         val localTime = LocalDateTime.parse("2026-08-27T04:10:00")

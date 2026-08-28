@@ -133,6 +133,10 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
         )
+        val transactionLoanInvolvement = LoanRepaymentAttribution.buildInvolvementIndex(
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+        )
 
         val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
@@ -231,6 +235,7 @@ class DashboardProjectionBuilder(
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
             transactionCardInvolvement = transactionCardInvolvement,
+            transactionLoanInvolvement = transactionLoanInvolvement,
             transactionDebitSpendInvolvement = debitSpend.transactionDebitSpendInvolvement,
             transactions = dedupedTransactions,
             meta = DashboardMeta(

@@ -47,14 +47,16 @@ object LoanOverviewBuilder {
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
             .format(salaryPeriod.startDate)
         val remainingByLoanKey = latestRemainingBalances(parsedRecords, rawSmsById, zoneId)
+        val parsedRecordsById = parsedRecords.associateBy { it.event.id }
 
         val overviews = ownedLoans.map { loan ->
             val loanContainerId = FinancialContainerIdFactory.loanId(loan.bank, loan.loanType)
             val loanKey = loanKey(loan.bank.id, loan.loanType)
             var periodPaymentTotal = Money.zero(primaryCurrency)
             transactions.forEach { tx ->
-                if (tx.type != FinancialTransactionType.LOAN_REPAYMENT) return@forEach
-                if (tx.destinationContainerId != loanContainerId) return@forEach
+                if (!LoanRepaymentAttribution.matchesLoan(tx, parsedRecordsById, loan.bank, loan.loanType)) {
+                    return@forEach
+                }
                 if (tx.occurredAt.isBefore(salaryPeriodStart) || !tx.occurredAt.isBefore(salaryPeriodEnd)) {
                     return@forEach
                 }
