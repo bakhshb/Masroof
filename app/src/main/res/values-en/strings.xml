@@ -200,6 +200,13 @@
     <string name="settings_updates_check_failed">Could not check for updates</string>
     <string name="settings_logs_title">Diagnostic log</string>
     <string name="settings_logs_subtitle">SMS, updates, and errors</string>
+    <string name="settings_design_catalog_title">Design catalog</string>
+    <string name="settings_design_catalog_subtitle">Preview shared tokens and components (debug only)</string>
+    <string name="settings_design_catalog_typography">Typography</string>
+    <string name="settings_design_catalog_colors">Colors</string>
+    <string name="settings_design_catalog_spacing">Spacing</string>
+    <string name="settings_design_catalog_icons">Icon sizes</string>
+    <string name="settings_design_catalog_components">Components</string>
     <string name="settings_logs_hint">Events are stored on this device only. Message bodies, OTPs, tokens, and amounts are never logged.</string>
     <string name="settings_logs_status">%1$d / %2$d · %3$d days</string>
     <string name="settings_logs_filter_all">All</string>

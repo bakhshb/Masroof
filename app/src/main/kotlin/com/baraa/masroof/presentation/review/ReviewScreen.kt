@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -41,6 +40,7 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.common.MasroofAmountRole
 import com.baraa.masroof.presentation.common.MasroofAmountText
@@ -103,7 +103,7 @@ private fun ReviewListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = MasroofSpacing.screenHorizontal, vertical = MasroofSpacing.sectionHeaderGap),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap),
             ) {
                 FilterChip(
                     selected = state.listMode == ReviewListMode.PENDING,
@@ -139,13 +139,13 @@ private fun ReviewListScreen(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                         )
-                        Spacer(Modifier.size(8.dp))
+                        Spacer(Modifier.size(MasroofSpacing.sectionHeaderGap))
                         Text(
                             stringResource(R.string.review_load_error),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
                     IconTextButton(
                         onClick = onRefresh,
                         icon = MasroofIcons.retry,
@@ -163,9 +163,9 @@ private fun ReviewListScreen(
                         imageVector = MasroofIcons.success,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(MasroofIconSizes.hero),
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
                     Text(
                         stringResource(
                             if (state.listMode == ReviewListMode.IGNORED) {
@@ -178,7 +178,7 @@ private fun ReviewListScreen(
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
                     IconTextButton(
                         onClick = onBack,
                         icon = MasroofIcons.backToCurrent,
@@ -189,7 +189,7 @@ private fun ReviewListScreen(
             else -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap),
                 ) {
                     item {
                         MasroofSectionHeader(
@@ -202,7 +202,7 @@ private fun ReviewListScreen(
                                 state.items.size,
                             ),
                             icon = MasroofIcons.reviewQueue,
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier = Modifier.padding(vertical = MasroofSpacing.sectionHeaderGap),
                         )
                     }
                     if (state.listMode == ReviewListMode.PENDING && state.informationalDismissCount > 0) {
@@ -244,10 +244,10 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                 imageVector = MasroofIcons.reviewKind(item.kind),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(MasroofIconSizes.xl),
             )
-            Spacer(Modifier.size(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Spacer(Modifier.size(MasroofSpacing.sectionGap))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -264,7 +264,7 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                         Text(
                             it,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(start = 8.dp),
+                            modifier = Modifier.padding(start = MasroofSpacing.sectionHeaderGap),
                         )
                     }
                 }
@@ -291,9 +291,9 @@ private fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
                         } else {
                             MaterialTheme.colorScheme.error
                         },
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(MasroofIconSizes.xs),
                     )
-                    Spacer(Modifier.size(4.dp))
+                    Spacer(Modifier.size(MasroofSpacing.inlineGap))
                     val reasonRes = ReviewReasonLabels.labelRes(item.reasonLabel)
                     Text(
                         reasonRes?.let { stringResource(it) } ?: item.reasonLabel,
@@ -336,7 +336,7 @@ private fun ReviewDetailScreen(
             modifier = contentModifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap),
         ) {
             MasroofCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -344,9 +344,9 @@ private fun ReviewDetailScreen(
                         imageVector = MasroofIcons.messageFamily(detail.messageFamily),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(MasroofIconSizes.logo),
                     )
-                    Spacer(Modifier.size(10.dp))
+                    Spacer(Modifier.size(MasroofSpacing.carouselGap))
                     Text(
                         stringResource(detail.kindLabelRes),
                         style = MaterialTheme.typography.titleMedium,
@@ -357,7 +357,7 @@ private fun ReviewDetailScreen(
                     MasroofAmountText(
                         amount = it,
                         role = MasroofAmountRole.Hero,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = MasroofSpacing.sectionHeaderGap),
                     )
                 }
             }
@@ -534,7 +534,7 @@ private fun ReviewDetailScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    Spacer(Modifier.size(6.dp))
+                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(
                         stringResource(R.string.review_resolved),
                         color = MaterialTheme.colorScheme.primary,
@@ -546,7 +546,7 @@ private fun ReviewDetailScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                     )
-                    Spacer(Modifier.size(6.dp))
+                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(
                         stringResource(R.string.review_still_pending),
                         color = MaterialTheme.colorScheme.error,
@@ -558,7 +558,7 @@ private fun ReviewDetailScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    Spacer(Modifier.size(6.dp))
+                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(
                         stringResource(R.string.review_restored),
                         color = MaterialTheme.colorScheme.primary,
@@ -573,7 +573,7 @@ private fun ReviewDetailScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                     )
-                    Spacer(Modifier.size(6.dp))
+                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(stringResource(R.string.review_action_failed), color = MaterialTheme.colorScheme.error)
                 }
                 actionErrorDetail?.let { reason ->

@@ -24,6 +24,8 @@ sealed interface SettingsDestination {
     data object About : SettingsDestination
 
     data object Logs : SettingsDestination
+
+    data object DesignCatalog : SettingsDestination
 }
 
 fun SettingsDestination.encode(): String =
@@ -36,6 +38,7 @@ fun SettingsDestination.encode(): String =
         is SettingsDestination.BankLoans -> "bank:$bankId:loans"
         SettingsDestination.About -> "about"
         SettingsDestination.Logs -> "logs"
+        SettingsDestination.DesignCatalog -> "design_catalog"
     }
 
 fun decodeSettingsDestination(encoded: String): SettingsDestination {
@@ -43,6 +46,7 @@ fun decodeSettingsDestination(encoded: String): SettingsDestination {
     if (encoded == "banks") return SettingsDestination.Banks
     if (encoded == "about") return SettingsDestination.About
     if (encoded == "logs") return SettingsDestination.Logs
+    if (encoded == "design_catalog") return SettingsDestination.DesignCatalog
     if (encoded.startsWith("bank:")) {
         val parts = encoded.removePrefix("bank:").split(":")
         val bankId = parts.firstOrNull().orEmpty()
@@ -65,6 +69,7 @@ fun SettingsDestination.parent(skippedBanksList: Boolean = false): SettingsDesti
             if (skippedBanksList) SettingsDestination.Hub else SettingsDestination.Banks
         SettingsDestination.Banks -> SettingsDestination.Hub
         SettingsDestination.Logs -> SettingsDestination.About
+        SettingsDestination.DesignCatalog -> SettingsDestination.About
         SettingsDestination.About,
         SettingsDestination.Hub,
         -> SettingsDestination.Hub

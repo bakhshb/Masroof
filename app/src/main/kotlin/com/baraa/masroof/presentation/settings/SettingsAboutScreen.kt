@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.IconLabelRow
@@ -49,6 +50,7 @@ fun SettingsAboutScreen(
     logErrorCount: Int = 0,
     onBack: () -> Unit,
     onOpenLogs: () -> Unit,
+    onOpenDesignCatalog: () -> Unit = {},
     onSaveGithubToken: (String) -> Unit,
     onClearGithubToken: () -> Unit,
     onCheckForUpdates: () -> Unit,
@@ -120,6 +122,15 @@ fun SettingsAboutScreen(
                 badgeCount = logErrorCount.takeIf { it > 0 },
                 onClick = onOpenLogs,
             )
+
+            if (BuildConfig.ENABLE_DESIGN_CATALOG) {
+                SettingsNavRow(
+                    icon = MasroofIcons.periodHint,
+                    title = stringResource(R.string.settings_design_catalog_title),
+                    subtitle = stringResource(R.string.settings_design_catalog_subtitle),
+                    onClick = onOpenDesignCatalog,
+                )
+            }
 
             UpdateSectionCard(
                 githubTokenConfigured = githubTokenConfigured,

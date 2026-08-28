@@ -13,8 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 
 @Composable
 fun CardOwnershipInlinePrompt(
@@ -25,23 +26,23 @@ fun CardOwnershipInlinePrompt(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = MasroofIcons.warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(MasroofIconSizes.sm),
             )
-            Spacer(Modifier.size(6.dp))
+            Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
             Text(
                 stringResource(R.string.ownership_prompt_needs_confirm),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
             IconTextButton(
                 onClick = onConfirmOwned,
                 enabled = enabled,

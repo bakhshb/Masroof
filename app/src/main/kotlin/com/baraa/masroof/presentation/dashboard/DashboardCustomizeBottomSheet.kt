@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardSectionId
@@ -71,12 +70,12 @@ fun DashboardCustomizeBottomSheet(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = MasroofSpacing.screenHorizontal, vertical = MasroofSpacing.sectionHeaderGap),
             )
 
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
             ) {
                 items(
                     items = draft.sections,
@@ -110,13 +109,13 @@ fun DashboardCustomizeBottomSheet(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(top = MasroofSpacing.sectionHeaderGap))
 
             Button(
                 onClick = onSave,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = MasroofSpacing.screenHorizontal, vertical = MasroofSpacing.sectionGap),
             ) {
                 Text(stringResource(R.string.dashboard_customize_save))
             }
@@ -141,12 +140,12 @@ private fun CustomizeSectionRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = MasroofSpacing.screenHorizontal),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
         ) {
             Icon(
                 imageVector = Icons.Default.DragHandle,
@@ -216,7 +215,7 @@ private fun QuickChildToggle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 40.dp, top = 4.dp),
+            .padding(start = MasroofSpacing.entityIconSize, top = MasroofSpacing.inlineGap),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

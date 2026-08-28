@@ -5,6 +5,17 @@ import org.junit.Test
 
 class SettingsDestinationNavigationTest {
     @Test
+    fun parent_designCatalog_returnsAbout() {
+        assertEquals(SettingsDestination.About, SettingsDestination.DesignCatalog.parent())
+    }
+
+    @Test
+    fun encodeDecode_designCatalog_roundTrips() {
+        val destination = SettingsDestination.DesignCatalog
+        assertEquals(destination, decodeSettingsDestination(destination.encode()))
+    }
+
+    @Test
     fun parent_skipsBanksListWhenSingleBankShortcutUsed() {
         val bankHub = SettingsDestination.BankHub("BANK_ALJAZIRA")
 

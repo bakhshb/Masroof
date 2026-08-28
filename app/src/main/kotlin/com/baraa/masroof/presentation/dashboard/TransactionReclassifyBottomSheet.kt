@@ -1,7 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
 import com.baraa.masroof.presentation.theme.MasroofSpacing
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -64,14 +63,17 @@ fun TransactionReclassifyBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(
+                        horizontal = MasroofSpacing.sectionHeaderGap,
+                        vertical = MasroofSpacing.inlineGap,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     stringResource(R.string.transaction_reclassify_sheet_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = MasroofSpacing.sectionHeaderGap),
                 )
                 IconButton(onClick = onDismiss, enabled = !saving) {
                     Icon(
@@ -88,7 +90,10 @@ fun TransactionReclassifyBottomSheet(
                         transactionTypeLabel(currentType),
                         transactionTypeLabel(pending),
                     ),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(
+                        horizontal = MasroofSpacing.screenHorizontal,
+                        vertical = MasroofSpacing.sectionHeaderGap,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -108,7 +113,10 @@ fun TransactionReclassifyBottomSheet(
                             .clickable(enabled = !isCurrent && !saving) {
                                 onSelectType(type)
                             }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(
+                        horizontal = MasroofSpacing.sectionHeaderGap,
+                        vertical = MasroofSpacing.inlineGap,
+                    ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
@@ -122,9 +130,9 @@ fun TransactionReclassifyBottomSheet(
                             imageVector = MasroofIcons.transactionType(type),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(MasroofIconSizes.lg),
                         )
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(MasroofSpacing.carouselGap))
                         Text(
                             transactionTypeLabel(type),
                             style = MaterialTheme.typography.bodyLarge,
@@ -141,13 +149,13 @@ fun TransactionReclassifyBottomSheet(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = MasroofSpacing.sectionHeaderGap))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = MasroofSpacing.screenHorizontal),
+                horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap),
             ) {
                 TextButton(
                     onClick = onDismiss,
