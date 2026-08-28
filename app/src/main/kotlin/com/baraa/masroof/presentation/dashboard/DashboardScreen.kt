@@ -338,36 +338,36 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.CARDS -> {
                     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
                     val followedFacilities = state.followedCreditFacilitiesCreditOnly()
-                    val followedLoans = state.followedLoansOverview()
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (followedFacilities != null) {
-                            CreditFacilitiesSection(
-                                overview = followedFacilities,
-                                cardNetworksByLast4 = cardNetworks,
-                                zoneId = ZoneId.systemDefault(),
-                                ownedCards = state.ownedCards,
-                                onViewAll = onOpenCardsSummary,
-                            )
-                        } else {
-                            state.followedCreditCardsOverview()?.let { followedOverview ->
-                                if (followedOverview.hasContent) {
-                                    CreditCardsSection(
-                                        overview = followedOverview,
-                                        cardNetworksByLast4 = cardNetworks,
-                                        zoneId = ZoneId.systemDefault(),
-                                        ownedCards = state.ownedCards,
-                                        onViewAll = onOpenCardsSummary,
-                                    )
-                                }
+                    if (followedFacilities != null) {
+                        CreditFacilitiesSection(
+                            overview = followedFacilities,
+                            cardNetworksByLast4 = cardNetworks,
+                            zoneId = ZoneId.systemDefault(),
+                            ownedCards = state.ownedCards,
+                            onViewAll = onOpenCardsSummary,
+                        )
+                    } else {
+                        state.followedCreditCardsOverview()?.let { followedOverview ->
+                            if (followedOverview.hasContent) {
+                                CreditCardsSection(
+                                    overview = followedOverview,
+                                    cardNetworksByLast4 = cardNetworks,
+                                    zoneId = ZoneId.systemDefault(),
+                                    ownedCards = state.ownedCards,
+                                    onViewAll = onOpenCardsSummary,
+                                )
                             }
                         }
-                        followedLoans?.let { loans ->
-                            LoansSection(
-                                overview = loans,
-                                onViewAll = onOpenLoansSummary,
-                                onOpenLoan = onOpenLoanDetail,
-                            )
-                        }
+                    }
+                }
+
+                DashboardSectionId.LOANS -> {
+                    state.followedLoansOverview()?.let { loans ->
+                        LoansSection(
+                            overview = loans,
+                            onViewAll = onOpenLoansSummary,
+                            onOpenLoan = onOpenLoanDetail,
+                        )
                     }
                 }
 

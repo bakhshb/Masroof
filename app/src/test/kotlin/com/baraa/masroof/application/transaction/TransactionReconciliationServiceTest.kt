@@ -951,6 +951,52 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun staleFeeFinancingInstallment_upgradesToLoanRepaymentOnReconcile() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+                لـ: تمويل شخصي
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+            ),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+        val staleFee = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
+            type = FinancialTransactionType.FEE,
+            amount = money("3036.11"),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+        ftRepo.save(staleFee, listOf("sms-loan"))
+
+        reconciliation.reconcileStoredEvents()
+
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, tx.type)
+        assertEquals(
+            FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL),
+            tx.destinationContainerId,
+        )
+    }
+
+    @Test
     fun financingInstallment_doesNotReconfirmExternalLoan() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")

@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
  * Pure FinancialTransaction → monthly dashboard projection.
@@ -18,7 +19,9 @@ object MonthlyFinancialSummaryCalculator {
         reviewRequiredCount: Int,
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
+        parsedRecords: List<ParsedEventRecord> = emptyList(),
     ): MonthlyFinancialSummary {
+        val parsedRecordsById = parsedRecords.associateBy { it.event.id }
         val excludedOtherCurrencyCount = transactions.count { tx ->
             tx.amount.currency != primaryCurrency && tx.id !in sarEquivalents
         }
@@ -38,7 +41,16 @@ object MonthlyFinancialSummaryCalculator {
                 FinancialTransactionType.EXPENSE,
                 FinancialTransactionType.BILL_PAYMENT,
                 FinancialTransactionType.FEE,
-                -> spendingGross = spendingGross + amount
+                -> {
+                    if (
+                        tx.type == FinancialTransactionType.FEE &&
+                        LoanRepaymentAttribution.isLoanRepayment(tx, parsedRecordsById)
+                    ) {
+                        Unit
+                    } else {
+                        spendingGross = spendingGross + amount
+                    }
+                }
 
                 FinancialTransactionType.REFUND ->
                     refunds = refunds + amount

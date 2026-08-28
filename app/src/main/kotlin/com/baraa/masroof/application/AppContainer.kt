@@ -264,6 +264,7 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             ownershipResolver = ownershipResolver,
+            ownershipConfirmationService = ownershipConfirmationService,
             appLogService = appLogService,
         )
 

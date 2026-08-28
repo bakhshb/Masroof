@@ -231,6 +231,7 @@ private fun sectionTitle(id: DashboardSectionId): String =
             DashboardSectionId.QUICK -> R.string.dashboard_customize_section_quick
             DashboardSectionId.ACCOUNTS -> R.string.dashboard_customize_section_accounts
             DashboardSectionId.CARDS -> R.string.dashboard_customize_section_cards
+            DashboardSectionId.LOANS -> R.string.dashboard_customize_section_loans
             DashboardSectionId.TRANSACTIONS -> R.string.dashboard_customize_section_transactions
         },
     )
@@ -251,5 +252,6 @@ private fun sectionIcon(id: DashboardSectionId) =
         DashboardSectionId.QUICK -> MasroofIcons.netCashFlow
         DashboardSectionId.ACCOUNTS -> MasroofIcons.moneyMovement
         DashboardSectionId.CARDS -> MasroofIcons.cardPayment
+        DashboardSectionId.LOANS -> MasroofIcons.moneyMovement
         DashboardSectionId.TRANSACTIONS -> MasroofIcons.recentTransactions
     }

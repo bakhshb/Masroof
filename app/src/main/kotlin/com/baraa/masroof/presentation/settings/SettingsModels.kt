@@ -115,6 +115,7 @@ data class SettingsUiState(
     val updating: Boolean = false,
     val stopConfirmCardTarget: ManagedCardUi? = null,
     val stopConfirmAccountTarget: ManagedAccountUi? = null,
+    val stopConfirmLoanTarget: ManagedLoanUi? = null,
     val renameCardTarget: ManagedCardUi? = null,
     val renameAccountTarget: ManagedAccountUi? = null,
     val accountTypeTarget: ManagedAccountUi? = null,

@@ -78,6 +78,7 @@ class DashboardProjectionBuilder(
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
+            parsedRecords = parsedRecords,
         )
         val fleet = CurrentAccountSummaryCalculator.summarize(
             transactions = dedupedTransactions,
@@ -132,6 +133,10 @@ class DashboardProjectionBuilder(
             transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
+        )
+        val transactionLoanInvolvement = LoanRepaymentAttribution.buildInvolvementIndex(
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
         )
 
         val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
@@ -231,6 +236,7 @@ class DashboardProjectionBuilder(
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
             transactionCardInvolvement = transactionCardInvolvement,
+            transactionLoanInvolvement = transactionLoanInvolvement,
             transactionDebitSpendInvolvement = debitSpend.transactionDebitSpendInvolvement,
             transactions = dedupedTransactions,
             meta = DashboardMeta(

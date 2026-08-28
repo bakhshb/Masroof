@@ -157,6 +157,11 @@ data class CurrentAccountTransactionScope(
         }
     }
 
+    fun isFinancingInstallment(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+    ): Boolean = LoanRepaymentAttribution.isLoanRepayment(tx, parsedRecordsById)
+
     private fun resolveOwnedDestinationAccountId(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,

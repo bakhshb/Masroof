@@ -37,6 +37,7 @@ object TransactionListFilterEngine {
         FinancialTransactionType.REFUND,
         FinancialTransactionType.CASH_WITHDRAWAL,
         FinancialTransactionType.BILL_PAYMENT,
+        FinancialTransactionType.LOAN_REPAYMENT,
         FinancialTransactionType.FEE,
         FinancialTransactionType.SELF_TRANSFER,
         FinancialTransactionType.ADJUSTMENT,
@@ -63,7 +64,7 @@ object TransactionListFilterEngine {
     }
 
     fun availableTypes(transactions: List<TransactionPreviewUi>): List<FinancialTransactionType> {
-        val present = transactions.map { it.type }.toSet()
+        val present = transactions.map { it.typeLabelResHint }.toSet()
         return TYPE_DISPLAY_ORDER.filter { it in present }
     }
 
@@ -113,7 +114,7 @@ object TransactionListFilterEngine {
     private fun matchesTypes(
         tx: TransactionPreviewUi,
         types: Set<FinancialTransactionType>,
-    ): Boolean = types.isEmpty() || tx.type in types
+    ): Boolean = types.isEmpty() || tx.typeLabelResHint in types
 
     private fun matchesCards(tx: TransactionPreviewUi, cardLast4s: Set<String>): Boolean =
         cardLast4s.isEmpty() || tx.cardLast4 in cardLast4s

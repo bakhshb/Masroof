@@ -373,6 +373,12 @@ class TransactionReconciliationService(
         failed += upgraded.failed
         settledRawSmsIds += upgraded.settledRawSmsIds
 
+        val healedLoans = upgradeStaleFeeFinancingInstallments(records)
+        assembledSingle += healedLoans.assembledSingle
+        alreadyLinked += healedLoans.alreadyLinked
+        failed += healedLoans.failed
+        settledRawSmsIds += healedLoans.settledRawSmsIds
+
         val summary = ReconciliationSummary(
             assembledSingle = assembledSingle,
             matchedPairs = matchedPairs,
@@ -505,6 +511,82 @@ class TransactionReconciliationService(
 
         return UpgradePassResult(
             matchedPairs = matchedPairs,
+            assembledSingle = assembledSingle,
+            alreadyLinked = alreadyLinked,
+            failed = failed,
+            settledRawSmsIds = settledRawSmsIds,
+        )
+    }
+
+    private suspend fun upgradeStaleFeeFinancingInstallments(
+        records: List<ParsedEventRecord>,
+    ): UpgradePassResult {
+        val parsedById = records.associateBy { it.event.id }
+        val staleFees = financialTransactionRepository.listAll().filter { transaction ->
+            transaction.type == FinancialTransactionType.FEE &&
+                transaction.linkedParsedEventIds.any { parsedById[it]?.event?.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
+        }
+        if (staleFees.isEmpty()) return UpgradePassResult()
+
+        var assembledSingle = 0
+        var alreadyLinked = 0
+        var failed = 0
+        val settledRawSmsIds = linkedSetOf<String>()
+
+        for (existing in staleFees) {
+            val record = existing.linkedParsedEventIds
+                .mapNotNull { parsedById[it] }
+                .firstOrNull { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
+                ?: continue
+            val event = record.event
+            val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: existing.occurredAt
+            val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
+                ?: OwnershipStatus.UNKNOWN
+            val destOwn = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
+                ?: OwnershipStatus.UNKNOWN
+            val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
+                ?: OwnershipStatus.UNKNOWN
+            maybeAutoConfirmLoanOwnership(event, sourceOwn)
+            val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+            val loanOwn = loanType?.let {
+                ownershipResolver.resolveLoan(LoanReference(event.bank, it))
+            } ?: OwnershipStatus.UNKNOWN
+            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(
+                event = event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = receivedAt,
+                zoneId = zoneId,
+            )
+            when (
+                val outcome = TransactionAssembler.assembleSingle(
+                    event = event,
+                    receivedAt = receivedAt,
+                    sourceOwnership = sourceOwn,
+                    destinationOwnership = destOwn,
+                    cardOwnership = cardOwn,
+                    loanOwnership = loanOwn,
+                    transactionOccurredAt = transactionOccurredAt,
+                )
+            ) {
+                is TransactionAssembler.Outcome.Assembled -> {
+                    if (outcome.transaction.type != FinancialTransactionType.LOAN_REPAYMENT) {
+                        failed++
+                        continue
+                    }
+                    val healed = outcome.transaction.copy(id = existing.id)
+                    if (financialTransactionRepository.update(healed)) {
+                        assembledSingle++
+                        settledRawSmsIds += event.rawSmsId
+                    } else {
+                        failed++
+                    }
+                }
+
+                else -> failed++
+            }
+        }
+
+        return UpgradePassResult(
             assembledSingle = assembledSingle,
             alreadyLinked = alreadyLinked,
             failed = failed,
