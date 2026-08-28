@@ -343,6 +343,11 @@
 <string name="dashboard_pos_purchases_short">شراء مدى</string>
     <string name="dashboard_fees_short">رسوم</string>
     <string name="dashboard_loan_repayments">أقساط التمويل</string>
+    <string name="dashboard_loans_summary_title">ملخص القروض</string>
+    <string name="dashboard_loan_remaining">المبلغ المتبقي</string>
+    <string name="dashboard_loan_period_payment">قسط منذ %1$s</string>
+    <string name="dashboard_loan_period_payment_fallback">قسط الفترة</string>
+    <string name="dashboard_loan_type_label">قرض</string>
     <string name="dashboard_credit_card_payment">سداد بطاقة ائتمانية</string>
 <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>

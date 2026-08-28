@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.model.LoanType
@@ -438,6 +439,7 @@ class SettingsViewModelTest {
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = accounts,
                 cardRegistry = cards,
+                loanRegistry = loans,
             ),
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),

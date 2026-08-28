@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
+import com.baraa.masroof.application.dashboard.LoansOverview
 
 fun DashboardUiState.followedCreditCardsOverview(): CreditCardsOverview? {
     val overview = creditCards ?: return null
@@ -32,3 +33,8 @@ fun DashboardUiState.followedCreditFacilitiesCreditOnly(): CreditFacilitiesOverv
 
 fun DashboardUiState.followedCreditFacilitiesForSummary(): CreditFacilitiesOverview? =
     followedCreditFacilitiesCreditOnly()
+
+fun DashboardUiState.followedLoansOverview(): LoansOverview? {
+    val overview = loansOverview ?: return null
+    return if (overview.hasContent) overview else null
+}

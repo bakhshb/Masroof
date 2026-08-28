@@ -63,7 +63,7 @@ class TransactionReclassificationServiceTest {
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
         service = TransactionReclassificationService(
             financialTransactionRepository = ftRepo,
             effectiveParsedEventProvider = EffectiveParsedEventProvider(

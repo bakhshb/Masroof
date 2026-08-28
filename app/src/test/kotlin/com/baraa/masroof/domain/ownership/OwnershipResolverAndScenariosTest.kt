@@ -43,7 +43,7 @@ class OwnershipResolverAndScenariosTest {
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
         resolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
     }
 
     @After

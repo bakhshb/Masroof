@@ -6,6 +6,7 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
+import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
@@ -14,11 +15,13 @@ import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
@@ -39,6 +42,7 @@ class ReviewWorkflowService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val ownershipResolver: OwnershipResolver,
+    private val ownershipConfirmationService: OwnershipConfirmationService,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val reconciliationService: TransactionReconciliationService,
     private val reviewQueueUpdater: ReviewQueueUpdater,
@@ -378,6 +382,13 @@ class ReviewWorkflowService(
             ->
                 sourceAccountId to null
 
+            FinancialTransactionType.LOAN_REPAYMENT -> {
+                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+                    ?: return ReviewWorkflowResult.Rejected("loan_type_missing")
+                maybeConfirmLoanOwned(LoanReference(event.bank, loanType))
+                sourceAccountId to FinancialContainerIdFactory.loanId(event.bank, loanType)
+            }
+
             FinancialTransactionType.ADJUSTMENT ->
                 sourceAccountId to destAccountId
 
@@ -440,6 +451,11 @@ class ReviewWorkflowService(
                 ReviewWorkflowResult.Rejected(result.reason)
         }
 
+    private suspend fun maybeConfirmLoanOwned(reference: LoanReference) {
+        if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
+        ownershipConfirmationService.confirmLoanOwned(reference)
+    }
+
     companion object {
         val ALLOWED_MANUAL_SINGLE_TYPES: Set<FinancialTransactionType> = setOf(
             FinancialTransactionType.EXPENSE,
@@ -449,6 +465,7 @@ class ReviewWorkflowService(
             FinancialTransactionType.CASH_WITHDRAWAL,
             FinancialTransactionType.BILL_PAYMENT,
             FinancialTransactionType.FEE,
+            FinancialTransactionType.LOAN_REPAYMENT,
             FinancialTransactionType.ADJUSTMENT,
         )
     }

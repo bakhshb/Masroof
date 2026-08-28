@@ -82,6 +82,7 @@ val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(
     FinancialTransactionType.CASH_WITHDRAWAL,
     FinancialTransactionType.BILL_PAYMENT,
     FinancialTransactionType.FEE,
+    FinancialTransactionType.LOAN_REPAYMENT,
 )
 
 /** Transfers use dedicated external-transfer / pair actions instead of generic type buttons. */

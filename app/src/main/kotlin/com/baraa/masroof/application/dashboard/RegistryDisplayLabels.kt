@@ -4,6 +4,8 @@ import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.LoanRegistryEntry
+import com.baraa.masroof.domain.model.LoanType
 
 object RegistryDisplayLabels {
     fun accountLabel(entry: AccountRegistryEntry): String {
@@ -39,6 +41,16 @@ object RegistryDisplayLabels {
                 append("→ ••${entry.parentCardLast4}")
             }
         }.ifEmpty { "••${entry.last4}" }
+
+    fun loanLabel(entry: LoanRegistryEntry): String {
+        val custom = entry.displayName?.trim().orEmpty()
+        if (custom.isNotEmpty()) return custom
+        return when (entry.loanType) {
+            LoanType.PERSONAL -> "Personal loan"
+            LoanType.AUTO -> "Auto loan"
+            LoanType.MORTGAGE -> "Mortgage"
+        }
+    }
 
     private fun accountLast4(maskedNumber: String): String {
         val trimmed = maskedNumber.trim()

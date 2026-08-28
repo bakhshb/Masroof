@@ -23,9 +23,12 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
+import com.baraa.masroof.application.dashboard.LoanOverview
 import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
 import com.baraa.masroof.application.dashboard.aggregateFacilityDue
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -42,8 +45,13 @@ fun CardsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedLoanKey by rememberSaveable { mutableStateOf<String?>(null) }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilitiesForSummary()
+    val followedLoans = state.followedLoansOverview()
+    val selectedLoan = selectedLoanKey?.let { key ->
+        followedLoans?.loans?.find { LoanOwnershipKey.of(it) == key }
+    }
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
             ?.flatMap { it.allCards }
@@ -52,14 +60,39 @@ fun CardsSummaryRoute(
     }
 
     BackHandler {
-        if (selectedCard != null) {
-            selectedCardKey = null
-        } else {
-            onBack()
+        when {
+            selectedLoan != null -> selectedLoanKey = null
+            selectedCard != null -> selectedCardKey = null
+            else -> onBack()
         }
     }
 
     when {
+        selectedLoan != null -> {
+            LoanDetailScreen(
+                loan = selectedLoan,
+                state = state,
+                onBack = { selectedLoanKey = null },
+                onOpenTransaction = onOpenTransaction,
+                onViewAllTransactions = {
+                    val loanContainerId = FinancialContainerIdFactory.loanId(
+                        selectedLoan.bank,
+                        selectedLoan.loanType,
+                    )
+                    val loanTransactionIds = state.allTransactions
+                        .filter { tx ->
+                            tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
+                                tx.destinationContainerId == loanContainerId
+                        }
+                        .map { it.id }
+                        .toSet()
+                    onOpenAllTransactions(
+                        TransactionListFilterState(transactionIds = loanTransactionIds),
+                    )
+                },
+            )
+        }
+
         selectedCard != null -> {
             CardDetailScreen(
                 row = selectedCard,
@@ -82,6 +115,7 @@ fun CardsSummaryRoute(
                 onBack = onBack,
                 onManageCards = onManageCards,
                 onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+                onOpenLoan = { loan -> selectedLoanKey = LoanOwnershipKey.of(loan) },
                 cardNetworksByLast4 = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork },
             )
         }
@@ -97,10 +131,12 @@ fun CardsSummaryScreen(
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
+    onOpenLoan: (LoanOverview) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
     val followedFacilities = state.followedCreditFacilitiesForSummary()
     val followedOverview = followedCreditCardsOverview(state)
+    val followedLoans = state.followedLoansOverview()
 
     DashboardSummaryScaffold(
         title = stringResource(R.string.dashboard_cards_summary_screen_title),
@@ -161,6 +197,13 @@ fun CardsSummaryScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            followedLoans?.let { loans ->
+                LoansSection(
+                    overview = loans,
+                    onOpenLoan = onOpenLoan,
+                    tileModifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

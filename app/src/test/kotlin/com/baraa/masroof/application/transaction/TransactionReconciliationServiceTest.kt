@@ -8,6 +8,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
+import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -21,6 +22,8 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -62,6 +65,7 @@ class TransactionReconciliationServiceTest {
     private lateinit var ftRepo: RoomFinancialTransactionRepository
     private lateinit var accounts: RoomAccountRegistryRepository
     private lateinit var cards: RoomCardRegistryRepository
+    private lateinit var loans: RoomLoanRegistryRepository
     private lateinit var confirmation: OwnershipConfirmationService
     private lateinit var reconciliation: TransactionReconciliationService
 
@@ -76,12 +80,14 @@ class TransactionReconciliationServiceTest {
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        loans = RoomLoanRegistryRepository.from(db)
+        confirmation = OwnershipConfirmationService(accounts, cards, loans)
         reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            ownershipResolver = OwnershipResolver(accounts, cards, loans),
+            ownershipConfirmationService = confirmation,
         )
     }
 
@@ -899,6 +905,81 @@ class TransactionReconciliationServiceTest {
         assertEquals("account:D360:6810", tx.destinationContainerId)
         assertNotEquals("account:UNKNOWN:6810", tx.destinationContainerId)
         assertNotEquals("account:UNKNOWN:6810", tx.sourceContainerId)
+    }
+
+    @Test
+    fun financingInstallmentFromOwnedAccount_autoConfirmsLoanAndAssemblesRepayment() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        val body = """
+            خصم: قسط تمويل
+            من: 3001
+            القسط: SAR 3,036.11
+            المبلغ المتبقي: SAR 33,397.25
+            لـ: تمويل شخصي
+            في: 2026-08-27 01:10
+        """.trimIndent()
+        persistEvent(
+            smsId = "sms-loan",
+            body = body,
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+            ),
+            details = ParsedEventDetails(outstandingBalance = money("33397.25")),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+
+        val summary = reconciliation.reconcileStoredEvents()
+
+        assertEquals(1, summary.assembledSingle)
+        assertEquals(OwnershipStatus.OWNED, loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)))
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, tx.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            tx.sourceContainerId,
+        )
+        assertEquals(
+            FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL),
+            tx.destinationContainerId,
+        )
+    }
+
+    @Test
+    fun financingInstallment_doesNotReconfirmExternalLoan() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        confirmation.markLoanExternal(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL))
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+                لـ: تمويل شخصي
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+            ),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(
+            OwnershipStatus.EXTERNAL,
+            loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)),
+        )
     }
 
     private suspend fun persistEvent(
