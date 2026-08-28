@@ -24,6 +24,7 @@ import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 class LoanOverviewBuilderTest {
@@ -99,6 +100,64 @@ class LoanOverviewBuilderTest {
         val personal = overview.loans.single()
         assertEquals(Money.of("33397.25", Currency.SAR), personal.remainingBalance)
         assertEquals(BigDecimal("3036.11"), personal.salaryPeriodPayment.amount)
+    }
+
+    @Test
+    fun build_usesOccurredAtLocalWhenParsedEventOccurredAtNull() {
+        val zoneId = ZoneId.of("Asia/Riyadh")
+        val localTime = LocalDateTime.parse("2026-08-27T04:10:00")
+        val loan = LoanRegistryEntry(
+            id = "loan-1",
+            bank = Bank.BANK_ALJAZIRA,
+            loanType = LoanType.PERSONAL,
+            ownership = OwnershipStatus.OWNED,
+            displayName = "Personal loan",
+            firstSeenRawSmsId = "sms-loan",
+            lastSeenRawSmsId = "sms-loan",
+        )
+        val parsedRecords = listOf(
+            ParsedEventRecord(
+                event = ParsedEvent(
+                    id = "evt-loan",
+                    rawSmsId = "sms-loan",
+                    bank = Bank.BANK_ALJAZIRA,
+                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
+                    direction = MoneyDirection.OUTGOING,
+                    amount = Money.of("3036.11", Currency.SAR),
+                    purchaseChannel = null,
+                    cardRef = null,
+                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
+                        Bank.BANK_ALJAZIRA,
+                        "3001",
+                    ),
+                    destinationAccountRef = null,
+                    merchant = null,
+                    counterparty = "تمويل شخصي",
+                    occurredAt = null,
+                    bankNetworkType = null,
+                    confidence = Confidence(1.0),
+                    parseStatus = ParseStatus.SUCCESS,
+                ),
+                details = ParsedEventDetails(
+                    outstandingBalance = Money.of("33397.25", Currency.SAR),
+                    occurredAtLocal = localTime,
+                ),
+            ),
+        )
+
+        val overview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(loan),
+            transactions = emptyList(),
+            parsedRecords = parsedRecords,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zoneId,
+        )
+
+        val personal = overview.loans.single()
+        assertEquals(Money.of("33397.25", Currency.SAR), personal.remainingBalance)
+        assertEquals(localTime.atZone(zoneId).toInstant(), personal.remainingBalanceAsOf)
     }
 
     @Test

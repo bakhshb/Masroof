@@ -42,7 +42,7 @@ object LoanOverviewBuilder {
         val salaryPeriodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
             .format(salaryPeriod.startDate)
-        val remainingByLoanKey = latestRemainingBalances(parsedRecords)
+        val remainingByLoanKey = latestRemainingBalances(parsedRecords, zoneId)
 
         val overviews = ownedLoans.map { loan ->
             val loanContainerId = FinancialContainerIdFactory.loanId(loan.bank, loan.loanType)
@@ -87,20 +87,36 @@ object LoanOverviewBuilder {
 
     private fun latestRemainingBalances(
         parsedRecords: List<ParsedEventRecord>,
-    ): Map<String, Pair<Money, Instant>> {
-        val latest = mutableMapOf<String, Pair<Money, Instant>>()
+        zoneId: ZoneId,
+    ): Map<String, Pair<Money, Instant?>> {
+        val latest = mutableMapOf<String, Pair<Money, Instant?>>()
         parsedRecords.forEach { record ->
             val event = record.event
             if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return@forEach
             val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return@forEach
             val balance = record.details.outstandingBalance ?: return@forEach
-            val occurredAt = event.occurredAt ?: return@forEach
+            val occurredAt = event.occurredAt
+                ?: record.details.occurredAtLocal?.atZone(zoneId)?.toInstant()
             val key = loanKey(event.bank.id, loanType)
             val existing = latest[key]
-            if (existing == null || occurredAt.isAfter(existing.second)) {
+            if (shouldReplaceRemainingBalance(existing, occurredAt)) {
                 latest[key] = balance to occurredAt
             }
         }
         return latest
+    }
+
+    private fun shouldReplaceRemainingBalance(
+        existing: Pair<Money, Instant?>?,
+        candidateAt: Instant?,
+    ): Boolean {
+        if (existing == null) return true
+        val existingAt = existing.second
+        return when {
+            candidateAt == null && existingAt == null -> true
+            candidateAt == null -> false
+            existingAt == null -> true
+            else -> candidateAt.isAfter(existingAt)
+        }
     }
 }
