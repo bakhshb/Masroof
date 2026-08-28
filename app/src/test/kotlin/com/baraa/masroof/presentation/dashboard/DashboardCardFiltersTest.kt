@@ -108,7 +108,45 @@ class DashboardCardFiltersTest {
     }
 
     @Test
-    fun followedCreditFacilitiesForSummary_includesOwnedDebitTiles() {
+    fun followedCreditFacilitiesCreditOnly_excludesDebitTiles() {
+        val state = DashboardUiState(
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = listOf(facility("1111", emptyList())),
+                debitCards = listOf(debit("5555"), debit("8888")),
+                legacyFlat = emptyOverview(),
+                currency = Currency.SAR,
+            ),
+            ownedCards = listOf(
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "1111"),
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "5555"),
+            ),
+        )
+
+        val filtered = state.followedCreditFacilitiesCreditOnly()
+        assertNotNull(filtered)
+        assertEquals(1, filtered!!.facilities.size)
+        assertEquals(emptyList<String>(), filtered.debitCards.map { it.last4 })
+    }
+
+    @Test
+    fun followedCreditFacilitiesCreditOnly_returnsNullWhenOnlyDebitTilesOwned() {
+        val state = DashboardUiState(
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = listOf(debit("8219")),
+                legacyFlat = emptyOverview(),
+                currency = Currency.SAR,
+            ),
+            ownedCards = listOf(
+                OwnedCardUi(Bank.BANK_ALJAZIRA, "8219", cardNetwork = CardNetwork.MADA),
+            ),
+        )
+
+        assertNull(state.followedCreditFacilitiesCreditOnly())
+    }
+
+    @Test
+    fun followedCreditFacilitiesForSummary_excludesOwnedDebitTiles() {
         val state = DashboardUiState(
             creditFacilities = CreditFacilitiesOverview(
                 facilities = listOf(facility("1111", emptyList())),
@@ -125,7 +163,7 @@ class DashboardCardFiltersTest {
         val filtered = state.followedCreditFacilitiesForSummary()
         assertNotNull(filtered)
         assertEquals(1, filtered!!.facilities.size)
-        assertEquals(listOf("5555"), filtered.debitCards.map { it.last4 })
+        assertEquals(emptyList<String>(), filtered.debitCards.map { it.last4 })
     }
 
     private fun facility(
