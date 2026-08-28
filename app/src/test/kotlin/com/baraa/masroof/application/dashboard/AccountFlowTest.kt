@@ -64,6 +64,7 @@ class AccountFlowTest {
                 cashWithdrawals = Money.zero(Currency.SAR),
                 posPurchases = Money.zero(Currency.SAR),
                 fees = Money.of("3036.11", Currency.SAR),
+                loanRepayments = Money.zero(Currency.SAR),
                 selfTransfersOut = Money.of("76078.00", Currency.SAR),
             ),
         )

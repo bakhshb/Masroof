@@ -22,14 +22,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 class CreditCardOverviewBuilderTest {
     private val zone = ZoneId.of("Asia/Riyadh")
-    private val clock = Clock.fixed(Instant.parse("2026-08-11T17:05:00Z"), zone)
     private val salaryPeriod = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
 
     private val card7271 = CardReference(Bank.BANK_ALJAZIRA, "7271")
@@ -121,7 +119,6 @@ class CreditCardOverviewBuilderTest {
                 statement7271.id to statement7271,
             ),
             zoneId = zone,
-            clock = clock,
         )
 
         assertEquals(Money.of("0.00", Currency.SAR), overview.aggregateDueAmount)
@@ -191,7 +188,6 @@ class CreditCardOverviewBuilderTest {
                 raw.id to raw
             },
             zoneId = zone,
-            clock = clock,
         )
 
         assertNull(overview.aggregateDueAmount)
@@ -235,7 +231,6 @@ class CreditCardOverviewBuilderTest {
             ),
             rawSmsById = mapOf(purchaseSms.id to purchaseSms),
             zoneId = zone,
-            clock = clock,
         )
 
         val row = overview.cards.single { it.last4 == "7271" }
@@ -271,7 +266,6 @@ class CreditCardOverviewBuilderTest {
             ),
             rawSmsById = mapOf(raw.id to raw),
             zoneId = zone,
-            clock = clock,
         )
         assertEquals(0, overview.cards.size)
         assertNull(overview.aggregateDueAmount)

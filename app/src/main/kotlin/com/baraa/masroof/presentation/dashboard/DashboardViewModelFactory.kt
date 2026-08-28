@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.onboarding.HistoricalSmsRescanService
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
-import android.content.Context
 import com.baraa.masroof.application.AppContainer
 import java.time.Clock
 import java.time.ZoneId

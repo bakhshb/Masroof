@@ -1,0 +1,19 @@
+# Masroof detekt — focused on dead-code hygiene (unused members and imports).
+# Full default rule sets are disabled; expand gradually as needed.
+
+style:
+  active: true
+  UnusedPrivateMember:
+    active: true
+    allowedNames: '(_|ignored|expected|serialVersionUID)'
+    ignoreAnnotated:
+      - 'Preview'
+  UnusedPrivateProperty:
+    active: true
+    allowedNames: '(_|ignored|expected|serialVersionUID)'
+
+formatting:
+  active: true
+  UnusedImports:
+    active: true
+    autoCorrect: true

@@ -67,6 +67,7 @@ class OwnedAccountTest {
             cashWithdrawals = Money.zero(Currency.SAR),
             posPurchases = Money.of(pos, Currency.SAR),
             fees = Money.zero(Currency.SAR),
+            loanRepayments = Money.zero(Currency.SAR),
         )
         return OwnedAccount(
             id = id,
