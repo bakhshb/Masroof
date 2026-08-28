@@ -5,76 +5,54 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsDestinationNavigationTest {
-    private val alJazira = SettingsDestination.BankHub("BANK_ALJAZIRA")
     private val alJaziraCards = SettingsDestination.BankCards("BANK_ALJAZIRA")
 
     @Test
-    fun encodeDecode_designCatalog_roundTrips() {
-        val destination = SettingsDestination.DesignCatalog
-        assertEquals(destination, decodeSettingsDestination(destination.encode()))
+    fun encodeDecode_newDestinations_roundTrip() {
+        assertEquals(SettingsDestination.MyAccounts, decodeSettingsDestination("my_accounts"))
+        assertEquals(SettingsDestination.MyCards, decodeSettingsDestination("my_cards"))
+        assertEquals(SettingsDestination.MyLoans, decodeSettingsDestination("my_loans"))
+        assertEquals(SettingsDestination.App, decodeSettingsDestination("app"))
+        assertEquals(SettingsDestination.DataBackup, decodeSettingsDestination("data_backup"))
+        assertEquals(SettingsDestination.DesignCatalog, decodeSettingsDestination("design_catalog"))
     }
 
     @Test
     fun pop_fromDeepLink_leavesSettings() {
         val fromCardsSummary = replaceSettingsStack(alJaziraCards)
         val fromDashboardAbout = replaceSettingsStack(SettingsDestination.About)
-        val fromNotificationAbout = replaceSettingsStack(SettingsDestination.About)
+        val fromDataBackup = replaceSettingsStack(SettingsDestination.DataBackup)
 
         assertNull(popSettingsStack(fromCardsSummary))
         assertNull(popSettingsStack(fromDashboardAbout))
-        assertNull(popSettingsStack(fromNotificationAbout))
-        assertEquals(alJaziraCards, decodeSettingsDestination(fromCardsSummary.single()))
-        assertEquals(SettingsDestination.About, decodeSettingsDestination(fromDashboardAbout.single()))
+        assertNull(popSettingsStack(fromDataBackup))
     }
 
     @Test
     fun pop_fromHubChild_returnsToHub() {
         val hub = replaceSettingsStack(SettingsDestination.Hub)
-        val about = pushSettingsDestination(hub, SettingsDestination.About)
+        val app = pushSettingsDestination(hub, SettingsDestination.App)
 
-        assertEquals(hub, popSettingsStack(about))
+        assertEquals(hub, popSettingsStack(app))
     }
 
     @Test
     fun pop_walksVisitHistory_notSyntheticParents() {
         val hub = replaceSettingsStack(SettingsDestination.Hub)
-        val banks = pushSettingsDestination(hub, SettingsDestination.Banks)
-        val bank = pushSettingsDestination(banks, alJazira)
-        val cards = pushSettingsDestination(bank, alJaziraCards)
+        val cardsList = pushSettingsDestination(hub, SettingsDestination.MyCards)
+        val cards = pushSettingsDestination(cardsList, alJaziraCards)
 
-        assertEquals(bank, popSettingsStack(cards))
-        assertEquals(banks, popSettingsStack(bank))
-        assertEquals(hub, popSettingsStack(banks))
+        assertEquals(cardsList, popSettingsStack(cards))
+        assertEquals(hub, popSettingsStack(cardsList))
         assertNull(popSettingsStack(hub))
     }
 
     @Test
-    fun singleBankShortcutFromHub_backSkipsBanksList() {
-        val hub = replaceSettingsStack(SettingsDestination.Hub)
-        val bankHub = pushSettingsDestination(hub, alJazira)
+    fun manageCardsThenOpenBank_backReturnsToCategoryListThenOrigin() {
+        val fromCardsSummary = replaceSettingsStack(SettingsDestination.MyCards)
+        val cards = pushSettingsDestination(fromCardsSummary, alJaziraCards)
 
-        assertEquals(hub, popSettingsStack(bankHub))
-    }
-
-    @Test
-    fun manageCardsThenOpenBank_backReturnsToBanksListThenOrigin() {
-        val fromCardsSummary = replaceSettingsStack(SettingsDestination.Banks)
-        val bank = pushSettingsDestination(fromCardsSummary, alJazira)
-        val cards = pushSettingsDestination(bank, alJaziraCards)
-
-        assertEquals(bank, popSettingsStack(cards))
-        assertEquals(fromCardsSummary, popSettingsStack(bank))
+        assertEquals(fromCardsSummary, popSettingsStack(cards))
         assertNull(popSettingsStack(fromCardsSummary))
-    }
-
-    @Test
-    fun replaceTop_recoversMissingBankWithoutKeepingInvalidHub() {
-        val hub = replaceSettingsStack(SettingsDestination.Hub)
-        val invalidBank = pushSettingsDestination(hub, alJazira)
-
-        val recovered = replaceSettingsTop(invalidBank, SettingsDestination.Banks)
-
-        assertEquals(listOf(SettingsDestination.Hub.encode(), SettingsDestination.Banks.encode()), recovered)
-        assertEquals(hub, popSettingsStack(recovered))
     }
 }

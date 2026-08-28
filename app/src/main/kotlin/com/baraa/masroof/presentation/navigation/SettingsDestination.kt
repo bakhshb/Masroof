@@ -3,8 +3,16 @@ package com.baraa.masroof.presentation.navigation
 sealed interface SettingsDestination {
     data object Hub : SettingsDestination
 
+    data object MyAccounts : SettingsDestination
+
+    data object MyCards : SettingsDestination
+
+    data object MyLoans : SettingsDestination
+
+    /** @deprecated Legacy bank list — decoded for saved navigation state only. */
     data object Banks : SettingsDestination
 
+    /** @deprecated Legacy bank hub — decoded for saved navigation state only. */
     data class BankHub(
         val bankId: String,
     ) : SettingsDestination
@@ -21,6 +29,10 @@ sealed interface SettingsDestination {
         val bankId: String,
     ) : SettingsDestination
 
+    data object App : SettingsDestination
+
+    data object DataBackup : SettingsDestination
+
     data object About : SettingsDestination
 
     data object Logs : SettingsDestination
@@ -31,11 +43,16 @@ sealed interface SettingsDestination {
 fun SettingsDestination.encode(): String =
     when (this) {
         SettingsDestination.Hub -> "hub"
+        SettingsDestination.MyAccounts -> "my_accounts"
+        SettingsDestination.MyCards -> "my_cards"
+        SettingsDestination.MyLoans -> "my_loans"
         SettingsDestination.Banks -> "banks"
         is SettingsDestination.BankHub -> "bank:$bankId"
         is SettingsDestination.BankAccounts -> "bank:$bankId:accounts"
         is SettingsDestination.BankCards -> "bank:$bankId:cards"
         is SettingsDestination.BankLoans -> "bank:$bankId:loans"
+        SettingsDestination.App -> "app"
+        SettingsDestination.DataBackup -> "data_backup"
         SettingsDestination.About -> "about"
         SettingsDestination.Logs -> "logs"
         SettingsDestination.DesignCatalog -> "design_catalog"
@@ -43,7 +60,12 @@ fun SettingsDestination.encode(): String =
 
 fun decodeSettingsDestination(encoded: String): SettingsDestination {
     if (encoded == "hub") return SettingsDestination.Hub
+    if (encoded == "my_accounts") return SettingsDestination.MyAccounts
+    if (encoded == "my_cards") return SettingsDestination.MyCards
+    if (encoded == "my_loans") return SettingsDestination.MyLoans
     if (encoded == "banks") return SettingsDestination.Banks
+    if (encoded == "app") return SettingsDestination.App
+    if (encoded == "data_backup") return SettingsDestination.DataBackup
     if (encoded == "about") return SettingsDestination.About
     if (encoded == "logs") return SettingsDestination.Logs
     if (encoded == "design_catalog") return SettingsDestination.DesignCatalog

@@ -4,17 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,15 +20,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.MasroofSectionHeader
-import com.baraa.masroof.presentation.common.MasroofTextStyles
 import com.baraa.masroof.presentation.debug.DesignCatalogScreen
 import com.baraa.masroof.presentation.navigation.SettingsDestination
 import com.baraa.masroof.presentation.navigation.SettingsLaunchRequest
@@ -43,7 +35,6 @@ import com.baraa.masroof.presentation.navigation.popSettingsStack
 import com.baraa.masroof.presentation.navigation.pushSettingsDestination
 import com.baraa.masroof.presentation.navigation.replaceSettingsStack
 import com.baraa.masroof.presentation.navigation.replaceSettingsTop
-import com.baraa.masroof.presentation.navigation.resolveBanksEntry
 import com.baraa.masroof.presentation.navigation.resolvePendingDestination
 
 @Composable
@@ -89,17 +80,18 @@ fun SettingsRoute(
         destinationStack = replaceSettingsStack(next)
     }
 
-    fun openBanksEntry() {
-        navigateTo(resolveBanksEntry(state))
+    fun openRegistryCategory(category: SettingsRegistryCategory) {
+        category.singleBankDirectDestination(state)?.let { direct ->
+            navigateTo(direct)
+            return
+        }
+        navigateTo(category.listDestination())
     }
 
     LaunchedEffect(pendingLaunch, state.loading, state.bankSummaries) {
         val launch = pendingLaunch ?: return@LaunchedEffect
-        if (launch.destination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
-        when (launch.destination) {
-            SettingsDestination.Banks -> openAt(resolveBanksEntry(state))
-            else -> openAt(resolvePendingDestination(launch.destination, state))
-        }
+        if (launch.destination.needsBankSummaries() && state.loading) return@LaunchedEffect
+        openAt(resolvePendingDestination(launch.destination, state))
         onPendingLaunchConsumed()
     }
 
@@ -121,29 +113,49 @@ fun SettingsRoute(
             state = state,
             reviewRequiredCount = reviewRequiredCount,
             onBack = { popOrExit() },
-            onOpenBanks = { openBanksEntry() },
+            onOpenAccounts = { openRegistryCategory(SettingsRegistryCategory.Accounts) },
+            onOpenCards = { openRegistryCategory(SettingsRegistryCategory.Cards) },
+            onOpenLoans = { openRegistryCategory(SettingsRegistryCategory.Loans) },
             onOpenReview = onOpenReview,
+            onOpenApp = { navigateTo(SettingsDestination.App) },
+            onOpenDataBackup = { navigateTo(SettingsDestination.DataBackup) },
             onOpenAbout = { navigateTo(SettingsDestination.About) },
-            onReparseStored = viewModel::reparseStoredMessages,
-            onImportSms = viewModel::importSmsFromPhone,
-            onClearSmsImportMessage = viewModel::clearSmsImportMessage,
-            onRequestSmsPermission = onRequestSmsPermission,
-            onOpenAppSettings = onOpenAppSettings,
-            onSelectLanguage = { tag ->
-                viewModel.setLanguageTag(tag, onLocaleChanged)
-            },
-            onSelectTheme = viewModel::setThemeMode,
-            onRequestExport = onRequestExport,
-            onRequestImport = onRequestImport,
-            onConfirmPendingImport = viewModel::confirmPendingImport,
-            onCancelPendingImport = viewModel::cancelPendingImport,
-            onClearBackupMessage = viewModel::clearBackupMessage,
         )
 
-        SettingsDestination.Banks -> SettingsBanksScreen(
+        SettingsDestination.MyAccounts -> SettingsRegistryCategoryScreen(
+            category = SettingsRegistryCategory.Accounts,
             state = state,
             onBack = { popOrExit() },
-            onOpenBank = { summary -> navigateTo(SettingsDestination.BankHub(summary.bank.id)) },
+            onOpenBank = { summary ->
+                navigateTo(SettingsDestination.BankAccounts(summary.bank.id))
+            },
+        )
+
+        SettingsDestination.MyCards -> SettingsRegistryCategoryScreen(
+            category = SettingsRegistryCategory.Cards,
+            state = state,
+            onBack = { popOrExit() },
+            onOpenBank = { summary ->
+                navigateTo(SettingsDestination.BankCards(summary.bank.id))
+            },
+        )
+
+        SettingsDestination.MyLoans -> SettingsRegistryCategoryScreen(
+            category = SettingsRegistryCategory.Loans,
+            state = state,
+            onBack = { popOrExit() },
+            onOpenBank = { summary ->
+                navigateTo(SettingsDestination.BankLoans(summary.bank.id))
+            },
+        )
+
+        SettingsDestination.Banks -> SettingsRegistryCategoryScreen(
+            category = SettingsRegistryCategory.Accounts,
+            state = state,
+            onBack = { popOrExit() },
+            onOpenBank = { summary ->
+                navigateTo(SettingsDestination.BankAccounts(summary.bank.id))
+            },
         )
 
         is SettingsDestination.BankHub -> {
@@ -166,7 +178,10 @@ fun SettingsRoute(
 
                 else -> {
                     LaunchedEffect(current.bankId) {
-                        destinationStack = replaceSettingsTop(destinationStack, SettingsDestination.Banks)
+                        destinationStack = replaceSettingsTop(
+                            destinationStack,
+                            SettingsDestination.MyAccounts,
+                        )
                     }
                     SettingsBankHubLoadingScreen(
                         bank = bank,
@@ -233,6 +248,31 @@ fun SettingsRoute(
             onConfirmStopTracking = viewModel::confirmStopLoanTracking,
         )
 
+        SettingsDestination.App -> SettingsAppScreen(
+            languageTag = state.languageTag,
+            themeMode = state.themeMode,
+            onBack = { popOrExit() },
+            onSelectLanguage = { tag ->
+                viewModel.setLanguageTag(tag, onLocaleChanged)
+            },
+            onSelectTheme = viewModel::setThemeMode,
+        )
+
+        SettingsDestination.DataBackup -> SettingsDataBackupScreen(
+            state = state,
+            onBack = { popOrExit() },
+            onReparseStored = viewModel::reparseStoredMessages,
+            onImportSms = viewModel::importSmsFromPhone,
+            onClearSmsImportMessage = viewModel::clearSmsImportMessage,
+            onRequestSmsPermission = onRequestSmsPermission,
+            onOpenAppSettings = onOpenAppSettings,
+            onRequestExport = onRequestExport,
+            onRequestImport = onRequestImport,
+            onConfirmPendingImport = viewModel::confirmPendingImport,
+            onCancelPendingImport = viewModel::cancelPendingImport,
+            onClearBackupMessage = viewModel::clearBackupMessage,
+        )
+
         SettingsDestination.About -> SettingsAboutScreen(
             appVersion = state.appVersion,
             githubTokenConfigured = state.githubTokenConfigured,
@@ -262,6 +302,21 @@ fun SettingsRoute(
     }
 }
 
+private fun SettingsDestination.needsBankSummaries(): Boolean =
+    when (this) {
+        SettingsDestination.MyAccounts,
+        SettingsDestination.MyCards,
+        SettingsDestination.MyLoans,
+        SettingsDestination.Banks,
+        is SettingsDestination.BankAccounts,
+        is SettingsDestination.BankCards,
+        is SettingsDestination.BankLoans,
+        is SettingsDestination.BankHub,
+        -> true
+
+        else -> false
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsBankHubLoadingScreen(
@@ -289,121 +344,14 @@ private fun SettingsHubScreen(
     state: SettingsUiState,
     reviewRequiredCount: Int,
     onBack: () -> Unit,
-    onOpenBanks: () -> Unit,
+    onOpenAccounts: () -> Unit,
+    onOpenCards: () -> Unit,
+    onOpenLoans: () -> Unit,
     onOpenReview: () -> Unit,
+    onOpenApp: () -> Unit,
+    onOpenDataBackup: () -> Unit,
     onOpenAbout: () -> Unit,
-    onReparseStored: () -> Unit,
-    onImportSms: () -> Unit,
-    onClearSmsImportMessage: () -> Unit,
-    onRequestSmsPermission: () -> Unit,
-    onOpenAppSettings: () -> Unit,
-    onSelectLanguage: (String) -> Unit,
-    onSelectTheme: (ThemeMode) -> Unit,
-    onRequestExport: () -> Unit,
-    onRequestImport: () -> Unit,
-    onConfirmPendingImport: () -> Unit,
-    onCancelPendingImport: () -> Unit,
-    onClearBackupMessage: () -> Unit,
 ) {
-    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
-    var showThemeDialog by rememberSaveable { mutableStateOf(false) }
-
-    if (showLanguageDialog) {
-        SettingsLanguageDialog(
-            selectedLanguageTag = state.languageTag,
-            onDismiss = { showLanguageDialog = false },
-            onSelectLanguage = { tag ->
-                showLanguageDialog = false
-                onSelectLanguage(tag)
-            },
-        )
-    }
-    if (showThemeDialog) {
-        SettingsThemeDialog(
-            selectedMode = state.themeMode,
-            onDismiss = { showThemeDialog = false },
-            onSelectMode = { mode ->
-                showThemeDialog = false
-                onSelectTheme(mode)
-            },
-        )
-    }
-    if (state.awaitingImportConfirm) {
-        AlertDialog(
-            onDismissRequest = onCancelPendingImport,
-            title = { Text(stringResource(R.string.settings_import_confirm_title)) },
-            text = { Text(stringResource(R.string.settings_import_confirm_body)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmPendingImport) {
-                    Text(stringResource(R.string.settings_import_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onCancelPendingImport) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
-    state.backupMessage?.let { message ->
-        val text = when (message) {
-            BackupMessage.EXPORT_SUCCESS -> stringResource(R.string.settings_export_success)
-            BackupMessage.EXPORT_FAILED -> stringResource(R.string.settings_export_failed)
-            BackupMessage.IMPORT_FAILED -> stringResource(R.string.settings_import_failed)
-            BackupMessage.IMPORT_INVALID -> stringResource(R.string.settings_import_invalid)
-        }
-        AlertDialog(
-            onDismissRequest = onClearBackupMessage,
-            title = { Text(stringResource(R.string.settings_data_section)) },
-            text = { Text(text) },
-            confirmButton = {
-                TextButton(onClick = onClearBackupMessage) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
-    state.smsImportMessage?.let { message ->
-        val text = when (message) {
-            SmsImportMessage.OK -> stringResource(R.string.dashboard_rescan_ok)
-            SmsImportMessage.ALREADY_UP_TO_DATE -> stringResource(R.string.dashboard_rescan_already_up_to_date)
-            SmsImportMessage.NEEDS_REVIEW -> stringResource(R.string.dashboard_rescan_needs_review)
-            SmsImportMessage.PERMISSION_DENIED -> stringResource(R.string.settings_import_sms_permission_denied)
-            SmsImportMessage.NO_MESSAGES -> stringResource(R.string.dashboard_rescan_no_messages)
-            SmsImportMessage.NO_BANK_SMS -> stringResource(R.string.dashboard_rescan_no_bank_sms)
-            SmsImportMessage.NO_TRANSACTIONS -> stringResource(R.string.dashboard_rescan_no_transactions)
-            SmsImportMessage.FAILED -> stringResource(R.string.dashboard_rescan_failed)
-        }
-        AlertDialog(
-            onDismissRequest = onClearSmsImportMessage,
-            title = { Text(stringResource(R.string.settings_import_sms_title)) },
-            text = { Text(text) },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (message == SmsImportMessage.PERMISSION_DENIED) {
-                        onRequestSmsPermission()
-                    }
-                    onClearSmsImportMessage()
-                }) {
-                    Text(
-                        if (message == SmsImportMessage.PERMISSION_DENIED) {
-                            stringResource(R.string.dashboard_sms_permission_grant)
-                        } else {
-                            stringResource(R.string.settings_cancel)
-                        },
-                    )
-                }
-            },
-            dismissButton = {
-                if (message == SmsImportMessage.PERMISSION_DENIED) {
-                    TextButton(onClick = onClearSmsImportMessage) {
-                        Text(stringResource(R.string.settings_cancel))
-                    }
-                }
-            },
-        )
-    }
-
     MasroofSecondaryScaffold(
         title = stringResource(R.string.settings_title),
         onBack = onBack,
@@ -426,11 +374,27 @@ private fun SettingsHubScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
+            SettingsGroupTitle(stringResource(R.string.settings_my_finances_section))
+
+            SettingsNavRow(
+                icon = MasroofIcons.externalIn,
+                title = stringResource(R.string.settings_accounts_section),
+                subtitle = SettingsRegistryCategory.Accounts.hubSubtitle(state),
+                onClick = onOpenAccounts,
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.cardPayment,
+                title = stringResource(R.string.settings_cards_section),
+                subtitle = SettingsRegistryCategory.Cards.hubSubtitle(state),
+                onClick = onOpenCards,
+            )
+
             SettingsNavRow(
                 icon = MasroofIcons.moneyMovement,
-                title = stringResource(R.string.settings_banks_section),
-                subtitle = banksHubSubtitle(state),
-                onClick = onOpenBanks,
+                title = stringResource(R.string.settings_loans_followed),
+                subtitle = SettingsRegistryCategory.Loans.hubSubtitle(state),
+                onClick = onOpenLoans,
             )
 
             SettingsNavRow(
@@ -441,80 +405,23 @@ private fun SettingsHubScreen(
                 onClick = onOpenReview,
             )
 
-            SettingsNavRow(
-                icon = Icons.Filled.Language,
-                title = stringResource(R.string.settings_language_title),
-                subtitle = languageSubtitle(state.languageTag),
-                onClick = { showLanguageDialog = true },
-            )
+            SettingsGroupTitle(stringResource(R.string.settings_app_section))
 
             SettingsNavRow(
                 icon = MasroofIcons.theme,
-                title = stringResource(R.string.settings_theme_title),
-                subtitle = themeSubtitle(state.themeMode),
-                onClick = { showThemeDialog = true },
+                title = stringResource(R.string.settings_app_section),
+                subtitle = appHubSubtitle(state.languageTag, state.themeMode),
+                onClick = onOpenApp,
             )
 
-            MasroofSectionHeader(
-                title = stringResource(R.string.settings_data_section),
-                icon = MasroofIcons.rescan,
-            )
-
-            if (!state.smsPermissionGranted) {
-                com.baraa.masroof.presentation.common.SmsPermissionNotice(
-                    onRequestPermission = onRequestSmsPermission,
-                    onOpenAppSettings = onOpenAppSettings,
-                )
-            }
-
-            SettingsReparseRow(
-                title = stringResource(R.string.settings_import_sms_title),
-                subtitle = stringResource(R.string.settings_import_sms_subtitle),
-                detail = null,
-                icon = MasroofIcons.externalIn,
-                actionIcon = MasroofIcons.rescan,
-                running = state.importingSms,
-                enabled = !state.importingSms && !state.reparsingStored && !state.updating &&
-                    !state.exportingBackup && !state.importingBackup,
-                onRefresh = onImportSms,
-            )
-
-            SettingsReparseRow(
-                title = stringResource(R.string.settings_reparse_title),
-                subtitle = stringResource(R.string.settings_reparse_stored_hint),
-                detail = stringResource(R.string.settings_reparse_stored_example),
-                icon = MasroofIcons.rescan,
-                actionIcon = MasroofIcons.retry,
-                running = state.reparsingStored,
-                enabled = !state.reparsingStored && !state.updating &&
-                    !state.exportingBackup && !state.importingBackup,
-                onRefresh = onReparseStored,
-            )
+            SettingsGroupTitle(stringResource(R.string.settings_data_backup_section))
 
             SettingsNavRow(
-                icon = MasroofIcons.export,
-                title = stringResource(R.string.settings_export_title),
-                subtitle = stringResource(R.string.settings_export_subtitle),
-                onClick = onRequestExport,
-                enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
+                icon = MasroofIcons.rescan,
+                title = stringResource(R.string.settings_data_backup_section),
+                subtitle = stringResource(R.string.settings_data_backup_hub_subtitle),
+                onClick = onOpenDataBackup,
             )
-
-            SettingsNavRow(
-                icon = MasroofIcons.importBackup,
-                title = stringResource(R.string.settings_import_title),
-                subtitle = stringResource(R.string.settings_import_subtitle),
-                onClick = onRequestImport,
-                enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
-            )
-
-            if (state.exportingBackup || state.importingBackup) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
 
             SettingsNavRow(
                 icon = MasroofIcons.periodHint,
@@ -535,31 +442,20 @@ private fun SettingsHubScreen(
 }
 
 @Composable
-private fun languageSubtitle(languageTag: String): String =
-    if (AppLocale.isEnglish(languageTag)) {
-        stringResource(R.string.settings_language_english)
-    } else {
-        stringResource(R.string.settings_language_arabic)
-    }
-
-@Composable
-private fun themeSubtitle(mode: ThemeMode): String =
-    when (mode) {
-        ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
-        ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
-        ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
-    }
-
-@Composable
-private fun banksHubSubtitle(state: SettingsUiState): String {
-    val bankCount = state.bankSummaries.size
-    val unregistered = state.bankSummaries.sumOf { it.unregisteredCount }
-    return when {
-        bankCount == 0 -> stringResource(R.string.settings_hub_banks_subtitle_none)
-        unregistered > 0 -> stringResource(R.string.settings_hub_banks_subtitle, bankCount, unregistered)
-        else -> stringResource(R.string.settings_hub_banks_subtitle_banks_only, bankCount)
-    }
-}
+private fun appHubSubtitle(languageTag: String, themeMode: ThemeMode): String =
+    stringResource(
+        R.string.settings_app_hub_subtitle,
+        if (AppLocale.isEnglish(languageTag)) {
+            stringResource(R.string.settings_language_english)
+        } else {
+            stringResource(R.string.settings_language_arabic)
+        },
+        when (themeMode) {
+            ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
+            ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
+            ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
+        },
+    )
 
 @Composable
 private fun reviewHubSubtitle(reviewRequiredCount: Int): String =
