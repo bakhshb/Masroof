@@ -60,17 +60,18 @@ fun decodeSettingsDestination(encoded: String): SettingsDestination {
     return SettingsDestination.Hub
 }
 
-fun SettingsDestination.parent(skippedBanksList: Boolean = false): SettingsDestination =
-    when (this) {
-        is SettingsDestination.BankAccounts -> SettingsDestination.BankHub(bankId)
-        is SettingsDestination.BankCards -> SettingsDestination.BankHub(bankId)
-        is SettingsDestination.BankLoans -> SettingsDestination.BankHub(bankId)
-        is SettingsDestination.BankHub ->
-            if (skippedBanksList) SettingsDestination.Hub else SettingsDestination.Banks
-        SettingsDestination.Banks -> SettingsDestination.Hub
-        SettingsDestination.Logs -> SettingsDestination.About
-        SettingsDestination.DesignCatalog -> SettingsDestination.About
-        SettingsDestination.About,
-        SettingsDestination.Hub,
-        -> SettingsDestination.Hub
-    }
+/** Starts Settings on [destination] only — back from here leaves Settings. */
+fun replaceSettingsStack(destination: SettingsDestination): List<String> =
+    listOf(destination.encode())
+
+fun pushSettingsDestination(stack: List<String>, next: SettingsDestination): List<String> =
+    stack + next.encode()
+
+/** `null` means the back press should leave Settings and return to the caller. */
+fun popSettingsStack(stack: List<String>): List<String>? =
+    if (stack.size <= 1) null else stack.dropLast(1)
+
+fun replaceSettingsTop(stack: List<String>, next: SettingsDestination): List<String> {
+    val remaining = if (stack.isEmpty()) emptyList() else stack.dropLast(1)
+    return remaining + next.encode()
+}

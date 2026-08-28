@@ -82,6 +82,7 @@ fun MasroofRoot(
     var pendingCardsSummaryDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
     var cardsSummaryDetailExitsToHome by rememberSaveable { mutableStateOf(false) }
 
+    // [launch] replaces the Settings stack so the first back returns to [returnTo].
     fun openSettings(
         returnTo: HomeDestination = HomeDestination.Dashboard,
         launch: SettingsLaunchRequest? = null,
