@@ -300,7 +300,6 @@ private fun DashboardCustomizableSections(
     editing: Boolean,
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
-    onOpenSettings: () -> Unit,
     onManageCardsInSettings: () -> Unit,
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
