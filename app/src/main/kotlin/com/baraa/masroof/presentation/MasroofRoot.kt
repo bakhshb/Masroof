@@ -84,7 +84,7 @@ fun MasroofRoot(
     var transactionListOpenGeneration by remember { mutableStateOf(0) }
     var pendingLoansSummaryLoanKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCardsSummaryCardKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingAccountsSummaryDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingCardsSummaryDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun openTransactionList(
         filter: TransactionListFilterState? = null,
@@ -170,11 +170,11 @@ fun MasroofRoot(
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
                 onOpenAccountsSummary = {
-                    pendingAccountsSummaryDebitKey = null
                     homeDestination = HomeDestination.AccountsSummary
                 },
                 onOpenCardsSummary = {
                     pendingCardsSummaryCardKey = null
+                    pendingCardsSummaryDebitKey = null
                     homeDestination = HomeDestination.CardsSummary
                 },
                 onOpenLoansSummary = {
@@ -190,16 +190,14 @@ fun MasroofRoot(
                     homeDestination = HomeDestination.CardsSummary
                 },
                 onOpenDebitDetail = { debit ->
-                    pendingAccountsSummaryDebitKey = CardOwnershipKey.of(debit)
-                    homeDestination = HomeDestination.AccountsSummary
+                    pendingCardsSummaryDebitKey = CardOwnershipKey.of(debit)
+                    homeDestination = HomeDestination.CardsSummary
                 },
                 onRequestSmsPermission = onRequestPermissions,
                 onOpenAppSettings = onOpenAppSettings,
             )
             HomeDestination.AccountsSummary -> AccountsSummaryRoute(
                 viewModel = dashboardViewModel,
-                initialSelectedDebitKey = pendingAccountsSummaryDebitKey,
-                onInitialSelectionConsumed = { pendingAccountsSummaryDebitKey = null },
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageAccounts = {
                     pendingSettingsDestination = SettingsDestination.Banks
@@ -216,7 +214,11 @@ fun MasroofRoot(
             HomeDestination.CardsSummary -> CardsSummaryRoute(
                 viewModel = dashboardViewModel,
                 initialSelectedCardKey = pendingCardsSummaryCardKey,
-                onInitialSelectionConsumed = { pendingCardsSummaryCardKey = null },
+                initialSelectedDebitKey = pendingCardsSummaryDebitKey,
+                onInitialSelectionConsumed = {
+                    pendingCardsSummaryCardKey = null
+                    pendingCardsSummaryDebitKey = null
+                },
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageCards = {
                     pendingSettingsDestination = SettingsDestination.Banks

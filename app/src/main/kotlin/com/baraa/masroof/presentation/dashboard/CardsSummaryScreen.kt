@@ -30,6 +30,7 @@ import java.time.ZoneId
 fun CardsSummaryRoute(
     viewModel: DashboardViewModel,
     initialSelectedCardKey: String? = null,
+    initialSelectedDebitKey: String? = null,
     onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageCards: () -> Unit,
@@ -42,10 +43,16 @@ fun CardsSummaryRoute(
     val followedFacilities = state.followedCreditFacilities()
     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
 
-    androidx.compose.runtime.LaunchedEffect(initialSelectedCardKey) {
-        if (initialSelectedCardKey != null) {
-            selectedCardKey = initialSelectedCardKey
-            onInitialSelectionConsumed()
+    androidx.compose.runtime.LaunchedEffect(initialSelectedCardKey, initialSelectedDebitKey) {
+        when {
+            initialSelectedCardKey != null -> {
+                selectedCardKey = initialSelectedCardKey
+                onInitialSelectionConsumed()
+            }
+            initialSelectedDebitKey != null -> {
+                selectedDebitKey = initialSelectedDebitKey
+                onInitialSelectionConsumed()
+            }
         }
     }
 

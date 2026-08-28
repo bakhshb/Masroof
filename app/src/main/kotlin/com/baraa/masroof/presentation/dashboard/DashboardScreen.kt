@@ -63,7 +63,7 @@ fun DashboardRoute(
     onOpenLoansSummary: () -> Unit = onOpenSettings,
     onOpenLoanDetail: (LoanOverview) -> Unit = { onOpenLoansSummary() },
     onOpenCardDetail: (CreditCardDashboardRow) -> Unit = { onOpenCardsSummary() },
-    onOpenDebitDetail: (DebitCardOverview) -> Unit = { onOpenAccountsSummary() },
+    onOpenDebitDetail: (DebitCardOverview) -> Unit = { onOpenCardsSummary() },
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -342,7 +342,6 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
-                        bankHierarchy = state.bankHierarchy,
                         onViewAll = onOpenAccountsSummary,
                     )
                 }
