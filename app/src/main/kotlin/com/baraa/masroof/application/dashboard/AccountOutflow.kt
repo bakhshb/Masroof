@@ -6,7 +6,7 @@ import com.baraa.masroof.core.money.Money
 /**
  * Canonical outflow breakdown for a current account in a salary period.
  *
- * [coreTotal] sums the six standard outflow categories and is used for aggregate
+ * [coreTotal] sums the standard outflow categories and is used for aggregate
  * net movement. [total] adds [selfTransfersOut] for a single-account remaining view.
  */
 data class AccountOutflow(

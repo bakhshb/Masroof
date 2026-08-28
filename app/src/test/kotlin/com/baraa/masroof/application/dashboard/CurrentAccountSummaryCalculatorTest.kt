@@ -2,6 +2,7 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -476,6 +477,71 @@ class CurrentAccountSummaryCalculatorTest {
         )
         assertEquals(Money.of("240.00", Currency.SAR), split.totalSpending)
         assertEquals(SignedMoneyAmount.of(Money.of("75.00", Currency.SAR)), split.creditCardPurchases)
+    }
+
+    @Test
+    fun feeWithFinancingInstallmentFamily_countsAsLoanRepayment() {
+        val owned = "account:bank_aljazira:3001"
+        val feeLoan = tx(
+            id = "fee-loan",
+            type = FinancialTransactionType.FEE,
+            amount = "3036.11",
+            source = owned,
+            linked = listOf("evt-fee-loan"),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(feeLoan),
+            parsedRecords = listOf(
+                parsedRecord(
+                    id = "evt-fee-loan",
+                    family = MessageFamily.FINANCING_INSTALLMENT,
+                    sourceLast4 = "3001",
+                    rawBody = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
+                ),
+            ),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+            rawSmsById = mapOf(
+                "sms-evt-fee-loan" to RawSms(
+                    id = "sms-evt-fee-loan",
+                    sender = "AlJazira",
+                    body = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
+                    receivedAt = Instant.parse("2026-08-27T01:10:00Z"),
+                    deviceMessageId = "evt-fee-loan",
+                    bodyHash = "evt-fee-loan",
+                ),
+            ),
+        )
+        assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.loanRepayments)
+        assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
+        assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.coreTotal)
+    }
+
+    @Test
+    fun loanRepayment_countsInAccountOutflow() {
+        val owned = "account:bank_aljazira:3001"
+        val loanTx = tx(
+            id = "loan",
+            type = FinancialTransactionType.LOAN_REPAYMENT,
+            amount = "3036.11",
+            source = owned,
+            dest = FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, com.baraa.masroof.domain.model.LoanType.PERSONAL),
+            linked = listOf("evt-loan"),
+        )
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(loanTx),
+            parsedRecords = listOf(
+                parsedRecord(
+                    id = "evt-loan",
+                    family = MessageFamily.FINANCING_INSTALLMENT,
+                    sourceLast4 = "3001",
+                ),
+            ),
+            ownedAccountContainerIds = setOf(owned),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.loanRepayments)
+        assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.coreTotal)
     }
 
     private fun tx(

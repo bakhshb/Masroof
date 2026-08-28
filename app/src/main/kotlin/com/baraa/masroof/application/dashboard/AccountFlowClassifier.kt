@@ -153,6 +153,9 @@ object AccountFlowClassifier {
                 }
                 listOf(
                     when {
+                        scope.isFinancingInstallment(tx, parsedRecordsById) ->
+                            FlowAssignment.Expense(FlowExpenseCategory.LOAN_REPAYMENT)
+
                         scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
 

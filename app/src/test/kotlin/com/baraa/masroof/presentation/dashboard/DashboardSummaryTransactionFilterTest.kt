@@ -6,6 +6,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -140,11 +141,38 @@ class DashboardSummaryTransactionFilterTest {
         assertEquals(listOf("legacy"), filtered.map { it.id })
     }
 
+    @Test
+    fun forLoan_matchesLegacyFeeViaInvolvementIndex() {
+        val loanContainerId = FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
+        val transactions = listOf(
+            preview(
+                id = "legacy-fee",
+                type = FinancialTransactionType.FEE,
+                destination = null,
+            ),
+            preview(
+                id = "real-loan",
+                type = FinancialTransactionType.LOAN_REPAYMENT,
+                destination = loanContainerId,
+            ),
+        )
+
+        val filtered = DashboardSummaryTransactionFilter.forLoan(
+            transactions = transactions,
+            bank = Bank.BANK_ALJAZIRA,
+            loanType = LoanType.PERSONAL,
+            involvementByTransactionId = mapOf("legacy-fee" to setOf(loanContainerId!!)),
+        )
+
+        assertEquals(listOf("legacy-fee", "real-loan"), filtered.map { it.id })
+    }
+
     private fun preview(
         id: String,
         source: String? = null,
         destination: String? = null,
         cardLast4: String? = null,
+        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
     ): TransactionPreviewUi =
         TransactionPreviewUi(
             id = id,
@@ -153,8 +181,8 @@ class DashboardSummaryTransactionFilterTest {
             localDate = LocalDate.of(2026, 8, 1),
             amountLabel = "10.00 SAR",
             dateLabel = "1 Aug",
-            type = FinancialTransactionType.EXPENSE,
-            typeLabelResHint = FinancialTransactionType.EXPENSE,
+            type = type,
+            typeLabelResHint = type,
             direction = TransactionDirectionUi.OUTWARD,
             cardLast4 = cardLast4,
             sourceContainerId = source,

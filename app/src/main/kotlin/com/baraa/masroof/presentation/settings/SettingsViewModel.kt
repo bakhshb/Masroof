@@ -27,6 +27,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -106,15 +107,33 @@ class SettingsViewModel(
     }
 
     fun requestStopTracking(card: ManagedCardUi) {
-        _uiState.update { it.copy(stopConfirmCardTarget = card, stopConfirmAccountTarget = null) }
+        _uiState.update {
+            it.copy(
+                stopConfirmCardTarget = card,
+                stopConfirmAccountTarget = null,
+                stopConfirmLoanTarget = null,
+            )
+        }
     }
 
     fun requestStopAccountTracking(account: ManagedAccountUi) {
-        _uiState.update { it.copy(stopConfirmAccountTarget = account, stopConfirmCardTarget = null) }
+        _uiState.update {
+            it.copy(
+                stopConfirmAccountTarget = account,
+                stopConfirmCardTarget = null,
+                stopConfirmLoanTarget = null,
+            )
+        }
     }
 
     fun dismissStopConfirm() {
-        _uiState.update { it.copy(stopConfirmCardTarget = null, stopConfirmAccountTarget = null) }
+        _uiState.update {
+            it.copy(
+                stopConfirmCardTarget = null,
+                stopConfirmAccountTarget = null,
+                stopConfirmLoanTarget = null,
+            )
+        }
     }
 
     fun openRenameCard(card: ManagedCardUi) {
@@ -264,6 +283,34 @@ class SettingsViewModel(
 
     fun resumeAccountTracking(account: ManagedAccountUi) {
         updateAccountOwnership(account, owned = true)
+    }
+
+    fun confirmLoanOwned(loan: ManagedLoanUi) {
+        updateLoanOwnership(loan, owned = true)
+    }
+
+    fun markLoanExternal(loan: ManagedLoanUi) {
+        updateLoanOwnership(loan, owned = false)
+    }
+
+    fun resumeLoanTracking(loan: ManagedLoanUi) {
+        updateLoanOwnership(loan, owned = true)
+    }
+
+    fun requestStopLoanTracking(loan: ManagedLoanUi) {
+        _uiState.update {
+            it.copy(
+                stopConfirmLoanTarget = loan,
+                stopConfirmCardTarget = null,
+                stopConfirmAccountTarget = null,
+            )
+        }
+    }
+
+    fun confirmStopLoanTracking() {
+        val target = _uiState.value.stopConfirmLoanTarget ?: return
+        dismissStopConfirm()
+        markLoanExternal(target)
     }
 
     fun reparseStoredMessages() {
@@ -733,6 +780,32 @@ class SettingsViewModel(
                     ownershipConfirmationService.confirmAccountOwned(ref)
                 } else {
                     ownershipConfirmationService.markAccountExternal(ref)
+                }
+                refreshReviewQueue()
+                applyRegistries(
+                    cards = cardRegistryRepository.listAll(),
+                    accounts = accountRegistryRepository.listAll(),
+                    loans = loanRegistryRepository.listAll(),
+                )
+                _uiState.update { it.copy(updating = false) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(updating = false, error = SettingsError.UPDATE_FAILED) }
+            }
+        }
+    }
+
+    private fun updateLoanOwnership(loan: ManagedLoanUi, owned: Boolean) {
+        if (_uiState.value.updating) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(updating = true, error = null) }
+            try {
+                val ref = LoanReference(loan.bank, loan.loanType)
+                if (owned) {
+                    ownershipConfirmationService.confirmLoanOwned(ref)
+                } else {
+                    ownershipConfirmationService.markLoanExternal(ref)
                 }
                 refreshReviewQueue()
                 applyRegistries(

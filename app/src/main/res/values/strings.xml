@@ -151,6 +151,12 @@
     <string name="settings_bank_summary_with_unregistered">%1$s • %2$d غير مسجّل</string>
     <string name="settings_loans_hint">القروض المكتشفة من رسائل البنك.</string>
     <string name="settings_loans_empty">لا توجد قروض مسجّلة بعد.</string>
+    <string name="settings_loans_unregistered">غير مسجّلة</string>
+    <string name="settings_loans_followed">قروضي</string>
+    <string name="settings_loans_stopped">متوقفة</string>
+    <string name="settings_stop_loan_tracking">إيقاف متابعة القرض</string>
+    <string name="settings_stop_loan_confirm_title">إيقاف متابعة القرض؟</string>
+    <string name="settings_stop_loan_confirm_body">لن يُعدّ %1$s من قروضك — لن يظهر في ملخص القروض.</string>
     <string name="settings_loan_type_personal">قرض شخصي</string>
     <string name="settings_loan_type_auto">قرض سيارة</string>
     <string name="settings_loan_type_mortgage">قرض عقاري</string>
@@ -275,7 +281,7 @@
     <string name="dashboard_accounts_summary_screen_title">ملخص الحسابات</string>
     <string name="dashboard_accounts_summary_empty">لا توجد حسابات مضافة</string>
 <string name="dashboard_account_remaining_label">المتبقي في الحساب</string>
-    <string name="dashboard_account_remaining_calculated_hint">وارد − منصرف (تحويلات خارجية، سداد بطاقة، سحب نقدي، فواتير، مدى، رسوم)</string>
+    <string name="dashboard_account_remaining_calculated_hint">وارد − منصرف (تحويلات خارجية، سداد بطاقة، سحب نقدي، فواتير، أقساط تمويل، مدى، رسوم)</string>
     <string name="dashboard_accounts_remaining_total_title">إجمالي المتبقي في الحسابات</string>
     <string name="dashboard_accounts_fleet_total_hint">مجموع كل الوارد − كل المنصرف لجميع حساباتك</string>
     <string name="dashboard_manage_accounts">إدارة الحسابات</string>
@@ -300,6 +306,7 @@
     <string name="dashboard_customize_section_quick">البطاقات السريعة</string>
     <string name="dashboard_customize_section_accounts">ملخص الحسابات</string>
     <string name="dashboard_customize_section_cards">ملخص البطاقات</string>
+    <string name="dashboard_customize_section_loans">ملخص القروض</string>
     <string name="dashboard_customize_section_transactions">العمليات الأخيرة</string>
     <string name="dashboard_customize_size_small">صغير</string>
     <string name="dashboard_customize_size_medium">متوسط</string>

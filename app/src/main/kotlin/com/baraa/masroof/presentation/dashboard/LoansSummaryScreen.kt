@@ -85,8 +85,9 @@ fun LoansSummaryRoute(
                     )
                     val loanTransactionIds = state.allTransactions
                         .filter { tx ->
-                            tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
-                                tx.destinationContainerId == loanContainerId
+                            loanContainerId in state.transactionLoanInvolvement[tx.id].orEmpty() ||
+                                (tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
+                                    tx.destinationContainerId == loanContainerId)
                         }
                         .map { it.id }
                         .toSet()

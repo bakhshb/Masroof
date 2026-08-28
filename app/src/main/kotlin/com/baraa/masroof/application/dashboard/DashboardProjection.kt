@@ -28,6 +28,7 @@ data class DashboardProjection(
     val flowDetail: CurrentAccountFlowDetailGrouping,
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),
+    val transactionLoanInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactions: List<FinancialTransaction>,
     val meta: DashboardMeta,
@@ -50,6 +51,7 @@ data class DashboardProjection(
             flowDetailGrouping = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,
             transactionCardInvolvement = transactionCardInvolvement,
+            transactionLoanInvolvement = transactionLoanInvolvement,
             transactionDebitSpendInvolvement = transactionDebitSpendInvolvement,
             isCurrentPeriod = isCurrentPeriod,
         )

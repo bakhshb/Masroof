@@ -21,13 +21,16 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -50,6 +53,7 @@ class TransactionReclassificationServiceTest {
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var rawRepo: RoomRawSmsRepository
     private lateinit var confirmation: OwnershipConfirmationService
+    private lateinit var loans: RoomLoanRegistryRepository
     private lateinit var service: TransactionReclassificationService
 
     @Before
@@ -63,14 +67,16 @@ class TransactionReclassificationServiceTest {
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
+        loans = RoomLoanRegistryRepository.from(db)
+        confirmation = OwnershipConfirmationService(accounts, cards, loans)
         service = TransactionReclassificationService(
             financialTransactionRepository = ftRepo,
             effectiveParsedEventProvider = EffectiveParsedEventProvider(
                 parsedRepo,
                 RoomUserCorrectionRepository(db.userCorrectionDao()),
             ),
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            ownershipResolver = OwnershipResolver(accounts, cards, loans),
+            ownershipConfirmationService = confirmation,
         )
     }
 
@@ -124,6 +130,76 @@ class TransactionReclassificationServiceTest {
         val result = service.reclassify("tx-pair", FinancialTransactionType.INCOME)
         assertTrue(result is ReclassificationResult.Rejected)
         assertEquals("paired_transaction_not_supported", (result as ReclassificationResult.Rejected).reason)
+    }
+
+    @Test
+    fun feeToLoanRepayment_updatesTypeAndConfirmsLoan() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        persistFinancingFee(smsId = "sms-loan", amount = "3036.11")
+        val txId = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan"))
+        val result = service.reclassify(txId, FinancialTransactionType.LOAN_REPAYMENT)
+        assertTrue(result is ReclassificationResult.Success)
+        val updated = ftRepo.getById(txId)!!
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, updated.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            updated.sourceContainerId,
+        )
+        assertEquals(
+            FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL),
+            updated.destinationContainerId,
+        )
+        assertEquals(
+            OwnershipStatus.OWNED,
+            loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)),
+        )
+    }
+
+    private suspend fun persistFinancingFee(smsId: String, amount: String) {
+        val body = "خصم: قسط تمويل\nمن: 3001\nالقسط: SAR $amount\nلـ: تمويل شخصي"
+        rawRepo.insertIfAbsent(
+            RawSms(
+                id = smsId,
+                sender = "AlJazira",
+                body = body,
+                bodyHash = SmsBodyHasher.sha256Hex(body),
+                receivedAt = Instant.parse("2026-08-27T01:10:00Z"),
+                deviceMessageId = smsId,
+            ),
+        )
+        val event = ParsedEvent(
+            id = "pe-$smsId",
+            rawSmsId = smsId,
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.FINANCING_INSTALLMENT,
+            direction = MoneyDirection.OUTGOING,
+            parseStatus = ParseStatus.SUCCESS,
+            amount = Money.of(amount, Currency.SAR),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destinationAccountRef = null,
+            cardRef = null,
+            purchaseChannel = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            bankNetworkType = null,
+            confidence = Confidence(1.0),
+        )
+        parsedRepo.save(event, ParsedEventDetails())
+        val tx = FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf(smsId)),
+            type = FinancialTransactionType.FEE,
+            amount = Money.of(amount, Currency.SAR),
+            occurredAt = event.occurredAt!!,
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf(event.id),
+        )
+        assertEquals(FinancialTransactionSaveResult.Saved, ftRepo.save(tx, listOf(smsId)))
     }
 
     private suspend fun persistIncomeTransfer(smsId: String, counterparty: String, amount: String) {
