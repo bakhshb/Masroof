@@ -567,6 +567,44 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun customizeLayout_toggleLoans_persistsVisibility() = runTest {
+        val layoutRepo = FakeLayoutPreferencesRepository()
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        vm.toggleCustomizeSection(DashboardSectionId.LOANS)
+        vm.saveCustomizeLayout()
+
+        assertFalse(vm.uiState.value.dashboardLayout.entry(DashboardSectionId.LOANS)!!.visible)
+        assertFalse(layoutRepo.saved!!.entry(DashboardSectionId.LOANS)!!.visible)
+    }
+
+    @Test
+    fun customizeLayout_moveLoans_persistsOrder() = runTest {
+        val layoutRepo = FakeLayoutPreferencesRepository()
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        val initialIndex = vm.uiState.value.customizeDraft!!.sections
+            .indexOfFirst { it.id == DashboardSectionId.LOANS }
+        repeat(initialIndex) {
+            vm.moveCustomizeSection(DashboardSectionId.LOANS, direction = -1)
+        }
+        vm.saveCustomizeLayout()
+
+        assertEquals(
+            DashboardSectionId.LOANS,
+            vm.uiState.value.dashboardLayout.sections.first().id,
+        )
+        assertEquals(
+            DashboardSectionId.LOANS,
+            layoutRepo.saved!!.sections.first().id,
+        )
+    }
+
+    @Test
     fun customizeLayout_dismissWithoutSave_discardsDraft() = runTest {
         val layoutRepo = FakeLayoutPreferencesRepository()
         val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)

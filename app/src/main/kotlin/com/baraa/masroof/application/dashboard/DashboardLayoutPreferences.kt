@@ -63,15 +63,34 @@ data class DashboardLayoutSnapshot(
     /** Appends sections introduced after a saved layout was stored (e.g. LOANS). */
     fun withMergedSections(): DashboardLayoutSnapshot {
         val defaults = default()
-        val byId = sections.associateBy { it.id }.toMutableMap()
-        defaults.sections.forEach { entry ->
-            if (entry.id !in byId) {
-                byId[entry.id] = entry
+        val existingIds = sections.map { it.id }.toSet()
+        val missing = defaults.sections.filter { it.id !in existingIds }
+        if (missing.isEmpty()) return this
+
+        val merged = sections.toMutableList()
+        val knownIds = existingIds.toMutableSet()
+        missing.forEach { newEntry ->
+            val defaultIndex = defaults.sections.indexOfFirst { it.id == newEntry.id }
+            val anchorAfter = defaults.sections
+                .drop(defaultIndex + 1)
+                .firstOrNull { it.id in knownIds }
+            val insertAt = when {
+                anchorAfter != null -> merged.indexOfFirst { it.id == anchorAfter.id }
+                else -> {
+                    val anchorBefore = defaults.sections
+                        .take(defaultIndex)
+                        .lastOrNull { it.id in knownIds }
+                    if (anchorBefore != null) {
+                        merged.indexOfFirst { it.id == anchorBefore.id } + 1
+                    } else {
+                        merged.size
+                    }
+                }
             }
+            merged.add(insertAt.coerceIn(0, merged.size), newEntry)
+            knownIds += newEntry.id
         }
-        val ordered = defaults.sections.mapNotNull { byId[it.id] }
-        val extras = byId.values.filter { entry -> defaults.sections.none { it.id == entry.id } }
-        return copy(sections = ordered + extras)
+        return copy(sections = merged)
     }
 
     companion object {

@@ -16,7 +16,12 @@ class SharedPrefsDashboardLayoutPreferencesRepository(
     override fun load(): DashboardLayoutSnapshot {
         val raw = prefs.getString(KEY_LAYOUT_JSON, null) ?: return DashboardLayoutSnapshot.default()
         return runCatching {
-            json.decodeFromString(DashboardLayoutSnapshot.serializer(), raw).withMergedSections()
+            val decoded = json.decodeFromString(DashboardLayoutSnapshot.serializer(), raw)
+            val merged = decoded.withMergedSections()
+            if (merged != decoded) {
+                save(merged)
+            }
+            merged
         }.getOrElse { DashboardLayoutSnapshot.default() }
     }
 

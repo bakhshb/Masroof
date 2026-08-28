@@ -24,6 +24,7 @@ class DashboardRedesignResourcesTest {
         assertEquals("Customize home screen", context.getString(R.string.dashboard_customize_sheet_title))
         assertEquals("Save layout", context.getString(R.string.dashboard_customize_save))
         assertEquals("Hero card", context.getString(R.string.dashboard_customize_section_hero))
+        assertEquals("Loans summary", context.getString(R.string.dashboard_customize_section_loans))
         assertEquals("Small", context.getString(R.string.dashboard_customize_size_small))
         assertEquals("Spending details", context.getString(R.string.dashboard_expense_details_title))
         assertEquals("Income details", context.getString(R.string.dashboard_income_details_title))
@@ -50,6 +51,7 @@ class DashboardRedesignResourcesTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         assertEquals("تخصيص", context.getString(R.string.dashboard_customize))
         assertEquals("تخصيص الشاشة الرئيسية", context.getString(R.string.dashboard_customize_sheet_title))
+        assertEquals("ملخص القروض", context.getString(R.string.dashboard_customize_section_loans))
         assertEquals("تفاصيل المنصرف", context.getString(R.string.dashboard_expense_details_title))
     }
 
