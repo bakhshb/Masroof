@@ -454,7 +454,11 @@ class DashboardViewModel(
                     return@launch
                 }
                 val previews = overview.transactions.map { tx ->
-                    toPreview(tx, overview.transactionCardInvolvement)
+                    toPreview(
+                        tx = tx,
+                        cardInvolvement = overview.transactionCardInvolvement,
+                        loanInvolvement = overview.transactionLoanInvolvement,
+                    )
                 }
                 val (loadedLabel, loadedHint) = periodPresentation(overview.period)
                 _uiState.update {
@@ -533,6 +537,7 @@ class DashboardViewModel(
     private fun toPreview(
         tx: FinancialTransaction,
         cardInvolvement: Map<String, Set<String>>,
+        loanInvolvement: Map<String, Set<String>>,
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
@@ -559,6 +564,11 @@ class DashboardViewModel(
             .resolvePrimaryCardKey(tx, cardInvolvement)
             ?.substringAfter(':', missingDelimiterValue = "")
             ?.takeIf { it.isNotEmpty() }
+        val effectiveType = if (tx.id in loanInvolvement) {
+            FinancialTransactionType.LOAN_REPAYMENT
+        } else {
+            tx.type
+        }
         return TransactionPreviewUi(
             id = tx.id,
             title = title,
@@ -567,8 +577,8 @@ class DashboardViewModel(
             amountLabel = MoneyUiFormatter.format(tx.amount, languageTag),
             dateLabel = dateFormatter.format(localDate),
             type = tx.type,
-            typeLabelResHint = tx.type,
-            direction = TransactionTypePresentation.direction(tx.type),
+            typeLabelResHint = effectiveType,
+            direction = TransactionTypePresentation.direction(effectiveType),
             cardLast4 = containerCardLast4 ?: parsedCardLast4,
             sourceContainerId = tx.sourceContainerId,
             destinationContainerId = tx.destinationContainerId,

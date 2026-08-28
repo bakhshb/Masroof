@@ -10,10 +10,22 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
- * Resolves which loan container a transaction repays, including legacy [FinancialTransactionType.FEE]
- * rows whose linked SMS is [MessageFamily.FINANCING_INSTALLMENT].
+ * Canonical SMS-driven loan repayment detection.
+ *
+ * A transaction repays a loan when stored as [FinancialTransactionType.LOAN_REPAYMENT],
+ * or when linked SMS is [MessageFamily.FINANCING_INSTALLMENT] (even if still stored as [FinancialTransactionType.FEE]).
  */
 object LoanRepaymentAttribution {
+    fun isLoanRepayment(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+    ): Boolean = loanContainerId(tx, parsedRecordsById) != null
+
+    fun isLoanRepayment(
+        tx: FinancialTransaction,
+        parsedRecords: List<ParsedEventRecord>,
+    ): Boolean = isLoanRepayment(tx, parsedRecords.associateBy { it.event.id })
+
     fun loanContainerId(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,
@@ -34,7 +46,7 @@ object LoanRepaymentAttribution {
         bank: Bank,
         loanType: LoanType,
     ): Boolean {
-        val expected = FinancialContainerIdFactory.loanId(bank, loanType) ?: return false
+        val expected = FinancialContainerIdFactory.loanId(bank, loanType)
         return loanContainerId(tx, parsedRecordsById) == expected
     }
 

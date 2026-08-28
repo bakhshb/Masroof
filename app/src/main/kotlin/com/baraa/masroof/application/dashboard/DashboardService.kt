@@ -33,7 +33,7 @@ data class DashboardOverview(
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     /** Transaction id → card keys (`bankId:last4`) from parsed SMS card refs. */
     val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),
-    /** Transaction id → loan container ids for repayments (including legacy fee-classified installments). */
+    /** Transaction id → loan container ids for SMS-attributed loan repayments. */
     val transactionLoanInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
     val isCurrentPeriod: Boolean,

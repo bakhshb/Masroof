@@ -191,6 +191,24 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
+    fun typeFilter_matchesEffectiveLoanRepaymentLabel() {
+        val txs = listOf(
+            preview(
+                type = FinancialTransactionType.FEE,
+                effectiveType = FinancialTransactionType.LOAN_REPAYMENT,
+                amount = "3036.11",
+            ),
+            preview(type = FinancialTransactionType.FEE, amount = "2"),
+        )
+        val filtered = TransactionListFilterEngine.apply(
+            txs,
+            TransactionListFilterState(types = setOf(FinancialTransactionType.LOAN_REPAYMENT)),
+        )
+        assertEquals(1, filtered.transactions.size)
+        assertEquals("3036.11", filtered.transactions.single().amount.amount.toPlainString())
+    }
+
+    @Test
     fun nonPrimaryCurrency_excludedFromTotal() {
         val txs = listOf(
             preview(type = FinancialTransactionType.EXPENSE, amount = "100", currency = Currency.SAR),
@@ -330,6 +348,7 @@ class TransactionListFilterEngineTest {
     private fun preview(
         id: String = "tx-${System.nanoTime()}",
         type: FinancialTransactionType,
+        effectiveType: FinancialTransactionType = type,
         amount: String,
         merchant: String? = null,
         counterparty: String? = null,
@@ -349,8 +368,8 @@ class TransactionListFilterEngineTest {
             amountLabel = money.amount.toPlainString(),
             dateLabel = "1 أغسطس",
             type = type,
-            typeLabelResHint = type,
-            direction = TransactionTypePresentation.direction(type),
+            typeLabelResHint = effectiveType,
+            direction = TransactionTypePresentation.direction(effectiveType),
             cardLast4 = card,
             sourceContainerId = sourceAccountId,
             destinationContainerId = destinationAccountId,

@@ -34,7 +34,7 @@ fun TransactionPreviewRow(
     onClick: (() -> Unit)? = null,
 ) {
     val extended = MasroofThemeExtras.extendedColors
-    val title = row.title ?: transactionTypeLabel(row.type)
+    val title = row.title ?: transactionTypeLabel(row.typeLabelResHint)
     val badge = when (row.direction) {
         TransactionDirectionUi.INCOME,
         TransactionDirectionUi.INWARD,
@@ -83,7 +83,7 @@ fun TransactionPreviewRow(
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
-                    imageVector = MasroofIcons.transactionType(row.type),
+                    imageVector = MasroofIcons.transactionType(row.typeLabelResHint),
                     contentDescription = null,
                     modifier = Modifier
                         .padding(10.dp)
@@ -101,7 +101,7 @@ fun TransactionPreviewRow(
                 )
                 Text(
                     buildString {
-                        append(transactionTypeLabel(row.type))
+                        append(transactionTypeLabel(row.typeLabelResHint))
                         row.cardLast4?.let {
                             append(" · ")
                             append(cardDisplayLabelFromTransaction(row = row, cards = ownedCards).orEmpty())

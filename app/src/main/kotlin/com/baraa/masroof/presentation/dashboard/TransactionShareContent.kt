@@ -22,7 +22,7 @@ fun transactionDetailShareText(transaction: TransactionPreviewUi): String {
         ),
         TransactionShareText.field(
             stringResource(R.string.transaction_detail_type),
-            transactionTypeLabel(transaction.type),
+            transactionTypeLabel(transaction.typeLabelResHint),
         ),
         TransactionShareText.field(
             stringResource(R.string.transaction_detail_date),
@@ -79,9 +79,9 @@ fun transactionListShareText(
     val rows = transactions.map { tx ->
         TransactionShareText.listRow(
             date = formatLocalizedTransactionDate(tx.localDate),
-            title = tx.title ?: transactionTypeLabel(tx.type),
+            title = tx.title ?: transactionTypeLabel(tx.typeLabelResHint),
             amount = formatLocalizedMoney(tx.amount),
-            type = transactionTypeLabel(tx.type),
+            type = transactionTypeLabel(tx.typeLabelResHint),
         )
     }
     return TransactionShareText.listDocument(

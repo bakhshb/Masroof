@@ -78,6 +78,7 @@ class DashboardProjectionBuilder(
             reviewRequiredCount = reviewRequiredCount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
+            parsedRecords = parsedRecords,
         )
         val fleet = CurrentAccountSummaryCalculator.summarize(
             transactions = dedupedTransactions,

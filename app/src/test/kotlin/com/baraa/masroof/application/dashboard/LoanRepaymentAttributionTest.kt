@@ -41,7 +41,28 @@ class LoanRepaymentAttributionTest {
     }
 
     @Test
-    fun loanContainerId_resolvesLegacyFeeFromFinancingSms() {
+    fun isLoanRepayment_trueForFeeWithFinancingSms() {
+        val parsedRecordsById = mapOf(
+            "evt-loan" to financingRecord(counterparty = "تمويل شخصي"),
+        )
+        val tx = FinancialTransaction(
+            id = "fee-loan",
+            type = FinancialTransactionType.FEE,
+            amount = Money.of("3036.11", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+
+        assertTrue(LoanRepaymentAttribution.isLoanRepayment(tx, parsedRecordsById))
+    }
+
+    @Test
+    fun loanContainerId_resolvesFeeFromFinancingSms() {
         val parsedRecordsById = mapOf(
             "evt-loan" to financingRecord(counterparty = "تمويل شخصي"),
         )
@@ -71,7 +92,7 @@ class LoanRepaymentAttributionTest {
     }
 
     @Test
-    fun buildInvolvementIndex_mapsLegacyFeeInstallments() {
+    fun buildInvolvementIndex_mapsFeeFinancingInstallments() {
         val parsedRecords = listOf(financingRecord(counterparty = "تمويل شخصي"))
         val tx = FinancialTransaction(
             id = "fee-loan",
