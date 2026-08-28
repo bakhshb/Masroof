@@ -645,7 +645,7 @@ class TransactionReconciliationService(
         if (sourceOwnership != OwnershipStatus.OWNED) return
         val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return
         val reference = LoanReference(event.bank, loanType)
-        if (ownershipResolver.resolveLoan(reference) == OwnershipStatus.OWNED) return
+        if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
         ownershipConfirmationService?.confirmLoanOwned(reference)
     }
 

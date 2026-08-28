@@ -950,6 +950,38 @@ class TransactionReconciliationServiceTest {
         )
     }
 
+    @Test
+    fun financingInstallment_doesNotReconfirmExternalLoan() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        confirmation.markLoanExternal(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL))
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+                لـ: تمويل شخصي
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+            ),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(
+            OwnershipStatus.EXTERNAL,
+            loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)),
+        )
+    }
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,

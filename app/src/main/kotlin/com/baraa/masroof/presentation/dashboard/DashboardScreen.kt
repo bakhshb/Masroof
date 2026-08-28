@@ -173,6 +173,7 @@ private fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp)
                     .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -325,7 +326,7 @@ private fun DashboardCustomizableSections(
 
                 DashboardSectionId.CARDS -> {
                     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
-                    val followedFacilities = state.followedCreditFacilities()
+                    val followedFacilities = state.followedCreditFacilitiesCreditOnly()
                     val followedLoans = state.followedLoansOverview()
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (followedFacilities != null) {
@@ -335,7 +336,6 @@ private fun DashboardCustomizableSections(
                                 zoneId = ZoneId.systemDefault(),
                                 ownedCards = state.ownedCards,
                                 onViewAll = onOpenCardsSummary,
-                                onOpenDebit = { onOpenCardsSummary() },
                             )
                         } else {
                             state.followedCreditCardsOverview()?.let { followedOverview ->

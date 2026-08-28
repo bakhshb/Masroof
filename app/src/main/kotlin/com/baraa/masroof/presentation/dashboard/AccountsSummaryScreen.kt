@@ -29,7 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.AccountsSummary
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.cashPosition
 import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -51,44 +53,80 @@ fun AccountsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedAccountKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
     val selectedAccount = selectedAccountKey?.let { key ->
         state.ownedAccounts.find { ownedAccountKey(it) == key }
     }
+    val selectedDebit = selectedDebitKey?.let { key ->
+        state.bankHierarchy?.banks
+            ?.flatMap { bank ->
+                bank.currentAccounts.flatMap { it.debitCards } + bank.unlinkedDebitCards
+            }
+            ?.find { CardOwnershipKey.of(it) == key }
+    }
 
     BackHandler {
-        if (selectedAccount != null) {
-            selectedAccountKey = null
-        } else {
-            onBack()
+        when {
+            selectedDebit != null -> selectedDebitKey = null
+            selectedAccount != null -> selectedAccountKey = null
+            else -> onBack()
         }
     }
 
-    if (selectedAccount != null) {
-        AccountDetailScreen(
-            account = selectedAccount,
-            state = state,
-            onBack = { selectedAccountKey = null },
-            onOpenTransaction = onOpenTransaction,
-            onViewAllTransactions = {
-                onOpenAllTransactions(
-                    TransactionListFilterState(
-                        accountContainerIds = setOf(
-                            FinancialContainerIdFactory.accountId(
-                                selectedAccount.bank,
-                                selectedAccount.maskedNumber,
+    when {
+        selectedDebit != null -> {
+            DebitCardDetailScreen(
+                debit = selectedDebit,
+                state = state,
+                cardNetwork = cardNetworks[CardOwnershipKey.of(selectedDebit)] ?: selectedDebit.network,
+                onBack = { selectedDebitKey = null },
+                onOpenTransaction = onOpenTransaction,
+                onViewAllTransactions = {
+                    val cardKey = CardTransactionInvolvementResolver.cardKey(
+                        selectedDebit.bank.id,
+                        selectedDebit.last4,
+                    )
+                    val spendTransactionIds = state.transactionDebitSpendInvolvement
+                        .filter { (_, cardKeys) -> cardKey in cardKeys }
+                        .keys
+                    onOpenAllTransactions(
+                        TransactionListFilterState(transactionIds = spendTransactionIds),
+                    )
+                },
+            )
+        }
+
+        selectedAccount != null -> {
+            AccountDetailScreen(
+                account = selectedAccount,
+                state = state,
+                onBack = { selectedAccountKey = null },
+                onOpenTransaction = onOpenTransaction,
+                onViewAllTransactions = {
+                    onOpenAllTransactions(
+                        TransactionListFilterState(
+                            accountContainerIds = setOf(
+                                FinancialContainerIdFactory.accountId(
+                                    selectedAccount.bank,
+                                    selectedAccount.maskedNumber,
+                                ),
                             ),
                         ),
-                    ),
-                )
-            },
-        )
-    } else {
-        AccountsSummaryScreen(
-            state = state,
-            onBack = onBack,
-            onManageAccounts = onManageAccounts,
-            onOpenAccount = { account -> selectedAccountKey = ownedAccountKey(account) },
-        )
+                    )
+                },
+            )
+        }
+
+        else -> {
+            AccountsSummaryScreen(
+                state = state,
+                onBack = onBack,
+                onManageAccounts = onManageAccounts,
+                onOpenAccount = { account -> selectedAccountKey = ownedAccountKey(account) },
+                onOpenDebit = { debit -> selectedDebitKey = CardOwnershipKey.of(debit) },
+            )
+        }
     }
 }
 
@@ -101,6 +139,7 @@ fun AccountsSummaryScreen(
     onBack: () -> Unit,
     onManageAccounts: () -> Unit,
     onOpenAccount: (OwnedAccountUi) -> Unit,
+    onOpenDebit: (DebitCardOverview) -> Unit,
 ) {
     DashboardSummaryScaffold(
         title = stringResource(R.string.dashboard_accounts_summary_screen_title),
@@ -135,12 +174,20 @@ fun AccountsSummaryScreen(
                     hierarchy.banks.forEach { bankTree ->
                         bankTree.savingsAccounts.forEach { node ->
                             resolveOwnedAccountUi(state.ownedAccounts, node.bank, node.maskedNumber)?.let { account ->
-                                AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) })
+                                AccountsSummaryAccountCard(
+                                    account = account,
+                                    onClick = { onOpenAccount(account) },
+                                    onOpenDebit = onOpenDebit,
+                                )
                             }
                         }
                         bankTree.walletAccounts.forEach { node ->
                             resolveOwnedAccountUi(state.ownedAccounts, node.bank, node.maskedNumber)?.let { account ->
-                                AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) })
+                                AccountsSummaryAccountCard(
+                                    account = account,
+                                    onClick = { onOpenAccount(account) },
+                                    onOpenDebit = onOpenDebit,
+                                )
                             }
                         }
                         bankTree.currentAccounts.forEach { node ->
@@ -149,18 +196,18 @@ fun AccountsSummaryScreen(
                                     account = account,
                                     debitCards = node.debitCards,
                                     onClick = { onOpenAccount(account) },
+                                    onOpenDebit = onOpenDebit,
                                 )
                             }
                         }
                         bankTree.unlinkedDebitCards.forEach { debit ->
-                            Text(
-                                stringResource(
+                            AccountsSummaryDebitBranchRow(
+                                label = stringResource(
                                     R.string.dashboard_account_unlinked_mada_label,
                                     debit.displayLabel,
                                 ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp),
+                                debit = debit,
+                                onOpenDebit = onOpenDebit,
                             )
                         }
                     }
@@ -171,6 +218,7 @@ fun AccountsSummaryScreen(
                         AccountsSummaryAccountCard(
                             account = account,
                             onClick = { onOpenAccount(account) },
+                            onOpenDebit = onOpenDebit,
                         )
                     }
                 }
@@ -243,6 +291,7 @@ private fun AccountsSummaryAccountCard(
     account: OwnedAccountUi,
     debitCards: List<DebitCardOverview> = emptyList(),
     onClick: () -> Unit,
+    onOpenDebit: (DebitCardOverview) -> Unit,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val summary = account.periodSummary
@@ -257,76 +306,118 @@ private fun AccountsSummaryAccountCard(
         else -> MaterialTheme.colorScheme.onSurface
     }
 
-    MasroofCard(modifier = Modifier.clickable(onClick = onClick)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(extended.accountSoft),
-                contentAlignment = Alignment.Center,
+    Column {
+        MasroofCard(modifier = Modifier.clickable(onClick = onClick)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(
-                    imageVector = MasroofIcons.moneyMovement,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                    tint = extended.account,
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    account.displayLabel(),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    stringResource(R.string.dashboard_account_remaining_calculated_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (periodInflow != null && periodOutflow != null) {
-                    Text(
-                        stringResource(
-                            R.string.dashboard_account_period_in_out,
-                            formatLocalizedMoney(periodInflow),
-                            formatLocalizedMoney(periodOutflow),
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(extended.accountSoft),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MasroofIcons.moneyMovement,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = extended.account,
                     )
                 }
-                debitCards.forEach { debit ->
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        stringResource(
-                            R.string.dashboard_account_linked_mada_label,
-                            debit.displayLabel,
-                        ),
+                        account.displayLabel(),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stringResource(R.string.dashboard_account_remaining_calculated_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    if (periodInflow != null && periodOutflow != null) {
+                        Text(
+                            stringResource(
+                                R.string.dashboard_account_period_in_out,
+                                formatLocalizedMoney(periodInflow),
+                                formatLocalizedMoney(periodOutflow),
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        stringResource(R.string.dashboard_account_remaining_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        remaining?.let { formatLocalizedMoney(it) }
+                            ?: stringResource(R.string.dashboard_value_unavailable),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = remainingColor,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    stringResource(R.string.dashboard_account_remaining_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    remaining?.let { formatLocalizedMoney(it) }
-                        ?: stringResource(R.string.dashboard_value_unavailable),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = remainingColor,
-                    modifier = Modifier.padding(top = 2.dp),
+        }
+        if (debitCards.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            debitCards.forEach { debit ->
+                AccountsSummaryDebitBranchRow(
+                    label = debit.displayLabel,
+                    debit = debit,
+                    onOpenDebit = onOpenDebit,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountsSummaryDebitBranchRow(
+    label: String,
+    debit: DebitCardOverview,
+    onOpenDebit: (DebitCardOverview) -> Unit,
+) {
+    val extended = MasroofThemeExtras.extendedColors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onOpenDebit(debit) }
+            .padding(start = 48.dp, top = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                formatLocalizedMoney(debit.salaryPeriodSpendingNet),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Icon(
+                imageVector = MasroofIcons.periodNext,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = extended.account,
+            )
         }
     }
 }

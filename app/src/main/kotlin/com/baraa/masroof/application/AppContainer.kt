@@ -250,6 +250,7 @@ class AppContainer(
             financialTransactionRepository = financialTransactionRepository,
             rawSmsRepository = rawSmsRepository,
             ownershipResolver = ownershipResolver,
+            ownershipConfirmationService = ownershipConfirmationService,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             reconciliationService = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,

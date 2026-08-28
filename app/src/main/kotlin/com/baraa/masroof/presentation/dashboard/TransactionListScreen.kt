@@ -164,9 +164,7 @@ fun TransactionListScreen(
         }
 
         Column(
-            modifier = contentModifier
-                .fillMaxSize()
-                .padding(top = 12.dp),
+            modifier = contentModifier.fillMaxSize(),
         ) {
             TransactionListToolbar(
                 periodLabel = periodLabel,

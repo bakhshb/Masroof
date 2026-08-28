@@ -21,8 +21,18 @@ fun DashboardUiState.followedCreditFacilities(): CreditFacilitiesOverview? {
     return overview.copy(facilities = facilities, debitCards = debitCards)
 }
 
+fun DashboardUiState.followedCreditFacilitiesCreditOnly(): CreditFacilitiesOverview? {
+    val overview = followedCreditFacilities() ?: return null
+    val creditOnly = overview.copy(debitCards = emptyList())
+    return if (creditOnly.facilities.isNotEmpty() || creditOnly.legacyFlat.hasContent) {
+        creditOnly
+    } else {
+        null
+    }
+}
+
 fun DashboardUiState.followedCreditFacilitiesForSummary(): CreditFacilitiesOverview? =
-    followedCreditFacilities()
+    followedCreditFacilitiesCreditOnly()
 
 fun DashboardUiState.followedLoansOverview(): LoansOverview? {
     val overview = loansOverview ?: return null

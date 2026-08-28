@@ -20,18 +20,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
-import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.application.dashboard.LoanOverview
-import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
-import com.baraa.masroof.application.dashboard.aggregateDebitSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateFacilityDue
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -49,15 +46,11 @@ fun CardsSummaryRoute(
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedLoanKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilitiesForSummary()
     val followedLoans = state.followedLoansOverview()
     val selectedLoan = selectedLoanKey?.let { key ->
         followedLoans?.loans?.find { LoanOwnershipKey.of(it) == key }
-    }
-    val selectedDebit = selectedCardKey?.let { key ->
-        followedFacilities?.debitCards?.find { CardOwnershipKey.of(it) == key }
     }
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
@@ -69,7 +62,7 @@ fun CardsSummaryRoute(
     BackHandler {
         when {
             selectedLoan != null -> selectedLoanKey = null
-            selectedCard != null || selectedDebit != null -> selectedCardKey = null
+            selectedCard != null -> selectedCardKey = null
             else -> onBack()
         }
     }
@@ -100,54 +93,31 @@ fun CardsSummaryRoute(
             )
         }
 
-        selectedDebit != null -> {
-            DebitCardDetailScreen(
-                debit = selectedDebit,
+        selectedCard != null -> {
+            CardDetailScreen(
+                row = selectedCard,
+                salaryPeriodLabel = followedOverview?.salaryPeriodLabel
+                    ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
                 state = state,
-                cardNetwork = cardNetworks[CardOwnershipKey.of(selectedDebit)] ?: selectedDebit.network,
                 onBack = { selectedCardKey = null },
                 onOpenTransaction = onOpenTransaction,
                 onViewAllTransactions = {
-                    val cardKey = CardTransactionInvolvementResolver.cardKey(
-                        selectedDebit.bank.id,
-                        selectedDebit.last4,
-                    )
-                    val spendTransactionIds = state.transactionDebitSpendInvolvement
-                        .filter { (_, cardKeys) -> cardKey in cardKeys }
-                        .keys
                     onOpenAllTransactions(
-                        TransactionListFilterState(transactionIds = spendTransactionIds),
+                        TransactionListFilterState(cardLast4s = setOf(selectedCard.last4)),
                     )
                 },
             )
         }
 
-        selectedCard != null -> {
-        CardDetailScreen(
-            row = selectedCard,
-            salaryPeriodLabel = followedOverview?.salaryPeriodLabel
-                ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
-            state = state,
-            onBack = { selectedCardKey = null },
-            onOpenTransaction = onOpenTransaction,
-            onViewAllTransactions = {
-                onOpenAllTransactions(
-                    TransactionListFilterState(cardLast4s = setOf(selectedCard.last4)),
-                )
-            },
-        )
-        }
-
         else -> {
-        CardsSummaryScreen(
-            state = state,
-            onBack = onBack,
-            onManageCards = onManageCards,
-            onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
-            onOpenDebit = { debit -> selectedCardKey = CardOwnershipKey.of(debit) },
-            onOpenLoan = { loan -> selectedLoanKey = LoanOwnershipKey.of(loan) },
-            cardNetworksByLast4 = cardNetworks,
-        )
+            CardsSummaryScreen(
+                state = state,
+                onBack = onBack,
+                onManageCards = onManageCards,
+                onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+                onOpenLoan = { loan -> selectedLoanKey = LoanOwnershipKey.of(loan) },
+                cardNetworksByLast4 = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork },
+            )
         }
     }
 }
@@ -161,7 +131,6 @@ fun CardsSummaryScreen(
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
-    onOpenDebit: (DebitCardOverview) -> Unit,
     onOpenLoan: (LoanOverview) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
@@ -182,7 +151,7 @@ fun CardsSummaryScreen(
                 followedFacilities != null && followedFacilities.hasContent -> {
                     FacilitiesSummaryHeroCard(overview = followedFacilities)
                     CardsSummaryHeader(
-                        cardCount = followedFacilities.facilities.size + followedFacilities.debitCards.size,
+                        cardCount = followedFacilities.facilities.size,
                         onManageCards = onManageCards,
                     )
                     followedFacilities.facilities.forEach { facility ->
@@ -193,14 +162,6 @@ fun CardsSummaryScreen(
                             ownedCards = state.ownedCards,
                             modifier = Modifier.fillMaxWidth(),
                             onOpenCard = onOpenCard,
-                        )
-                    }
-                    followedFacilities.debitCards.forEach { debit ->
-                        DebitCardSummaryTile(
-                            debit = debit,
-                            network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { onOpenDebit(debit) },
                         )
                     }
                 }
@@ -254,12 +215,8 @@ private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
     val due = aggregateDue?.amount
     val creditPeriodSpending = overview.aggregateCreditSalaryPeriodSpending()
     val creditStatementSpending = overview.aggregateCreditStatementSpending()
-    val debitPeriodSpending = overview.aggregateDebitSalaryPeriodSpending()
     val aggregateStatementLabel = overview.facilities.firstOrNull()?.aggregateStatementPeriodLabel
     val salaryPeriodLabel = overview.facilities.firstOrNull()?.salaryPeriodLabel
-        ?: overview.debitCards.firstOrNull()?.salaryPeriodLabel
-    val showCreditSpending = overview.facilities.isNotEmpty()
-    val showDebitSpending = overview.debitCards.isNotEmpty()
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
     val dueDateHint = aggregateDue?.dueDate?.let { dueDate ->
@@ -270,55 +227,40 @@ private fun FacilitiesSummaryHeroCard(overview: CreditFacilitiesOverview) {
     }
 
     val metrics = buildList {
-        if (showCreditSpending) {
-            add(
-                DashboardSummaryMetricItem(
-                    title = stringResource(R.string.dashboard_credit_card_aggregate_due),
-                    amount = due?.let { formatLocalizedMoney(it) }
-                        ?: stringResource(R.string.dashboard_value_unavailable),
-                    tone = DashboardMetricTone.Liability,
-                    hint = dueDateHint,
-                ),
-            )
-            add(
-                DashboardSummaryMetricItem(
-                    title = if (salaryPeriodLabel != null) {
-                        stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
-                    } else {
-                        stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
-                    },
-                    amount = formatLocalizedMoney(creditPeriodSpending),
-                    tone = spendingMetricTone(creditPeriodSpending),
-                ),
-            )
-            add(
-                DashboardSummaryMetricItem(
-                    title = if (aggregateStatementLabel != null) {
-                        stringResource(
-                            R.string.dashboard_credit_cards_aggregate_statement_spending,
-                            aggregateStatementLabel,
-                        )
-                    } else {
-                        stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
-                    },
-                    amount = formatLocalizedMoney(creditStatementSpending),
-                    tone = spendingMetricTone(creditStatementSpending),
-                ),
-            )
-        }
-        if (showDebitSpending) {
-            add(
-                DashboardSummaryMetricItem(
-                    title = if (salaryPeriodLabel != null) {
-                        stringResource(R.string.dashboard_debit_cards_aggregate_period_spending, salaryPeriodLabel)
-                    } else {
-                        stringResource(R.string.dashboard_debit_cards_aggregate_period_spending_fallback)
-                    },
-                    amount = formatLocalizedMoney(debitPeriodSpending),
-                    tone = spendingMetricTone(debitPeriodSpending),
-                ),
-            )
-        }
+        add(
+            DashboardSummaryMetricItem(
+                title = stringResource(R.string.dashboard_credit_card_aggregate_due),
+                amount = due?.let { formatLocalizedMoney(it) }
+                    ?: stringResource(R.string.dashboard_value_unavailable),
+                tone = DashboardMetricTone.Liability,
+                hint = dueDateHint,
+            ),
+        )
+        add(
+            DashboardSummaryMetricItem(
+                title = if (salaryPeriodLabel != null) {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, salaryPeriodLabel)
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback)
+                },
+                amount = formatLocalizedMoney(creditPeriodSpending),
+                tone = spendingMetricTone(creditPeriodSpending),
+            ),
+        )
+        add(
+            DashboardSummaryMetricItem(
+                title = if (aggregateStatementLabel != null) {
+                    stringResource(
+                        R.string.dashboard_credit_cards_aggregate_statement_spending,
+                        aggregateStatementLabel,
+                    )
+                } else {
+                    stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback)
+                },
+                amount = formatLocalizedMoney(creditStatementSpending),
+                tone = spendingMetricTone(creditStatementSpending),
+            ),
+        )
     }
 
     DashboardSummaryMetricsCard(

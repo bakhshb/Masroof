@@ -9,6 +9,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
+import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
@@ -24,6 +25,8 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -37,7 +40,6 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
@@ -69,6 +71,7 @@ class ReviewWorkflowServiceTest {
     private lateinit var ftRepo: RoomFinancialTransactionRepository
     private lateinit var reviewRepo: RoomReviewRepository
     private lateinit var correctionRepo: RoomUserCorrectionRepository
+    private lateinit var loans: RoomLoanRegistryRepository
     private lateinit var confirmation: OwnershipConfirmationService
     private lateinit var workflow: ReviewWorkflowService
     private val now = AtomicReference(Instant.parse("2026-08-11T12:00:00Z"))
@@ -85,10 +88,11 @@ class ReviewWorkflowServiceTest {
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
+        loans = RoomLoanRegistryRepository.from(db)
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
-        val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
+        confirmation = OwnershipConfirmationService(accounts, cards, loans)
+        val ownershipResolver = OwnershipResolver(accounts, cards, loans)
         val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
         val reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
@@ -105,6 +109,7 @@ class ReviewWorkflowServiceTest {
             financialTransactionRepository = ftRepo,
             rawSmsRepository = rawRepo,
             ownershipResolver = ownershipResolver,
+            ownershipConfirmationService = confirmation,
             effectiveParsedEventProvider = effective,
             reconciliationService = reconciliation,
             reviewQueueUpdater = updater,
@@ -713,6 +718,39 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
+    fun resolveAsFinancialType_loanRepayment_confirmsLoanOwnership() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        persistEvent(
+            smsId = "sms-loan",
+            event = event(
+                id = "pe-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+            ),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-loan",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("manual_resolution"),
+            now = clock.now(),
+        )
+        val result = workflow.resolveAsFinancialType(
+            reviewId = ReviewIdFactory.fromRawSmsId("sms-loan"),
+            type = FinancialTransactionType.LOAN_REPAYMENT,
+        )
+        assertTrue(result is ReviewWorkflowResult.Success)
+        assertEquals(
+            OwnershipStatus.OWNED,
+            loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)),
+        )
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, ftRepo.listAll().single().type)
+    }
+
+    @Test
     fun resolvedReview_upsertRequired_doesNotReopen() = runBlocking {
         persistEvent(
             smsId = "sms-unknown",
@@ -889,6 +927,7 @@ class ReviewWorkflowServiceTest {
         network: BankNetworkType? = null,
         channel: PurchaseChannel? = null,
         merchant: String? = null,
+        counterparty: String? = null,
     ) = ParsedEvent(
         id = id,
         rawSmsId = rawSmsId,
@@ -901,7 +940,7 @@ class ReviewWorkflowServiceTest {
         destinationAccountRef = destination,
         cardRef = card,
         merchant = merchant,
-        counterparty = null,
+        counterparty = counterparty,
         occurredAt = null,
         bankNetworkType = network,
         confidence = Confidence(1.0),
