@@ -22,6 +22,8 @@ import com.baraa.masroof.presentation.dashboard.CardsSummaryRoute
 import com.baraa.masroof.presentation.dashboard.DashboardRoute
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
+import com.baraa.masroof.presentation.dashboard.LoanOwnershipKey
+import com.baraa.masroof.presentation.dashboard.LoansSummaryRoute
 import com.baraa.masroof.presentation.dashboard.TransactionDetailScreen
 import com.baraa.masroof.presentation.dashboard.TransactionListFilterState
 import com.baraa.masroof.presentation.dashboard.TransactionListScreen
@@ -41,6 +43,7 @@ private enum class HomeDestination {
     Dashboard,
     AccountsSummary,
     CardsSummary,
+    LoansSummary,
     NotificationCenter,
     Review,
     AllTransactions,
@@ -77,6 +80,7 @@ fun MasroofRoot(
         mutableStateOf(HomeDestination.Dashboard)
     }
     var transactionListOpenGeneration by remember { mutableStateOf(0) }
+    var pendingLoansSummaryLoanKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun openTransactionList(
         filter: TransactionListFilterState? = null,
@@ -110,6 +114,9 @@ fun MasroofRoot(
                     homeDestination = HomeDestination.Dashboard
 
                 homeDestination == HomeDestination.CardsSummary ->
+                    homeDestination = HomeDestination.Dashboard
+
+                homeDestination == HomeDestination.LoansSummary ->
                     homeDestination = HomeDestination.Dashboard
 
                 homeDestination == HomeDestination.NotificationCenter ->
@@ -160,6 +167,14 @@ fun MasroofRoot(
                 onOpenSettings = { homeDestination = HomeDestination.Settings },
                 onOpenAccountsSummary = { homeDestination = HomeDestination.AccountsSummary },
                 onOpenCardsSummary = { homeDestination = HomeDestination.CardsSummary },
+                onOpenLoansSummary = {
+                    pendingLoansSummaryLoanKey = null
+                    homeDestination = HomeDestination.LoansSummary
+                },
+                onOpenLoanDetail = { loan ->
+                    pendingLoansSummaryLoanKey = LoanOwnershipKey.of(loan)
+                    homeDestination = HomeDestination.LoansSummary
+                },
                 onRequestSmsPermission = onRequestPermissions,
                 onOpenAppSettings = onOpenAppSettings,
             )
@@ -190,6 +205,23 @@ fun MasroofRoot(
                     openTransactionList(
                         filter = filter,
                         returnTo = HomeDestination.CardsSummary,
+                    )
+                },
+            )
+            HomeDestination.LoansSummary -> LoansSummaryRoute(
+                viewModel = dashboardViewModel,
+                initialSelectedLoanKey = pendingLoansSummaryLoanKey,
+                onInitialSelectionConsumed = { pendingLoansSummaryLoanKey = null },
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onManageLoans = {
+                    pendingSettingsDestination = SettingsDestination.Banks
+                    homeDestination = HomeDestination.Settings
+                },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                onOpenAllTransactions = { filter ->
+                    openTransactionList(
+                        filter = filter,
+                        returnTo = HomeDestination.LoansSummary,
                     )
                 },
             )

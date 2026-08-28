@@ -23,3 +23,12 @@ data class LoansOverview(
 ) {
     val hasContent: Boolean get() = loans.isNotEmpty()
 }
+
+fun LoansOverview.aggregateRemainingBalance(): Money? {
+    val balances = loans.mapNotNull { it.remainingBalance }
+    if (balances.isEmpty()) return null
+    return balances.reduce { acc, balance -> acc + balance }
+}
+
+fun LoansOverview.aggregateSalaryPeriodPayment(): SignedMoneyAmount =
+    SpendingAmounts.sum(loans.map { it.salaryPeriodPayment })
