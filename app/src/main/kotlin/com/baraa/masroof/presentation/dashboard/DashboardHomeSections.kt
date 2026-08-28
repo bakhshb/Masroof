@@ -69,6 +69,7 @@ fun DashboardHeroCard(
             amount = formatLocalizedMoney(remaining),
             role = DashboardAmountRole.Hero,
             color = remainingColor,
+            heroScale = heroAmountStyleScale(size),
             modifier = Modifier.padding(top = 6.dp),
         )
 

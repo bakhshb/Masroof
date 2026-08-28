@@ -60,9 +60,12 @@ fun DashboardAmountText(
     color: Color = Color.Unspecified,
     textAlign: TextAlign? = null,
     maxLines: Int = 1,
+    heroScale: Float = 1f,
 ) {
     val baseStyle = when (role) {
-        DashboardAmountRole.Hero -> DashboardTextStyles.heroAmount
+        DashboardAmountRole.Hero -> DashboardTextStyles.heroAmount.copy(
+            fontSize = DashboardTextStyles.heroAmount.fontSize * heroScale,
+        )
         DashboardAmountRole.Card -> DashboardTextStyles.cardAmount
         DashboardAmountRole.Tile -> DashboardTextStyles.tileAmount
         DashboardAmountRole.List -> DashboardTextStyles.listAmount
