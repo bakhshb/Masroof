@@ -22,6 +22,9 @@ enum class DashboardSectionId {
     @SerialName("cards")
     CARDS,
 
+    @SerialName("loans")
+    LOANS,
+
     @SerialName("transactions")
     TRANSACTIONS,
 }
@@ -57,6 +60,39 @@ data class DashboardLayoutSnapshot(
     fun entry(id: DashboardSectionId): DashboardSectionEntry? =
         sections.firstOrNull { it.id == id }
 
+    /** Appends sections introduced after a saved layout was stored (e.g. LOANS). */
+    fun withMergedSections(): DashboardLayoutSnapshot {
+        val defaults = default()
+        val existingIds = sections.map { it.id }.toSet()
+        val missing = defaults.sections.filter { it.id !in existingIds }
+        if (missing.isEmpty()) return this
+
+        val merged = sections.toMutableList()
+        val knownIds = existingIds.toMutableSet()
+        missing.forEach { newEntry ->
+            val defaultIndex = defaults.sections.indexOfFirst { it.id == newEntry.id }
+            val anchorAfter = defaults.sections
+                .drop(defaultIndex + 1)
+                .firstOrNull { it.id in knownIds }
+            val insertAt = when {
+                anchorAfter != null -> merged.indexOfFirst { it.id == anchorAfter.id }
+                else -> {
+                    val anchorBefore = defaults.sections
+                        .take(defaultIndex)
+                        .lastOrNull { it.id in knownIds }
+                    if (anchorBefore != null) {
+                        merged.indexOfFirst { it.id == anchorBefore.id } + 1
+                    } else {
+                        merged.size
+                    }
+                }
+            }
+            merged.add(insertAt.coerceIn(0, merged.size), newEntry)
+            knownIds += newEntry.id
+        }
+        return copy(sections = merged)
+    }
+
     companion object {
         fun default(): DashboardLayoutSnapshot =
             DashboardLayoutSnapshot(
@@ -65,6 +101,7 @@ data class DashboardLayoutSnapshot(
                     DashboardSectionEntry(DashboardSectionId.QUICK, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.ACCOUNTS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.CARDS, size = DashboardSectionSize.LARGE),
+                    DashboardSectionEntry(DashboardSectionId.LOANS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.TRANSACTIONS, size = DashboardSectionSize.MEDIUM),
                 ),
             )

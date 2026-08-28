@@ -222,7 +222,7 @@ fun TransactionDetailScreen(
         ) {
             MasroofCard {
                 Text(
-                    transaction.title ?: transactionTypeLabel(transaction.type),
+                    transaction.title ?: transactionTypeLabel(transaction.typeLabelResHint),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
@@ -247,9 +247,9 @@ fun TransactionDetailScreen(
             MasroofCard {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     IconLabelRow(
-                        icon = MasroofIcons.transactionType(transaction.type),
+                        icon = MasroofIcons.transactionType(transaction.typeLabelResHint),
                         label = stringResource(R.string.transaction_detail_type),
-                        trailing = transactionTypeLabel(transaction.type),
+                        trailing = transactionTypeLabel(transaction.typeLabelResHint),
                     )
                     IconLabelRow(
                         icon = MasroofIcons.calendar,

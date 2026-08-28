@@ -208,6 +208,12 @@ fun SettingsRoute(
             bank = Bank(current.bankId),
             state = state,
             onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
+            onConfirmOwned = viewModel::confirmLoanOwned,
+            onMarkExternal = viewModel::markLoanExternal,
+            onRequestStopTracking = viewModel::requestStopLoanTracking,
+            onResumeTracking = viewModel::resumeLoanTracking,
+            onDismissStopConfirm = viewModel::dismissStopConfirm,
+            onConfirmStopTracking = viewModel::confirmStopLoanTracking,
         )
 
         SettingsDestination.About -> SettingsAboutScreen(

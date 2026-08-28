@@ -8,6 +8,7 @@
 - Use helpers such as `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, and `AccountsSummary.totalInflow`.
 - Credit facility due is one value per facility (primary + supplementaries share the statement due).
 - Mada (debit) cards have salary-period spending only — no statement due.
+- Loan repayments are detected from `LOAN_REPAYMENT` or `FEE` + `FINANCING_INSTALLMENT` SMS via `LoanRepaymentAttribution`; all dashboard calculators must use it.
 
 ## Testing dashboard changes
 

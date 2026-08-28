@@ -164,6 +164,56 @@ class MonthlyFinancialSummaryCalculatorTest {
         assertEquals(1, summary.transactionCount)
     }
 
+    @Test
+    fun feeWithFinancingInstallmentSms_excludedFromSpendingGross() {
+        val parsedRecord = com.baraa.masroof.parsing.repository.ParsedEventRecord(
+            event = com.baraa.masroof.domain.model.ParsedEvent(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                bank = com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+                messageFamily = com.baraa.masroof.domain.model.MessageFamily.FINANCING_INSTALLMENT,
+                direction = com.baraa.masroof.domain.model.MoneyDirection.OUTGOING,
+                amount = Money.of("3036.11", Currency.SAR),
+                purchaseChannel = null,
+                cardRef = null,
+                sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
+                    com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+                    "3001",
+                ),
+                destinationAccountRef = null,
+                merchant = null,
+                counterparty = "تمويل شخصي",
+                occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                bankNetworkType = null,
+                confidence = com.baraa.masroof.domain.model.Confidence(1.0),
+                parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
+            ),
+            details = com.baraa.masroof.parsing.model.ParsedEventDetails(),
+        )
+        val feeLoan = FinancialTransaction(
+            id = "fee-loan",
+            type = FinancialTransactionType.FEE,
+            amount = Money.of("3036.11", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
+                com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
+                "3001",
+            ),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+        val summary = MonthlyFinancialSummaryCalculator.summarize(
+            period = period,
+            transactions = listOf(feeLoan),
+            reviewRequiredCount = 0,
+            parsedRecords = listOf(parsedRecord),
+        )
+        assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
+    }
+
     private fun summarize(vararg transactions: FinancialTransaction): MonthlyFinancialSummary =
         MonthlyFinancialSummaryCalculator.summarize(
             period = period,

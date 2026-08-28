@@ -5,9 +5,12 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 
@@ -24,6 +27,7 @@ class TransactionReclassificationService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val ownershipResolver: OwnershipResolver,
+    private val ownershipConfirmationService: OwnershipConfirmationService? = null,
     private val appLogService: AppLogService? = null,
 ) {
     suspend fun reclassify(
@@ -95,6 +99,19 @@ class TransactionReclassificationService(
             ->
                 sourceAccountId to null
 
+            FinancialTransactionType.LOAN_REPAYMENT -> {
+                val sourceRef = event.sourceAccountRef
+                    ?: return ReclassificationResult.Rejected("missing_source")
+                if (ownershipResolver.resolveAccount(sourceRef) != OwnershipStatus.OWNED) {
+                    return ReclassificationResult.Rejected("source_not_owned")
+                }
+                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+                    ?: return ReclassificationResult.Rejected("loan_type_missing")
+                val loanRef = LoanReference(event.bank, loanType)
+                maybeConfirmLoanOwned(loanRef)
+                sourceAccountId to FinancialContainerIdFactory.loanId(event.bank, loanType)
+            }
+
             else ->
                 return ReclassificationResult.Rejected("type_not_allowed")
         }
@@ -114,6 +131,11 @@ class TransactionReclassificationService(
         return ReclassificationResult.Success(updated)
     }
 
+    private suspend fun maybeConfirmLoanOwned(reference: LoanReference) {
+        if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
+        ownershipConfirmationService?.confirmLoanOwned(reference)
+    }
+
     companion object {
         val ALLOWED_TYPES: Set<FinancialTransactionType> = setOf(
             FinancialTransactionType.EXPENSE,
@@ -123,6 +145,7 @@ class TransactionReclassificationService(
             FinancialTransactionType.CASH_WITHDRAWAL,
             FinancialTransactionType.BILL_PAYMENT,
             FinancialTransactionType.FEE,
+            FinancialTransactionType.LOAN_REPAYMENT,
             FinancialTransactionType.EXTERNAL_TRANSFER_IN,
             FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
         )

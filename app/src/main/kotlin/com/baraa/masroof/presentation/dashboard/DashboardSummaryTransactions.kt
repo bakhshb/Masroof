@@ -47,11 +47,13 @@ object DashboardSummaryTransactionFilter {
         transactions: List<TransactionPreviewUi>,
         bank: Bank,
         loanType: LoanType,
+        involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): List<TransactionPreviewUi> {
         val loanContainerId = FinancialContainerIdFactory.loanId(bank, loanType)
         return transactions.filter { tx ->
-            tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
-                tx.destinationContainerId == loanContainerId
+            loanContainerId in involvementByTransactionId[tx.id].orEmpty() ||
+                (tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
+                    tx.destinationContainerId == loanContainerId)
         }
     }
 
