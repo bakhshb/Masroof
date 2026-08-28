@@ -51,6 +51,7 @@ fun CreditCardsSection(
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?> = emptyMap(),
     ownedCards: List<OwnedCardUi> = emptyList(),
     onViewAll: (() -> Unit)? = null,
+    onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
 ) {
     if (!overview.hasContent) return
 
@@ -75,6 +76,7 @@ fun CreditCardsSection(
                     cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
                     ownedCards = ownedCards,
                     modifier = Modifier.width(288.dp),
+                    onClick = onOpenCard?.let { open -> { open(row) } },
                 )
             }
         }
@@ -235,9 +237,12 @@ fun CreditCardSummaryTile(
     showBalanceAndDue: Boolean = presentation == CreditCardMetricsPresentation.SummaryPurchases,
     cardNetwork: CardNetwork? = null,
     ownedCards: List<OwnedCardUi> = emptyList(),
+    onClick: (() -> Unit)? = null,
+    showNavigationIcon: Boolean = onClick != null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val dateTimeFormatter = DateTimeFormatter.ofPattern("d MMM HH:mm", locale)
+    val extended = MasroofThemeExtras.extendedColors
 
     val salaryPeriodLabelText = when (presentation) {
         CreditCardMetricsPresentation.SummaryPurchases -> {
@@ -281,7 +286,11 @@ fun CreditCardSummaryTile(
         }
     }
 
-    MasroofCard(modifier = modifier) {
+    MasroofCard(
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+        ),
+    ) {
         Column(modifier = Modifier.padding(bottom = 4.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -305,6 +314,13 @@ fun CreditCardSummaryTile(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+                if (showNavigationIcon) {
+                    Icon(
+                        imageVector = MasroofIcons.periodNext,
+                        contentDescription = null,
+                        tint = extended.account,
+                    )
                 }
             }
 

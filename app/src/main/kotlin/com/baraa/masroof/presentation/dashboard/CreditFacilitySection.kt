@@ -58,6 +58,7 @@ fun CreditFacilitiesSection(
     ownedCards: List<OwnedCardUi> = emptyList(),
     modifier: Modifier = Modifier,
     onViewAll: (() -> Unit)? = null,
+    onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
     onOpenDebit: ((DebitCardOverview) -> Unit)? = null,
     facilityModifier: Modifier = Modifier.width(288.dp),
 ) {
@@ -83,6 +84,7 @@ fun CreditFacilitiesSection(
                         zoneId = zoneId,
                         ownedCards = ownedCards,
                         modifier = facilityModifier.heightIn(min = dashboardCarouselCardMinHeight),
+                        onOpenCard = onOpenCard,
                     )
                 }
                 items(overview.debitCards, key = { "debit-${it.bank.id}-${it.last4}" }) { debit ->

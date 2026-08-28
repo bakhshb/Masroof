@@ -46,6 +46,8 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 @Composable
 fun AccountsSummaryRoute(
     viewModel: DashboardViewModel,
+    initialSelectedDebitKey: String? = null,
+    onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageAccounts: () -> Unit,
     onOpenTransaction: (String) -> Unit,
@@ -55,6 +57,14 @@ fun AccountsSummaryRoute(
     var selectedAccountKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
+
+    androidx.compose.runtime.LaunchedEffect(initialSelectedDebitKey) {
+        if (initialSelectedDebitKey != null) {
+            selectedDebitKey = initialSelectedDebitKey
+            onInitialSelectionConsumed()
+        }
+    }
+
     val selectedAccount = selectedAccountKey?.let { key ->
         state.ownedAccounts.find { ownedAccountKey(it) == key }
     }

@@ -28,6 +28,8 @@ import java.time.ZoneId
 @Composable
 fun CardsSummaryRoute(
     viewModel: DashboardViewModel,
+    initialSelectedCardKey: String? = null,
+    onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenTransaction: (String) -> Unit,
@@ -37,11 +39,19 @@ fun CardsSummaryRoute(
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
     val followedOverview = followedCreditCardsOverview(state)
     val followedFacilities = state.followedCreditFacilitiesForSummary()
+
+    androidx.compose.runtime.LaunchedEffect(initialSelectedCardKey) {
+        if (initialSelectedCardKey != null) {
+            selectedCardKey = initialSelectedCardKey
+            onInitialSelectionConsumed()
+        }
+    }
+
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
             ?.flatMap { it.allCards }
-            ?.find { ownedCardKey(it) == key }
-            ?: followedOverview?.cards?.find { ownedCardKey(it) == key }
+            ?.find { CardOwnershipKey.of(it) == key }
+            ?: followedOverview?.cards?.find { CardOwnershipKey.of(it) == key }
     }
 
     BackHandler {
@@ -74,15 +84,12 @@ fun CardsSummaryRoute(
                 state = state,
                 onBack = onBack,
                 onManageCards = onManageCards,
-                onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
+                onOpenCard = { row -> selectedCardKey = CardOwnershipKey.of(row) },
                 cardNetworksByLast4 = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork },
             )
         }
     }
 }
-
-private fun ownedCardKey(row: CreditCardDashboardRow): String =
-    "${row.bank.id}:${row.last4}"
 
 @Composable
 fun CardsSummaryScreen(
