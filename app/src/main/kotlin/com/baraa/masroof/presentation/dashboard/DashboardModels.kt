@@ -3,7 +3,6 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.BankHierarchyOverview
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
 import com.baraa.masroof.application.dashboard.AccountsSummary
@@ -82,7 +81,6 @@ data class DashboardUiState(
     val summary: MonthlyFinancialSummary? = null,
     val currentAccount: CurrentAccountSummary? = null,
     val spendingSplit: SpendingSplitSummary? = null,
-    val creditCards: CreditCardsOverview? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
     val loansOverview: LoansOverview? = null,
     val bankHierarchy: BankHierarchyOverview? = null,

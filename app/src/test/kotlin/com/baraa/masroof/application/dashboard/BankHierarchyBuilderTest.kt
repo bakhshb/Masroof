@@ -35,18 +35,6 @@ class BankHierarchyBuilderTest {
                 debitOverview(last4 = "5555", linkedMask = "3001"),
                 debitOverview(last4 = "8888", linkedMask = null),
             ),
-            legacyFlat = CreditCardsOverview(
-                cards = emptyList(),
-                aggregateDueAmount = null,
-                aggregateDueUpdatedAt = null,
-                aggregateDueDate = null,
-                aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-                aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-                aggregateStatementPeriodLabel = null,
-                calendarMonthLabel = null,
-                salaryPeriodLabel = null,
-                currency = Currency.SAR,
-            ),
             currency = Currency.SAR,
         )
 

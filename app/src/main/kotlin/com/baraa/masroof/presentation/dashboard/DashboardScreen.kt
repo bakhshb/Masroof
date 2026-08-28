@@ -349,8 +349,7 @@ private fun DashboardCustomizableSections(
 
                 DashboardSectionId.CARDS -> {
                     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
-                    val followedFacilities = state.followedCreditFacilitiesCreditOnly()
-                    if (followedFacilities != null) {
+                    state.followedCreditFacilities()?.let { followedFacilities ->
                         CreditFacilitiesSection(
                             overview = followedFacilities,
                             cardNetworksByLast4 = cardNetworks,
@@ -360,19 +359,6 @@ private fun DashboardCustomizableSections(
                             onOpenCard = onOpenCardDetail,
                             onOpenDebit = onOpenDebitDetail,
                         )
-                    } else {
-                        state.followedCreditCardsOverview()?.let { followedOverview ->
-                            if (followedOverview.hasContent) {
-                                CreditCardsSection(
-                                    overview = followedOverview,
-                                    cardNetworksByLast4 = cardNetworks,
-                                    zoneId = ZoneId.systemDefault(),
-                                    ownedCards = state.ownedCards,
-                                    onViewAll = onOpenCardsSummary,
-                                    onOpenCard = onOpenCardDetail,
-                                )
-                            }
-                        }
                     }
                 }
 

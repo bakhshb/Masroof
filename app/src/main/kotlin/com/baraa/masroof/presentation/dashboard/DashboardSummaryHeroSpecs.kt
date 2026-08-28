@@ -4,14 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
+import com.baraa.masroof.application.dashboard.aggregateDebitSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateFacilityDue
+import com.baraa.masroof.application.dashboard.SpendingAmounts
 import com.baraa.masroof.application.dashboard.aggregateRemainingBalance
 import com.baraa.masroof.application.dashboard.aggregateSalaryPeriodPayment
 import com.baraa.masroof.core.money.Money
@@ -54,39 +55,25 @@ private val accountsSummaryHeroLocale: Locale
     @Composable get() = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
 
 @Composable
-fun creditCardsSummaryHeroSpec(
-    overview: CreditCardsOverview,
-    locale: Locale,
-): DashboardSummaryHeroSpec =
-    buildCreditSummaryHeroSpec(
-        aggregateDue = overview.aggregateDueAmount,
-        dueDateLabel = overview.aggregateDueDate?.let { dueDate ->
-            stringResource(
-                R.string.dashboard_credit_card_due_date,
-                DateTimeFormatter.ofPattern("d MMM yyyy", locale).format(dueDate),
-            )
-        },
-        periodSpending = overview.aggregatePeriodSpendingNet,
-        statementSpending = overview.aggregateStatementSpendingNet,
-        dueTitle = stringResource(R.string.dashboard_credit_card_aggregate_due),
-        periodSpendingTitle = overview.salaryPeriodLabel?.let {
-            stringResource(R.string.dashboard_credit_cards_aggregate_period_spending, it)
-        } ?: stringResource(R.string.dashboard_credit_cards_aggregate_period_spending_fallback),
-        statementSpendingTitle = overview.aggregateStatementPeriodLabel?.let {
-            stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending, it)
-        } ?: stringResource(R.string.dashboard_credit_cards_aggregate_statement_spending_fallback),
-        unavailableLabel = stringResource(R.string.dashboard_value_unavailable),
-        languageTag = locale.toLanguageTag(),
-    )
-
-@Composable
 fun creditFacilitiesSummaryHeroSpec(
     overview: CreditFacilitiesOverview,
     locale: Locale,
 ): DashboardSummaryHeroSpec {
     val aggregateDue = overview.aggregateFacilityDue()
     val salaryPeriodLabel = overview.facilities.firstOrNull()?.salaryPeriodLabel
+        ?: overview.debitCards.firstOrNull()?.salaryPeriodLabel
     val statementPeriodLabel = overview.facilities.firstOrNull()?.aggregateStatementPeriodLabel
+    val periodSpending = when {
+        overview.facilities.isNotEmpty() && overview.debitCards.isNotEmpty() ->
+            SpendingAmounts.sum(
+                listOf(
+                    overview.aggregateCreditSalaryPeriodSpending(),
+                    overview.aggregateDebitSalaryPeriodSpending(),
+                ),
+            )
+        overview.facilities.isNotEmpty() -> overview.aggregateCreditSalaryPeriodSpending()
+        else -> overview.aggregateDebitSalaryPeriodSpending()
+    }
     return buildCreditSummaryHeroSpec(
         aggregateDue = aggregateDue?.amount,
         dueDateLabel = aggregateDue?.dueDate?.let { dueDate ->
@@ -95,7 +82,7 @@ fun creditFacilitiesSummaryHeroSpec(
                 DateTimeFormatter.ofPattern("d MMM yyyy", locale).format(dueDate),
             )
         },
-        periodSpending = overview.aggregateCreditSalaryPeriodSpending(),
+        periodSpending = periodSpending,
         statementSpending = overview.aggregateCreditStatementSpending(),
         dueTitle = stringResource(R.string.dashboard_credit_card_aggregate_due),
         periodSpendingTitle = salaryPeriodLabel?.let {

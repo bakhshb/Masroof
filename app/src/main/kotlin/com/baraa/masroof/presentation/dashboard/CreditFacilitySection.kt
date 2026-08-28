@@ -414,21 +414,13 @@ fun CreditFacilityCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 facility.supplementaries.forEach { supplementary ->
-                    CreditCardSummaryTile(
+                    CreditSupplementaryRow(
                         row = supplementary,
                         salaryPeriodLabel = facility.salaryPeriodLabel,
-                        zoneId = zoneId,
-                        presentation = CreditCardMetricsPresentation.SummaryPurchases,
-                        showBalanceAndDue = false,
                         cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(supplementary)],
                         ownedCards = ownedCards,
-                        modifier = if (onOpenCard != null) {
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenCard(supplementary) }
-                        } else {
-                            Modifier.fillMaxWidth()
-                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onOpenCard?.let { open -> { open(supplementary) } },
                     )
                 }
             }

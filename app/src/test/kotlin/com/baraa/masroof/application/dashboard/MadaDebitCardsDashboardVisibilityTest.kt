@@ -17,7 +17,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.OwnedCardUi
-import com.baraa.masroof.presentation.dashboard.followedCreditFacilitiesForSummary
+import com.baraa.masroof.presentation.dashboard.followedCreditFacilities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -93,7 +93,7 @@ class MadaDebitCardsDashboardVisibilityTest {
     }
 
     @Test
-    fun followedCreditFacilitiesForSummary_excludesInferredMadaCards() {
+    fun followedCreditFacilities_includesOwnedMadaDebitCards() {
         val registry = listOf(
             creditCard("1111"),
             ownedMadaWithoutMetadata("8219"),
@@ -120,11 +120,14 @@ class MadaDebitCardsDashboardVisibilityTest {
             },
         )
 
-        val followed = state.followedCreditFacilitiesForSummary()
+        val followed = state.followedCreditFacilities()
 
         assertNotNull(followed)
         assertEquals(1, followed!!.facilities.size)
-        assertEquals(emptyList<String>(), followed.debitCards.map { it.last4 })
+        assertEquals(
+            listOf("5555", "8219"),
+            followed.debitCards.map { it.last4 }.sorted(),
+        )
     }
 
     @Test
