@@ -30,9 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.LoanOverview
-import com.baraa.masroof.application.dashboard.LoansOverview
-import com.baraa.masroof.application.dashboard.aggregateRemainingBalance
-import com.baraa.masroof.application.dashboard.aggregateSalaryPeriodPayment
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -136,7 +133,7 @@ fun LoansSummaryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                LoansSummaryHeroCard(overview = followedLoans)
+                DashboardSummaryHeroCard(spec = loansSummaryHeroSpec(overview = followedLoans))
                 LoansSummaryHeader(
                     loanCount = followedLoans.loans.size,
                     onManageLoans = onManageLoans,
@@ -150,36 +147,6 @@ fun LoansSummaryScreen(
             }
         }
     }
-}
-
-@Composable
-private fun LoansSummaryHeroCard(overview: LoansOverview) {
-    val aggregateRemaining = overview.aggregateRemainingBalance()
-    val aggregatePayment = overview.aggregateSalaryPeriodPayment()
-    val paymentTitle = if (overview.salaryPeriodLabel != null) {
-        stringResource(R.string.dashboard_loans_aggregate_period_payment, overview.salaryPeriodLabel)
-    } else {
-        stringResource(R.string.dashboard_loans_aggregate_period_payment_fallback)
-    }
-
-    val metrics = listOf(
-        DashboardSummaryMetricItem(
-            title = stringResource(R.string.dashboard_loans_remaining_total_title),
-            amount = aggregateRemaining?.let { formatLocalizedMoney(it) }
-                ?: stringResource(R.string.dashboard_value_unavailable),
-            tone = DashboardMetricTone.Liability,
-        ),
-        DashboardSummaryMetricItem(
-            title = paymentTitle,
-            amount = formatLocalizedMoney(aggregatePayment),
-            tone = spendingMetricTone(aggregatePayment),
-        ),
-    )
-
-    DashboardSummaryMetricsCard(
-        metrics = metrics,
-        accent = MasroofCardAccent.Credit,
-    )
 }
 
 @Composable
