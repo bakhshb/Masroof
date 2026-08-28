@@ -130,6 +130,17 @@
     <string name="settings_hub_cards_subtitle_stopped_only">%1$d stopped card(s)</string>
     <string name="settings_hub_cards_subtitle_followed_stopped">%1$d card(s) • %2$d stopped</string>
     <string name="settings_bank_category_stopped_suffix"> • %1$d stopped</string>
+    <string name="settings_my_finances_section">My finances</string>
+    <string name="settings_app_section">App</string>
+    <string name="settings_app_hub_subtitle">%1$s • %2$s</string>
+    <string name="settings_data_backup_section">Data &amp; backup</string>
+    <string name="settings_data_backup_hub_subtitle">SMS import, reparse, and backup</string>
+    <string name="settings_registry_accounts_hint">Choose a bank to manage its accounts.</string>
+    <string name="settings_registry_cards_hint">Choose a bank to manage its cards.</string>
+    <string name="settings_registry_loans_hint">Choose a bank to manage its loans.</string>
+    <string name="settings_hub_loans_subtitle">%1$d loan(s)</string>
+    <string name="settings_hub_loans_subtitle_only">%1$d loan(s)</string>
+    <string name="settings_hub_loans_subtitle_none">No loans yet</string>
     <string name="settings_banks_section">Banks</string>
     <string name="settings_banks_hint">Choose a bank to manage its accounts, cards, and loans.</string>
     <string name="settings_banks_empty">No banks detected yet.</string>

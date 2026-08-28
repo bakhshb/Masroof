@@ -141,7 +141,7 @@ internal fun resolveRegistryCategorySubtitle(
 }
 
 @Composable
-private fun formatRegistryCategorySubtitle(
+internal fun formatRegistryCategorySubtitle(
     state: RegistryCategorySubtitleState,
     emptyLabel: String,
     followedUnregisteredRes: Int,

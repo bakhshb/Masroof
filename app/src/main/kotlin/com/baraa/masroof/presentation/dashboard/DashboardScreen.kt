@@ -59,6 +59,7 @@ fun DashboardRoute(
     onOpenAllTransactions: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onManageCardsInSettings: () -> Unit = onOpenSettings,
     onOpenAccountsSummary: () -> Unit = onOpenSettings,
     onOpenCardsSummary: () -> Unit = onOpenSettings,
     onOpenLoansSummary: () -> Unit = onOpenSettings,
@@ -84,6 +85,7 @@ fun DashboardRoute(
         onOpenAllTransactions = onOpenAllTransactions,
         onOpenTransaction = onOpenTransaction,
         onOpenSettings = onOpenSettings,
+        onManageCardsInSettings = onManageCardsInSettings,
         onOpenAccountsSummary = onOpenAccountsSummary,
         onOpenCardsSummary = onOpenCardsSummary,
         onOpenLoansSummary = onOpenLoansSummary,
@@ -118,6 +120,7 @@ private fun DashboardScreen(
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onManageCardsInSettings: () -> Unit,
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
@@ -261,7 +264,7 @@ private fun DashboardScreen(
                                 editing = state.customizeSheetOpen,
                                 onOpenExpenseDetails = { flowDetailMode = DashboardFlowDetailMode.Expense },
                                 onOpenIncomeDetails = { flowDetailMode = DashboardFlowDetailMode.Income },
-                                onOpenSettings = onOpenSettings,
+                                onManageCardsInSettings = onManageCardsInSettings,
                                 onOpenAccountsSummary = onOpenAccountsSummary,
                                 onOpenCardsSummary = onOpenCardsSummary,
                                 onOpenLoansSummary = onOpenLoansSummary,
@@ -297,7 +300,7 @@ private fun DashboardCustomizableSections(
     editing: Boolean,
     onOpenExpenseDetails: () -> Unit,
     onOpenIncomeDetails: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onManageCardsInSettings: () -> Unit,
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
@@ -384,7 +387,7 @@ private fun DashboardCustomizableSections(
                         UnregisteredCardsNotice(
                             firstLast4 = firstUnknown.last4,
                             extraCount = (state.unknownCards.size - 1).coerceAtLeast(0),
-                            onOpenSettings = onOpenSettings,
+                            onManageCards = onManageCardsInSettings,
                         )
                     }
 

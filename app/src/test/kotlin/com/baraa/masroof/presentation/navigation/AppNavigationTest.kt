@@ -43,32 +43,50 @@ class AppNavigationTest {
     }
 
     @Test
-    fun resolveManageSettingsLaunch_multipleBanks_opensBanksList() {
+    fun resolveManageSettingsLaunch_multipleBanks_opensCategoryList() {
         val state = SettingsUiState(
             bankSummaries = listOf(summary(alJazira), summary(rajhi)),
         )
 
         assertEquals(
-            SettingsLaunchRequest(SettingsDestination.Banks),
+            SettingsLaunchRequest(SettingsDestination.MyCards),
             resolveManageSettingsLaunch(state, ManageSettingsTarget.Cards),
+        )
+        assertEquals(
+            SettingsLaunchRequest(SettingsDestination.MyAccounts),
+            resolveManageSettingsLaunch(state, ManageSettingsTarget.Accounts),
+        )
+        assertEquals(
+            SettingsLaunchRequest(SettingsDestination.MyLoans),
+            resolveManageSettingsLaunch(state, ManageSettingsTarget.Loans),
         )
     }
 
     @Test
-    fun resolveBanksEntry_singleBank_opensBankHub() {
+    fun resolvePendingDestination_legacyBanks_mapsToMyAccounts() {
         val state = SettingsUiState(bankSummaries = listOf(summary(alJazira)))
 
         assertEquals(
-            SettingsDestination.BankHub(alJazira.id),
-            resolveBanksEntry(state),
+            SettingsDestination.MyAccounts,
+            resolvePendingDestination(SettingsDestination.Banks, state),
         )
     }
 
     @Test
-    fun resolveBanksEntry_multipleBanks_opensBanksList() {
-        val state = SettingsUiState(bankSummaries = listOf(summary(alJazira), summary(rajhi)))
-
-        assertEquals(SettingsDestination.Banks, resolveBanksEntry(state))
+    fun recoverRegistryListDestination_mapsBankScreensToCategoryLists() {
+        assertEquals(
+            SettingsDestination.MyAccounts,
+            SettingsDestination.BankAccounts("BANK_ALJAZIRA").recoverRegistryListDestination(),
+        )
+        assertEquals(
+            SettingsDestination.MyCards,
+            SettingsDestination.BankCards("BANK_ALJAZIRA").recoverRegistryListDestination(),
+        )
+        assertEquals(
+            SettingsDestination.MyLoans,
+            SettingsDestination.BankLoans("BANK_ALJAZIRA").recoverRegistryListDestination(),
+        )
+        assertNull(SettingsDestination.About.recoverRegistryListDestination())
     }
 
     @Test
