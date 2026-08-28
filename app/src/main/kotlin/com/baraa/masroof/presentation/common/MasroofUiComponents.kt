@@ -92,14 +92,14 @@ fun IconLabelRow(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.rowHorizontalPadding),
             modifier = Modifier.weight(1f, fill = false),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = iconTint,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(MasroofIconSizes.appBarAction),
             )
             Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         }
@@ -131,15 +131,15 @@ fun IconTextButton(
         ),
     ) {
         if (brandedLogo) {
-            MasroofLogoMark(size = 18.dp)
+            MasroofLogoMark(size = MasroofIconSizes.moneyRowLeading)
         } else {
             Icon(
                 imageVector = icon!!,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(MasroofIconSizes.moneyRowLeading),
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
         Text(text)
     }
 }
@@ -162,9 +162,9 @@ fun IconTextButtonOutlined(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(MasroofIconSizes.moneyRowLeading),
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(MasroofSpacing.carouselGap))
         Text(text)
     }
 }
