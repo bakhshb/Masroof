@@ -467,6 +467,7 @@ class DashboardViewModel(
                         spendingSplit = overview.spendingSplit,
                         creditCards = overview.creditCards,
                         creditFacilities = overview.creditFacilities,
+                        loansOverview = overview.loansOverview,
                         bankHierarchy = overview.bankHierarchy,
                         accountsFleet = overview.accountsFleet,
                         recentTransactions = previews.take(RECENT_TRANSACTION_LIMIT),

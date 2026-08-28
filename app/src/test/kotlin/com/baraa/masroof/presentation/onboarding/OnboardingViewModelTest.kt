@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -503,7 +504,7 @@ AccountRegistryEntry.forTest(
                 historicalImportGateway = gateway,
                 accountRegistryRepository = accountRepo,
                 cardRegistryRepository = cardRepo,
-                ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo),
+                ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo, NoOpLoanRegistryRepository),
                 reviewRepository = reviewRepo,
                 discoverFromStoredEvents = {
                     if (discoverShouldFail) error("discover failed")

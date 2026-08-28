@@ -87,7 +87,7 @@ class IntraBankSelfTransferReconciliationTest {
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
         reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,

@@ -18,6 +18,7 @@ import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
@@ -50,6 +51,7 @@ class TransactionReconciliationService(
     private val rawSmsRepository: RawSmsRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val ownershipResolver: OwnershipResolver,
+    private val ownershipConfirmationService: OwnershipConfirmationService? = null,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider? = null,
     private val reviewRepository: ReviewRepository? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -137,6 +139,7 @@ class TransactionReconciliationService(
                 ?: OwnershipStatus.UNKNOWN
             val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
                 ?: OwnershipStatus.UNKNOWN
+            maybeAutoConfirmLoanOwnership(event, sourceOwn)
             val loanType = LoanTypeResolver.fromLabel(event.counterparty)
             val loanOwn = loanType?.let {
                 ownershipResolver.resolveLoan(LoanReference(event.bank, it))
@@ -632,6 +635,18 @@ class TransactionReconciliationService(
         } else {
             outcome
         }
+    }
+
+    private suspend fun maybeAutoConfirmLoanOwnership(
+        event: ParsedEvent,
+        sourceOwnership: OwnershipStatus,
+    ) {
+        if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return
+        if (sourceOwnership != OwnershipStatus.OWNED) return
+        val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return
+        val reference = LoanReference(event.bank, loanType)
+        if (ownershipResolver.resolveLoan(reference) == OwnershipStatus.OWNED) return
+        ownershipConfirmationService?.confirmLoanOwned(reference)
     }
 
     private enum class PersistOutcome { Saved, Already, Failed }

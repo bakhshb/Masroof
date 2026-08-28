@@ -14,10 +14,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
+import com.baraa.masroof.application.dashboard.CurrentAccountTransactionScope
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.application.dashboard.CurrentAccountTransactionScope
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 
 object DashboardSummaryTransactionFilter {
@@ -38,6 +40,18 @@ object DashboardSummaryTransactionFilter {
             if (!involvesAccount) return@mapNotNull null
             val direction = AccountTransactionPresentation.directionForAccount(tx, containerId, last4s)
             if (direction == tx.direction) tx else tx.copy(direction = direction)
+        }
+    }
+
+    fun forLoan(
+        transactions: List<TransactionPreviewUi>,
+        bank: Bank,
+        loanType: LoanType,
+    ): List<TransactionPreviewUi> {
+        val loanContainerId = FinancialContainerIdFactory.loanId(bank, loanType)
+        return transactions.filter { tx ->
+            tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
+                tx.destinationContainerId == loanContainerId
         }
     }
 

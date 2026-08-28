@@ -86,6 +86,7 @@ class SettingsImportConfirmTest {
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = EmptyAccounts(),
                 cardRegistry = EmptyCards(),
+                loanRegistry = NoOpLoanRegistryRepository,
             ),
             appLocaleRepository = object : AppLocaleRepository {
                 override fun getLanguageTag() = AppLocale.DEFAULT_TAG

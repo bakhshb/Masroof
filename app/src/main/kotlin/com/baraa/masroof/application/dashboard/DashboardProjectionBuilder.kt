@@ -198,6 +198,16 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
         )
+        val loansOverview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = loanRegistryRepository.listAll(),
+            transactions = dedupedTransactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            zoneId = zoneId,
+            displayLocale = displayLocale,
+        )
         val bankHierarchy = BankHierarchyBuilder.build(
             ownedAccounts = ownedAccounts,
             accountsFleet = accountsFleet,
@@ -215,6 +225,7 @@ class DashboardProjectionBuilder(
             accountsFleet = accountsFleet,
             perAccount = perAccount,
             creditFacilities = creditFacilities,
+            loansOverview = loansOverview,
             bankHierarchy = bankHierarchy,
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,

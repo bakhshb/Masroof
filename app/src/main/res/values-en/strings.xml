@@ -337,6 +337,11 @@
 <string name="dashboard_pos_purchases_short">Mada purchase</string>
     <string name="dashboard_fees_short">Fees</string>
     <string name="dashboard_loan_repayments">Loan repayments</string>
+    <string name="dashboard_loans_summary_title">Loans summary</string>
+    <string name="dashboard_loan_remaining">Remaining balance</string>
+    <string name="dashboard_loan_period_payment">Installment since %1$s</string>
+    <string name="dashboard_loan_period_payment_fallback">Period installment</string>
+    <string name="dashboard_loan_type_label">Loan</string>
     <string name="dashboard_credit_card_payment">Credit card payment</string>
 <string name="dashboard_salary_period_label">Salary period: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">Started on the 26th because the 27th is Friday</string>

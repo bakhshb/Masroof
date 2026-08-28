@@ -14,6 +14,7 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -75,6 +76,7 @@ class OnboardingBackupRestoreTest {
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = accounts,
                 cardRegistry = cards,
+                loanRegistry = NoOpLoanRegistryRepository,
             ),
             reviewRepository = EmptyReviewRepo(),
             discoverFromStoredEvents = { 0 },

@@ -5,6 +5,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.BankHierarchyOverview
 import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
+import com.baraa.masroof.application.dashboard.LoansOverview
 import com.baraa.masroof.application.dashboard.AccountsSummary
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -83,6 +84,7 @@ data class DashboardUiState(
     val spendingSplit: SpendingSplitSummary? = null,
     val creditCards: CreditCardsOverview? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
+    val loansOverview: LoansOverview? = null,
     val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),

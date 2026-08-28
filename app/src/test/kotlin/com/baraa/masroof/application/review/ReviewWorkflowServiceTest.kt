@@ -87,7 +87,7 @@ class ReviewWorkflowServiceTest {
         correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
         val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
         val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
         val reconciliation = TransactionReconciliationService(

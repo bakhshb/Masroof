@@ -116,6 +116,13 @@ fun AccountPeriodSummaryCard(
                 amount = summary.outflow.billPayments,
                 direction = TransactionDirectionUi.OUTWARD,
             )
+            if (summary.outflow.loanRepayments.amount.signum() > 0) {
+                AccountDirectionMoneyRow(
+                    label = stringResource(R.string.dashboard_loan_repayments),
+                    amount = summary.outflow.loanRepayments,
+                    direction = TransactionDirectionUi.OUTWARD,
+                )
+            }
             AccountDirectionMoneyRow(
                 label = stringResource(R.string.dashboard_pos_purchases_short),
                 amount = summary.outflow.posPurchases,

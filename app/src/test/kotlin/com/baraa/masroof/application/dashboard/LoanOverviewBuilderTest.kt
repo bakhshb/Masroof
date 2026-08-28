@@ -1,0 +1,128 @@
+package com.baraa.masroof.application.dashboard
+
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanRegistryEntry
+import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Test
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+class LoanOverviewBuilderTest {
+    private val period = FinancialPeriod(
+        startDate = LocalDate.parse("2026-08-27"),
+        endDateExclusive = LocalDate.parse("2026-09-27"),
+    )
+
+    @Test
+    fun build_includesRemainingBalanceAndPeriodPayment() {
+        val loan = LoanRegistryEntry(
+            id = "loan-1",
+            bank = Bank.BANK_ALJAZIRA,
+            loanType = LoanType.PERSONAL,
+            ownership = OwnershipStatus.OWNED,
+            displayName = "Personal loan",
+            firstSeenRawSmsId = "sms-loan",
+            lastSeenRawSmsId = "sms-loan",
+        )
+        val parsedRecords = listOf(
+            ParsedEventRecord(
+                event = ParsedEvent(
+                    id = "evt-loan",
+                    rawSmsId = "sms-loan",
+                    bank = Bank.BANK_ALJAZIRA,
+                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
+                    direction = MoneyDirection.OUTGOING,
+                    amount = Money.of("3036.11", Currency.SAR),
+                    purchaseChannel = null,
+                    cardRef = null,
+                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
+                        Bank.BANK_ALJAZIRA,
+                        "3001",
+                    ),
+                    destinationAccountRef = null,
+                    merchant = null,
+                    counterparty = "تمويل شخصي",
+                    occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                    bankNetworkType = null,
+                    confidence = Confidence(1.0),
+                    parseStatus = ParseStatus.SUCCESS,
+                ),
+                details = ParsedEventDetails(outstandingBalance = Money.of("33397.25", Currency.SAR)),
+            ),
+        )
+        val loanContainerId = FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
+        val transactions = listOf(
+            FinancialTransaction(
+                id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
+                type = FinancialTransactionType.LOAN_REPAYMENT,
+                amount = Money.of("3036.11", Currency.SAR),
+                occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                destinationContainerId = loanContainerId,
+                merchant = null,
+                counterparty = "تمويل شخصي",
+                categoryId = null,
+                linkedParsedEventIds = listOf("evt-loan"),
+            ),
+        )
+
+        val overview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(loan),
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+
+        assertEquals(1, overview.loans.size)
+        val personal = overview.loans.single()
+        assertEquals(Money.of("33397.25", Currency.SAR), personal.remainingBalance)
+        assertEquals(BigDecimal("3036.11"), personal.salaryPeriodPayment.amount)
+    }
+
+    @Test
+    fun build_ignoresUnknownLoans() {
+        val overview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(
+                LoanRegistryEntry(
+                    id = "loan-1",
+                    bank = Bank.BANK_ALJAZIRA,
+                    loanType = LoanType.PERSONAL,
+                    ownership = OwnershipStatus.UNKNOWN,
+                    displayName = null,
+                    firstSeenRawSmsId = "sms-loan",
+                    lastSeenRawSmsId = "sms-loan",
+                ),
+            ),
+            transactions = emptyList(),
+            parsedRecords = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+
+        assertEquals(0, overview.loans.size)
+    }
+}

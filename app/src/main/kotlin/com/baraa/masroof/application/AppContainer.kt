@@ -210,6 +210,7 @@ class AppContainer(
         OwnershipConfirmationService(
             accountRegistry = accountRegistryRepository,
             cardRegistry = cardRegistryRepository,
+            loanRegistry = loanRegistryRepository,
         )
 
     val effectiveParsedEventProvider: EffectiveParsedEventProvider =
@@ -224,6 +225,7 @@ class AppContainer(
             rawSmsRepository = rawSmsRepository,
             financialTransactionRepository = financialTransactionRepository,
             ownershipResolver = ownershipResolver,
+            ownershipConfirmationService = ownershipConfirmationService,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             reviewRepository = reviewRepository,
         )

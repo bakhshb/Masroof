@@ -10,6 +10,7 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -47,7 +48,7 @@ class AccountCardRegistryTest {
             .build()
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards)
+        confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
     }
 
     @After

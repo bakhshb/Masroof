@@ -97,7 +97,7 @@ class IntraBankSelfTransferIngestionTest {
     reviewRepo = RoomReviewRepository(db.reviewItemDao())
     accounts = RoomAccountRegistryRepository.from(db)
     cards = RoomCardRegistryRepository.from(db)
-    confirmation = OwnershipConfirmationService(accounts, cards)
+    confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
 
     val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
     val reconciliation = TransactionReconciliationService(
