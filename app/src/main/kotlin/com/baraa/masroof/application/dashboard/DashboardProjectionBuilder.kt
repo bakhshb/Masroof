@@ -203,6 +203,7 @@ class DashboardProjectionBuilder(
             loans = loanRegistryRepository.listAll(),
             transactions = dedupedTransactions,
             parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             zoneId = zoneId,

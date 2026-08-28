@@ -15,11 +15,11 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -91,6 +91,7 @@ class LoanOverviewBuilderTest {
             loans = listOf(loan),
             transactions = transactions,
             parsedRecords = parsedRecords,
+            rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T01:10:00Z"))),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             zoneId = ZoneId.of("Asia/Riyadh"),
@@ -150,6 +151,7 @@ class LoanOverviewBuilderTest {
             loans = listOf(loan),
             transactions = emptyList(),
             parsedRecords = parsedRecords,
+            rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T05:00:00Z"))),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             zoneId = zoneId,
@@ -177,6 +179,7 @@ class LoanOverviewBuilderTest {
             ),
             transactions = emptyList(),
             parsedRecords = emptyList(),
+            rawSmsById = emptyMap(),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             zoneId = ZoneId.of("Asia/Riyadh"),
@@ -184,4 +187,13 @@ class LoanOverviewBuilderTest {
 
         assertEquals(0, overview.loans.size)
     }
+
+    private fun rawSms(id: String, receivedAt: Instant) = RawSms(
+        id = id,
+        sender = "AlJazira",
+        body = "loan sms",
+        receivedAt = receivedAt,
+        deviceMessageId = id,
+        bodyHash = id,
+    )
 }

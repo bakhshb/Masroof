@@ -3,13 +3,16 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanRegistryEntry
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -24,6 +27,7 @@ object LoanOverviewBuilder {
         loans: List<LoanRegistryEntry>,
         transactions: List<FinancialTransaction>,
         parsedRecords: List<ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
@@ -42,7 +46,7 @@ object LoanOverviewBuilder {
         val salaryPeriodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
             .format(salaryPeriod.startDate)
-        val remainingByLoanKey = latestRemainingBalances(parsedRecords, zoneId)
+        val remainingByLoanKey = latestRemainingBalances(parsedRecords, rawSmsById, zoneId)
 
         val overviews = ownedLoans.map { loan ->
             val loanContainerId = FinancialContainerIdFactory.loanId(loan.bank, loan.loanType)
@@ -82,41 +86,33 @@ object LoanOverviewBuilder {
         )
     }
 
-    private fun loanKey(bankId: String, loanType: com.baraa.masroof.domain.model.LoanType): String =
+    private fun loanKey(bankId: String, loanType: LoanType): String =
         "$bankId:${loanType.name}"
 
     private fun latestRemainingBalances(
         parsedRecords: List<ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
-    ): Map<String, Pair<Money, Instant?>> {
-        val latest = mutableMapOf<String, Pair<Money, Instant?>>()
+    ): Map<String, Pair<Money, Instant>> {
+        val latest = mutableMapOf<String, Pair<Money, Instant>>()
         parsedRecords.forEach { record ->
             val event = record.event
             if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return@forEach
             val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return@forEach
             val balance = record.details.outstandingBalance ?: return@forEach
-            val occurredAt = event.occurredAt
-                ?: record.details.occurredAtLocal?.atZone(zoneId)?.toInstant()
+            val raw = rawSmsById[event.rawSmsId] ?: return@forEach
+            val occurredAt = TransactionTiming.effectiveOccurredAt(
+                event = event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = raw.receivedAt,
+                zoneId = zoneId,
+            )
             val key = loanKey(event.bank.id, loanType)
             val existing = latest[key]
-            if (shouldReplaceRemainingBalance(existing, occurredAt)) {
+            if (existing == null || occurredAt.isAfter(existing.second)) {
                 latest[key] = balance to occurredAt
             }
         }
         return latest
-    }
-
-    private fun shouldReplaceRemainingBalance(
-        existing: Pair<Money, Instant?>?,
-        candidateAt: Instant?,
-    ): Boolean {
-        if (existing == null) return true
-        val existingAt = existing.second
-        return when {
-            candidateAt == null && existingAt == null -> true
-            candidateAt == null -> false
-            existingAt == null -> true
-            else -> candidateAt.isAfter(existingAt)
-        }
     }
 }
