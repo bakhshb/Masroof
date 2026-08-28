@@ -506,6 +506,7 @@ fun MasroofSecondaryScaffold(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .padding(top = 16.dp)
                 .padding(bottom = 16.dp),
         )
     }
