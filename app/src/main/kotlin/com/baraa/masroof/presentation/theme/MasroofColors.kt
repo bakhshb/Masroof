@@ -20,7 +20,7 @@ object MasroofPalette {
     val HighlightBorder = Color(0xFFFED7AA)
     val Text = Color(0xFF1A1F24)
     val Muted = Color(0xFF6B7280)
-    val Border = Color(0xFFE5E7EB)
+    val Border = Color(0xFFD1D5DB)
     val MiniBackground = Color(0xFFFAFAFA)
     val HintBackground = Color(0xFFF9FAFB)
 }
@@ -29,44 +29,60 @@ object MasroofLightColors {
     val Background = Color(0xFFF4F6F8)
     val BackgroundGradientTop = Color(0xFFE8EEF3)
     val Surface = Color(0xFFFFFFFF)
+    val SurfaceDim = Color(0xFFEEF2F5)
+    val SurfaceBright = Color(0xFFFFFFFF)
+    val SurfaceContainerLowest = Color(0xFFFFFFFF)
+    val SurfaceContainerLow = Color(0xFFF7F9FA)
+    val SurfaceContainer = Color(0xFFF4F6F8)
+    val SurfaceContainerHigh = Color(0xFFEEF2F5)
+    val SurfaceContainerHighest = Color(0xFFE8EEF3)
     val OnSurface = MasroofPalette.Text
     val OnSurfaceVariant = MasroofPalette.Muted
     val Outline = MasroofPalette.Border
+    val OutlineVariant = Color(0xFFE5E7EB)
     val Primary = MasroofPalette.Primary
     val OnPrimary = Color(0xFFFFFFFF)
-    val PrimaryContainer = Color(0xFFCCFBF1)
-    val OnPrimaryContainer = Color(0xFF134E4A)
+    val PrimaryContainer = Color(0xFF5EEAD4)
+    val OnPrimaryContainer = Color(0xFF042F2E)
     val SecondaryContainer = MasroofPalette.CardSoft
     val OnSecondaryContainer = MasroofPalette.Card
     val Tertiary = MasroofPalette.Inflow
     val OnTertiary = Color(0xFFFFFFFF)
-    val Error = MasroofPalette.Outflow
+    val Error = Color(0xFFBA1A1A)
     val OnError = Color(0xFFFFFFFF)
-    val ErrorContainer = MasroofPalette.OutflowSoft
-    val OnErrorContainer = Color(0xFF991B1B)
-    val SurfaceVariant = Color(0xFFF3F4F6)
+    val ErrorContainer = Color(0xFFFFDAD6)
+    val OnErrorContainer = Color(0xFF410002)
+    val SurfaceVariant = Color(0xFFE8EEF3)
 }
 
 object MasroofDarkColors {
-    val Background = Color(0xFF111827)
-    val BackgroundGradientTop = Color(0xFF1F2937)
-    val Surface = Color(0xFF1F2937)
-    val OnSurface = Color(0xFFF3F4F6)
-    val OnSurfaceVariant = Color(0xFF9CA3AF)
-    val Outline = Color(0xFF374151)
-    val Primary = Color(0xFF2DD4BF)
+    val Background = Color(0xFF121212)
+    val BackgroundGradientTop = Color(0xFF1A1A1A)
+    val Surface = Color(0xFF121212)
+    val SurfaceDim = Color(0xFF0F0F0F)
+    val SurfaceBright = Color(0xFF1A1A1A)
+    val SurfaceContainerLowest = Color(0xFF0F0F0F)
+    val SurfaceContainerLow = Color(0xFF1A1A1A)
+    val SurfaceContainer = Color(0xFF1E1E1E)
+    val SurfaceContainerHigh = Color(0xFF282828)
+    val SurfaceContainerHighest = Color(0xFF323232)
+    val OnSurface = Color(0xFFE3E3E3)
+    val OnSurfaceVariant = Color(0xFFA8A8A8)
+    val Outline = Color(0xFF454545)
+    val OutlineVariant = Color(0xFF323232)
+    val Primary = Color(0xFF5EBDB2)
     val OnPrimary = Color(0xFF042F2E)
-    val PrimaryContainer = Color(0xFF134E4A)
+    val PrimaryContainer = Color(0xFF0F766E)
     val OnPrimaryContainer = Color(0xFFCCFBF1)
-    val SecondaryContainer = Color(0xFF3B0764)
+    val SecondaryContainer = Color(0xFF2E1065)
     val OnSecondaryContainer = Color(0xFFE9D5FF)
-    val Tertiary = Color(0xFF34D399)
+    val Tertiary = Color(0xFF6EE7B7)
     val OnTertiary = Color(0xFF064E3B)
-    val Error = Color(0xFFF87171)
-    val OnError = Color(0xFF450A0A)
-    val ErrorContainer = Color(0xFF7F1D1D)
-    val OnErrorContainer = Color(0xFFFECACA)
-    val SurfaceVariant = Color(0xFF374151)
+    val Error = Color(0xFFFFB4AB)
+    val OnError = Color(0xFF690005)
+    val ErrorContainer = Color(0xFF93000A)
+    val OnErrorContainer = Color(0xFFFFB4AB)
+    val SurfaceVariant = SurfaceContainer
 }
 
 @Immutable
@@ -88,6 +104,7 @@ data class MasroofExtendedColors(
     val miniBackground: Color,
     val hintBackground: Color,
     val cardSurface: Color,
+    val navCardSurface: Color,
     val cardBorder: Color,
     val backgroundGradientTop: Color,
     val cardShadow: Color,
@@ -111,7 +128,8 @@ val LocalMasroofExtendedColors = staticCompositionLocalOf {
         highlightBorder = MasroofPalette.HighlightBorder,
         miniBackground = Color(0xFFF8FAFC),
         hintBackground = MasroofPalette.HintBackground,
-        cardSurface = Color(0xFFFFFFFF),
+        cardSurface = MasroofLightColors.Surface,
+        navCardSurface = MasroofLightColors.SurfaceContainerHigh,
         cardBorder = Color(0xFFE2E8F0),
         backgroundGradientTop = MasroofLightColors.BackgroundGradientTop,
         cardShadow = Color(0x140F172A),
@@ -135,7 +153,8 @@ fun lightExtendedColors() = MasroofExtendedColors(
     highlightBorder = MasroofPalette.HighlightBorder,
     miniBackground = Color(0xFFF8FAFC),
     hintBackground = Color(0xFFF8FAFC),
-    cardSurface = Color(0xFFFFFFFF),
+    cardSurface = MasroofLightColors.Surface,
+    navCardSurface = MasroofLightColors.SurfaceContainerHigh,
     cardBorder = Color(0xFFE2E8F0),
     backgroundGradientTop = MasroofLightColors.BackgroundGradientTop,
     cardShadow = Color(0x140F172A),
@@ -143,22 +162,23 @@ fun lightExtendedColors() = MasroofExtendedColors(
 
 fun darkExtendedColors() = MasroofExtendedColors(
     account = Color(0xFF93C5FD),
-    accountSoft = Color(0xFF1E3A5F),
+    accountSoft = Color(0xFF1A2744),
     card = Color(0xFFC4B5FD),
-    cardSoft = Color(0xFF4C1D95),
+    cardSoft = Color(0xFF2E1065),
     liability = Color(0xFFFCD34D),
-    liabilitySoft = Color(0xFF78350F),
+    liabilitySoft = Color(0xFF422006),
     inflow = Color(0xFF6EE7B7),
-    inflowSoft = Color(0xFF14532D),
+    inflowSoft = Color(0xFF0F3D2E),
     inflowRowBorder = Color(0xFF166534),
     outflow = Color(0xFFFCA5A5),
-    outflowSoft = Color(0xFF7F1D1D),
+    outflowSoft = Color(0xFF4A1515),
     outflowRowBorder = Color(0xFF991B1B),
     highlight = Color(0xFF7C2D12),
     highlightBorder = Color(0xFFEA580C),
-    miniBackground = Color(0xFF2B3440),
-    hintBackground = Color(0xFF252F3B),
-    cardSurface = MasroofDarkColors.Surface,
+    miniBackground = MasroofDarkColors.SurfaceContainerLow,
+    hintBackground = MasroofDarkColors.SurfaceContainerLow,
+    cardSurface = MasroofDarkColors.SurfaceContainer,
+    navCardSurface = MasroofDarkColors.SurfaceContainerHigh,
     cardBorder = MasroofDarkColors.Outline,
     backgroundGradientTop = MasroofDarkColors.BackgroundGradientTop,
     cardShadow = Color(0x40000000),

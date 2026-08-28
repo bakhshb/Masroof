@@ -157,7 +157,7 @@ fun MasroofCompactCard(
             ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
-            containerColor = extended.cardSurface,
+            containerColor = extended.navCardSurface,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -242,7 +242,7 @@ fun MasroofNavCard(
             ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
-            containerColor = extended.cardSurface,
+            containerColor = extended.navCardSurface,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
