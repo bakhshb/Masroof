@@ -25,3 +25,8 @@ release-signing.env
 
 # Cursor agent debug logs
 .cursor/
+
+# Node (local tooling only; not part of Android build)
+node_modules/
+package-lock.json
+.package-lock.json
