@@ -20,14 +20,18 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import java.time.ZoneId
 
 @Composable
 fun CardsSummaryRoute(
     viewModel: DashboardViewModel,
+    initialSelectedCardKey: String? = null,
+    initialSelectedDebitKey: String? = null,
+    onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenTransaction: (String) -> Unit,
@@ -35,29 +39,71 @@ fun CardsSummaryRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedCardKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val followedOverview = followedCreditCardsOverview(state)
-    val followedFacilities = state.followedCreditFacilitiesForSummary()
+    var selectedDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val followedFacilities = state.followedCreditFacilities()
+    val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
+
+    androidx.compose.runtime.LaunchedEffect(initialSelectedCardKey, initialSelectedDebitKey) {
+        when {
+            initialSelectedCardKey != null -> {
+                selectedCardKey = initialSelectedCardKey
+                onInitialSelectionConsumed()
+            }
+            initialSelectedDebitKey != null -> {
+                selectedDebitKey = initialSelectedDebitKey
+                onInitialSelectionConsumed()
+            }
+        }
+    }
+
     val selectedCard = selectedCardKey?.let { key ->
         followedFacilities?.facilities
             ?.flatMap { it.allCards }
-            ?.find { ownedCardKey(it) == key }
-            ?: followedOverview?.cards?.find { ownedCardKey(it) == key }
+            ?.find { CardOwnershipKey.of(it) == key }
+    }
+    val selectedDebit = selectedDebitKey?.let { key ->
+        followedFacilities?.debitCards?.find { CardOwnershipKey.of(it) == key }
     }
 
     BackHandler {
-        if (selectedCard != null) {
-            selectedCardKey = null
-        } else {
-            onBack()
+        when {
+            selectedDebit != null -> selectedDebitKey = null
+            selectedCard != null -> selectedCardKey = null
+            else -> onBack()
         }
     }
 
     when {
+        selectedDebit != null -> {
+            DebitCardDetailScreen(
+                debit = selectedDebit,
+                state = state,
+                cardNetwork = cardNetworks[CardOwnershipKey.of(selectedDebit)] ?: selectedDebit.network,
+                onBack = { selectedDebitKey = null },
+                onOpenTransaction = onOpenTransaction,
+                onViewAllTransactions = {
+                    val cardKey = CardTransactionInvolvementResolver.cardKey(
+                        selectedDebit.bank.id,
+                        selectedDebit.last4,
+                    )
+                    val spendTransactionIds = state.transactionDebitSpendInvolvement
+                        .filter { (_, cardKeys) -> cardKey in cardKeys }
+                        .keys
+                    onOpenAllTransactions(
+                        TransactionListFilterState(transactionIds = spendTransactionIds),
+                    )
+                },
+            )
+        }
+
         selectedCard != null -> {
             CardDetailScreen(
                 row = selectedCard,
-                salaryPeriodLabel = followedOverview?.salaryPeriodLabel
-                    ?: followedFacilities?.facilities?.firstOrNull()?.salaryPeriodLabel,
+                salaryPeriodLabel = followedFacilities?.facilities
+                    ?.firstOrNull { facility ->
+                        facility.allCards.any { CardOwnershipKey.of(it) == selectedCardKey }
+                    }
+                    ?.salaryPeriodLabel,
                 state = state,
                 onBack = { selectedCardKey = null },
                 onOpenTransaction = onOpenTransaction,
@@ -74,15 +120,13 @@ fun CardsSummaryRoute(
                 state = state,
                 onBack = onBack,
                 onManageCards = onManageCards,
-                onOpenCard = { row -> selectedCardKey = ownedCardKey(row) },
-                cardNetworksByLast4 = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork },
+                onOpenCard = { row -> selectedCardKey = CardOwnershipKey.of(row) },
+                onOpenDebit = { debit -> selectedDebitKey = CardOwnershipKey.of(debit) },
+                cardNetworksByLast4 = cardNetworks,
             )
         }
     }
 }
-
-private fun ownedCardKey(row: CreditCardDashboardRow): String =
-    "${row.bank.id}:${row.last4}"
 
 @Composable
 fun CardsSummaryScreen(
@@ -90,10 +134,10 @@ fun CardsSummaryScreen(
     onBack: () -> Unit,
     onManageCards: () -> Unit,
     onOpenCard: (CreditCardDashboardRow) -> Unit,
+    onOpenDebit: (DebitCardOverview) -> Unit,
     cardNetworksByLast4: Map<String, com.baraa.masroof.domain.model.CardNetwork?>,
 ) {
-    val followedFacilities = state.followedCreditFacilitiesForSummary()
-    val followedOverview = followedCreditCardsOverview(state)
+    val followedFacilities = state.followedCreditFacilities()
     val locale = LocalConfiguration.current.locales[0]
 
     DashboardSummaryScaffold(
@@ -105,64 +149,40 @@ fun CardsSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            when {
-                followedFacilities != null && followedFacilities.hasContent -> {
-                    DashboardSummaryHeroCard(
-                        spec = creditFacilitiesSummaryHeroSpec(
-                            overview = followedFacilities,
-                            locale = locale,
-                        ),
+            if (followedFacilities == null || !followedFacilities.hasContent) {
+                Text(
+                    stringResource(R.string.dashboard_cards_summary_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                DashboardSummaryHeroCard(
+                    spec = creditFacilitiesSummaryHeroSpec(
+                        overview = followedFacilities,
+                        locale = locale,
+                    ),
+                )
+                CardsSummaryHeader(
+                    cardCount = followedFacilities.facilities.size + followedFacilities.debitCards.size,
+                    onManageCards = onManageCards,
+                )
+                followedFacilities.facilities.forEach { facility ->
+                    CreditFacilityCard(
+                        facility = facility,
+                        cardNetworksByLast4 = cardNetworksByLast4,
+                        zoneId = ZoneId.systemDefault(),
+                        ownedCards = state.ownedCards,
+                        modifier = Modifier.fillMaxWidth(),
+                        onOpenCard = onOpenCard,
                     )
-                    CardsSummaryHeader(
-                        cardCount = followedFacilities.facilities.size,
-                        onManageCards = onManageCards,
-                    )
-                    followedFacilities.facilities.forEach { facility ->
-                        CreditFacilityCard(
-                            facility = facility,
-                            cardNetworksByLast4 = cardNetworksByLast4,
-                            zoneId = ZoneId.systemDefault(),
-                            ownedCards = state.ownedCards,
-                            modifier = Modifier.fillMaxWidth(),
-                            onOpenCard = onOpenCard,
-                        )
-                    }
                 }
-
-                followedOverview != null -> {
-                    DashboardSummaryHeroCard(
-                        spec = creditCardsSummaryHeroSpec(
-                            overview = followedOverview,
-                            locale = locale,
-                        ),
-                    )
-                    CardsSummaryHeader(
-                        cardCount = followedOverview.cards.size,
-                        onManageCards = onManageCards,
-                    )
-                    if (followedOverview.cards.isEmpty()) {
-                        Text(
-                            stringResource(R.string.dashboard_cards_summary_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        followedOverview.cards.forEach { row ->
-                            CreditCardCompactListRow(
-                                row = row,
-                                cardNetwork = cardNetworksByLast4[CardOwnershipKey.of(row)],
-                                ownedCards = state.ownedCards,
-                                onClick = { onOpenCard(row) },
-                            )
-                        }
-                    }
-                }
-
-                else -> {
-                    Text(
-                        stringResource(R.string.dashboard_cards_summary_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                followedFacilities.debitCards.forEach { debit ->
+                    DebitCardSummaryTile(
+                        debit = debit,
+                        network = cardNetworksByLast4[CardOwnershipKey.of(debit)] ?: debit.network,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onOpenDebit(debit) },
+                        presentation = DebitCardTilePresentation.List,
                     )
                 }
             }
@@ -181,6 +201,3 @@ private fun CardsSummaryHeader(
         onTrailingClick = onManageCards,
     )
 }
-
-private fun followedCreditCardsOverview(state: DashboardUiState): CreditCardsOverview? =
-    state.followedCreditCardsOverview()

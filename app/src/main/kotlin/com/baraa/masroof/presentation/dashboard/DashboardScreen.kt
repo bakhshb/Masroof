@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
+import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.application.dashboard.LoanOverview
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
@@ -60,6 +62,8 @@ fun DashboardRoute(
     onOpenCardsSummary: () -> Unit = onOpenSettings,
     onOpenLoansSummary: () -> Unit = onOpenSettings,
     onOpenLoanDetail: (LoanOverview) -> Unit = { onOpenLoansSummary() },
+    onOpenCardDetail: (CreditCardDashboardRow) -> Unit = { onOpenCardsSummary() },
+    onOpenDebitDetail: (DebitCardOverview) -> Unit = { onOpenCardsSummary() },
     onRequestSmsPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
 ) {
@@ -83,6 +87,8 @@ fun DashboardRoute(
         onOpenCardsSummary = onOpenCardsSummary,
         onOpenLoansSummary = onOpenLoansSummary,
         onOpenLoanDetail = onOpenLoanDetail,
+        onOpenCardDetail = onOpenCardDetail,
+        onOpenDebitDetail = onOpenDebitDetail,
         onRequestSmsPermission = onRequestSmsPermission,
         onOpenAppSettings = onOpenAppSettings,
         onDismissRescanStatus = viewModel::clearRescanStatus,
@@ -115,6 +121,8 @@ private fun DashboardScreen(
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
     onOpenLoanDetail: (LoanOverview) -> Unit,
+    onOpenCardDetail: (CreditCardDashboardRow) -> Unit,
+    onOpenDebitDetail: (DebitCardOverview) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onDismissRescanStatus: () -> Unit,
@@ -257,6 +265,8 @@ private fun DashboardScreen(
                                 onOpenCardsSummary = onOpenCardsSummary,
                                 onOpenLoansSummary = onOpenLoansSummary,
                                 onOpenLoanDetail = onOpenLoanDetail,
+                                onOpenCardDetail = onOpenCardDetail,
+                                onOpenDebitDetail = onOpenDebitDetail,
                                 onOpenAllTransactions = onOpenAllTransactions,
                                 onOpenTransaction = onOpenTransaction,
                                 onRescan = onRescan,
@@ -291,6 +301,8 @@ private fun DashboardCustomizableSections(
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
     onOpenLoanDetail: (LoanOverview) -> Unit,
+    onOpenCardDetail: (CreditCardDashboardRow) -> Unit,
+    onOpenDebitDetail: (DebitCardOverview) -> Unit,
     onOpenAllTransactions: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     onRescan: () -> Unit,
@@ -330,34 +342,22 @@ private fun DashboardCustomizableSections(
                 DashboardSectionId.ACCOUNTS -> {
                     DashboardAccountsSection(
                         accounts = state.ownedAccounts,
-                        bankHierarchy = state.bankHierarchy,
                         onViewAll = onOpenAccountsSummary,
                     )
                 }
 
                 DashboardSectionId.CARDS -> {
                     val cardNetworks = state.ownedCards.associate { CardOwnershipKey.of(it) to it.cardNetwork }
-                    val followedFacilities = state.followedCreditFacilitiesCreditOnly()
-                    if (followedFacilities != null) {
+                    state.followedCreditFacilities()?.let { followedFacilities ->
                         CreditFacilitiesSection(
                             overview = followedFacilities,
                             cardNetworksByLast4 = cardNetworks,
                             zoneId = ZoneId.systemDefault(),
                             ownedCards = state.ownedCards,
                             onViewAll = onOpenCardsSummary,
+                            onOpenCard = onOpenCardDetail,
+                            onOpenDebit = onOpenDebitDetail,
                         )
-                    } else {
-                        state.followedCreditCardsOverview()?.let { followedOverview ->
-                            if (followedOverview.hasContent) {
-                                CreditCardsSection(
-                                    overview = followedOverview,
-                                    cardNetworksByLast4 = cardNetworks,
-                                    zoneId = ZoneId.systemDefault(),
-                                    ownedCards = state.ownedCards,
-                                    onViewAll = onOpenCardsSummary,
-                                )
-                            }
-                        }
                     }
                 }
 

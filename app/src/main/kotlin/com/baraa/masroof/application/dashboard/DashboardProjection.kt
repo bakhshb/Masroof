@@ -42,7 +42,6 @@ data class DashboardProjection(
             currentAccount = fleet,
             spendingSplit = spendingSplit,
             transactions = transactions,
-            creditCards = creditFacilities.legacyFlat,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
             bankHierarchy = bankHierarchy,

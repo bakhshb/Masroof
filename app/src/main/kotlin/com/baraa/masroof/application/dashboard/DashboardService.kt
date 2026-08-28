@@ -22,8 +22,7 @@ data class DashboardOverview(
     val spendingSplit: SpendingSplitSummary,
     /** All transactions in the selected period, newest first. */
     val transactions: List<com.baraa.masroof.domain.model.FinancialTransaction>,
-    val creditCards: CreditCardsOverview,
-    val creditFacilities: CreditFacilitiesOverview? = null,
+    val creditFacilities: CreditFacilitiesOverview,
     val loansOverview: LoansOverview? = null,
     val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,

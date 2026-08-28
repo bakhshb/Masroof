@@ -1,14 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
-
-fun DashboardUiState.followedCreditCardsOverview(): CreditCardsOverview? {
-    val overview = creditCards ?: return null
-    val ownedKeys = CardOwnershipKey.ownedKeys(ownedCards)
-    return overview.followedOnly(ownedKeys)
-}
 
 fun DashboardUiState.followedCreditFacilities(): CreditFacilitiesOverview? {
     val overview = creditFacilities ?: return null
@@ -20,19 +13,6 @@ fun DashboardUiState.followedCreditFacilities(): CreditFacilitiesOverview? {
     if (facilities.isEmpty() && debitCards.isEmpty()) return null
     return overview.copy(facilities = facilities, debitCards = debitCards)
 }
-
-fun DashboardUiState.followedCreditFacilitiesCreditOnly(): CreditFacilitiesOverview? {
-    val overview = followedCreditFacilities() ?: return null
-    val creditOnly = overview.copy(debitCards = emptyList())
-    return if (creditOnly.facilities.isNotEmpty() || creditOnly.legacyFlat.hasContent) {
-        creditOnly
-    } else {
-        null
-    }
-}
-
-fun DashboardUiState.followedCreditFacilitiesForSummary(): CreditFacilitiesOverview? =
-    followedCreditFacilitiesCreditOnly()
 
 fun DashboardUiState.followedLoansOverview(): LoansOverview? {
     val overview = loansOverview ?: return null

@@ -7,7 +7,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverview
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
+import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -324,7 +324,7 @@ class DashboardViewModelTest {
                 currentAccount = emptyCurrentAccount(),
                 spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
-                creditCards = emptyCreditCards(),
+                creditFacilities = emptyCreditFacilities(),
                 ownedAccountPeriodSummaries = emptyList(),
                 flowDetailGrouping = CurrentAccountFlowDetailGrouping.empty(),
                 isCurrentPeriod = true,
@@ -511,24 +511,17 @@ class DashboardViewModelTest {
             currentAccount = emptyCurrentAccount(),
             spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
-            creditCards = emptyCreditCards(),
+            creditFacilities = emptyCreditFacilities(),
             ownedAccountPeriodSummaries = emptyList(),
             flowDetailGrouping = CurrentAccountFlowDetailGrouping.empty(),
             isCurrentPeriod = period == currentPeriod,
         )
     }
 
-    private fun emptyCreditCards(): CreditCardsOverview =
-        CreditCardsOverview(
-            cards = emptyList(),
-            aggregateDueAmount = null,
-            aggregateDueUpdatedAt = null,
-            aggregateDueDate = null,
-            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            aggregateStatementPeriodLabel = null,
-            calendarMonthLabel = null,
-            salaryPeriodLabel = null,
+    private fun emptyCreditFacilities(): CreditFacilitiesOverview =
+        CreditFacilitiesOverview(
+            facilities = emptyList(),
+            debitCards = emptyList(),
             currency = Currency.SAR,
         )
 
@@ -851,16 +844,9 @@ class DashboardViewModelTest {
                     currentAccount = DashboardViewModelTest.emptyCurrentAccount(),
                     spendingSplit = DashboardViewModelTest.emptySpendingSplit(),
                     transactions = emptyList(),
-                    creditCards = CreditCardsOverview(
-                        cards = emptyList(),
-                        aggregateDueAmount = null,
-                        aggregateDueUpdatedAt = null,
-                        aggregateDueDate = null,
-                        aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-                        aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-                        aggregateStatementPeriodLabel = null,
-                        calendarMonthLabel = null,
-                        salaryPeriodLabel = null,
+                    creditFacilities = CreditFacilitiesOverview(
+                        facilities = emptyList(),
+                        debitCards = emptyList(),
                         currency = Currency.SAR,
                     ),
                     ownedAccountPeriodSummaries = emptyList(),

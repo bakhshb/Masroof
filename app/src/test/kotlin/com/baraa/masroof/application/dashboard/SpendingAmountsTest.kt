@@ -21,7 +21,6 @@ class SpendingAmountsTest {
                 debitSpending("120.00"),
                 debitSpending("30.00"),
             ),
-            legacyFlat = emptyCreditOverview(),
             currency = Currency.SAR,
         )
 
@@ -57,7 +56,6 @@ class SpendingAmountsTest {
                 facilitySpending("0.00", "0.00", due = newer),
             ),
             debitCards = emptyList(),
-            legacyFlat = emptyCreditOverview(),
             currency = Currency.SAR,
         )
 
@@ -69,7 +67,6 @@ class SpendingAmountsTest {
         val overview = CreditFacilitiesOverview(
             facilities = emptyList(),
             debitCards = listOf(debitSpending("50.00")),
-            legacyFlat = emptyCreditOverview(),
             currency = Currency.SAR,
         )
 
@@ -113,19 +110,5 @@ class SpendingAmountsTest {
             network = com.baraa.masroof.domain.model.CardNetwork.MADA,
             salaryPeriodSpendingNet = SignedMoneyAmount.of(Money.of(amount, Currency.SAR)),
             salaryPeriodLabel = "Aug",
-        )
-
-    private fun emptyCreditOverview(): CreditCardsOverview =
-        CreditCardsOverview(
-            cards = emptyList(),
-            aggregateDueAmount = null,
-            aggregateDueUpdatedAt = null,
-            aggregateDueDate = null,
-            aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-            aggregateStatementPeriodLabel = null,
-            calendarMonthLabel = null,
-            salaryPeriodLabel = null,
-            currency = Currency.SAR,
         )
 }

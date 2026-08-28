@@ -28,11 +28,10 @@ data class CreditFacilityOverview(
 data class CreditFacilitiesOverview(
     val facilities: List<CreditFacilityOverview>,
     val debitCards: List<DebitCardOverview>,
-    val legacyFlat: CreditCardsOverview,
     val currency: Currency,
 ) {
     val hasContent: Boolean
-        get() = facilities.isNotEmpty() || debitCards.isNotEmpty() || legacyFlat.hasContent
+        get() = facilities.isNotEmpty() || debitCards.isNotEmpty()
 }
 
 data class DebitCardOverview(
@@ -134,11 +133,10 @@ object CreditFacilityOverviewBuilder {
             }
         }
 
-        if (facilities.isEmpty() && overview.cards.isNotEmpty()) {
+        if (facilities.isEmpty() && debitCards.isEmpty()) {
             return CreditFacilitiesOverview(
                 facilities = emptyList(),
-                debitCards = debitCards,
-                legacyFlat = overview,
+                debitCards = emptyList(),
                 currency = overview.currency,
             )
         }
@@ -146,7 +144,6 @@ object CreditFacilityOverviewBuilder {
         return CreditFacilitiesOverview(
             facilities = facilities,
             debitCards = debitCards,
-            legacyFlat = overview,
             currency = overview.currency,
         )
     }

@@ -1,7 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
-import com.baraa.masroof.application.dashboard.CreditCardsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.CreditFacilityOverview
 import com.baraa.masroof.application.dashboard.DebitCardOverview
@@ -13,7 +12,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.math.BigDecimal
 
 class DashboardCardFiltersTest {
     @Test
@@ -28,7 +26,6 @@ class DashboardCardFiltersTest {
                     debit("3333"),
                     debit("8888"),
                 ),
-                legacyFlat = emptyOverview(),
                 currency = Currency.SAR,
             ),
             ownedCards = listOf(
@@ -52,7 +49,6 @@ class DashboardCardFiltersTest {
             creditFacilities = CreditFacilitiesOverview(
                 facilities = emptyList(),
                 debitCards = listOf(debit("8219")),
-                legacyFlat = emptyOverview(),
                 currency = Currency.SAR,
             ),
             ownedCards = listOf(
@@ -77,7 +73,6 @@ class DashboardCardFiltersTest {
                     facility("1234", emptyList(), bank = Bank.BANK_ALJAZIRA),
                 ),
                 debitCards = emptyList(),
-                legacyFlat = emptyOverview(),
                 currency = Currency.SAR,
             ),
             ownedCards = listOf(
@@ -98,72 +93,12 @@ class DashboardCardFiltersTest {
             creditFacilities = CreditFacilitiesOverview(
                 facilities = listOf(facility("9999", emptyList())),
                 debitCards = emptyList(),
-                legacyFlat = emptyOverview(),
                 currency = Currency.SAR,
             ),
             ownedCards = emptyList(),
         )
 
         assertNull(state.followedCreditFacilities())
-    }
-
-    @Test
-    fun followedCreditFacilitiesCreditOnly_excludesDebitTiles() {
-        val state = DashboardUiState(
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = listOf(facility("1111", emptyList())),
-                debitCards = listOf(debit("5555"), debit("8888")),
-                legacyFlat = emptyOverview(),
-                currency = Currency.SAR,
-            ),
-            ownedCards = listOf(
-                OwnedCardUi(Bank.BANK_ALJAZIRA, "1111"),
-                OwnedCardUi(Bank.BANK_ALJAZIRA, "5555"),
-            ),
-        )
-
-        val filtered = state.followedCreditFacilitiesCreditOnly()
-        assertNotNull(filtered)
-        assertEquals(1, filtered!!.facilities.size)
-        assertEquals(emptyList<String>(), filtered.debitCards.map { it.last4 })
-    }
-
-    @Test
-    fun followedCreditFacilitiesCreditOnly_returnsNullWhenOnlyDebitTilesOwned() {
-        val state = DashboardUiState(
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = listOf(debit("8219")),
-                legacyFlat = emptyOverview(),
-                currency = Currency.SAR,
-            ),
-            ownedCards = listOf(
-                OwnedCardUi(Bank.BANK_ALJAZIRA, "8219", cardNetwork = CardNetwork.MADA),
-            ),
-        )
-
-        assertNull(state.followedCreditFacilitiesCreditOnly())
-    }
-
-    @Test
-    fun followedCreditFacilitiesForSummary_excludesOwnedDebitTiles() {
-        val state = DashboardUiState(
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = listOf(facility("1111", emptyList())),
-                debitCards = listOf(debit("5555"), debit("8888")),
-                legacyFlat = emptyOverview(),
-                currency = Currency.SAR,
-            ),
-            ownedCards = listOf(
-                OwnedCardUi(Bank.BANK_ALJAZIRA, "1111"),
-                OwnedCardUi(Bank.BANK_ALJAZIRA, "5555"),
-            ),
-        )
-
-        val filtered = state.followedCreditFacilitiesForSummary()
-        assertNotNull(filtered)
-        assertEquals(1, filtered!!.facilities.size)
-        assertEquals(emptyList<String>(), filtered.debitCards.map { it.last4 })
     }
 
     private fun facility(
@@ -204,18 +139,5 @@ class DashboardCardFiltersTest {
         network = CardNetwork.MADA,
         salaryPeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
         salaryPeriodLabel = null,
-    )
-
-    private fun emptyOverview() = CreditCardsOverview(
-        cards = emptyList(),
-        aggregateDueAmount = null,
-        aggregateDueUpdatedAt = null,
-        aggregateDueDate = null,
-        aggregatePeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-        aggregateStatementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
-        aggregateStatementPeriodLabel = null,
-        calendarMonthLabel = null,
-        salaryPeriodLabel = null,
-        currency = Currency.SAR,
     )
 }
