@@ -29,24 +29,15 @@ class AppNavigationTest {
         )
 
         assertEquals(
-            SettingsLaunchRequest(
-                destination = SettingsDestination.BankCards(alJazira.id),
-                skipBanksList = true,
-            ),
+            SettingsLaunchRequest(SettingsDestination.BankCards(alJazira.id)),
             resolveManageSettingsLaunch(state, ManageSettingsTarget.Cards),
         )
         assertEquals(
-            SettingsLaunchRequest(
-                destination = SettingsDestination.BankAccounts(alJazira.id),
-                skipBanksList = true,
-            ),
+            SettingsLaunchRequest(SettingsDestination.BankAccounts(alJazira.id)),
             resolveManageSettingsLaunch(state, ManageSettingsTarget.Accounts),
         )
         assertEquals(
-            SettingsLaunchRequest(
-                destination = SettingsDestination.BankLoans(alJazira.id),
-                skipBanksList = true,
-            ),
+            SettingsLaunchRequest(SettingsDestination.BankLoans(alJazira.id)),
             resolveManageSettingsLaunch(state, ManageSettingsTarget.Loans),
         )
     }
@@ -58,33 +49,26 @@ class AppNavigationTest {
         )
 
         assertEquals(
-            SettingsLaunchRequest(
-                destination = SettingsDestination.Banks,
-                skipBanksList = false,
-            ),
+            SettingsLaunchRequest(SettingsDestination.Banks),
             resolveManageSettingsLaunch(state, ManageSettingsTarget.Cards),
         )
     }
 
     @Test
-    fun parent_skipsBanksListWhenSingleBankShortcutUsed() {
-        val bankHub = SettingsDestination.BankHub(alJazira.id)
-
-        assertEquals(SettingsDestination.Hub, bankHub.parent(skippedBanksList = true))
-        assertEquals(SettingsDestination.Banks, bankHub.parent(skippedBanksList = false))
-    }
-
-    @Test
-    fun resolveBanksEntry_singleBank_skipsBanksList() {
+    fun resolveBanksEntry_singleBank_opensBankHub() {
         val state = SettingsUiState(bankSummaries = listOf(summary(alJazira)))
 
         assertEquals(
-            BanksNavigation(
-                destination = SettingsDestination.BankHub(alJazira.id),
-                skipBanksList = true,
-            ),
+            SettingsDestination.BankHub(alJazira.id),
             resolveBanksEntry(state),
         )
+    }
+
+    @Test
+    fun resolveBanksEntry_multipleBanks_opensBanksList() {
+        val state = SettingsUiState(bankSummaries = listOf(summary(alJazira), summary(rajhi)))
+
+        assertEquals(SettingsDestination.Banks, resolveBanksEntry(state))
     }
 
     @Test

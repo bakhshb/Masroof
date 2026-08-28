@@ -20,27 +20,21 @@ internal enum class ManageSettingsTarget {
     Loans,
 }
 
+/**
+ * Open Settings on [destination], replacing the settings stack.
+ *
+ * Back from that screen leaves Settings and returns to the caller of
+ * `openSettings`. Taps after landing push onto the stack and pop normally.
+ */
 data class SettingsLaunchRequest(
     val destination: SettingsDestination,
-    val skipBanksList: Boolean = false,
 )
 
-internal data class BanksNavigation(
-    val destination: SettingsDestination,
-    val skipBanksList: Boolean,
-)
-
-internal fun resolveBanksEntry(state: SettingsUiState): BanksNavigation =
+internal fun resolveBanksEntry(state: SettingsUiState): SettingsDestination =
     if (state.bankSummaries.size == 1) {
-        BanksNavigation(
-            destination = SettingsDestination.BankHub(state.bankSummaries.single().bank.id),
-            skipBanksList = true,
-        )
+        SettingsDestination.BankHub(state.bankSummaries.single().bank.id)
     } else {
-        BanksNavigation(
-            destination = SettingsDestination.Banks,
-            skipBanksList = false,
-        )
+        SettingsDestination.Banks
     }
 
 internal fun resolvePendingDestination(
@@ -48,7 +42,7 @@ internal fun resolvePendingDestination(
     state: SettingsUiState,
 ): SettingsDestination =
     when (pending) {
-        SettingsDestination.Banks -> resolveBanksEntry(state).destination
+        SettingsDestination.Banks -> resolveBanksEntry(state)
         is SettingsDestination.BankAccounts,
         is SettingsDestination.BankCards,
         is SettingsDestination.BankLoans,
@@ -73,15 +67,9 @@ internal fun resolveManageSettingsLaunch(
             ManageSettingsTarget.Cards -> SettingsDestination.BankCards(bankId)
             ManageSettingsTarget.Loans -> SettingsDestination.BankLoans(bankId)
         }
-        return SettingsLaunchRequest(
-            destination = destination,
-            skipBanksList = true,
-        )
+        return SettingsLaunchRequest(destination)
     }
-    return SettingsLaunchRequest(
-        destination = SettingsDestination.Banks,
-        skipBanksList = false,
-    )
+    return SettingsLaunchRequest(SettingsDestination.Banks)
 }
 
 internal fun resolveNotificationSettingsLaunch(

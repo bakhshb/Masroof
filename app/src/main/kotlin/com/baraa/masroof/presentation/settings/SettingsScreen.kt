@@ -39,7 +39,10 @@ import com.baraa.masroof.presentation.navigation.SettingsDestination
 import com.baraa.masroof.presentation.navigation.SettingsLaunchRequest
 import com.baraa.masroof.presentation.navigation.decodeSettingsDestination
 import com.baraa.masroof.presentation.navigation.encode
-import com.baraa.masroof.presentation.navigation.parent
+import com.baraa.masroof.presentation.navigation.popSettingsStack
+import com.baraa.masroof.presentation.navigation.pushSettingsDestination
+import com.baraa.masroof.presentation.navigation.replaceSettingsStack
+import com.baraa.masroof.presentation.navigation.replaceSettingsTop
 import com.baraa.masroof.presentation.navigation.resolveBanksEntry
 import com.baraa.masroof.presentation.navigation.resolvePendingDestination
 
@@ -62,38 +65,40 @@ fun SettingsRoute(
         viewModel.refresh()
     }
     val state by viewModel.uiState.collectAsState()
-    var destinationRoute by rememberSaveable { mutableStateOf(SettingsDestination.Hub.encode()) }
-    var skippedBanksList by rememberSaveable { mutableStateOf(false) }
-    val destination = decodeSettingsDestination(destinationRoute)
+    var destinationStack by rememberSaveable {
+        mutableStateOf(listOf(SettingsDestination.Hub.encode()))
+    }
+    val destination = decodeSettingsDestination(
+        destinationStack.lastOrNull() ?: SettingsDestination.Hub.encode(),
+    )
 
-    fun bankHubBack(): SettingsDestination = destination.parent(skippedBanksList)
+    fun navigateTo(next: SettingsDestination) {
+        destinationStack = pushSettingsDestination(destinationStack, next)
+    }
 
-    fun navigateTo(next: SettingsDestination, skipBanksList: Boolean = false) {
-        destinationRoute = next.encode()
-        skippedBanksList = when {
-            skipBanksList -> true
-            next == SettingsDestination.Banks || next == SettingsDestination.Hub -> false
-            else -> skippedBanksList
+    fun popOrExit() {
+        val popped = popSettingsStack(destinationStack)
+        if (popped == null) {
+            onBack()
+        } else {
+            destinationStack = popped
         }
     }
 
+    fun openAt(next: SettingsDestination) {
+        destinationStack = replaceSettingsStack(next)
+    }
+
     fun openBanksEntry() {
-        val entry = resolveBanksEntry(state)
-        navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
+        navigateTo(resolveBanksEntry(state))
     }
 
     LaunchedEffect(pendingLaunch, state.loading, state.bankSummaries) {
         val launch = pendingLaunch ?: return@LaunchedEffect
         if (launch.destination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
         when (launch.destination) {
-            SettingsDestination.Banks -> {
-                val entry = resolveBanksEntry(state)
-                navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
-            }
-            else -> navigateTo(
-                next = resolvePendingDestination(launch.destination, state),
-                skipBanksList = launch.skipBanksList,
-            )
+            SettingsDestination.Banks -> openAt(resolveBanksEntry(state))
+            else -> openAt(resolvePendingDestination(launch.destination, state))
         }
         onPendingLaunchConsumed()
     }
@@ -104,8 +109,8 @@ fun SettingsRoute(
         }
     }
 
-    BackHandler(enabled = destination != SettingsDestination.Hub) {
-        navigateTo(destination.parent(skippedBanksList))
+    BackHandler {
+        popOrExit()
     }
 
     val logEntries by viewModel.logEntries.collectAsState()
@@ -115,7 +120,7 @@ fun SettingsRoute(
         SettingsDestination.Hub -> SettingsHubScreen(
             state = state,
             reviewRequiredCount = reviewRequiredCount,
-            onBack = onBack,
+            onBack = { popOrExit() },
             onOpenBanks = { openBanksEntry() },
             onOpenReview = onOpenReview,
             onOpenAbout = { navigateTo(SettingsDestination.About) },
@@ -137,7 +142,7 @@ fun SettingsRoute(
 
         SettingsDestination.Banks -> SettingsBanksScreen(
             state = state,
-            onBack = { navigateTo(SettingsDestination.Hub) },
+            onBack = { popOrExit() },
             onOpenBank = { summary -> navigateTo(SettingsDestination.BankHub(summary.bank.id)) },
         )
 
@@ -148,7 +153,7 @@ fun SettingsRoute(
                 summary != null -> SettingsBankScreen(
                     bank = bank,
                     summary = summary,
-                    onBack = { navigateTo(bankHubBack()) },
+                    onBack = { popOrExit() },
                     onOpenAccounts = { navigateTo(SettingsDestination.BankAccounts(current.bankId)) },
                     onOpenCards = { navigateTo(SettingsDestination.BankCards(current.bankId)) },
                     onOpenLoans = { navigateTo(SettingsDestination.BankLoans(current.bankId)) },
@@ -156,16 +161,16 @@ fun SettingsRoute(
 
                 state.loading -> SettingsBankHubLoadingScreen(
                     bank = bank,
-                    onBack = { navigateTo(bankHubBack()) },
+                    onBack = { popOrExit() },
                 )
 
                 else -> {
                     LaunchedEffect(current.bankId) {
-                        navigateTo(SettingsDestination.Banks)
+                        destinationStack = replaceSettingsTop(destinationStack, SettingsDestination.Banks)
                     }
                     SettingsBankHubLoadingScreen(
                         bank = bank,
-                        onBack = { navigateTo(bankHubBack()) },
+                        onBack = { popOrExit() },
                     )
                 }
             }
@@ -174,7 +179,7 @@ fun SettingsRoute(
         is SettingsDestination.BankAccounts -> SettingsBankAccountsScreen(
             bank = Bank(current.bankId),
             state = state,
-            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
+            onBack = { popOrExit() },
             onConfirmOwned = viewModel::confirmAccountOwned,
             onMarkExternal = viewModel::markAccountExternal,
             onRequestStopTracking = viewModel::requestStopAccountTracking,
@@ -192,7 +197,7 @@ fun SettingsRoute(
         is SettingsDestination.BankCards -> SettingsBankCardsScreen(
             bank = Bank(current.bankId),
             state = state,
-            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
+            onBack = { popOrExit() },
             onConfirmOwned = viewModel::confirmCardOwned,
             onMarkExternal = viewModel::markCardExternal,
             onRequestStopTracking = viewModel::requestStopTracking,
@@ -219,7 +224,7 @@ fun SettingsRoute(
         is SettingsDestination.BankLoans -> SettingsBankLoansScreen(
             bank = Bank(current.bankId),
             state = state,
-            onBack = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
+            onBack = { popOrExit() },
             onConfirmOwned = viewModel::confirmLoanOwned,
             onMarkExternal = viewModel::markLoanExternal,
             onRequestStopTracking = viewModel::requestStopLoanTracking,
@@ -234,7 +239,7 @@ fun SettingsRoute(
             updateState = state.updateState,
             updateMessage = state.updateMessage,
             logErrorCount = logErrorCount,
-            onBack = { navigateTo(SettingsDestination.Hub) },
+            onBack = { popOrExit() },
             onOpenLogs = { navigateTo(SettingsDestination.Logs) },
             onOpenDesignCatalog = { navigateTo(SettingsDestination.DesignCatalog) },
             onSaveGithubToken = viewModel::saveGithubToken,
@@ -247,12 +252,12 @@ fun SettingsRoute(
 
         SettingsDestination.Logs -> SettingsLogsScreen(
             viewModel = viewModel,
-            onBack = { navigateTo(SettingsDestination.About) },
+            onBack = { popOrExit() },
             onRequestExport = onRequestExportLogs,
         )
 
         SettingsDestination.DesignCatalog -> DesignCatalogScreen(
-            onBack = { navigateTo(SettingsDestination.About) },
+            onBack = { popOrExit() },
         )
     }
 }
