@@ -4,10 +4,8 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionTiming
-import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -50,7 +48,6 @@ object LoanOverviewBuilder {
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
 
         val overviews = ownedLoans.map { loan ->
-            val loanContainerId = FinancialContainerIdFactory.loanId(loan.bank, loan.loanType)
             val loanKey = loanKey(loan.bank.id, loan.loanType)
             var periodPaymentTotal = Money.zero(primaryCurrency)
             transactions.forEach { tx ->
