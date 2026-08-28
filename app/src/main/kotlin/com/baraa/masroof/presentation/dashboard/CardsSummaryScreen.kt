@@ -33,6 +33,7 @@ fun CardsSummaryRoute(
     viewModel: DashboardViewModel,
     initialSelectedCardKey: String? = null,
     initialSelectedDebitKey: String? = null,
+    detailBackExitsSummary: Boolean = false,
     onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageCards: () -> Unit,
@@ -67,10 +68,18 @@ fun CardsSummaryRoute(
         followedFacilities?.debitCards?.find { CardOwnershipKey.of(it) == key }
     }
 
+    fun clearDetailSelection() {
+        if (detailBackExitsSummary) {
+            onBack()
+        } else {
+            selectedDebitKey = null
+            selectedCardKey = null
+        }
+    }
+
     BackHandler {
         when {
-            selectedDebit != null -> selectedDebitKey = null
-            selectedCard != null -> selectedCardKey = null
+            selectedDebit != null || selectedCard != null -> clearDetailSelection()
             else -> onBack()
         }
     }
@@ -81,7 +90,7 @@ fun CardsSummaryRoute(
                 debit = selectedDebit,
                 state = state,
                 cardNetwork = cardNetworks[CardOwnershipKey.of(selectedDebit)] ?: selectedDebit.network,
-                onBack = { selectedDebitKey = null },
+                onBack = { clearDetailSelection() },
                 onOpenTransaction = onOpenTransaction,
                 onViewAllTransactions = {
                     val cardKey = CardTransactionInvolvementResolver.cardKey(
@@ -107,7 +116,7 @@ fun CardsSummaryRoute(
                     }
                     ?.salaryPeriodLabel,
                 state = state,
-                onBack = { selectedCardKey = null },
+                onBack = { clearDetailSelection() },
                 onOpenTransaction = onOpenTransaction,
                 onViewAllTransactions = {
                     onOpenAllTransactions(

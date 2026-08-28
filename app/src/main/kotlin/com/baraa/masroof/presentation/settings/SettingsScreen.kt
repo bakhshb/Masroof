@@ -34,6 +34,9 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.MasroofTextStyles
+import com.baraa.masroof.presentation.SettingsLaunchRequest
+import com.baraa.masroof.presentation.resolveBanksEntry
+import com.baraa.masroof.presentation.resolvePendingDestination
 
 @Composable
 fun SettingsRoute(
@@ -41,8 +44,8 @@ fun SettingsRoute(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
-    pendingDestination: SettingsDestination? = null,
-    onPendingDestinationConsumed: () -> Unit = {},
+    pendingLaunch: SettingsLaunchRequest? = null,
+    onPendingLaunchConsumed: () -> Unit = {},
     onLocaleChanged: () -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
@@ -74,17 +77,20 @@ fun SettingsRoute(
         navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
     }
 
-    LaunchedEffect(pendingDestination, state.loading, state.bankSummaries) {
-        if (pendingDestination == null) return@LaunchedEffect
-        if (pendingDestination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
-        when (pendingDestination) {
+    LaunchedEffect(pendingLaunch, state.loading, state.bankSummaries) {
+        val launch = pendingLaunch ?: return@LaunchedEffect
+        if (launch.destination == SettingsDestination.Banks && state.loading) return@LaunchedEffect
+        when (launch.destination) {
             SettingsDestination.Banks -> {
                 val entry = resolveBanksEntry(state)
                 navigateTo(entry.destination, skipBanksList = entry.skipBanksList)
             }
-            else -> navigateTo(resolvePendingDestination(pendingDestination, state))
+            else -> navigateTo(
+                next = resolvePendingDestination(launch.destination, state),
+                skipBanksList = launch.skipBanksList,
+            )
         }
-        onPendingDestinationConsumed()
+        onPendingLaunchConsumed()
     }
 
     LaunchedEffect(destination) {
@@ -240,42 +246,6 @@ fun SettingsRoute(
         )
     }
 }
-
-private data class BanksNavigation(
-    val destination: SettingsDestination,
-    val skipBanksList: Boolean,
-)
-
-private fun resolveBanksEntry(state: SettingsUiState): BanksNavigation =
-    if (state.bankSummaries.size == 1) {
-        BanksNavigation(
-            destination = SettingsDestination.BankHub(state.bankSummaries.single().bank.id),
-            skipBanksList = true,
-        )
-    } else {
-        BanksNavigation(
-            destination = SettingsDestination.Banks,
-            skipBanksList = false,
-        )
-    }
-
-private fun resolvePendingDestination(
-    pending: SettingsDestination,
-    state: SettingsUiState,
-): SettingsDestination =
-    when (pending) {
-        SettingsDestination.Banks -> resolveBanksEntry(state).destination
-        is SettingsDestination.BankAccounts,
-        is SettingsDestination.BankCards,
-        is SettingsDestination.BankLoans,
-        is SettingsDestination.BankHub,
-        -> pending
-
-        SettingsDestination.Hub,
-        SettingsDestination.About,
-        SettingsDestination.Logs,
-        -> pending
-    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
