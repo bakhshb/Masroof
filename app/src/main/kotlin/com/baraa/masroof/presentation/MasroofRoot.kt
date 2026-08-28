@@ -41,17 +41,6 @@ import com.baraa.masroof.presentation.settings.SettingsDestination
 import com.baraa.masroof.presentation.settings.SettingsRoute
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 
-private enum class HomeDestination {
-    Dashboard,
-    AccountsSummary,
-    CardsSummary,
-    LoansSummary,
-    NotificationCenter,
-    Review,
-    AllTransactions,
-    Settings,
-}
-
 /**
  * Minimal root composition: onboarding while incomplete, dashboard + review after HOME.
  */
@@ -76,15 +65,37 @@ fun MasroofRoot(
     val settingsState by settingsViewModel.uiState.collectAsState()
     val notificationState by notificationCenterViewModel.uiState.collectAsState()
     var homeDestination by rememberSaveable { mutableStateOf(HomeDestination.Dashboard) }
-    var pendingSettingsDestination by remember { mutableStateOf<SettingsDestination?>(null) }
+    var settingsReturnDestination by rememberSaveable {
+        mutableStateOf(HomeDestination.Dashboard)
+    }
+    var reviewReturnDestination by rememberSaveable {
+        mutableStateOf(HomeDestination.Dashboard)
+    }
+    var pendingSettingsLaunch by remember { mutableStateOf<SettingsLaunchRequest?>(null) }
     var transactionListSeedFilter by remember { mutableStateOf<TransactionListFilterState?>(null) }
     var transactionListReturnDestination by rememberSaveable {
         mutableStateOf(HomeDestination.Dashboard)
     }
     var transactionListOpenGeneration by remember { mutableStateOf(0) }
     var pendingLoansSummaryLoanKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var loansSummaryDetailExitsToHome by rememberSaveable { mutableStateOf(false) }
     var pendingCardsSummaryCardKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCardsSummaryDebitKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var cardsSummaryDetailExitsToHome by rememberSaveable { mutableStateOf(false) }
+
+    fun openSettings(
+        returnTo: HomeDestination = HomeDestination.Dashboard,
+        launch: SettingsLaunchRequest? = null,
+    ) {
+        settingsReturnDestination = returnTo
+        pendingSettingsLaunch = launch
+        homeDestination = HomeDestination.Settings
+    }
+
+    fun openReview(returnTo: HomeDestination) {
+        reviewReturnDestination = returnTo
+        homeDestination = HomeDestination.Review
+    }
 
     fun openTransactionList(
         filter: TransactionListFilterState? = null,
@@ -127,7 +138,7 @@ fun MasroofRoot(
                     homeDestination = HomeDestination.Dashboard
 
                 homeDestination == HomeDestination.Settings -> {
-                    homeDestination = HomeDestination.Dashboard
+                    homeDestination = settingsReturnDestination
                     dashboardViewModel.refresh()
                 }
 
@@ -135,8 +146,10 @@ fun MasroofRoot(
                     if (reviewState.selectedDetail != null) {
                         reviewViewModel.closeDetail()
                     } else {
-                        homeDestination = HomeDestination.Dashboard
-                        dashboardViewModel.refresh()
+                        homeDestination = reviewReturnDestination
+                        if (reviewReturnDestination == HomeDestination.Dashboard) {
+                            dashboardViewModel.refresh()
+                        }
                     }
 
                 else -> {
@@ -168,29 +181,36 @@ fun MasroofRoot(
                 onOpenNotificationCenter = { homeDestination = HomeDestination.NotificationCenter },
                 onOpenAllTransactions = { openTransactionList() },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
-                onOpenSettings = { homeDestination = HomeDestination.Settings },
+                onOpenSettings = { openSettings() },
                 onOpenAccountsSummary = {
                     homeDestination = HomeDestination.AccountsSummary
                 },
                 onOpenCardsSummary = {
                     pendingCardsSummaryCardKey = null
                     pendingCardsSummaryDebitKey = null
+                    cardsSummaryDetailExitsToHome = false
                     homeDestination = HomeDestination.CardsSummary
                 },
                 onOpenLoansSummary = {
                     pendingLoansSummaryLoanKey = null
+                    loansSummaryDetailExitsToHome = false
                     homeDestination = HomeDestination.LoansSummary
                 },
                 onOpenLoanDetail = { loan ->
                     pendingLoansSummaryLoanKey = LoanOwnershipKey.of(loan)
+                    loansSummaryDetailExitsToHome = true
                     homeDestination = HomeDestination.LoansSummary
                 },
                 onOpenCardDetail = { card ->
                     pendingCardsSummaryCardKey = CardOwnershipKey.of(card)
+                    pendingCardsSummaryDebitKey = null
+                    cardsSummaryDetailExitsToHome = true
                     homeDestination = HomeDestination.CardsSummary
                 },
                 onOpenDebitDetail = { debit ->
                     pendingCardsSummaryDebitKey = CardOwnershipKey.of(debit)
+                    pendingCardsSummaryCardKey = null
+                    cardsSummaryDetailExitsToHome = true
                     homeDestination = HomeDestination.CardsSummary
                 },
                 onRequestSmsPermission = onRequestPermissions,
@@ -200,8 +220,13 @@ fun MasroofRoot(
                 viewModel = dashboardViewModel,
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageAccounts = {
-                    pendingSettingsDestination = SettingsDestination.Banks
-                    homeDestination = HomeDestination.Settings
+                    openSettings(
+                        returnTo = HomeDestination.AccountsSummary,
+                        launch = resolveManageSettingsLaunch(
+                            state = settingsState,
+                            target = ManageSettingsTarget.Accounts,
+                        ),
+                    )
                 },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenAllTransactions = { filter ->
@@ -215,14 +240,20 @@ fun MasroofRoot(
                 viewModel = dashboardViewModel,
                 initialSelectedCardKey = pendingCardsSummaryCardKey,
                 initialSelectedDebitKey = pendingCardsSummaryDebitKey,
+                detailBackExitsSummary = cardsSummaryDetailExitsToHome,
                 onInitialSelectionConsumed = {
                     pendingCardsSummaryCardKey = null
                     pendingCardsSummaryDebitKey = null
                 },
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageCards = {
-                    pendingSettingsDestination = SettingsDestination.Banks
-                    homeDestination = HomeDestination.Settings
+                    openSettings(
+                        returnTo = HomeDestination.CardsSummary,
+                        launch = resolveManageSettingsLaunch(
+                            state = settingsState,
+                            target = ManageSettingsTarget.Cards,
+                        ),
+                    )
                 },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenAllTransactions = { filter ->
@@ -235,11 +266,17 @@ fun MasroofRoot(
             HomeDestination.LoansSummary -> LoansSummaryRoute(
                 viewModel = dashboardViewModel,
                 initialSelectedLoanKey = pendingLoansSummaryLoanKey,
+                detailBackExitsSummary = loansSummaryDetailExitsToHome,
                 onInitialSelectionConsumed = { pendingLoansSummaryLoanKey = null },
                 onBack = { homeDestination = HomeDestination.Dashboard },
                 onManageLoans = {
-                    pendingSettingsDestination = SettingsDestination.Banks
-                    homeDestination = HomeDestination.Settings
+                    openSettings(
+                        returnTo = HomeDestination.LoansSummary,
+                        launch = resolveManageSettingsLaunch(
+                            state = settingsState,
+                            target = ManageSettingsTarget.Loans,
+                        ),
+                    )
                 },
                 onOpenTransaction = dashboardViewModel::openTransactionDetail,
                 onOpenAllTransactions = { filter ->
@@ -256,12 +293,17 @@ fun MasroofRoot(
                 onNavigate = { action ->
                     handleNotificationAction(
                         action = action,
+                        settingsState = settingsState,
                         onRequestPermissions = onRequestPermissions,
                         onOpenAppSettings = onOpenAppSettings,
-                        onOpenReview = { homeDestination = HomeDestination.Review },
-                        onOpenSettings = { destination ->
-                            pendingSettingsDestination = destination
-                            homeDestination = HomeDestination.Settings
+                        onOpenReview = {
+                            openReview(returnTo = HomeDestination.NotificationCenter)
+                        },
+                        onOpenSettings = { launch ->
+                            openSettings(
+                                returnTo = HomeDestination.NotificationCenter,
+                                launch = launch,
+                            )
                         },
                         onDismissRescanStatus = dashboardViewModel::clearRescanStatus,
                     )
@@ -270,8 +312,10 @@ fun MasroofRoot(
             HomeDestination.Review -> ReviewRoute(
                 viewModel = reviewViewModel,
                 onBack = {
-                    homeDestination = HomeDestination.Dashboard
-                    dashboardViewModel.refresh()
+                    homeDestination = reviewReturnDestination
+                    if (reviewReturnDestination == HomeDestination.Dashboard) {
+                        dashboardViewModel.refresh()
+                    }
                 },
             )
             HomeDestination.AllTransactions -> {
@@ -310,13 +354,13 @@ fun MasroofRoot(
             HomeDestination.Settings -> SettingsRoute(
                 viewModel = settingsViewModel,
                 reviewRequiredCount = dashboardState.summary?.reviewRequiredCount ?: 0,
-                pendingDestination = pendingSettingsDestination,
-                onPendingDestinationConsumed = { pendingSettingsDestination = null },
+                pendingLaunch = pendingSettingsLaunch,
+                onPendingLaunchConsumed = { pendingSettingsLaunch = null },
                 onBack = {
-                    homeDestination = HomeDestination.Dashboard
+                    homeDestination = settingsReturnDestination
                     dashboardViewModel.refresh()
                 },
-                onOpenReview = { homeDestination = HomeDestination.Review },
+                onOpenReview = { openReview(returnTo = HomeDestination.Settings) },
                 onLocaleChanged = onLocaleChanged,
                 onRequestExport = onRequestExport,
                 onRequestImport = onRequestImport,
@@ -381,19 +425,22 @@ private fun showTransactionDetail(
 
 private fun handleNotificationAction(
     action: NotificationAction,
+    settingsState: com.baraa.masroof.presentation.settings.SettingsUiState,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onOpenReview: () -> Unit,
-    onOpenSettings: (SettingsDestination) -> Unit,
+    onOpenSettings: (SettingsLaunchRequest) -> Unit,
     onDismissRescanStatus: () -> Unit,
 ) {
     when (action) {
         NotificationAction.REQUEST_SMS_PERMISSION -> onRequestPermissions()
         NotificationAction.OPEN_APP_SETTINGS -> onOpenAppSettings()
         NotificationAction.OPEN_REVIEW -> onOpenReview()
-        NotificationAction.OPEN_SETTINGS_CARDS -> onOpenSettings(SettingsDestination.Banks)
-        NotificationAction.OPEN_SETTINGS_ACCOUNTS -> onOpenSettings(SettingsDestination.Banks)
-        NotificationAction.OPEN_SETTINGS_ABOUT -> onOpenSettings(SettingsDestination.About)
+        NotificationAction.OPEN_SETTINGS_CARDS,
+        NotificationAction.OPEN_SETTINGS_ACCOUNTS,
+        NotificationAction.OPEN_SETTINGS_ABOUT,
+        -> resolveNotificationSettingsLaunch(action, settingsState)?.let(onOpenSettings)
+
         NotificationAction.DISMISS_RESCAN -> onDismissRescanStatus()
         NotificationAction.MARK_READ_ONLY -> Unit
     }

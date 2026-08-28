@@ -38,6 +38,7 @@ import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 fun LoansSummaryRoute(
     viewModel: DashboardViewModel,
     initialSelectedLoanKey: String? = null,
+    detailBackExitsSummary: Boolean = false,
     onInitialSelectionConsumed: () -> Unit = {},
     onBack: () -> Unit,
     onManageLoans: () -> Unit,
@@ -59,9 +60,17 @@ fun LoansSummaryRoute(
         followedLoans?.loans?.find { LoanOwnershipKey.of(it) == key }
     }
 
+    fun clearLoanSelection() {
+        if (detailBackExitsSummary) {
+            onBack()
+        } else {
+            selectedLoanKey = null
+        }
+    }
+
     BackHandler {
         when {
-            selectedLoan != null -> selectedLoanKey = null
+            selectedLoan != null -> clearLoanSelection()
             else -> onBack()
         }
     }
@@ -71,7 +80,7 @@ fun LoansSummaryRoute(
             LoanDetailScreen(
                 loan = selectedLoan,
                 state = state,
-                onBack = { selectedLoanKey = null },
+                onBack = { clearLoanSelection() },
                 onOpenTransaction = onOpenTransaction,
                 onViewAllTransactions = {
                     val loanContainerId = FinancialContainerIdFactory.loanId(
