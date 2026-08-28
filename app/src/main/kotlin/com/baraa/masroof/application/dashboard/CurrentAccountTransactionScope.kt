@@ -157,6 +157,16 @@ data class CurrentAccountTransactionScope(
         }
     }
 
+    fun isFinancingInstallment(
+        tx: FinancialTransaction,
+        parsedRecordsById: Map<String, ParsedEventRecord>,
+    ): Boolean {
+        if (tx.type == FinancialTransactionType.LOAN_REPAYMENT) return true
+        return linkedRecords(tx, parsedRecordsById).any { record ->
+            record.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT
+        }
+    }
+
     private fun resolveOwnedDestinationAccountId(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,

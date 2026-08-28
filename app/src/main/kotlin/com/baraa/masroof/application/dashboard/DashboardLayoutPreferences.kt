@@ -22,6 +22,9 @@ enum class DashboardSectionId {
     @SerialName("cards")
     CARDS,
 
+    @SerialName("loans")
+    LOANS,
+
     @SerialName("transactions")
     TRANSACTIONS,
 }
@@ -57,6 +60,20 @@ data class DashboardLayoutSnapshot(
     fun entry(id: DashboardSectionId): DashboardSectionEntry? =
         sections.firstOrNull { it.id == id }
 
+    /** Appends sections introduced after a saved layout was stored (e.g. LOANS). */
+    fun withMergedSections(): DashboardLayoutSnapshot {
+        val defaults = default()
+        val byId = sections.associateBy { it.id }.toMutableMap()
+        defaults.sections.forEach { entry ->
+            if (entry.id !in byId) {
+                byId[entry.id] = entry
+            }
+        }
+        val ordered = defaults.sections.mapNotNull { byId[it.id] }
+        val extras = byId.values.filter { entry -> defaults.sections.none { it.id == entry.id } }
+        return copy(sections = ordered + extras)
+    }
+
     companion object {
         fun default(): DashboardLayoutSnapshot =
             DashboardLayoutSnapshot(
@@ -65,6 +82,7 @@ data class DashboardLayoutSnapshot(
                     DashboardSectionEntry(DashboardSectionId.QUICK, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.ACCOUNTS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.CARDS, size = DashboardSectionSize.LARGE),
+                    DashboardSectionEntry(DashboardSectionId.LOANS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.TRANSACTIONS, size = DashboardSectionSize.MEDIUM),
                 ),
             )

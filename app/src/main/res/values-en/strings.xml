@@ -146,6 +146,12 @@
     <string name="settings_bank_summary_with_unregistered">%1$s • %2$d unregistered</string>
     <string name="settings_loans_hint">Loans discovered from bank SMS.</string>
     <string name="settings_loans_empty">No loans registered yet.</string>
+    <string name="settings_loans_unregistered">Unregistered</string>
+    <string name="settings_loans_followed">My loans</string>
+    <string name="settings_loans_stopped">Stopped</string>
+    <string name="settings_stop_loan_tracking">Stop tracking loan</string>
+    <string name="settings_stop_loan_confirm_title">Stop tracking this loan?</string>
+    <string name="settings_stop_loan_confirm_body">%1$s will no longer count as one of your loans — it will be hidden from the loans summary.</string>
     <string name="settings_loan_type_personal">Personal loan</string>
     <string name="settings_loan_type_auto">Auto loan</string>
     <string name="settings_loan_type_mortgage">Mortgage</string>
@@ -269,7 +275,7 @@
     <string name="dashboard_accounts_summary_screen_title">Accounts summary</string>
     <string name="dashboard_accounts_summary_empty">No accounts added yet</string>
 <string name="dashboard_account_remaining_label">Remaining in account</string>
-    <string name="dashboard_account_remaining_calculated_hint">In − out (external transfers, card payments, cash, bills, POS, fees)</string>
+    <string name="dashboard_account_remaining_calculated_hint">In − out (external transfers, card payments, cash, bills, loan repayments, POS, fees)</string>
     <string name="dashboard_accounts_remaining_total_title">Total remaining in accounts</string>
     <string name="dashboard_accounts_fleet_total_hint">Sum of all in − all out across your accounts</string>
     <string name="dashboard_manage_accounts">Manage accounts</string>
@@ -294,6 +300,7 @@
     <string name="dashboard_customize_section_quick">Quick cards</string>
     <string name="dashboard_customize_section_accounts">Accounts summary</string>
     <string name="dashboard_customize_section_cards">Cards summary</string>
+    <string name="dashboard_customize_section_loans">Loans summary</string>
     <string name="dashboard_customize_section_transactions">Recent transactions</string>
     <string name="dashboard_customize_size_small">Small</string>
     <string name="dashboard_customize_size_medium">Medium</string>

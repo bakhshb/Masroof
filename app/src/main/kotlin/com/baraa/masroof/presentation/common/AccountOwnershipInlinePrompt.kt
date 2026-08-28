@@ -22,6 +22,7 @@ fun AccountOwnershipInlinePrompt(
     onConfirmOwned: () -> Unit,
     onMarkExternal: () -> Unit,
     modifier: Modifier = Modifier,
+    titleRes: Int = R.string.settings_accounts_unregistered,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -36,7 +37,7 @@ fun AccountOwnershipInlinePrompt(
             )
             Spacer(Modifier.size(6.dp))
             Text(
-                stringResource(R.string.settings_accounts_unregistered),
+                stringResource(titleRes),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
             )
