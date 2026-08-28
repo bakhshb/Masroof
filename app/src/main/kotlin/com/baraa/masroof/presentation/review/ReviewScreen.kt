@@ -40,9 +40,10 @@ import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.SectionHeader
-import com.baraa.masroof.presentation.dashboard.DashboardAmountRole
-import com.baraa.masroof.presentation.dashboard.DashboardAmountText
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 
 @Composable
@@ -101,7 +102,7 @@ private fun ReviewListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = MasroofSpacing.screenHorizontal, vertical = MasroofSpacing.sectionHeaderGap),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 FilterChip(
@@ -129,7 +130,7 @@ private fun ReviewListScreen(
             }
             state.error == ReviewError.LOAD_FAILED && state.items.isEmpty() -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier.fillMaxSize().padding(MasroofSpacing.screenPaddingLarge),
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +155,7 @@ private fun ReviewListScreen(
             }
             state.items.isEmpty() -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier.fillMaxSize().padding(MasroofSpacing.screenPaddingLarge),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -191,7 +192,7 @@ private fun ReviewListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
-                        SectionHeader(
+                        MasroofSectionHeader(
                             title = stringResource(
                                 if (state.listMode == ReviewListMode.IGNORED) {
                                     R.string.review_ignored_count
@@ -221,7 +222,7 @@ private fun ReviewListScreen(
                     items(state.items, key = { it.id }) { item ->
                         ReviewListCard(item = item, onClick = { onOpen(item.id) })
                     }
-                    item { Spacer(Modifier.height(16.dp)) }
+                    item { Spacer(Modifier.height(MasroofSpacing.screenVertical)) }
                 }
             }
             }
@@ -353,9 +354,9 @@ private fun ReviewDetailScreen(
                     )
                 }
                 detail.amountLabel?.let {
-                    DashboardAmountText(
+                    MasroofAmountText(
                         amount = it,
-                        role = DashboardAmountRole.Hero,
+                        role = MasroofAmountRole.Hero,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -381,7 +382,7 @@ private fun ReviewDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.review_restore_actions_title),
                     icon = MasroofIcons.reviewQueue,
                 )
@@ -409,7 +410,7 @@ private fun ReviewDetailScreen(
                 IconLabelRow(icon = MasroofIcons.counterparty, label = stringResource(R.string.review_counterparty, it))
             }
 
-            SectionHeader(
+            MasroofSectionHeader(
                 title = stringResource(R.string.review_reasons_title),
                 icon = MasroofIcons.warning,
             )
@@ -422,7 +423,7 @@ private fun ReviewDetailScreen(
             }
 
             if (detail.showOwnershipActions && detail.ownershipCard?.last4 != null) {
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.review_ownership_prompt_title),
                     icon = MasroofIcons.ownership,
                 )
@@ -441,7 +442,7 @@ private fun ReviewDetailScreen(
                 )
             }
 
-            SectionHeader(
+            MasroofSectionHeader(
                 title = stringResource(R.string.review_sms_body),
                 icon = MasroofIcons.sms,
             )
@@ -464,7 +465,7 @@ private fun ReviewDetailScreen(
             }
 
             if (detail.showFinancialTypeActions) {
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.review_actions_title),
                     icon = MasroofIcons.reviewQueue,
                 )
@@ -511,7 +512,7 @@ private fun ReviewDetailScreen(
             }
 
             if (detail.pairCandidates.isNotEmpty()) {
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.review_pair_candidates),
                     icon = MasroofIcons.pairMatch,
                 )

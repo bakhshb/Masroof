@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,7 +51,7 @@ fun AccountPeriodSummaryCard(
 
         Text(
             stringResource(R.string.dashboard_account_remaining_calculated_hint),
-            style = DashboardTextStyles.hint,
+            style = MasroofTextStyles.hint,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )

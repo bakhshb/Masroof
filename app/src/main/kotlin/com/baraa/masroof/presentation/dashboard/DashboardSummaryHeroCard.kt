@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +37,7 @@ fun DashboardSummaryHeroCard(
         spec.footerHint?.let { hint ->
             Text(
                 hint,
-                style = DashboardTextStyles.hint,
+                style = MasroofTextStyles.hint,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )

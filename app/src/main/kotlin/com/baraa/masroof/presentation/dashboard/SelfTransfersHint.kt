@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +26,7 @@ fun SelfTransfersHint(
     Text(
         stringResource(textRes),
         modifier = modifier,
-        style = DashboardTextStyles.hint,
+        style = MasroofTextStyles.hint,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 
 @Composable
 fun BackNavigationIcon(
@@ -52,14 +54,14 @@ fun SectionHeader(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap),
             modifier = Modifier.weight(1f),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(MasroofIconSizes.sectionHeader),
             )
             MasroofSectionTitle(title = title, modifier = Modifier.fillMaxWidth())
         }

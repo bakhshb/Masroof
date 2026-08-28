@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,7 +59,7 @@ fun TransactionReclassifyBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = DashboardSpacing.bottomSheetBottom),
+                .padding(bottom = MasroofSpacing.bottomSheetBottom),
         ) {
             Row(
                 modifier = Modifier

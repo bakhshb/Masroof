@@ -34,15 +34,15 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.ShareActionIcon
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
-import com.baraa.masroof.presentation.dashboard.DashboardAmountRole
-import com.baraa.masroof.presentation.dashboard.DashboardAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
@@ -227,9 +227,9 @@ fun TransactionDetailScreen(
                     transaction.title ?: transactionTypeLabel(transaction.typeLabelResHint),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                DashboardAmountText(
+                MasroofAmountText(
                     amount = formatLocalizedMoney(transaction.amount),
-                    role = DashboardAmountRole.Hero,
+                    role = MasroofAmountRole.Hero,
                     color = when (transaction.direction) {
                         TransactionDirectionUi.INCOME,
                         TransactionDirectionUi.INWARD,
@@ -242,7 +242,7 @@ fun TransactionDetailScreen(
                 )
             }
 
-            SectionHeader(
+            MasroofSectionHeader(
                 title = stringResource(R.string.transaction_detail_info_section),
                 icon = MasroofIcons.recentTransactions,
             )
@@ -313,7 +313,7 @@ fun TransactionDetailScreen(
             if (smsLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else if (smsEvidence.isNotEmpty()) {
-                SectionHeader(
+                MasroofSectionHeader(
                     title = stringResource(R.string.transaction_detail_sms_section),
                     icon = MasroofIcons.sms,
                 )

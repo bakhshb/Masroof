@@ -6,7 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.presentation.common.MasroofSpacing
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 object SettingsSpacing {

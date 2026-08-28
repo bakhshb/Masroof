@@ -1,10 +1,11 @@
-package com.baraa.masroof.presentation.common
+package com.baraa.masroof.presentation.theme
 
 import androidx.compose.ui.unit.dp
 
 object MasroofSpacing {
     val screenHorizontal = 16.dp
     val screenVertical = 16.dp
+    val screenPaddingLarge = 24.dp
     val sectionGap = 12.dp
     val sectionHeaderGap = 8.dp
     val cardInnerGap = 8.dp

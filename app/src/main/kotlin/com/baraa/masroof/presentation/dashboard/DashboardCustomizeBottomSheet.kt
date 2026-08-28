@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,7 +64,7 @@ fun DashboardCustomizeBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = DashboardSpacing.bottomSheetBottom),
+                .padding(bottom = MasroofSpacing.bottomSheetBottom),
         ) {
             Text(
                 stringResource(R.string.dashboard_customize_sheet_title),

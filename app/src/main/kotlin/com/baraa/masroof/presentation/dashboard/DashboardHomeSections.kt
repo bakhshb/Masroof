@@ -1,5 +1,15 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+
+import com.baraa.masroof.presentation.common.MasroofAmountText
+
+import com.baraa.masroof.presentation.common.MasroofTextStyles
+
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,12 +72,12 @@ fun DashboardHeroCard(
     MasroofCard(modifier = modifier) {
         Text(
             stringResource(R.string.dashboard_hero_remaining_title),
-            style = DashboardTextStyles.hint,
+            style = MasroofTextStyles.hint,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        DashboardAmountText(
+        MasroofAmountText(
             amount = formatLocalizedMoney(remaining),
-            role = DashboardAmountRole.Hero,
+            role = MasroofAmountRole.Hero,
             color = remainingColor,
             heroScale = heroAmountStyleScale(size),
             modifier = Modifier.padding(top = 6.dp),
@@ -185,7 +195,7 @@ fun DashboardQuickSummaryRow(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DashboardSpacing.cardInnerGap),
+        horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap),
     ) {
         MasroofCompactCard(
             label = stringResource(R.string.dashboard_quick_net_remaining),
@@ -240,8 +250,8 @@ fun DashboardAccountsSection(
 ) {
     if (accounts.isEmpty()) return
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(DashboardSpacing.sectionHeaderGap)) {
-        DashboardSectionHeader(
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
+        MasroofSectionHeader(
             title = stringResource(R.string.dashboard_accounts_summary_title),
             icon = MasroofIcons.moneyMovement,
             onViewAll = onViewAll,
@@ -250,7 +260,7 @@ fun DashboardAccountsSection(
         MasroofCard {
             accounts.forEachIndexed { index, account ->
                 if (index > 0) {
-                    Spacer(Modifier.height(DashboardSpacing.listItemGap))
+                    Spacer(Modifier.height(MasroofSpacing.listItemGap))
                 }
                 DashboardAccountRow(account = account, index = index)
             }
@@ -285,8 +295,8 @@ private fun DashboardAccountRow(
     ) {
         Box(
             modifier = Modifier
-                .size(DashboardSpacing.entityIconSize)
-                .clip(RoundedCornerShape(DashboardSpacing.entityIconRadius))
+                .size(MasroofSpacing.entityIconSize)
+                .clip(RoundedCornerShape(MasroofSpacing.entityIconRadius))
                 .background(iconBg),
             contentAlignment = Alignment.Center,
         ) {
@@ -300,7 +310,7 @@ private fun DashboardAccountRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 account.displayLabel(),
-                style = DashboardTextStyles.cardTitle,
+                style = MasroofTextStyles.cardTitle,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -323,10 +333,10 @@ private fun DashboardAccountRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            DashboardAmountText(
+            MasroofAmountText(
                 amount = remaining?.let { formatLocalizedMoney(it) }
                     ?: stringResource(R.string.dashboard_value_unavailable),
-                role = DashboardAmountRole.Card,
+                role = MasroofAmountRole.Card,
                 color = remaining?.let { value ->
                     when {
                         value.amount.signum() > 0 -> extended.inflow

@@ -1,5 +1,9 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
+
+import com.baraa.masroof.presentation.theme.MasroofSpacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -121,9 +125,9 @@ fun DashboardSummaryTransactionsSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DashboardSpacing.listItemGap),
+        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
     ) {
-        DashboardSectionHeader(
+        MasroofSectionHeader(
             title = stringResource(R.string.dashboard_summary_transactions_title, transactions.size),
             onViewAll = if (onViewAll != null && transactions.isNotEmpty()) onViewAll else null,
             viewAllLabel = if (onViewAll != null && transactions.isNotEmpty()) {

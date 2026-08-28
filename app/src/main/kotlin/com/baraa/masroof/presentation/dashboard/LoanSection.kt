@@ -32,7 +32,7 @@ import com.baraa.masroof.application.dashboard.LoanOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.time.ZoneId
@@ -54,7 +54,7 @@ fun LoansSection(
     if (!overview.hasContent) return
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
+        MasroofSectionHeader(
             title = stringResource(R.string.dashboard_loans_summary_title),
             icon = MasroofIcons.savings,
             onViewAll = onViewAll,

@@ -35,7 +35,7 @@ import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.SectionHeader
+import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
@@ -65,7 +65,7 @@ fun CreditFacilitiesSection(
     if (!overview.hasContent) return
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(
+        MasroofSectionHeader(
             title = stringResource(R.string.dashboard_cards_summary_title),
             icon = MasroofIcons.cardPayment,
             onViewAll = onViewAll,

@@ -43,8 +43,11 @@ import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.theme.MasroofBadgeShape
 import com.baraa.masroof.presentation.theme.MasroofCardShape
+import com.baraa.masroof.presentation.theme.MasroofElevation
+import com.baraa.masroof.presentation.theme.MasroofIconSizes
 import com.baraa.masroof.presentation.theme.MasroofPillShape
 import com.baraa.masroof.presentation.theme.MasroofRowShape
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 enum class MasroofCardAccent {
@@ -168,7 +171,7 @@ fun MasroofCard(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 8.dp,
+                elevation = MasroofElevation.card,
                 shape = MasroofCardShape,
                 ambientColor = extended.cardShadow,
                 spotColor = extended.cardShadow,
@@ -495,7 +498,7 @@ fun MasroofCompactCard(
                 if (clickable && onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
             )
             .shadow(
-                elevation = 8.dp,
+                elevation = MasroofElevation.card,
                 shape = MasroofCardShape,
                 ambientColor = extended.cardShadow,
                 spotColor = extended.cardShadow,
@@ -599,9 +602,9 @@ fun MasroofSecondaryScaffold(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(top = 16.dp)
-                .padding(bottom = 16.dp),
+                .padding(horizontal = MasroofSpacing.screenHorizontal)
+                .padding(top = MasroofSpacing.screenVertical)
+                .padding(bottom = MasroofSpacing.screenVertical),
         )
     }
 }
@@ -620,7 +623,7 @@ fun MasroofNavCard(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 6.dp,
+                elevation = MasroofElevation.navCard,
                 shape = MasroofCardShape,
                 ambientColor = extended.cardShadow,
                 spotColor = extended.cardShadow,
