@@ -152,8 +152,8 @@ fun MasroofCompactCard(
             .shadow(
                 elevation = MasroofElevation.card,
                 shape = MasroofCardShape,
-                ambientColor = extended.cardShadow,
-                spotColor = extended.cardShadow,
+                ambientColor = extended.navCardShadow,
+                spotColor = extended.navCardShadow,
             ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
@@ -161,7 +161,7 @@ fun MasroofCompactCard(
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
+        border = androidx.compose.foundation.BorderStroke(1.dp, extended.navCardBorder),
     ) {
         Column(
             modifier = Modifier
@@ -237,8 +237,8 @@ fun MasroofNavCard(
             .shadow(
                 elevation = MasroofElevation.navCard,
                 shape = MasroofCardShape,
-                ambientColor = extended.cardShadow,
-                spotColor = extended.cardShadow,
+                ambientColor = extended.navCardShadow,
+                spotColor = extended.navCardShadow,
             ),
         shape = MasroofCardShape,
         colors = CardDefaults.cardColors(
@@ -246,7 +246,7 @@ fun MasroofNavCard(
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, extended.cardBorder),
+        border = androidx.compose.foundation.BorderStroke(1.dp, extended.navCardBorder),
     ) {
         Column(
             modifier = Modifier.padding(

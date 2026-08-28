@@ -29,6 +29,13 @@ class MasroofExtendedColorsTest {
     }
 
     @Test
+    fun lightNavCardSurface_contrastsWithPageBackground() {
+        val light = lightExtendedColors()
+        assertTrue(relativeLuminance(light.navCardSurface) > relativeLuminance(MasroofLightColors.Background))
+        assertTrue(isLight(light.navCardSurface))
+    }
+
+    @Test
     fun darkNavCardSurface_isHigherThanCardSurface() {
         val dark = darkExtendedColors()
         assertTrue(relativeLuminance(dark.navCardSurface) > relativeLuminance(dark.cardSurface))
