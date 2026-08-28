@@ -1,7 +1,6 @@
-package com.baraa.masroof.presentation
+package com.baraa.masroof.presentation.navigation
 
 import com.baraa.masroof.application.notification.NotificationAction
-import com.baraa.masroof.presentation.settings.SettingsDestination
 import com.baraa.masroof.presentation.settings.SettingsUiState
 
 internal enum class HomeDestination {

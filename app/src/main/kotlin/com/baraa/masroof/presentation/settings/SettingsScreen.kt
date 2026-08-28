@@ -34,9 +34,13 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.MasroofTextStyles
-import com.baraa.masroof.presentation.SettingsLaunchRequest
-import com.baraa.masroof.presentation.resolveBanksEntry
-import com.baraa.masroof.presentation.resolvePendingDestination
+import com.baraa.masroof.presentation.navigation.SettingsDestination
+import com.baraa.masroof.presentation.navigation.SettingsLaunchRequest
+import com.baraa.masroof.presentation.navigation.decodeSettingsDestination
+import com.baraa.masroof.presentation.navigation.encode
+import com.baraa.masroof.presentation.navigation.parent
+import com.baraa.masroof.presentation.navigation.resolveBanksEntry
+import com.baraa.masroof.presentation.navigation.resolvePendingDestination
 
 @Composable
 fun SettingsRoute(

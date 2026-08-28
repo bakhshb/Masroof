@@ -1,10 +1,8 @@
-package com.baraa.masroof.presentation
+package com.baraa.masroof.presentation.navigation
 
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.settings.SettingsBankSummaryUi
-import com.baraa.masroof.presentation.settings.SettingsDestination
 import com.baraa.masroof.presentation.settings.SettingsUiState
-import com.baraa.masroof.presentation.settings.parent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
