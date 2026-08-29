@@ -78,6 +78,9 @@ fun MerchantSpendingSummaryScreen(
             modifier = contentModifier,
             verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap),
         ) {
+            MasroofSectionTitle(
+                title = stringResource(R.string.dashboard_merchants_summary_title),
+            )
             if (!overview.hasContent) {
                 Text(
                     stringResource(R.string.dashboard_merchants_empty),

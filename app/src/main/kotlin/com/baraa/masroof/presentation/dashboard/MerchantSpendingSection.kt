@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -39,7 +43,7 @@ fun DashboardAnalysisSection(
     ) {
         MasroofSectionHeader(
             title = stringResource(R.string.dashboard_analysis_title),
-            icon = MasroofIcons.merchant,
+            icon = MasroofIcons.analysis,
         )
         MerchantSpendingSection(
             overview = merchantOverview,
@@ -77,9 +81,12 @@ private fun MerchantSpendingSection(
 private fun DailySpendingTrendSection(trend: DailySpendingTrend) {
     val locale = LocalConfiguration.current.locales[0]
     val dateFormatter = DateTimeFormatter.ofPattern("d MMM", locale)
+    val selectedDateFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM", locale)
     val firstDate = trend.points.first().date
     val lastDate = trend.points.last().date
     val middleDate = trend.points[trend.points.lastIndex / 2].date
+    var selectedPointIndex by rememberSaveable { mutableIntStateOf(-1) }
+    val selectedPoint = trend.points.getOrNull(selectedPointIndex)
 
     Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
         MasroofSectionHeader(
@@ -98,7 +105,16 @@ private fun DailySpendingTrendSection(trend: DailySpendingTrend) {
             MasroofLineChart(
                 values = trend.points.map { it.spending.amount },
                 referenceValue = trend.averageDailySpending.amount,
+                selectedPointIndex = selectedPointIndex.takeIf { it >= 0 },
+                onPointSelected = { selectedPointIndex = it },
             )
+            selectedPoint?.let { point ->
+                Text(
+                    text = "${selectedDateFormatter.format(point.date)} · ${formatLocalizedMoney(point.spending)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

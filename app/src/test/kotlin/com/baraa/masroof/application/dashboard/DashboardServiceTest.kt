@@ -147,7 +147,7 @@ class DashboardServiceTest {
         )
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
-        val purchases = (1..5).map { index ->
+        val purchases = (1..2).map { index ->
             tx(
                 id = "inside-$index",
                 type = FinancialTransactionType.EXPENSE,
@@ -167,8 +167,8 @@ class DashboardServiceTest {
         ).loadOverview(period)
 
         val merchant = overview.merchantSpending.merchants.single()
-        assertEquals(5, merchant.purchaseTransactionCount)
-        assertEquals(Money.of("50.00", Currency.SAR).amount, merchant.totalSpent.amount)
+        assertEquals(2, merchant.purchaseTransactionCount)
+        assertEquals(Money.of("20.00", Currency.SAR).amount, merchant.totalSpent.amount)
         assertEquals(purchases.map { it.id }.toSet(), merchant.transactionIds)
     }
 

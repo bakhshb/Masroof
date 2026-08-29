@@ -26,4 +26,18 @@ class MasroofLineChartTest {
         assertEquals(BigDecimal.ZERO, range.minimum)
         assertEquals(BigDecimal.ONE, range.maximum)
     }
+
+    @Test
+    fun nearestPointIndex_selectsClosestPointAndClampsToChartBounds() {
+        assertEquals(0, MasroofLineChart.nearestPointIndex(x = -10f, width = 100f, pointCount = 3))
+        assertEquals(1, MasroofLineChart.nearestPointIndex(x = 54f, width = 100f, pointCount = 3))
+        assertEquals(2, MasroofLineChart.nearestPointIndex(x = 120f, width = 100f, pointCount = 3))
+    }
+
+    @Test
+    fun nearestPointIndex_handlesSingleAndInvalidCharts() {
+        assertEquals(0, MasroofLineChart.nearestPointIndex(x = 50f, width = 100f, pointCount = 1))
+        assertEquals(null, MasroofLineChart.nearestPointIndex(x = 50f, width = 0f, pointCount = 3))
+        assertEquals(null, MasroofLineChart.nearestPointIndex(x = 50f, width = 100f, pointCount = 0))
+    }
 }

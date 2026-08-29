@@ -12,28 +12,28 @@ import java.time.Instant
 
 class MerchantSpendingOverviewBuilderTest {
     @Test
-    fun fourPurchases_doNotQualify() {
-        val overview = build(purchases("Cafe", 4))
+    fun onePurchase_doesNotQualify() {
+        val overview = build(purchases("Cafe", 1))
 
         assertFalse(overview.hasContent)
     }
 
     @Test
-    fun fivePurchases_qualifyWithExactTransactionIds() {
-        val transactions = purchases("Cafe", 5)
+    fun twoPurchases_qualifyWithExactTransactionIds() {
+        val transactions = purchases("Cafe", 2)
 
         val row = build(transactions).merchants.single()
 
-        assertEquals(5, row.purchaseTransactionCount)
+        assertEquals(2, row.purchaseTransactionCount)
         assertEquals(transactions.map { it.id }.toSet(), row.transactionIds)
-        assertEquals(Money.of("50.00", Currency.SAR).amount, row.totalSpent.amount)
+        assertEquals(Money.of("20.00", Currency.SAR).amount, row.totalSpent.amount)
     }
 
     @Test
     fun ranksByTotalSpendingDescending() {
         val overview = build(
-            purchases("Lower total", 5, amount = "10") +
-                purchases("Higher total", 5, amount = "20"),
+            purchases("Lower total", 2, amount = "10") +
+                purchases("Higher total", 2, amount = "20"),
         )
 
         assertEquals(listOf("Higher total", "Lower total"), overview.merchants.map { it.displayName })
@@ -42,8 +42,8 @@ class MerchantSpendingOverviewBuilderTest {
     @Test
     fun normalizesOnlySafeTextualDifferencesAndPreservesFrequentDisplayLabel() {
         val transactions = listOf(
-            *purchases(" Coffee, Shop ", 3).toTypedArray(),
-            *purchases("coffee , shop", 2).toTypedArray(),
+            *purchases(" Coffee, Shop ", 1).toTypedArray(),
+            *purchases("coffee , shop", 1).toTypedArray(),
         )
 
         val row = build(transactions).merchants.single()
@@ -54,7 +54,7 @@ class MerchantSpendingOverviewBuilderTest {
 
     @Test
     fun refund_reducesSpendWithoutIncreasingPurchaseCount() {
-        val purchases = purchases("Cafe", 5, amount = "10")
+        val purchases = purchases("Cafe", 2, amount = "10")
         val refund = transaction(
             id = "refund",
             merchant = "CAFE",
@@ -64,14 +64,14 @@ class MerchantSpendingOverviewBuilderTest {
 
         val row = build(purchases + refund).merchants.single()
 
-        assertEquals(5, row.purchaseTransactionCount)
-        assertEquals(Money.of("38.00", Currency.SAR).amount, row.totalSpent.amount)
+        assertEquals(2, row.purchaseTransactionCount)
+        assertEquals(Money.of("8.00", Currency.SAR).amount, row.totalSpent.amount)
         assertEquals((purchases.map { it.id } + "refund").toSet(), row.transactionIds)
     }
 
     @Test
     fun excludesNonMerchantAndNonPurchaseTypes() {
-        val transactions = purchases("Cafe", 5) + listOf(
+        val transactions = purchases("Cafe", 2) + listOf(
             transaction("transfer", "Cafe", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100"),
             transaction("loan", "Cafe", FinancialTransactionType.LOAN_REPAYMENT, "100"),
             transaction("payment", "Cafe", FinancialTransactionType.CREDIT_CARD_PAYMENT, "100"),
@@ -81,14 +81,14 @@ class MerchantSpendingOverviewBuilderTest {
 
         val row = build(transactions).merchants.single()
 
-        assertEquals(5, row.purchaseTransactionCount)
-        assertEquals(Money.of("50.00", Currency.SAR).amount, row.totalSpent.amount)
+        assertEquals(2, row.purchaseTransactionCount)
+        assertEquals(Money.of("20.00", Currency.SAR).amount, row.totalSpent.amount)
         assertTrue(row.transactionIds.none { it in setOf("transfer", "loan", "payment", "self", "counterparty") })
     }
 
     @Test
     fun usesSarEquivalentForForeignMerchantPurchase() {
-        val transactions = purchases("Cafe", 4) + transaction(
+        val transactions = purchases("Cafe", 1) + transaction(
             id = "usd",
             merchant = "Cafe",
             type = FinancialTransactionType.EXPENSE,
@@ -102,12 +102,12 @@ class MerchantSpendingOverviewBuilderTest {
             sarEquivalents = mapOf("usd" to Money.of("37.50", Currency.SAR)),
         ).merchants.single()
 
-        assertEquals(Money.of("77.50", Currency.SAR).amount, row.totalSpent.amount)
+        assertEquals(Money.of("47.50", Currency.SAR).amount, row.totalSpent.amount)
     }
 
     @Test
     fun dashboardLimitReturnsTopFiveWhileOverviewRetainsAllQualifyingMerchants() {
-        val overview = build((1..6).flatMap { index -> purchases("Merchant $index", 5, "$index") })
+        val overview = build((1..6).flatMap { index -> purchases("Merchant $index", 2, "$index") })
 
         assertEquals(6, overview.merchants.size)
         assertEquals(5, overview.topForDashboard().size)
