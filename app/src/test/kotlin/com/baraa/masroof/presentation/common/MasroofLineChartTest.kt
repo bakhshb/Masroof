@@ -49,6 +49,20 @@ class MasroofLineChartTest {
     }
 
     @Test
+    fun xForPoint_mirrorsPointsForRtl() {
+        assertEquals(100f, MasroofLineChartLayout.xForPoint(index = 0, width = 100f, pointCount = 5, mirrorHorizontally = true))
+        assertEquals(50f, MasroofLineChartLayout.xForPoint(index = 2, width = 100f, pointCount = 5, mirrorHorizontally = true))
+        assertEquals(0f, MasroofLineChartLayout.xForPoint(index = 4, width = 100f, pointCount = 5, mirrorHorizontally = true))
+    }
+
+    @Test
+    fun touchXForNearestPoint_mirrorsRtlTouchesBackToLogicalAxis() {
+        assertEquals(80f, MasroofLineChartLayout.touchXForNearestPoint(touchX = 20f, width = 100f, mirrorHorizontally = true))
+        assertEquals(20f, MasroofLineChartLayout.touchXForNearestPoint(touchX = 80f, width = 100f, mirrorHorizontally = true))
+        assertEquals(20f, MasroofLineChartLayout.touchXForNearestPoint(touchX = 20f, width = 100f, mirrorHorizontally = false))
+    }
+
+    @Test
     fun yFor_mapsValuesIntoDrawableHeight() {
         val range = MasroofLineChart.ValueRange(BigDecimal.ZERO, BigDecimal("100"))
 

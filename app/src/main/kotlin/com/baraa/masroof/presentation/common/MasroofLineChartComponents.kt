@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +36,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.theme.MasroofBadgeShape
@@ -72,10 +74,21 @@ object MasroofLineChart {
 }
 
 internal object MasroofLineChartLayout {
-    fun xForPoint(index: Int, width: Float, pointCount: Int): Float {
-        if (pointCount <= 1) return 0f
-        return index * (width / (pointCount - 1))
+    fun xForPoint(
+        index: Int,
+        width: Float,
+        pointCount: Int,
+        mirrorHorizontally: Boolean = false,
+    ): Float {
+        val logicalX = if (pointCount <= 1) 0f else index * (width / (pointCount - 1))
+        return if (mirrorHorizontally) width - logicalX else logicalX
     }
+
+    fun touchXForNearestPoint(
+        touchX: Float,
+        width: Float,
+        mirrorHorizontally: Boolean,
+    ): Float = if (mirrorHorizontally) width - touchX else touchX
 
     fun yFor(
         value: BigDecimal,
@@ -136,6 +149,7 @@ fun MasroofInteractiveLineChart(
     if (values.isEmpty()) return
 
     val resolvedSelectedIndex = MasroofLineChartLayout.coerceSelectedIndex(selectedPointIndex, values.size)
+    val mirrorHorizontally = LocalLayoutDirection.current == LayoutDirection.Rtl
     val extended = MasroofThemeExtras.extendedColors
     val range = remember(values, referenceValue) {
         MasroofLineChart.valueRange(values, referenceValue)
@@ -187,16 +201,22 @@ fun MasroofInteractiveLineChart(
             .fillMaxWidth()
             .height(MasroofSpacing.chartHeight)
             .then(chartSemantics)
-            .pointerInput(values.size, onPointSelected) {
+            .pointerInput(values.size, onPointSelected, mirrorHorizontally) {
                 val onSelect = onPointSelected ?: return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
+                val chartWidth = size.width.toFloat()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pointerId = down.id
-                    fun selectAt(x: Float) {
+                    fun selectAt(touchX: Float) {
+                        val logicalX = MasroofLineChartLayout.touchXForNearestPoint(
+                            touchX = touchX,
+                            width = chartWidth,
+                            mirrorHorizontally = mirrorHorizontally,
+                        )
                         MasroofLineChart.nearestPointIndex(
-                            x = x,
-                            width = size.width.toFloat(),
+                            x = logicalX,
+                            width = chartWidth,
                             pointCount = values.size,
                         )?.let(onSelect)
                     }
@@ -234,7 +254,12 @@ fun MasroofInteractiveLineChart(
         val drawableHeightPx = (bottomPx - topPx).coerceAtLeast(0f)
 
         fun pointOffset(index: Int): Offset {
-            val x = MasroofLineChartLayout.xForPoint(index, chartWidthPx, values.size)
+            val x = MasroofLineChartLayout.xForPoint(
+                index = index,
+                width = chartWidthPx,
+                pointCount = values.size,
+                mirrorHorizontally = mirrorHorizontally,
+            )
             val y = MasroofLineChartLayout.yFor(values[index], range, topPx, drawableHeightPx)
             return Offset(x, y)
         }
@@ -243,10 +268,14 @@ fun MasroofInteractiveLineChart(
             modifier = Modifier
                 .fillMaxSize()
                 .drawWithCache {
-                    val xStep = if (values.size > 1) size.width / (values.size - 1) else 0f
                     val path = Path()
                     values.forEachIndexed { index, value ->
-                        val x = index * xStep
+                        val x = MasroofLineChartLayout.xForPoint(
+                            index = index,
+                            width = size.width,
+                            pointCount = values.size,
+                            mirrorHorizontally = mirrorHorizontally,
+                        )
                         val y = MasroofLineChartLayout.yFor(value, range, topPx, drawableHeightPx)
                         if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     }
@@ -277,7 +306,15 @@ fun MasroofInteractiveLineChart(
                             drawCircle(
                                 color = lineColor,
                                 radius = pointRadius.toPx(),
-                                center = Offset(index * xStep, MasroofLineChartLayout.yFor(value, range, topPx, drawableHeightPx)),
+                                center = Offset(
+                                    MasroofLineChartLayout.xForPoint(
+                                        index = index,
+                                        width = size.width,
+                                        pointCount = values.size,
+                                        mirrorHorizontally = mirrorHorizontally,
+                                    ),
+                                    MasroofLineChartLayout.yFor(value, range, topPx, drawableHeightPx),
+                                ),
                             )
                         }
                     }
