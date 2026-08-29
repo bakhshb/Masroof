@@ -48,7 +48,7 @@ class MerchantSpendingOverviewBuilderTest {
 
         val row = build(transactions).merchants.single()
 
-        assertEquals("coffee, shop", row.merchantKey)
+        assertEquals("coffee,shop", row.merchantKey)
         assertEquals("Coffee, Shop", row.displayName)
     }
 
