@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -99,6 +98,11 @@ internal object MasroofLineChartLayout {
         val maxLeft = (chartWidth - tooltipWidth - horizontalPadding).coerceAtLeast(horizontalPadding)
         return (anchorX - tooltipWidth / 2f).coerceIn(horizontalPadding, maxLeft)
     }
+
+    fun coerceSelectedIndex(index: Int?, pointCount: Int): Int? {
+        if (pointCount <= 0) return null
+        return index?.takeIf { it in 0 until pointCount }
+    }
 }
 
 @Composable
@@ -131,6 +135,7 @@ fun MasroofInteractiveLineChart(
 ) {
     if (values.isEmpty()) return
 
+    val resolvedSelectedIndex = MasroofLineChartLayout.coerceSelectedIndex(selectedPointIndex, values.size)
     val extended = MasroofThemeExtras.extendedColors
     val range = remember(values, referenceValue) {
         MasroofLineChart.valueRange(values, referenceValue)
@@ -150,25 +155,25 @@ fun MasroofInteractiveLineChart(
     val previousPointLabel = stringResource(R.string.chart_previous_point)
     val nextPointLabel = stringResource(R.string.chart_next_point)
 
-    val selectedLabel = selectedPointIndex?.let(pointLabel).orEmpty()
+    val selectedLabel = resolvedSelectedIndex?.let(pointLabel).orEmpty()
     val chartSemantics = Modifier.semantics {
         if (selectedLabel.isNotBlank()) {
             contentDescription = selectedLabel
         }
         if (onPointSelected != null) {
             customActions = buildList {
-                if (selectedPointIndex != null && selectedPointIndex > 0) {
+                if (resolvedSelectedIndex != null && resolvedSelectedIndex > 0) {
                     add(
                         CustomAccessibilityAction(previousPointLabel) {
-                            onPointSelected(selectedPointIndex - 1)
+                            onPointSelected(resolvedSelectedIndex - 1)
                             true
                         },
                     )
                 }
-                if (selectedPointIndex != null && selectedPointIndex < values.lastIndex) {
+                if (resolvedSelectedIndex != null && resolvedSelectedIndex < values.lastIndex) {
                     add(
                         CustomAccessibilityAction(nextPointLabel) {
-                            onPointSelected(selectedPointIndex + 1)
+                            onPointSelected(resolvedSelectedIndex + 1)
                             true
                         },
                     )
@@ -184,24 +189,40 @@ fun MasroofInteractiveLineChart(
             .then(chartSemantics)
             .pointerInput(values.size, onPointSelected) {
                 val onSelect = onPointSelected ?: return@pointerInput
+                val touchSlop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    MasroofLineChart.nearestPointIndex(
-                        x = down.position.x,
-                        width = size.width.toFloat(),
-                        pointCount = values.size,
-                    )?.let(onSelect)
-                    down.consume()
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
+                    val pointerId = down.id
+                    fun selectAt(x: Float) {
                         MasroofLineChart.nearestPointIndex(
-                            x = change.position.x,
+                            x = x,
                             width = size.width.toFloat(),
                             pointCount = values.size,
                         )?.let(onSelect)
-                        change.consume()
+                    }
+                    var scrubbing: Boolean? = null
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                        if (!change.pressed) {
+                            if (scrubbing != true) {
+                                val movement = (change.position - down.position).getDistance()
+                                if (movement < touchSlop) {
+                                    selectAt(down.position.x)
+                                    change.consume()
+                                }
+                            }
+                            break
+                        }
+                        val movement = change.position - down.position
+                        if (scrubbing == null && movement.getDistance() >= touchSlop) {
+                            scrubbing = kotlin.math.abs(movement.x) > kotlin.math.abs(movement.y)
+                            if (scrubbing == false) break
+                        }
+                        if (scrubbing == true) {
+                            selectAt(change.position.x)
+                            change.consume()
+                        }
                     }
                 }
             },
@@ -252,7 +273,7 @@ fun MasroofInteractiveLineChart(
                             style = Stroke(width = lineWidth.toPx(), cap = StrokeCap.Round),
                         )
                         values.forEachIndexed { index, value ->
-                            if (index == selectedPointIndex) return@forEachIndexed
+                            if (index == resolvedSelectedIndex) return@forEachIndexed
                             drawCircle(
                                 color = lineColor,
                                 radius = pointRadius.toPx(),
@@ -262,7 +283,7 @@ fun MasroofInteractiveLineChart(
                     }
                 },
         ) {
-            selectedPointIndex?.let { index ->
+            resolvedSelectedIndex?.let { index ->
                 val anchor = pointOffset(index)
                 drawLine(
                     color = selectedGuideColor,
@@ -283,7 +304,7 @@ fun MasroofInteractiveLineChart(
             }
         }
 
-        selectedPointIndex?.let { index ->
+        resolvedSelectedIndex?.let { index ->
             val anchor = pointOffset(index)
             var tooltipSize by remember(index) { mutableStateOf(IntSize.Zero) }
             val tooltipLeftPx = MasroofLineChartLayout.tooltipLeft(

@@ -63,4 +63,13 @@ class MasroofLineChartTest {
         assertEquals(50f, MasroofLineChartLayout.tooltipLeft(anchorX = 70f, tooltipWidth = 40f, chartWidth = 100f, horizontalPadding = 10f))
         assertEquals(10f, MasroofLineChartLayout.tooltipLeft(anchorX = 5f, tooltipWidth = 40f, chartWidth = 100f, horizontalPadding = 10f))
     }
+
+    @Test
+    fun coerceSelectedIndex_clampsToValidRange() {
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = null, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = -1, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = 5, pointCount = 5))
+        assertEquals(2, MasroofLineChartLayout.coerceSelectedIndex(index = 2, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = 0, pointCount = 0))
+    }
 }
