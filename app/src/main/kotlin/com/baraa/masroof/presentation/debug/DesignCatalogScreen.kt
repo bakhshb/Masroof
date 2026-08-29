@@ -37,6 +37,7 @@ import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofHorizontalBar
 import com.baraa.masroof.presentation.common.MasroofHorizontalBarStyle
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofLineChart
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofRankedBarRow
@@ -286,6 +287,16 @@ private fun ComponentSection() {
                 ),
                 subtitle = "5 purchase / payment transactions",
                 style = MasroofHorizontalBarStyle.Outflow,
+            )
+            MasroofLineChart(
+                values = listOf(
+                    java.math.BigDecimal("240"),
+                    java.math.BigDecimal("90"),
+                    java.math.BigDecimal("380"),
+                    java.math.BigDecimal("140"),
+                    java.math.BigDecimal("275"),
+                ),
+                referenceValue = java.math.BigDecimal("225"),
             )
         }
     }
