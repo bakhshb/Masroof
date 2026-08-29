@@ -1,11 +1,13 @@
 package com.baraa.masroof.presentation.common
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -13,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 import java.math.BigDecimal
+import kotlin.math.roundToInt
 
 object MasroofLineChart {
     data class ValueRange(
@@ -33,6 +36,13 @@ object MasroofLineChart {
             ValueRange(minimum, maximum)
         }
     }
+
+    fun nearestPointIndex(x: Float, width: Float, pointCount: Int): Int? {
+        if (pointCount <= 0 || width <= 0f) return null
+        if (pointCount == 1) return 0
+        val step = width / (pointCount - 1)
+        return (x / step).roundToInt().coerceIn(0, pointCount - 1)
+    }
 }
 
 @Composable
@@ -40,6 +50,8 @@ fun MasroofLineChart(
     values: List<BigDecimal>,
     referenceValue: BigDecimal,
     modifier: Modifier = Modifier,
+    selectedPointIndex: Int? = null,
+    onPointSelected: ((Int) -> Unit)? = null,
 ) {
     if (values.isEmpty()) return
 
@@ -54,7 +66,16 @@ fun MasroofLineChart(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(MasroofSpacing.chartHeight),
+            .height(MasroofSpacing.chartHeight)
+            .pointerInput(values.size, onPointSelected) {
+                detectTapGestures { offset ->
+                    MasroofLineChart.nearestPointIndex(
+                        x = offset.x,
+                        width = size.width.toFloat(),
+                        pointCount = values.size,
+                    )?.let { index -> onPointSelected?.invoke(index) }
+                }
+            },
     ) {
         val top = verticalPadding.toPx()
         val bottom = size.height - verticalPadding.toPx()
@@ -89,7 +110,7 @@ fun MasroofLineChart(
         values.forEachIndexed { index, value ->
             drawCircle(
                 color = lineColor,
-                radius = pointRadius.toPx(),
+                radius = if (index == selectedPointIndex) pointRadius.toPx() * 2 else pointRadius.toPx(),
                 center = androidx.compose.ui.geometry.Offset(index * xStep, yFor(value)),
             )
         }

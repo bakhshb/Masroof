@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
@@ -72,6 +73,7 @@ object MasroofIcons {
 
     val sms: ImageVector = Icons.Filled.Sms
     val calendar: ImageVector = Icons.Filled.CalendarMonth
+    val analysis: ImageVector = Icons.Filled.Analytics
     val merchant: ImageVector = Icons.Filled.Store
     val counterparty: ImageVector = Icons.Filled.Person
     val sender: ImageVector = Icons.Filled.Notifications
