@@ -229,6 +229,65 @@ class LoanOverviewBuilderTest {
     }
 
     @Test
+    fun build_usesRemainingBalanceAsOfSelectedSalaryPeriodEnd() {
+        val previousPeriod = FinancialPeriod(
+            startDate = LocalDate.parse("2026-07-27"),
+            endDateExclusive = LocalDate.parse("2026-08-27"),
+        )
+        val loan = LoanRegistryEntry(
+            id = "loan-1",
+            bank = Bank.BANK_ALJAZIRA,
+            loanType = LoanType.PERSONAL,
+            ownership = OwnershipStatus.OWNED,
+            displayName = "Personal loan",
+            firstSeenRawSmsId = "sms-loan-prev",
+            lastSeenRawSmsId = "sms-loan-current",
+        )
+        val parsedRecords = listOf(
+            financingInstallmentRecord(
+                eventId = "evt-loan-prev",
+                rawSmsId = "sms-loan-prev",
+                occurredAt = Instant.parse("2026-07-28T01:10:00Z"),
+                outstandingBalance = Money.of("40000.00", Currency.SAR),
+            ),
+            financingInstallmentRecord(
+                eventId = "evt-loan-current",
+                rawSmsId = "sms-loan-current",
+                occurredAt = Instant.parse("2026-08-28T01:10:00Z"),
+                outstandingBalance = Money.of("33397.25", Currency.SAR),
+            ),
+        )
+        val rawSmsById = mapOf(
+            "sms-loan-prev" to rawSms("sms-loan-prev", Instant.parse("2026-07-28T01:10:00Z")),
+            "sms-loan-current" to rawSms("sms-loan-current", Instant.parse("2026-08-28T01:10:00Z")),
+        )
+
+        val previousOverview = LoanOverviewBuilder.build(
+            salaryPeriod = previousPeriod,
+            loans = listOf(loan),
+            transactions = emptyList(),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+        val currentOverview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(loan),
+            transactions = emptyList(),
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+
+        assertEquals(Money.of("40000.00", Currency.SAR), previousOverview.loans.single().remainingBalance)
+        assertEquals(Money.of("33397.25", Currency.SAR), currentOverview.loans.single().remainingBalance)
+    }
+
+    @Test
     fun build_ignoresUnknownLoans() {
         val overview = LoanOverviewBuilder.build(
             salaryPeriod = period,
@@ -253,6 +312,36 @@ class LoanOverviewBuilderTest {
 
         assertEquals(0, overview.loans.size)
     }
+
+    private fun financingInstallmentRecord(
+        eventId: String,
+        rawSmsId: String,
+        occurredAt: Instant,
+        outstandingBalance: Money,
+    ) = ParsedEventRecord(
+        event = ParsedEvent(
+            id = eventId,
+            rawSmsId = rawSmsId,
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.FINANCING_INSTALLMENT,
+            direction = MoneyDirection.OUTGOING,
+            amount = Money.of("3036.11", Currency.SAR),
+            purchaseChannel = null,
+            cardRef = null,
+            sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
+                Bank.BANK_ALJAZIRA,
+                "3001",
+            ),
+            destinationAccountRef = null,
+            merchant = null,
+            counterparty = "تمويل شخصي",
+            occurredAt = occurredAt,
+            bankNetworkType = null,
+            confidence = Confidence(1.0),
+            parseStatus = ParseStatus.SUCCESS,
+        ),
+        details = ParsedEventDetails(outstandingBalance = outstandingBalance),
+    )
 
     private fun rawSms(id: String, receivedAt: Instant) = RawSms(
         id = id,
