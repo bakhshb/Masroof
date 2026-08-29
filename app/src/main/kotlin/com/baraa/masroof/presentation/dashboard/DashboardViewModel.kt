@@ -383,7 +383,14 @@ class DashboardViewModel(
                     markCommitmentSuccess = false,
                 )
             }
-            when (val result = commitmentFromTransactionService.createFromTransaction(transactionId)) {
+            val result = try {
+                commitmentFromTransactionService.createFromTransaction(transactionId)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                CommitmentCreationResult.Rejected("create_failed")
+            }
+            when (result) {
                 CommitmentCreationResult.Success -> {
                     refreshPreservingSelection()
                     _uiState.update {

@@ -36,20 +36,28 @@ class CommitmentFromTransactionService(
 
         val draft = buildDraft(transaction) ?: return CommitmentCreationResult.Rejected("invalid_transaction")
         val now = clock.instant()
-        commitmentRepository.create(
-            Commitment(
-                id = RegistryEntityIdFactory.newCommitmentId(),
-                name = draft.name,
-                amount = draft.amount,
-                transactionDate = draft.transactionDate,
-                recurrence = draft.recurrence,
-                dueDate = draft.dueDate,
-                active = true,
-                sourceTransactionId = draft.sourceTransactionId,
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+        try {
+            commitmentRepository.create(
+                Commitment(
+                    id = RegistryEntityIdFactory.newCommitmentId(),
+                    name = draft.name,
+                    amount = draft.amount,
+                    transactionDate = draft.transactionDate,
+                    recurrence = draft.recurrence,
+                    dueDate = draft.dueDate,
+                    active = true,
+                    sourceTransactionId = draft.sourceTransactionId,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        } catch (_: Exception) {
+            return if (commitmentRepository.getBySourceTransactionId(transactionId) != null) {
+                CommitmentCreationResult.AlreadyExists
+            } else {
+                CommitmentCreationResult.Rejected("create_failed")
+            }
+        }
         return CommitmentCreationResult.Success
     }
 
