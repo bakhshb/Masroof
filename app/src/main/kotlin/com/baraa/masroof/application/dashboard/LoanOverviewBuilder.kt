@@ -44,7 +44,12 @@ object LoanOverviewBuilder {
         val salaryPeriodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
         val salaryPeriodLabel = DateTimeFormatter.ofPattern("d MMMM", displayLocale)
             .format(salaryPeriod.startDate)
-        val remainingByLoanKey = latestRemainingBalances(parsedRecords, rawSmsById, zoneId)
+        val remainingByLoanKey = latestRemainingBalances(
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            zoneId = zoneId,
+            asOfExclusive = salaryPeriodEnd,
+        )
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
 
         val overviews = ownedLoans.map { loan ->
@@ -92,6 +97,7 @@ object LoanOverviewBuilder {
         parsedRecords: List<ParsedEventRecord>,
         rawSmsById: Map<String, RawSms>,
         zoneId: ZoneId,
+        asOfExclusive: Instant,
     ): Map<String, Pair<Money, Instant>> {
         val latest = mutableMapOf<String, Pair<Money, Instant>>()
         parsedRecords.forEach { record ->
@@ -106,6 +112,7 @@ object LoanOverviewBuilder {
                 receivedAt = raw.receivedAt,
                 zoneId = zoneId,
             )
+            if (!occurredAt.isBefore(asOfExclusive)) return@forEach
             val key = loanKey(event.bank.id, loanType)
             val existing = latest[key]
             if (existing == null || occurredAt.isAfter(existing.second)) {
