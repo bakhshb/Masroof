@@ -226,6 +226,7 @@ class DashboardProjectionBuilder(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             zoneId = zoneId,
+            today = LocalDate.now(clock),
         )
         val bankHierarchy = BankHierarchyBuilder.build(
             ownedAccounts = ownedAccounts,

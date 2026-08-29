@@ -37,6 +37,7 @@ data class DailySpendingTrend(
                 primaryCurrency = currency,
                 sarEquivalents = emptyMap(),
                 zoneId = ZoneId.systemDefault(),
+                today = LocalDate.now(ZoneId.systemDefault()),
             )
     }
 }
@@ -56,6 +57,7 @@ object DailySpendingTrendBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
+        today: LocalDate,
     ): DailySpendingTrend {
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
         val totalsByDay = mutableMapOf<LocalDate, BigDecimal>()
@@ -73,8 +75,9 @@ object DailySpendingTrendBuilder {
                 .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
         }
 
+        val lastInclusiveDate = minOf(period.displayEndDateInclusive, today)
         val points = generateSequence(period.startDate) { date ->
-            date.plusDays(1).takeIf { it.isBefore(period.endDateExclusive) }
+            date.plusDays(1).takeIf { !it.isAfter(lastInclusiveDate) }
         }.map { date ->
             DailySpendingPoint(
                 date = date,

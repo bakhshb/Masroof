@@ -21,11 +21,12 @@ class DailySpendingTrendBuilderTest {
     @Test
     fun zeroFillsEveryPeriodDay_andAveragesNetDailySpending() {
         val trend = build(
-            listOf(
+            transactions = listOf(
                 transaction("expense", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z"),
                 transaction("bill", FinancialTransactionType.BILL_PAYMENT, "30", "2026-07-28T07:00:00Z"),
                 transaction("refund", FinancialTransactionType.REFUND, "20", "2026-07-28T08:00:00Z"),
             ),
+            today = LocalDate.parse("2026-07-29"),
         )
 
         assertEquals(
@@ -65,13 +66,36 @@ class DailySpendingTrendBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = mapOf(foreignExpense.id to Money.of("37.50", Currency.SAR)),
             zoneId = zone,
+            today = LocalDate.parse("2026-07-29"),
         )
 
         assertEquals("37.50", trend.points.first().spending.amount.toPlainString())
         assertEquals("12.50", trend.averageDailySpending.amount.toPlainString())
     }
 
-    private fun build(transactions: List<FinancialTransaction>): DailySpendingTrend =
+    @Test
+    fun currentPeriod_omitsFutureDaysFromChartAndAverage() {
+        val trend = build(
+            transactions = listOf(
+                transaction("expense", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z"),
+            ),
+            today = LocalDate.parse("2026-07-28"),
+        )
+
+        assertEquals(
+            listOf(
+                LocalDate.parse("2026-07-27"),
+                LocalDate.parse("2026-07-28"),
+            ),
+            trend.points.map { it.date },
+        )
+        assertEquals("50.00", trend.averageDailySpending.amount.toPlainString())
+    }
+
+    private fun build(
+        transactions: List<FinancialTransaction>,
+        today: LocalDate = LocalDate.parse("2026-07-29"),
+    ): DailySpendingTrend =
         DailySpendingTrendBuilder.build(
             period = period,
             transactions = transactions,
@@ -79,6 +103,7 @@ class DailySpendingTrendBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             zoneId = zone,
+            today = today,
         )
 
     private fun transaction(
