@@ -319,6 +319,7 @@
     <string name="dashboard_customize_section_accounts">Accounts summary</string>
     <string name="dashboard_customize_section_cards">Cards summary</string>
     <string name="dashboard_customize_section_loans">Loans summary</string>
+    <string name="dashboard_customize_section_merchants">Merchant spending</string>
     <string name="dashboard_customize_section_transactions">Recent transactions</string>
     <string name="dashboard_customize_size_small">Small</string>
     <string name="dashboard_customize_size_medium">Medium</string>
@@ -374,6 +375,12 @@
     <string name="dashboard_loans_aggregate_period_payment">Installments since %1$s</string>
     <string name="dashboard_loans_aggregate_period_payment_fallback">Period installments</string>
     <string name="dashboard_loans_summary_empty">No followed loans</string>
+    <string name="dashboard_merchants_title">Spending by merchant</string>
+    <string name="dashboard_merchants_summary_title">Spending by merchant</string>
+    <string name="dashboard_merchants_view_all">View all ›</string>
+    <string name="dashboard_merchants_empty">No qualifying merchants in this period</string>
+    <string name="dashboard_merchants_transaction_count">%1$d purchase / payment transactions</string>
+    <string name="dashboard_merchants_qualifying_count">%1$d qualifying merchants</string>
     <string name="dashboard_credit_card_payment">Credit card payment</string>
 <string name="dashboard_salary_period_label">Salary period: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">Started on the 26th because the 27th is Friday</string>

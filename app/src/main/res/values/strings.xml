@@ -325,6 +325,7 @@
     <string name="dashboard_customize_section_accounts">ملخص الحسابات</string>
     <string name="dashboard_customize_section_cards">ملخص البطاقات</string>
     <string name="dashboard_customize_section_loans">ملخص القروض</string>
+    <string name="dashboard_customize_section_merchants">إنفاق المتاجر</string>
     <string name="dashboard_customize_section_transactions">العمليات الأخيرة</string>
     <string name="dashboard_customize_size_small">صغير</string>
     <string name="dashboard_customize_size_medium">متوسط</string>
@@ -380,6 +381,12 @@
     <string name="dashboard_loans_aggregate_period_payment">أقساط منذ %1$s</string>
     <string name="dashboard_loans_aggregate_period_payment_fallback">أقساط الفترة</string>
     <string name="dashboard_loans_summary_empty">لا توجد قروض متابعة</string>
+    <string name="dashboard_merchants_title">الإنفاق حسب المتجر</string>
+    <string name="dashboard_merchants_summary_title">الإنفاق حسب المتجر</string>
+    <string name="dashboard_merchants_view_all">عرض الكل ›</string>
+    <string name="dashboard_merchants_empty">لا توجد متاجر مؤهلة في هذه الفترة</string>
+    <string name="dashboard_merchants_transaction_count">%1$d عمليات شراء / دفع</string>
+    <string name="dashboard_merchants_qualifying_count">%1$d متجر مؤهل</string>
     <string name="dashboard_credit_card_payment">سداد بطاقة ائتمانية</string>
 <string name="dashboard_salary_period_label">فترة الراتب: %1$s</string>
     <string name="dashboard_period_adjustment_early_friday">بدأت 26 لأن 27 جمعة</string>

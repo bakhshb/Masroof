@@ -214,6 +214,11 @@ class DashboardProjectionBuilder(
             zoneId = zoneId,
             displayLocale = displayLocale,
         )
+        val merchantSpending = MerchantSpendingOverviewBuilder.build(
+            transactions = dedupedTransactions,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+        )
         val bankHierarchy = BankHierarchyBuilder.build(
             ownedAccounts = ownedAccounts,
             accountsFleet = accountsFleet,
@@ -232,6 +237,7 @@ class DashboardProjectionBuilder(
             perAccount = perAccount,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
+            merchantSpending = merchantSpending,
             bankHierarchy = bankHierarchy,
             flowDetail = flowDetail,
             transactionAccountInvolvement = transactionAccountInvolvement,

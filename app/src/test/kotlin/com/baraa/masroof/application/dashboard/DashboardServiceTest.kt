@@ -140,6 +140,39 @@ class DashboardServiceTest {
     }
 
     @Test
+    fun merchantSpending_usesOnlyTransactionsInsideActivePeriod() = runBlocking {
+        val period = FinancialPeriod(
+            startDate = LocalDate.parse("2026-07-27"),
+            endDateExclusive = LocalDate.parse("2026-08-27"),
+        )
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
+        val purchases = (1..5).map { index ->
+            tx(
+                id = "inside-$index",
+                type = FinancialTransactionType.EXPENSE,
+                amount = "10",
+                at = start.plusSeconds(index.toLong()),
+                merchant = "Cafe",
+            )
+        }
+        val overview = dashboardService(
+            FakeFtRepo(
+                purchases + listOf(
+                    tx("before", FinancialTransactionType.EXPENSE, "99", start.minusSeconds(1), merchant = "Cafe"),
+                    tx("end", FinancialTransactionType.EXPENSE, "99", end, merchant = "Cafe"),
+                ),
+            ),
+            FakeReviewRepo(),
+        ).loadOverview(period)
+
+        val merchant = overview.merchantSpending.merchants.single()
+        assertEquals(5, merchant.purchaseTransactionCount)
+        assertEquals(Money.of("50.00", Currency.SAR).amount, merchant.totalSpent.amount)
+        assertEquals(purchases.map { it.id }.toSet(), merchant.transactionIds)
+    }
+
+    @Test
     fun loadCurrentOverview_marksCurrentPeriod() = runBlocking {
         val service = dashboardService(FakeFtRepo(emptyList()), FakeReviewRepo())
         val overview = service.loadCurrentOverview()
@@ -232,6 +265,7 @@ class DashboardServiceTest {
         amount: String,
         at: Instant,
         counterparty: String? = null,
+        merchant: String? = null,
     ): FinancialTransaction =
         FinancialTransaction(
             id = id,
@@ -240,7 +274,7 @@ class DashboardServiceTest {
             occurredAt = at,
             sourceContainerId = null,
             destinationContainerId = null,
-            merchant = null,
+            merchant = merchant,
             counterparty = counterparty,
             categoryId = null,
             linkedParsedEventIds = emptyList(),
