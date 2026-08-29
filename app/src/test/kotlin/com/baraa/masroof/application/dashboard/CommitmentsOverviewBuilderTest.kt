@@ -203,6 +203,44 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun loanWithoutPeriodPayment_usesInstallmentNotRemainingBalance() {
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(
+                loans = listOf(
+                    LoanOverview(
+                        bank = Bank.BANK_ALJAZIRA,
+                        loanType = LoanType.PERSONAL,
+                        displayLabel = "Personal loan",
+                        remainingBalance = Money.of("12000.00", Currency.SAR),
+                        remainingBalanceAsOf = Instant.parse("2026-08-01T00:00:00Z"),
+                        latestInstallmentAmount = Money.of("900.00", Currency.SAR),
+                        latestInstallmentAsOf = Instant.parse("2026-07-27T00:00:00Z"),
+                        salaryPeriodPayment = SignedMoneyAmount.zero(Currency.SAR),
+                        salaryPeriodLabel = "27 July",
+                    ),
+                ),
+                salaryPeriodLabel = "27 July",
+                currency = Currency.SAR,
+            ),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
+        assertEquals(Money.of("900.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("900.00", Currency.SAR), overview.remaining)
+    }
+
+    @Test
     fun foreignCurrencyCommitment_usesSarEquivalentWhenSourceTxMissingFromPeriodList() {
         val commitment = commitment(
             name = "Amazon",
