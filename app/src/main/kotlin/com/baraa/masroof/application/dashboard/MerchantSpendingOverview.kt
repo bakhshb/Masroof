@@ -51,7 +51,7 @@ data class MerchantSpendingOverview(
 }
 
 object MerchantSpendingOverviewBuilder {
-    const val MINIMUM_PURCHASE_TRANSACTION_COUNT = 5
+    const val MINIMUM_PURCHASE_TRANSACTION_COUNT = 2
 
     fun build(
         transactions: List<FinancialTransaction>,
