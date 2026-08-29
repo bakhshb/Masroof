@@ -382,6 +382,8 @@
     <string name="dashboard_top_merchants_title">Top merchants</string>
     <string name="dashboard_daily_spending_title">Average daily spending</string>
     <string name="dashboard_average_daily_spending">Daily average: %1$s</string>
+    <string name="chart_previous_point">Previous day</string>
+    <string name="chart_next_point">Next day</string>
     <string name="dashboard_merchants_empty">No qualifying merchants in this period</string>
     <string name="dashboard_merchants_transaction_count">%1$d purchase / payment transactions</string>
     <string name="dashboard_merchants_qualifying_count">%1$d qualifying merchants</string>
