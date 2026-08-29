@@ -72,7 +72,20 @@ object CommitmentsOverviewBuilder {
     ): CommitmentsOverview {
         val rows = buildList {
             commitments.filter { it.active }.forEach { commitment ->
-                add(buildUserRow(commitment, salaryPeriod, transactions, primaryCurrency, sarEquivalents, zoneId))
+                if (
+                    commitment.recurrence == null &&
+                    !isOneTimeCommitmentInPeriod(commitment, salaryPeriod, transactions, zoneId)
+                ) {
+                    return@forEach
+                }
+                buildUserRow(
+                    commitment,
+                    salaryPeriod,
+                    transactions,
+                    primaryCurrency,
+                    sarEquivalents,
+                    zoneId,
+                )?.let(::add)
             }
             addAll(buildCreditCardRows(creditFacilities))
             addAll(buildLoanRows(loansOverview))
@@ -109,8 +122,14 @@ object CommitmentsOverviewBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
-    ): CommitmentDashboardRow {
-        val amount = resolveMoney(commitment.amount, primaryCurrency, sarEquivalents, commitment.sourceTransactionId, transactions)
+    ): CommitmentDashboardRow? {
+        val amount = resolveMoney(
+            amount = commitment.amount,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            sourceTransactionId = commitment.sourceTransactionId,
+            transactions = transactions,
+        ) ?: return null
         val status = resolveUserStatus(
             commitment = commitment,
             salaryPeriod = salaryPeriod,
@@ -150,14 +169,12 @@ object CommitmentsOverviewBuilder {
         loansOverview: LoansOverview,
     ): List<CommitmentDashboardRow> =
         loansOverview.loans.mapNotNull { loan ->
-            val amount = loan.remainingBalance
-                ?: if (loan.salaryPeriodPayment.amount.signum() > 0) {
-                    Money(loan.salaryPeriodPayment.amount, loan.salaryPeriodPayment.currency)
-                } else {
-                    null
-                }
-                ?: return@mapNotNull null
             val paid = loan.salaryPeriodPayment.amount.signum() > 0
+            val amount = when {
+                paid -> Money(loan.salaryPeriodPayment.amount, loan.salaryPeriodPayment.currency)
+                loan.remainingBalance != null -> loan.remainingBalance
+                else -> return@mapNotNull null
+            }
             CommitmentDashboardRow(
                 key = "loan:${loan.bank.id}:${loan.loanType.name}",
                 source = CommitmentDashboardSource.LOAN,
@@ -168,6 +185,22 @@ object CommitmentsOverviewBuilder {
                 loanKey = "${loan.bank.id}:${loan.loanType.name}",
             )
         }
+
+    internal fun isOneTimeCommitmentInPeriod(
+        commitment: Commitment,
+        salaryPeriod: FinancialPeriod,
+        transactions: List<FinancialTransaction>,
+        zoneId: ZoneId,
+    ): Boolean {
+        val anchorDate = transactions
+            .find { it.id == commitment.sourceTransactionId }
+            ?.occurredAt
+            ?.atZone(zoneId)
+            ?.toLocalDate()
+            ?: commitment.transactionDate
+        return !anchorDate.isBefore(salaryPeriod.startDate) &&
+            anchorDate.isBefore(salaryPeriod.endDateExclusive)
+    }
 
     internal fun resolveUserStatus(
         commitment: Commitment,
@@ -203,12 +236,12 @@ object CommitmentsOverviewBuilder {
             sarEquivalents = sarEquivalents,
         ) ?: return false
         val commitmentAmount = resolveMoney(
-            commitment.amount,
-            primaryCurrency,
-            sarEquivalents,
-            commitment.sourceTransactionId,
-            listOf(transaction),
-        )
+            amount = commitment.amount,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            sourceTransactionId = commitment.sourceTransactionId,
+            transactions = listOf(transaction),
+        ) ?: return false
         if (txAmount.amount.compareTo(commitmentAmount.amount) != 0) return false
         val txName = transaction.merchant?.trim()?.lowercase()
             ?: transaction.counterparty?.trim()?.lowercase()
@@ -222,19 +255,15 @@ object CommitmentsOverviewBuilder {
         sarEquivalents: Map<String, Money>,
         sourceTransactionId: String,
         transactions: List<FinancialTransaction>,
-    ): Money {
-        val sourceTx = transactions.find { it.id == sourceTransactionId }
-        if (sourceTx != null) {
+    ): Money? {
+        transactions.find { it.id == sourceTransactionId }?.let { sourceTx ->
             TransactionAmountResolver.effectiveAmount(
                 tx = sourceTx,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
             )?.let { return it }
         }
-        return if (amount.currency == primaryCurrency) {
-            amount
-        } else {
-            Money(amount.amount, primaryCurrency)
-        }
+        sarEquivalents[sourceTransactionId]?.let { return it }
+        return if (amount.currency == primaryCurrency) amount else null
     }
 }
