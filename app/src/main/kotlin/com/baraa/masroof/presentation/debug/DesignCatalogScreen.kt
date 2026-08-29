@@ -20,6 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,7 +41,7 @@ import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofHorizontalBar
 import com.baraa.masroof.presentation.common.MasroofHorizontalBarStyle
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MasroofLineChart
+import com.baraa.masroof.presentation.common.MasroofInteractiveLineChart
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofRankedBarRow
@@ -288,15 +292,22 @@ private fun ComponentSection() {
                 subtitle = "5 purchase / payment transactions",
                 style = MasroofHorizontalBarStyle.Outflow,
             )
-            MasroofLineChart(
-                values = listOf(
+            val previewValues = remember {
+                listOf(
                     java.math.BigDecimal("240"),
                     java.math.BigDecimal("90"),
                     java.math.BigDecimal("380"),
                     java.math.BigDecimal("140"),
                     java.math.BigDecimal("275"),
-                ),
+                )
+            }
+            var selectedPointIndex by remember { mutableIntStateOf(2) }
+            MasroofInteractiveLineChart(
+                values = previewValues,
                 referenceValue = java.math.BigDecimal("225"),
+                selectedPointIndex = selectedPointIndex,
+                onPointSelected = { selectedPointIndex = it },
+                pointLabel = { index -> "Day ${index + 1}: ${previewValues[index]}" },
             )
         }
     }

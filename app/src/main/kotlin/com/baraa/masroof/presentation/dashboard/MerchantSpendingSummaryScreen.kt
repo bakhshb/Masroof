@@ -91,6 +91,7 @@ fun MerchantSpendingSummaryScreen(
                 Text(
                     stringResource(R.string.dashboard_merchants_qualifying_count, overview.merchants.size),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 overview.merchants.forEach { row ->
                     MerchantSpendingListRow(row = row, onClick = { onOpenMerchant(row) })

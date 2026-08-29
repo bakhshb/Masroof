@@ -40,4 +40,36 @@ class MasroofLineChartTest {
         assertEquals(null, MasroofLineChart.nearestPointIndex(x = 50f, width = 0f, pointCount = 3))
         assertEquals(null, MasroofLineChart.nearestPointIndex(x = 50f, width = 100f, pointCount = 0))
     }
+
+    @Test
+    fun xForPoint_distributesPointsAcrossChartWidth() {
+        assertEquals(0f, MasroofLineChartLayout.xForPoint(index = 0, width = 100f, pointCount = 5))
+        assertEquals(50f, MasroofLineChartLayout.xForPoint(index = 2, width = 100f, pointCount = 5))
+        assertEquals(100f, MasroofLineChartLayout.xForPoint(index = 4, width = 100f, pointCount = 5))
+    }
+
+    @Test
+    fun yFor_mapsValuesIntoDrawableHeight() {
+        val range = MasroofLineChart.ValueRange(BigDecimal.ZERO, BigDecimal("100"))
+
+        assertEquals(100f, MasroofLineChartLayout.yFor(BigDecimal.ZERO, range, top = 10f, chartHeight = 90f))
+        assertEquals(10f, MasroofLineChartLayout.yFor(BigDecimal("100"), range, top = 10f, chartHeight = 90f))
+        assertEquals(55f, MasroofLineChartLayout.yFor(BigDecimal("50"), range, top = 10f, chartHeight = 90f))
+    }
+
+    @Test
+    fun tooltipLeft_centersOnAnchorAndClampsToChartEdges() {
+        assertEquals(10f, MasroofLineChartLayout.tooltipLeft(anchorX = 20f, tooltipWidth = 40f, chartWidth = 100f, horizontalPadding = 10f))
+        assertEquals(50f, MasroofLineChartLayout.tooltipLeft(anchorX = 70f, tooltipWidth = 40f, chartWidth = 100f, horizontalPadding = 10f))
+        assertEquals(10f, MasroofLineChartLayout.tooltipLeft(anchorX = 5f, tooltipWidth = 40f, chartWidth = 100f, horizontalPadding = 10f))
+    }
+
+    @Test
+    fun coerceSelectedIndex_clampsToValidRange() {
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = null, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = -1, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = 5, pointCount = 5))
+        assertEquals(2, MasroofLineChartLayout.coerceSelectedIndex(index = 2, pointCount = 5))
+        assertEquals(null, MasroofLineChartLayout.coerceSelectedIndex(index = 0, pointCount = 0))
+    }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -22,7 +23,8 @@ import com.baraa.masroof.presentation.common.MasroofBarChart
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofHorizontalBarStyle
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MasroofLineChart
+import com.baraa.masroof.presentation.common.MasroofInteractiveLineChart
+import com.baraa.masroof.presentation.common.MasroofLineChartLayout
 import com.baraa.masroof.presentation.common.MasroofRankedBarRow
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -85,8 +87,19 @@ private fun DailySpendingTrendSection(trend: DailySpendingTrend) {
     val firstDate = trend.points.first().date
     val lastDate = trend.points.last().date
     val middleDate = trend.points[trend.points.lastIndex / 2].date
+    val pointLabels = trend.points.map { point ->
+        "${selectedDateFormatter.format(point.date)} · ${formatLocalizedMoney(point.spending)}"
+    }
     var selectedPointIndex by rememberSaveable { mutableIntStateOf(-1) }
-    val selectedPoint = trend.points.getOrNull(selectedPointIndex)
+    SideEffect {
+        if (selectedPointIndex >= trend.points.size) {
+            selectedPointIndex = -1
+        }
+    }
+    val resolvedSelectedIndex = MasroofLineChartLayout.coerceSelectedIndex(
+        index = selectedPointIndex.takeIf { it >= 0 },
+        pointCount = trend.points.size,
+    )
 
     Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
         MasroofSectionHeader(
@@ -102,19 +115,13 @@ private fun DailySpendingTrendSection(trend: DailySpendingTrend) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            MasroofLineChart(
+            MasroofInteractiveLineChart(
                 values = trend.points.map { it.spending.amount },
                 referenceValue = trend.averageDailySpending.amount,
-                selectedPointIndex = selectedPointIndex.takeIf { it >= 0 },
+                selectedPointIndex = resolvedSelectedIndex,
                 onPointSelected = { selectedPointIndex = it },
+                pointLabel = { index -> pointLabels[index] },
             )
-            selectedPoint?.let { point ->
-                Text(
-                    text = "${selectedDateFormatter.format(point.date)} · ${formatLocalizedMoney(point.spending)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
