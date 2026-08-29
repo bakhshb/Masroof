@@ -1,0 +1,195 @@
+package com.baraa.masroof.application.dashboard
+
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentRecurrence
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+class CommitmentsOverviewBuilderTest {
+    private val zone = ZoneId.of("Asia/Riyadh")
+    private val period = FinancialPeriod(
+        startDate = LocalDate.parse("2026-07-27"),
+        endDateExclusive = LocalDate.parse("2026-08-27"),
+    )
+
+    @Test
+    fun userCommitmentWithoutRecurrence_countsAsPaid() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val tx = transaction(
+            id = "tx-netflix",
+            merchant = "Netflix",
+            amount = "71",
+            at = start.plusSeconds(60),
+        )
+        val commitment = commitment(
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = tx.id,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(tx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(Money.of("71.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("71.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+    }
+
+    @Test
+    fun recurringCommitment_withoutPaymentInPeriod_isUnpaid() {
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("173.00", Currency.SAR),
+            sourceTransactionId = "tx-old",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(Money.of("173.00", Currency.SAR), overview.total)
+        assertEquals(Money.zero(Currency.SAR), overview.paid)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.remaining)
+        assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
+    }
+
+    @Test
+    fun inactiveCommitments_areExcluded() {
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(
+                commitment(
+                    name = "School",
+                    amount = Money.of("3000.00", Currency.SAR),
+                    sourceTransactionId = "tx-school",
+                    active = false,
+                ),
+            ),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertTrue(overview.rows.isEmpty())
+        assertEquals(Money.zero(Currency.SAR), overview.total)
+    }
+
+    @Test
+    fun loanWithPeriodPayment_countsAsPaid() {
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(
+                loans = listOf(
+                    LoanOverview(
+                        bank = Bank.BANK_ALJAZIRA,
+                        loanType = LoanType.PERSONAL,
+                        displayLabel = "Personal loan",
+                        remainingBalance = Money.of("12000.00", Currency.SAR),
+                        remainingBalanceAsOf = Instant.parse("2026-08-01T00:00:00Z"),
+                        salaryPeriodPayment = SignedMoneyAmount.of(Money.of("900.00", Currency.SAR)),
+                        salaryPeriodLabel = "27 July",
+                    ),
+                ),
+                salaryPeriodLabel = "27 July",
+                currency = Currency.SAR,
+            ),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+        assertEquals(Money.of("12000.00", Currency.SAR), overview.paid)
+    }
+
+    private fun commitment(
+        name: String,
+        amount: Money,
+        sourceTransactionId: String,
+        recurrence: CommitmentRecurrence? = null,
+        active: Boolean = true,
+    ): Commitment {
+        val now = Instant.parse("2026-08-01T00:00:00Z")
+        return Commitment(
+            id = RegistryEntityIdFactory.newCommitmentId(),
+            name = name,
+            amount = amount,
+            transactionDate = LocalDate.parse("2026-08-01"),
+            recurrence = recurrence,
+            dueDate = null,
+            active = active,
+            sourceTransactionId = sourceTransactionId,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    private fun transaction(
+        id: String,
+        merchant: String,
+        amount: String,
+        at: Instant,
+    ): FinancialTransaction =
+        FinancialTransaction(
+            id = id,
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of(amount, Currency.SAR),
+            occurredAt = at,
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = merchant,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = emptyList(),
+        )
+}

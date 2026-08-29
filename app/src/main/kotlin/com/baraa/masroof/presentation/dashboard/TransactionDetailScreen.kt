@@ -56,18 +56,23 @@ fun TransactionDetailScreen(
     reclassifying: Boolean,
     reclassifySuccess: Boolean,
     ignoring: Boolean,
+    markingCommitment: Boolean = false,
+    isCommitted: Boolean = false,
+    markCommitmentSuccess: Boolean = false,
     error: String?,
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
     onIgnore: () -> Unit,
+    onMarkAsCommitment: () -> Unit = {},
     ownedCards: List<OwnedCardUi> = emptyList(),
 ) {
     var showReclassifySheet by rememberSaveable { mutableStateOf(false) }
     var pendingType by rememberSaveable { mutableStateOf<String?>(null) }
     var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
     var showIgnoreConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var showMarkCommitmentConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
-    val actionInProgress = reclassifying || ignoring
+    val actionInProgress = reclassifying || ignoring || markingCommitment
 
     val pendingTypeEnum = pendingType?.let { name ->
         runCatching { FinancialTransactionType.valueOf(name) }.getOrNull()
@@ -79,6 +84,47 @@ fun TransactionDetailScreen(
             showConfirmDialog = false
             pendingType = null
         }
+    }
+
+    LaunchedEffect(markCommitmentSuccess) {
+        if (markCommitmentSuccess) {
+            showMarkCommitmentConfirmDialog = false
+        }
+    }
+
+    if (showMarkCommitmentConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!actionInProgress) showMarkCommitmentConfirmDialog = false
+            },
+            icon = {
+                Icon(
+                    imageVector = MasroofIcons.calendar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            },
+            title = { Text(stringResource(R.string.transaction_detail_mark_commitment_confirm_title)) },
+            text = { Text(stringResource(R.string.transaction_detail_mark_commitment_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onMarkAsCommitment()
+                    },
+                    enabled = !actionInProgress,
+                ) {
+                    Text(stringResource(R.string.transaction_detail_mark_commitment_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showMarkCommitmentConfirmDialog = false },
+                    enabled = !actionInProgress,
+                ) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
     }
 
     if (showIgnoreConfirmDialog) {
@@ -363,6 +409,22 @@ fun TransactionDetailScreen(
                 Text(stringResource(R.string.transaction_detail_edit_category))
             }
 
+            if (!isCommitted) {
+                IconTextButtonOutlined(
+                    onClick = { showMarkCommitmentConfirmDialog = true },
+                    enabled = !actionInProgress,
+                    icon = MasroofIcons.calendar,
+                    text = stringResource(R.string.transaction_detail_mark_commitment),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    stringResource(R.string.transaction_detail_mark_commitment_already),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             IconTextButtonOutlined(
                 onClick = { showIgnoreConfirmDialog = true },
                 enabled = !actionInProgress,
@@ -377,24 +439,39 @@ fun TransactionDetailScreen(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+            if (markCommitmentSuccess) {
+                Text(
+                    stringResource(R.string.transaction_detail_mark_commitment_success),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             error?.let { reason ->
                 val isIgnoreError = reason in IGNORE_ERROR_REASONS
+                val isMarkCommitmentError = reason in MARK_COMMITMENT_ERROR_REASONS
                 Text(
                     stringResource(
-                        if (isIgnoreError) {
-                            R.string.transaction_detail_ignore_failed
-                        } else {
-                            R.string.transaction_detail_reclassify_failed
+                        when {
+                            isIgnoreError -> R.string.transaction_detail_ignore_failed
+                            isMarkCommitmentError -> R.string.transaction_detail_mark_commitment_failed
+                            else -> R.string.transaction_detail_reclassify_failed
                         },
                     ),
                     color = MaterialTheme.colorScheme.error,
                 )
-                val detailRes = ReviewReasonLabels.labelRes(reason)
-                Text(
-                    detailRes?.let { stringResource(it) } ?: reason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                if (!isMarkCommitmentError) {
+                    val detailRes = ReviewReasonLabels.labelRes(reason)
+                    Text(
+                        detailRes?.let { stringResource(it) } ?: reason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else if (reason == "already_exists") {
+                    Text(
+                        stringResource(R.string.transaction_detail_mark_commitment_already),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             if (actionInProgress) {
@@ -407,5 +484,11 @@ fun TransactionDetailScreen(
 private val IGNORE_ERROR_REASONS = setOf(
     "delete_failed",
     "review_resolution_failed",
+)
+
+private val MARK_COMMITMENT_ERROR_REASONS = setOf(
+    "transaction_not_found",
+    "invalid_transaction",
+    "already_exists",
 )
 

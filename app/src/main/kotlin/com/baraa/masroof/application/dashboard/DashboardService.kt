@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import java.time.Clock
@@ -24,6 +25,7 @@ data class DashboardOverview(
     val transactions: List<com.baraa.masroof.domain.model.FinancialTransaction>,
     val creditFacilities: CreditFacilitiesOverview,
     val loansOverview: LoansOverview? = null,
+    val commitmentsOverview: CommitmentsOverview = CommitmentsOverview.empty(),
     val merchantSpending: MerchantSpendingOverview = MerchantSpendingOverview.empty(),
     val dailySpendingTrend: DailySpendingTrend = DailySpendingTrend.empty(period),
     val bankHierarchy: BankHierarchyOverview? = null,
@@ -52,6 +54,7 @@ class DashboardService(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
     private val loanRegistryRepository: LoanRegistryRepository,
+    private val commitmentRepository: CommitmentRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -64,6 +67,7 @@ class DashboardService(
             accountRegistryRepository = accountRegistryRepository,
             cardRegistryRepository = cardRegistryRepository,
             loanRegistryRepository = loanRegistryRepository,
+            commitmentRepository = commitmentRepository,
             appLocaleRepository = appLocaleRepository,
             sarEquivalentResolver = sarEquivalentResolver,
             zoneId = zoneId,
@@ -77,6 +81,7 @@ class DashboardService(
         return projection.toOverview().copy(
             creditFacilities = projection.creditFacilities,
             loansOverview = projection.loansOverview,
+            commitmentsOverview = projection.commitmentsOverview,
             merchantSpending = projection.merchantSpending,
             dailySpendingTrend = projection.dailySpendingTrend,
             bankHierarchy = projection.bankHierarchy,

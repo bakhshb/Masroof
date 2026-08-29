@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.BankHierarchyOverview
+import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
 import com.baraa.masroof.application.dashboard.AccountsSummary
@@ -85,6 +86,7 @@ data class DashboardUiState(
     val spendingSplit: SpendingSplitSummary? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
     val loansOverview: LoansOverview? = null,
+    val commitmentsOverview: CommitmentsOverview = CommitmentsOverview.empty(),
     val merchantSpending: MerchantSpendingOverview = MerchantSpendingOverview.empty(),
     val dailySpendingTrend: DailySpendingTrend? = null,
     val bankHierarchy: BankHierarchyOverview? = null,
@@ -104,6 +106,10 @@ data class DashboardUiState(
     val reclassifySuccess: Boolean = false,
     val ignoring: Boolean = false,
     val ignoreError: String? = null,
+    val markingCommitment: Boolean = false,
+    val markCommitmentError: String? = null,
+    val markCommitmentSuccess: Boolean = false,
+    val committedSourceTransactionIds: Set<String> = emptySet(),
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),

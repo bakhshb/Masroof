@@ -28,10 +28,12 @@ import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +48,7 @@ class SettingsViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val loanRegistryRepository: LoanRegistryRepository,
+    private val commitmentRepository: CommitmentRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
@@ -98,6 +101,7 @@ class SettingsViewModel(
                     accounts = accountRegistryRepository.listAll(),
                     loans = loanRegistryRepository.listAll(),
                 )
+                applyCommitments(commitmentRepository.listAll())
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -880,6 +884,75 @@ class SettingsViewModel(
             )
         }
     }
+
+    fun saveCommitment(commitmentId: String, draft: CommitmentEditorDraft) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(savingCommitment = true) }
+            try {
+                val existing = commitmentRepository.get(commitmentId) ?: return@launch
+                val now = java.time.Instant.now()
+                commitmentRepository.update(
+                    existing.copy(
+                        name = draft.name,
+                        amount = draft.amount,
+                        transactionDate = draft.transactionDate,
+                        recurrence = draft.recurrence,
+                        dueDate = draft.dueDate,
+                        updatedAt = now,
+                    ),
+                )
+                applyCommitments(commitmentRepository.listAll())
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) }
+            } finally {
+                _uiState.update { it.copy(savingCommitment = false) }
+            }
+        }
+    }
+
+    fun toggleCommitmentActive(commitmentId: String) {
+        viewModelScope.launch {
+            val existing = commitmentRepository.get(commitmentId) ?: return@launch
+            commitmentRepository.setActive(commitmentId, active = !existing.active)
+            applyCommitments(commitmentRepository.listAll())
+        }
+    }
+
+    fun deleteCommitment(commitmentId: String, onDeleted: () -> Unit = {}) {
+        viewModelScope.launch {
+            commitmentRepository.delete(commitmentId)
+            applyCommitments(commitmentRepository.listAll())
+            onDeleted()
+        }
+    }
+
+    fun commitmentById(commitmentId: String): ManagedCommitmentUi? =
+        (_uiState.value.activeCommitments + _uiState.value.disabledCommitments)
+            .find { it.id == commitmentId }
+
+    private fun applyCommitments(commitments: List<Commitment>) {
+        val items = commitments.map(::toManagedCommitmentUi)
+        _uiState.update {
+            it.copy(
+                activeCommitments = items.filter { item -> item.active },
+                disabledCommitments = items.filter { item -> !item.active },
+            )
+        }
+    }
+
+    private fun toManagedCommitmentUi(commitment: Commitment): ManagedCommitmentUi =
+        ManagedCommitmentUi(
+            id = commitment.id,
+            name = commitment.name,
+            amount = commitment.amount,
+            transactionDate = commitment.transactionDate,
+            recurrence = commitment.recurrence,
+            dueDate = commitment.dueDate,
+            active = commitment.active,
+            sourceTransactionId = commitment.sourceTransactionId,
+        )
 
     private fun applyRegistries(
         cards: List<com.baraa.masroof.domain.model.CardRegistryEntry>,

@@ -18,6 +18,7 @@ class SettingsViewModelFactory(
             cardRegistryRepository = container.cardRegistryRepository,
             accountRegistryRepository = container.accountRegistryRepository,
             loanRegistryRepository = container.loanRegistryRepository,
+            commitmentRepository = container.commitmentRepository,
             ownershipConfirmationService = container.ownershipConfirmationService,
             appLocaleRepository = container.appLocaleRepository,
             themePreferencesRepository = container.themePreferencesRepository,

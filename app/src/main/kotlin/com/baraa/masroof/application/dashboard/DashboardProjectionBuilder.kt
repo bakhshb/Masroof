@@ -13,6 +13,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
+import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -26,6 +27,7 @@ class DashboardProjectionBuilder(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
     private val loanRegistryRepository: LoanRegistryRepository,
+    private val commitmentRepository: CommitmentRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -214,6 +216,16 @@ class DashboardProjectionBuilder(
             zoneId = zoneId,
             displayLocale = displayLocale,
         )
+        val commitmentsOverview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = commitmentRepository.listAll(),
+            creditFacilities = creditFacilities,
+            loansOverview = loansOverview,
+            transactions = dedupedTransactions,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            zoneId = zoneId,
+        )
         val merchantSpending = MerchantSpendingOverviewBuilder.build(
             transactions = dedupedTransactions,
             primaryCurrency = primaryCurrency,
@@ -246,6 +258,7 @@ class DashboardProjectionBuilder(
             perAccount = perAccount,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
+            commitmentsOverview = commitmentsOverview,
             merchantSpending = merchantSpending,
             dailySpendingTrend = dailySpendingTrend,
             bankHierarchy = bankHierarchy,

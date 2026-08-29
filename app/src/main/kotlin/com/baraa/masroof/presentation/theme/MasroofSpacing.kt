@@ -41,4 +41,5 @@ object MasroofSpacing {
     val chartVerticalPadding = 12.dp
     val chartLineWidth = 2.dp
     val chartPointRadius = 3.dp
+    val donutChartSize = 96.dp
 }

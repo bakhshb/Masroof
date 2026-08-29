@@ -380,6 +380,10 @@ private fun DashboardCustomizableSections(
                     }
                 }
 
+                DashboardSectionId.COMMITMENTS -> {
+                    CommitmentsSection(overview = state.commitmentsOverview)
+                }
+
                 DashboardSectionId.MERCHANTS -> {
                     state.dailySpendingTrend?.let { trend ->
                         DashboardAnalysisSection(

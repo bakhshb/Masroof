@@ -172,6 +172,7 @@ fun MasroofRoot(
                     onBack = dashboardViewModel::closeTransactionDetail,
                     onReclassify = dashboardViewModel::reclassifySelectedTransaction,
                     onIgnore = dashboardViewModel::ignoreSelectedTransaction,
+                    onMarkAsCommitment = dashboardViewModel::markSelectedTransactionAsCommitment,
                 )
             ) {
                 return
@@ -373,6 +374,7 @@ fun MasroofRoot(
                         onBack = dashboardViewModel::closeTransactionDetail,
                         onReclassify = dashboardViewModel::reclassifySelectedTransaction,
                         onIgnore = dashboardViewModel::ignoreSelectedTransaction,
+                        onMarkAsCommitment = dashboardViewModel::markSelectedTransactionAsCommitment,
                         overlayOnList = true,
                     )
                 }
@@ -417,6 +419,7 @@ private fun showTransactionDetail(
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
     onIgnore: () -> Unit,
+    onMarkAsCommitment: () -> Unit,
     overlayOnList: Boolean = false,
 ): Boolean {
     val selectedId = dashboardState.selectedTransactionId ?: return false
@@ -431,10 +434,14 @@ private fun showTransactionDetail(
                 reclassifying = dashboardState.reclassifying,
                 reclassifySuccess = dashboardState.reclassifySuccess,
                 ignoring = dashboardState.ignoring,
-                error = dashboardState.reclassifyError ?: dashboardState.ignoreError,
+                markingCommitment = dashboardState.markingCommitment,
+                isCommitted = selected.id in dashboardState.committedSourceTransactionIds,
+                markCommitmentSuccess = dashboardState.markCommitmentSuccess,
+                error = dashboardState.reclassifyError ?: dashboardState.ignoreError ?: dashboardState.markCommitmentError,
                 onBack = onBack,
                 onReclassify = onReclassify,
                 onIgnore = onIgnore,
+                onMarkAsCommitment = onMarkAsCommitment,
                 ownedCards = dashboardState.ownedCards,
             )
         }

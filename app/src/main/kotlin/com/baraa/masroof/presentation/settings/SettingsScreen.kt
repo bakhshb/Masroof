@@ -116,6 +116,7 @@ fun SettingsRoute(
             onOpenAccounts = { openRegistryCategory(SettingsRegistryCategory.Accounts) },
             onOpenCards = { openRegistryCategory(SettingsRegistryCategory.Cards) },
             onOpenLoans = { openRegistryCategory(SettingsRegistryCategory.Loans) },
+            onOpenCommitments = { navigateTo(SettingsDestination.MyCommitments) },
             onOpenReview = onOpenReview,
             onOpenApp = { navigateTo(SettingsDestination.App) },
             onOpenDataBackup = { navigateTo(SettingsDestination.DataBackup) },
@@ -148,6 +149,43 @@ fun SettingsRoute(
                 navigateTo(SettingsDestination.BankLoans(summary.bank.id))
             },
         )
+
+        SettingsDestination.MyCommitments -> SettingsCommitmentsScreen(
+            state = state,
+            onBack = { popOrExit() },
+            onOpenCommitment = { commitment ->
+                navigateTo(SettingsDestination.CommitmentDetail(commitment.id))
+            },
+        )
+
+        is SettingsDestination.CommitmentDetail -> {
+            val commitment = viewModel.commitmentById(current.commitmentId)
+            when {
+                commitment != null -> SettingsCommitmentEditorScreen(
+                    commitment = commitment,
+                    saving = state.savingCommitment,
+                    onBack = { popOrExit() },
+                    onSave = { draft ->
+                        viewModel.saveCommitment(current.commitmentId, draft)
+                    },
+                    onToggleActive = {
+                        viewModel.toggleCommitmentActive(current.commitmentId)
+                    },
+                    onDelete = {
+                        viewModel.deleteCommitment(current.commitmentId) { popOrExit() }
+                    },
+                )
+
+                state.loading -> SettingsCommitmentsLoadingScreen(onBack = { popOrExit() })
+
+                else -> {
+                    LaunchedEffect(current.commitmentId) {
+                        destinationStack = replaceSettingsTop(destinationStack, SettingsDestination.MyCommitments)
+                    }
+                    SettingsCommitmentsLoadingScreen(onBack = { popOrExit() })
+                }
+            }
+        }
 
         SettingsDestination.Banks -> SettingsRegistryCategoryScreen(
             category = SettingsRegistryCategory.Accounts,
@@ -347,6 +385,7 @@ private fun SettingsHubScreen(
     onOpenAccounts: () -> Unit,
     onOpenCards: () -> Unit,
     onOpenLoans: () -> Unit,
+    onOpenCommitments: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenApp: () -> Unit,
     onOpenDataBackup: () -> Unit,
@@ -395,6 +434,17 @@ private fun SettingsHubScreen(
                 title = stringResource(R.string.settings_loans_followed),
                 subtitle = SettingsRegistryCategory.Loans.hubSubtitle(state),
                 onClick = onOpenLoans,
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.calendar,
+                title = stringResource(R.string.settings_commitments_section),
+                subtitle = stringResource(
+                    R.string.settings_commitments_hub_subtitle,
+                    state.activeCommitments.size,
+                    state.disabledCommitments.size,
+                ),
+                onClick = onOpenCommitments,
             )
 
             SettingsNavRow(

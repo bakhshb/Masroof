@@ -25,6 +25,9 @@ enum class DashboardSectionId {
     @SerialName("loans")
     LOANS,
 
+    @SerialName("commitments")
+    COMMITMENTS,
+
     @SerialName("merchants")
     MERCHANTS,
 
@@ -105,6 +108,7 @@ data class DashboardLayoutSnapshot(
                     DashboardSectionEntry(DashboardSectionId.ACCOUNTS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.CARDS, size = DashboardSectionSize.LARGE),
                     DashboardSectionEntry(DashboardSectionId.LOANS, size = DashboardSectionSize.MEDIUM),
+                    DashboardSectionEntry(DashboardSectionId.COMMITMENTS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.MERCHANTS, size = DashboardSectionSize.MEDIUM),
                     DashboardSectionEntry(DashboardSectionId.TRANSACTIONS, size = DashboardSectionSize.MEDIUM),
                 ),

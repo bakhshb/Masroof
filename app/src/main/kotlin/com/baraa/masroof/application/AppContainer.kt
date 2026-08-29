@@ -3,6 +3,7 @@ package com.baraa.masroof.application
 import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
+import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
@@ -45,6 +46,7 @@ import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomBankRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomCommitmentRepository
 import com.baraa.masroof.data.repository.RoomCreditFacilityRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
@@ -59,6 +61,7 @@ import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.BankRegistryRepository
+import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.CreditFacilityRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
@@ -126,6 +129,9 @@ class AppContainer(
 
     val loanRegistryRepository: LoanRegistryRepository =
         RoomLoanRegistryRepository.from(database)
+
+    val commitmentRepository: CommitmentRepository =
+        RoomCommitmentRepository.from(database)
 
     val financialTransactionRepository: FinancialTransactionRepository =
         RoomFinancialTransactionRepository(
@@ -276,6 +282,12 @@ class AppContainer(
             appLogService = appLogService,
         )
 
+    val commitmentFromTransactionService: CommitmentFromTransactionService =
+        CommitmentFromTransactionService(
+            commitmentRepository = commitmentRepository,
+            financialTransactionRepository = financialTransactionRepository,
+        )
+
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
     val dashboardService: DashboardService =
@@ -288,6 +300,7 @@ class AppContainer(
             accountRegistryRepository = accountRegistryRepository,
             cardRegistryRepository = cardRegistryRepository,
             loanRegistryRepository = loanRegistryRepository,
+            commitmentRepository = commitmentRepository,
             sarEquivalentResolver = TransactionSarEquivalentResolver(
                 marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
             ),

@@ -436,6 +436,7 @@ class SettingsViewModelTest {
             cardRegistryRepository = cards,
             accountRegistryRepository = accounts,
             loanRegistryRepository = loans,
+            commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = accounts,
                 cardRegistry = cards,

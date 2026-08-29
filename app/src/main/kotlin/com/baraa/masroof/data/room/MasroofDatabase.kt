@@ -6,6 +6,7 @@ import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.dao.BankRegistryDao
 import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.dao.CreditFacilityDao
+import com.baraa.masroof.data.room.dao.CommitmentDao
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.LoanRegistryDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
@@ -17,6 +18,7 @@ import com.baraa.masroof.data.room.entity.BankRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.entity.CreditFacilityEntity
 import com.baraa.masroof.data.room.entity.LoanRegistryEntity
+import com.baraa.masroof.data.room.entity.CommitmentEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
@@ -30,6 +32,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_4_5
 import com.baraa.masroof.data.room.migration.MIGRATION_5_6
 import com.baraa.masroof.data.room.migration.MIGRATION_6_7
 import com.baraa.masroof.data.room.migration.MIGRATION_8_9
+import com.baraa.masroof.data.room.migration.MIGRATION_9_10
 import com.baraa.masroof.data.room.migration.MIGRATION_7_8
 
 /**
@@ -38,7 +41,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
  * Migrations: 1→2 ownership registries; 2→3 financial transactions; 3→4 review workflow;
  * 4→5 exchange rates; 5→6 registry display names and card relationships;
  * 6→7 bank hierarchy (bank_registry, credit_facility, loan_registry, account types);
- * 7→8 opaque registry entity ids; 8→9 loan registry composite key.
+ * 7→8 opaque registry entity ids; 8→9 loan registry composite key; 9→10 user commitments.
  * Does not use destructive migration.
  */
 @Database(
@@ -52,10 +55,11 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
         LoanRegistryEntity::class,
         FinancialTransactionEntity::class,
         FinancialTransactionRawSmsLinkEntity::class,
+        CommitmentEntity::class,
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -75,22 +79,24 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun financialTransactionDao(): FinancialTransactionDao
 
+    abstract fun commitmentDao(): CommitmentDao
+
     abstract fun reviewItemDao(): ReviewItemDao
 
     abstract fun userCorrectionDao(): UserCorrectionDao
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 9
+        const val VERSION: Int = 10
 
-        /** Must match app/schemas/.../9.json identityHash — updated after schema export. */
-        const val IDENTITY_HASH: String = "a673ee53e423dc6952d5514ed2d14206"
+        /** Must match app/schemas/.../10.json identityHash — updated after schema export. */
+        const val IDENTITY_HASH: String = "a1bb13cc1ca6c7d3187e1dd0c14b115d"
 
-        /** Previous production schema (v8 opaque registry ids). */
-        const val PREVIOUS_VERSION: Int = 8
+        /** Previous production schema (v9 loan registry composite key). */
+        const val PREVIOUS_VERSION: Int = 9
 
-        /** Must match app/schemas/.../8.json identityHash. */
-        const val PREVIOUS_IDENTITY_HASH: String = "051d1cf4633e66c7ae6b851428871ab4"
+        /** Must match app/schemas/.../9.json identityHash. */
+        const val PREVIOUS_IDENTITY_HASH: String = "a673ee53e423dc6952d5514ed2d14206"
 
         /** Legacy v7 backups (bank hierarchy). */
         const val LEGACY_VERSION_7: Int = 7
@@ -119,6 +125,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
         )
     }
 }

@@ -83,6 +83,7 @@ class SettingsImportConfirmTest {
             cardRegistryRepository = EmptyCards(),
             accountRegistryRepository = EmptyAccounts(),
             loanRegistryRepository = NoOpLoanRegistryRepository,
+            commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ownershipConfirmationService = OwnershipConfirmationService(
                 accountRegistry = EmptyAccounts(),
                 cardRegistry = EmptyCards(),
