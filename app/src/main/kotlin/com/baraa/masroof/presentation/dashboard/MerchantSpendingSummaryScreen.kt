@@ -25,6 +25,7 @@ import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofSectionTitle
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofSpacing
+import com.baraa.masroof.presentation.theme.MasroofThemeExtras
 
 @Composable
 fun MerchantSpendingSummaryRoute(
@@ -131,7 +132,7 @@ private fun MerchantSpendingListRow(
             Text(
                 formatLocalizedMoney(row.totalSpent),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
+                color = MasroofThemeExtras.extendedColors.outflow,
             )
         }
     }
