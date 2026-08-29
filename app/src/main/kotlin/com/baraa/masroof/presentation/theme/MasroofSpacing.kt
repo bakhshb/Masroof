@@ -37,4 +37,8 @@ object MasroofSpacing {
     val customizeButtonRadius = 10.dp
     val customizeButtonVerticalPadding = 7.dp
     val inlineGap = 4.dp
+    val chartHeight = 168.dp
+    val chartVerticalPadding = 12.dp
+    val chartLineWidth = 2.dp
+    val chartPointRadius = 3.dp
 }

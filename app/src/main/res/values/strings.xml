@@ -325,7 +325,7 @@
     <string name="dashboard_customize_section_accounts">ملخص الحسابات</string>
     <string name="dashboard_customize_section_cards">ملخص البطاقات</string>
     <string name="dashboard_customize_section_loans">ملخص القروض</string>
-    <string name="dashboard_customize_section_merchants">إنفاق المتاجر</string>
+    <string name="dashboard_customize_section_merchants">التحليل</string>
     <string name="dashboard_customize_section_transactions">العمليات الأخيرة</string>
     <string name="dashboard_customize_size_small">صغير</string>
     <string name="dashboard_customize_size_medium">متوسط</string>
@@ -384,6 +384,10 @@
     <string name="dashboard_merchants_title">الإنفاق حسب المتجر</string>
     <string name="dashboard_merchants_summary_title">الإنفاق حسب المتجر</string>
     <string name="dashboard_merchants_view_all">عرض الكل ›</string>
+    <string name="dashboard_analysis_title">التحليل</string>
+    <string name="dashboard_top_merchants_title">أكثر المتاجر إنفاقًا</string>
+    <string name="dashboard_daily_spending_title">متوسط الإنفاق اليومي</string>
+    <string name="dashboard_average_daily_spending">المتوسط اليومي: %1$s</string>
     <string name="dashboard_merchants_empty">لا توجد متاجر مؤهلة في هذه الفترة</string>
     <string name="dashboard_merchants_transaction_count">%1$d عمليات شراء / دفع</string>
     <string name="dashboard_merchants_qualifying_count">%1$d متجر مؤهل</string>
