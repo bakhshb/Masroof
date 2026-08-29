@@ -24,6 +24,7 @@ data class DashboardOverview(
     val transactions: List<com.baraa.masroof.domain.model.FinancialTransaction>,
     val creditFacilities: CreditFacilitiesOverview,
     val loansOverview: LoansOverview? = null,
+    val merchantSpending: MerchantSpendingOverview = MerchantSpendingOverview.empty(),
     val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,
     val ownedAccountPeriodSummaries: List<OwnedAccountPeriodSummary>,
@@ -75,6 +76,7 @@ class DashboardService(
         return projection.toOverview().copy(
             creditFacilities = projection.creditFacilities,
             loansOverview = projection.loansOverview,
+            merchantSpending = projection.merchantSpending,
             bankHierarchy = projection.bankHierarchy,
             accountsFleet = projection.accountsFleet,
         )

@@ -63,6 +63,7 @@ fun DashboardRoute(
     onOpenAccountsSummary: () -> Unit = onOpenSettings,
     onOpenCardsSummary: () -> Unit = onOpenSettings,
     onOpenLoansSummary: () -> Unit = onOpenSettings,
+    onOpenMerchantsSummary: () -> Unit = {},
     onOpenLoanDetail: (LoanOverview) -> Unit = { onOpenLoansSummary() },
     onOpenCardDetail: (CreditCardDashboardRow) -> Unit = { onOpenCardsSummary() },
     onOpenDebitDetail: (DebitCardOverview) -> Unit = { onOpenCardsSummary() },
@@ -89,6 +90,7 @@ fun DashboardRoute(
         onOpenAccountsSummary = onOpenAccountsSummary,
         onOpenCardsSummary = onOpenCardsSummary,
         onOpenLoansSummary = onOpenLoansSummary,
+        onOpenMerchantsSummary = onOpenMerchantsSummary,
         onOpenLoanDetail = onOpenLoanDetail,
         onOpenCardDetail = onOpenCardDetail,
         onOpenDebitDetail = onOpenDebitDetail,
@@ -124,6 +126,7 @@ private fun DashboardScreen(
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
+    onOpenMerchantsSummary: () -> Unit,
     onOpenLoanDetail: (LoanOverview) -> Unit,
     onOpenCardDetail: (CreditCardDashboardRow) -> Unit,
     onOpenDebitDetail: (DebitCardOverview) -> Unit,
@@ -268,6 +271,7 @@ private fun DashboardScreen(
                                 onOpenAccountsSummary = onOpenAccountsSummary,
                                 onOpenCardsSummary = onOpenCardsSummary,
                                 onOpenLoansSummary = onOpenLoansSummary,
+                                onOpenMerchantsSummary = onOpenMerchantsSummary,
                                 onOpenLoanDetail = onOpenLoanDetail,
                                 onOpenCardDetail = onOpenCardDetail,
                                 onOpenDebitDetail = onOpenDebitDetail,
@@ -304,6 +308,7 @@ private fun DashboardCustomizableSections(
     onOpenAccountsSummary: () -> Unit,
     onOpenCardsSummary: () -> Unit,
     onOpenLoansSummary: () -> Unit,
+    onOpenMerchantsSummary: () -> Unit,
     onOpenLoanDetail: (LoanOverview) -> Unit,
     onOpenCardDetail: (CreditCardDashboardRow) -> Unit,
     onOpenDebitDetail: (DebitCardOverview) -> Unit,
@@ -373,6 +378,13 @@ private fun DashboardCustomizableSections(
                             onOpenLoan = onOpenLoanDetail,
                         )
                     }
+                }
+
+                DashboardSectionId.MERCHANTS -> {
+                    MerchantSpendingSection(
+                        overview = state.merchantSpending,
+                        onViewAll = onOpenMerchantsSummary,
+                    )
                 }
 
                 DashboardSectionId.TRANSACTIONS -> {

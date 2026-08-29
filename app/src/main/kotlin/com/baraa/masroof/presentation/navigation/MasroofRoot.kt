@@ -26,6 +26,7 @@ import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.DashboardViewModel
 import com.baraa.masroof.presentation.dashboard.LoanOwnershipKey
 import com.baraa.masroof.presentation.dashboard.LoansSummaryRoute
+import com.baraa.masroof.presentation.dashboard.MerchantSpendingSummaryRoute
 import com.baraa.masroof.presentation.dashboard.TransactionDetailScreen
 import com.baraa.masroof.presentation.dashboard.TransactionListFilterState
 import com.baraa.masroof.presentation.dashboard.TransactionListScreen
@@ -134,6 +135,9 @@ fun MasroofRoot(
                 homeDestination == HomeDestination.LoansSummary ->
                     homeDestination = HomeDestination.Dashboard
 
+                homeDestination == HomeDestination.MerchantsSummary ->
+                    homeDestination = HomeDestination.Dashboard
+
                 homeDestination == HomeDestination.NotificationCenter ->
                     homeDestination = HomeDestination.Dashboard
 
@@ -203,6 +207,9 @@ fun MasroofRoot(
                     pendingLoansSummaryLoanKey = null
                     loansSummaryDetailExitsToHome = false
                     homeDestination = HomeDestination.LoansSummary
+                },
+                onOpenMerchantsSummary = {
+                    homeDestination = HomeDestination.MerchantsSummary
                 },
                 onOpenLoanDetail = { loan ->
                     pendingLoansSummaryLoanKey = LoanOwnershipKey.of(loan)
@@ -291,6 +298,17 @@ fun MasroofRoot(
                     openTransactionList(
                         filter = filter,
                         returnTo = HomeDestination.LoansSummary,
+                    )
+                },
+            )
+            HomeDestination.MerchantsSummary -> MerchantSpendingSummaryRoute(
+                viewModel = dashboardViewModel,
+                onBack = { homeDestination = HomeDestination.Dashboard },
+                onOpenTransaction = dashboardViewModel::openTransactionDetail,
+                onOpenAllTransactions = { filter ->
+                    openTransactionList(
+                        filter = filter,
+                        returnTo = HomeDestination.MerchantsSummary,
                     )
                 },
             )

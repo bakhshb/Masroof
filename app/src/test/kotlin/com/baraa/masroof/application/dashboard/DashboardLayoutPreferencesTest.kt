@@ -13,6 +13,7 @@ class DashboardLayoutPreferencesTest {
                 entry(DashboardSectionId.HERO),
                 entry(DashboardSectionId.CARDS),
                 entry(DashboardSectionId.LOANS),
+                entry(DashboardSectionId.MERCHANTS),
                 entry(DashboardSectionId.ACCOUNTS),
                 entry(DashboardSectionId.QUICK),
             ),
@@ -27,6 +28,7 @@ class DashboardLayoutPreferencesTest {
                 DashboardSectionId.HERO,
                 DashboardSectionId.CARDS,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.MERCHANTS,
                 DashboardSectionId.ACCOUNTS,
                 DashboardSectionId.QUICK,
             ),
@@ -52,6 +54,7 @@ class DashboardLayoutPreferencesTest {
             listOf(
                 DashboardSectionId.HERO,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.MERCHANTS,
                 DashboardSectionId.TRANSACTIONS,
                 DashboardSectionId.CARDS,
                 DashboardSectionId.ACCOUNTS,
@@ -82,6 +85,7 @@ class DashboardLayoutPreferencesTest {
                 DashboardSectionId.ACCOUNTS,
                 DashboardSectionId.CARDS,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.MERCHANTS,
                 DashboardSectionId.TRANSACTIONS,
             ),
             merged.sections.map { it.id },
@@ -96,8 +100,10 @@ class DashboardLayoutPreferencesTest {
 
         val ids = defaults.sections.map { it.id }
         assertTrue(DashboardSectionId.LOANS in ids)
+        assertTrue(DashboardSectionId.MERCHANTS in ids)
         assertTrue(ids.indexOf(DashboardSectionId.LOANS) > ids.indexOf(DashboardSectionId.CARDS))
-        assertTrue(ids.indexOf(DashboardSectionId.LOANS) < ids.indexOf(DashboardSectionId.TRANSACTIONS))
+        assertTrue(ids.indexOf(DashboardSectionId.MERCHANTS) > ids.indexOf(DashboardSectionId.LOANS))
+        assertTrue(ids.indexOf(DashboardSectionId.MERCHANTS) < ids.indexOf(DashboardSectionId.TRANSACTIONS))
     }
 
     private fun entry(

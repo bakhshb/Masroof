@@ -10,6 +10,7 @@ import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
+import com.baraa.masroof.application.dashboard.MerchantSpendingOverview
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
@@ -83,6 +84,7 @@ data class DashboardUiState(
     val spendingSplit: SpendingSplitSummary? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
     val loansOverview: LoansOverview? = null,
+    val merchantSpending: MerchantSpendingOverview = MerchantSpendingOverview.empty(),
     val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),

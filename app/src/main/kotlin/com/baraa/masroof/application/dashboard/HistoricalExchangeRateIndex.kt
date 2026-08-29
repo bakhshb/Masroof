@@ -7,7 +7,6 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.math.BigDecimal
 import java.time.Instant
-import java.util.Locale
 
 /**
  * Merchant + currency → exchange-rate evidence mined from earlier SMS that included سعر الصرف.
@@ -17,7 +16,7 @@ class HistoricalExchangeRateIndex private constructor(
 ) {
     fun rateForMerchant(merchant: String?, currency: Currency): BigDecimal? {
         if (!currency.convertsToSar()) return null
-        val normalized = merchant?.normalizeMerchantKey() ?: return null
+        val normalized = merchant?.let(MerchantNameNormalizer::key)?.takeIf { it.isNotBlank() } ?: return null
         val byCurrency = ratesByMerchant[normalized]
             ?: ratesByMerchant.entries.firstOrNull { (key, _) ->
                 normalized.contains(key) || key.contains(normalized)
@@ -33,7 +32,10 @@ class HistoricalExchangeRateIndex private constructor(
         ): HistoricalExchangeRateIndex {
             val latest = mutableMapOf<String, MutableMap<Currency, Pair<BigDecimal, Instant?>>>()
             for (record in parsedRecords) {
-                val merchant = record.event.merchant?.normalizeMerchantKey() ?: continue
+                val merchant = record.event.merchant
+                    ?.let(MerchantNameNormalizer::key)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: continue
                 val body = rawSmsById[record.event.rawSmsId]?.body ?: continue
                 val currency = record.event.amount?.currency?.takeIf { it.convertsToSar() }
                     ?: foreignCurrencyFromSms(body)
@@ -61,9 +63,6 @@ class HistoricalExchangeRateIndex private constructor(
             if (current == null) return true
             return candidate.isAfter(current)
         }
-
-        private fun String.normalizeMerchantKey(): String =
-            lowercase(Locale.ROOT).trim()
 
         private fun foreignCurrencyFromSms(body: String): Currency? {
             val match = MoneyTokens.moneyAfterLabel.find(body) ?: return null

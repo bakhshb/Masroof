@@ -11,6 +11,7 @@ internal enum class HomeDestination {
     AccountsSummary,
     CardsSummary,
     LoansSummary,
+    MerchantsSummary,
     NotificationCenter,
     Review,
     AllTransactions,
