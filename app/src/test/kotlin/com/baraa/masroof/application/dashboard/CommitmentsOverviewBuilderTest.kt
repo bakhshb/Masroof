@@ -109,6 +109,59 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun oneTimeCommitment_editedTransactionDate_appearsOnlyInEditedPeriod() {
+        val previousPeriod = FinancialPeriod(
+            startDate = LocalDate.parse("2026-06-27"),
+            endDateExclusive = LocalDate.parse("2026-07-27"),
+        )
+        val sourceTx = transaction(
+            id = "tx-netflix",
+            merchant = "Netflix",
+            amount = "71",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(previousPeriod.startDate, zone).plusSeconds(60),
+        )
+        val commitment = commitment(
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = sourceTx.id,
+            transactionDate = LocalDate.parse("2026-08-01"),
+        )
+
+        val inSourcePeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = previousPeriod,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(sourceTx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertTrue(inSourcePeriod.rows.isEmpty())
+
+        val inEditedPeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(sourceTx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertEquals(1, inEditedPeriod.rows.size)
+        assertEquals(CommitmentPaymentStatus.PAID, inEditedPeriod.rows.single().status)
+    }
+
+    @Test
     fun recurringCommitment_withoutPaymentInPeriod_isUnpaid() {
         val commitment = commitment(
             name = "STC",

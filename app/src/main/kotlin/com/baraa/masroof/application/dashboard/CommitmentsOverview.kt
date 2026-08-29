@@ -74,7 +74,7 @@ object CommitmentsOverviewBuilder {
             commitments.filter { it.active }.forEach { commitment ->
                 if (
                     commitment.recurrence == null &&
-                    !isOneTimeCommitmentInPeriod(commitment, salaryPeriod, transactions, zoneId)
+                    !isOneTimeCommitmentInPeriod(commitment, salaryPeriod)
                 ) {
                     return@forEach
                 }
@@ -189,15 +189,8 @@ object CommitmentsOverviewBuilder {
     internal fun isOneTimeCommitmentInPeriod(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
-        transactions: List<FinancialTransaction>,
-        zoneId: ZoneId,
     ): Boolean {
-        val anchorDate = transactions
-            .find { it.id == commitment.sourceTransactionId }
-            ?.occurredAt
-            ?.atZone(zoneId)
-            ?.toLocalDate()
-            ?: commitment.transactionDate
+        val anchorDate = commitment.transactionDate
         return !anchorDate.isBefore(salaryPeriod.startDate) &&
             anchorDate.isBefore(salaryPeriod.endDateExclusive)
     }
