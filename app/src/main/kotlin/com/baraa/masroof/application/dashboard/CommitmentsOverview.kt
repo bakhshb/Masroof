@@ -2,12 +2,13 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.domain.repository.CommitmentRepository
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -73,8 +74,7 @@ object CommitmentsOverviewBuilder {
         val rows = buildList {
             commitments.filter { it.active }.forEach { commitment ->
                 if (
-                    commitment.recurrence == null &&
-                    !isOneTimeCommitmentInPeriod(commitment, salaryPeriod)
+                    !isCommitmentDueInPeriod(commitment, salaryPeriod)
                 ) {
                     return@forEach
                 }
@@ -87,7 +87,16 @@ object CommitmentsOverviewBuilder {
                     zoneId,
                 )?.let(::add)
             }
-            addAll(buildCreditCardRows(creditFacilities))
+            addAll(
+                buildCreditCardRows(
+                    creditFacilities = creditFacilities,
+                    salaryPeriod = salaryPeriod,
+                    transactions = transactions,
+                    primaryCurrency = primaryCurrency,
+                    sarEquivalents = sarEquivalents,
+                    zoneId = zoneId,
+                ),
+            )
             addAll(buildLoanRows(loansOverview))
         }.sortedBy { it.displayName.lowercase() }
 
@@ -151,19 +160,64 @@ object CommitmentsOverviewBuilder {
 
     private fun buildCreditCardRows(
         creditFacilities: CreditFacilitiesOverview,
+        salaryPeriod: FinancialPeriod,
+        transactions: List<FinancialTransaction>,
+        primaryCurrency: Currency,
+        sarEquivalents: Map<String, Money>,
+        zoneId: ZoneId,
     ): List<CommitmentDashboardRow> =
         creditFacilities.facilities.mapNotNull { facility ->
             val due = facility.facilityDue ?: return@mapNotNull null
+            val paid = creditFacilityPaymentAmount(
+                facility = facility,
+                salaryPeriod = salaryPeriod,
+                transactions = transactions,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents,
+                zoneId = zoneId,
+            ).amount >= due.amount.amount
             CommitmentDashboardRow(
                 key = "credit:${facility.bank.id}:${facility.primaryLast4}",
                 source = CommitmentDashboardSource.CREDIT_CARD,
                 displayName = "Credit ••${facility.primaryLast4}",
                 amount = due.amount,
                 dueDate = due.dueDate,
-                status = CommitmentPaymentStatus.UNPAID,
+                status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,
                 creditFacilityKey = "${facility.bank.id}:${facility.primaryLast4}",
             )
         }
+
+    private fun creditFacilityPaymentAmount(
+        facility: CreditFacilityOverview,
+        salaryPeriod: FinancialPeriod,
+        transactions: List<FinancialTransaction>,
+        primaryCurrency: Currency,
+        sarEquivalents: Map<String, Money>,
+        zoneId: ZoneId,
+    ): Money {
+        val cardIds = facility.allCards.mapNotNull { card ->
+            FinancialContainerIdFactory.cardId(card.bank, card.last4)
+        }.toSet()
+        val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
+        val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
+        return transactions.fold(Money.zero(primaryCurrency)) { total, transaction ->
+            if (
+                transaction.type != FinancialTransactionType.CREDIT_CARD_PAYMENT ||
+                transaction.destinationContainerId !in cardIds ||
+                transaction.occurredAt < periodStart ||
+                transaction.occurredAt >= periodEnd
+            ) {
+                total
+            } else {
+                val amount = TransactionAmountResolver.effectiveAmount(
+                    tx = transaction,
+                    primaryCurrency = primaryCurrency,
+                    sarEquivalents = sarEquivalents,
+                )
+                if (amount == null) total else total + amount
+            }
+        }
+    }
 
     private fun buildLoanRows(
         loansOverview: LoansOverview,
@@ -190,7 +244,31 @@ object CommitmentsOverviewBuilder {
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
     ): Boolean {
-        val anchorDate = commitment.transactionDate
+        return isDateInPeriod(commitment.transactionDate, salaryPeriod)
+    }
+
+    internal fun isCommitmentDueInPeriod(
+        commitment: Commitment,
+        salaryPeriod: FinancialPeriod,
+    ): Boolean {
+        val recurrence = commitment.recurrence ?: return isOneTimeCommitmentInPeriod(commitment, salaryPeriod)
+        var occurrence = commitment.transactionDate
+        val increment: (LocalDate) -> LocalDate = when (recurrence) {
+            CommitmentRecurrence.WEEKLY -> { date -> date.plusWeeks(1) }
+            CommitmentRecurrence.MONTHLY -> { date -> date.plusMonths(1) }
+            CommitmentRecurrence.YEARLY -> { date -> date.plusYears(1) }
+        }
+        while (occurrence.isBefore(salaryPeriod.startDate)) {
+            occurrence = increment(occurrence)
+        }
+        return isDateInPeriod(occurrence, salaryPeriod)
+    }
+
+    private fun isDateInPeriod(
+        date: LocalDate,
+        salaryPeriod: FinancialPeriod,
+    ): Boolean {
+        val anchorDate = date
         return !anchorDate.isBefore(salaryPeriod.startDate) &&
             anchorDate.isBefore(salaryPeriod.endDateExclusive)
     }
@@ -222,6 +300,13 @@ object CommitmentsOverviewBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
     ): Boolean {
+        if (
+            transaction.type != FinancialTransactionType.EXPENSE &&
+            transaction.type != FinancialTransactionType.FEE &&
+            transaction.type != FinancialTransactionType.BILL_PAYMENT
+        ) {
+            return false
+        }
         if (transaction.id == commitment.sourceTransactionId) return true
         val txAmount = TransactionAmountResolver.effectiveAmount(
             tx = transaction,

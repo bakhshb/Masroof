@@ -191,6 +191,91 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun yearlyCommitment_outsideAnniversaryPeriod_isExcluded() {
+        val commitment = commitment(
+            name = "Insurance",
+            amount = Money.of("1200.00", Currency.SAR),
+            sourceTransactionId = "tx-insurance",
+            recurrence = CommitmentRecurrence.YEARLY,
+            transactionDate = LocalDate.parse("2026-01-15"),
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertTrue(overview.rows.isEmpty())
+    }
+
+    @Test
+    fun refundDoesNotCountAsRecurringCommitmentPayment() {
+        val refund = transaction(
+            id = "refund-stc",
+            merchant = "STC",
+            amount = "173",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            type = FinancialTransactionType.REFUND,
+        )
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("173.00", Currency.SAR),
+            sourceTransactionId = "tx-stc",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(refund),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
+    }
+
+    @Test
+    fun paidCreditCardStatement_isMarkedPaid() {
+        val facility = creditFacility(
+            due = Money.of("500.00", Currency.SAR),
+            last4 = "1234",
+        )
+        val payment = transaction(
+            id = "payment-card",
+            merchant = "Card payment",
+            amount = "500",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+        assertEquals(Money.of("500.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
+    }
+
+    @Test
     fun inactiveCommitments_areExcluded() {
         val overview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,
@@ -348,17 +433,47 @@ class CommitmentsOverviewBuilderTest {
         merchant: String,
         amount: String,
         at: Instant,
+        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
+        destinationContainerId: String? = null,
     ): FinancialTransaction =
         FinancialTransaction(
             id = id,
-            type = FinancialTransactionType.EXPENSE,
+            type = type,
             amount = Money.of(amount, Currency.SAR),
             occurredAt = at,
             sourceContainerId = null,
-            destinationContainerId = null,
+            destinationContainerId = destinationContainerId,
             merchant = merchant,
             counterparty = null,
             categoryId = null,
             linkedParsedEventIds = emptyList(),
+        )
+
+    private fun creditFacility(
+        due: Money,
+        last4: String,
+    ): CreditFacilityOverview =
+        CreditFacilityOverview(
+            bank = Bank.BANK_ALJAZIRA,
+            primary = CreditCardDashboardRow(
+                bank = Bank.BANK_ALJAZIRA,
+                last4 = last4,
+                calendarMonthSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+                statementSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+                salaryPeriodSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
+                statementPeriodLabel = null,
+                snapshot = null,
+            ),
+            supplementaries = emptyList(),
+            facilityDue = StatementDueSnapshot(
+                amount = due,
+                updatedAt = Instant.parse("2026-07-25T00:00:00Z"),
+                dueDate = LocalDate.parse("2026-08-15"),
+            ),
+            facilitySalaryPeriodSpending = SignedMoneyAmount.zero(Currency.SAR),
+            facilityStatementSpending = SignedMoneyAmount.zero(Currency.SAR),
+            aggregateStatementPeriodLabel = null,
+            salaryPeriodLabel = null,
+            currency = Currency.SAR,
         )
 }
