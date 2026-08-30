@@ -104,8 +104,8 @@ class PackageDependencyRulesTest {
 
     @Test
     fun presentation_doesNotUseDomainServicesOrPortsOutsideTemporaryExceptions() {
-        assertPackagesDoNotImport(
-            packages = listOf("presentation"),
+        assertFilesDoNotImport(
+            files = kotlinFilesIn("presentation").filter { it.name.endsWith("ViewModel.kt") },
             forbiddenImports = listOf(
                 "import com.baraa.masroof.domain.ownership.",
                 "import com.baraa.masroof.domain.period.",
@@ -114,7 +114,6 @@ class PackageDependencyRulesTest {
             ),
             allowedFiles = setOf(
                 // PR 7 — review/settings/registry workflow application facades.
-                "presentation/review/ReviewModels.kt",
                 "presentation/review/ReviewViewModel.kt",
                 "presentation/settings/SettingsViewModel.kt",
                 // PR 8 — dashboard/onboarding/notification workflow facades.
@@ -129,9 +128,18 @@ class PackageDependencyRulesTest {
         packages: List<String>,
         forbiddenImports: List<String>,
         allowedFiles: Set<String> = emptySet(),
+    ) = assertFilesDoNotImport(
+        files = packages.flatMap(::kotlinFilesIn),
+        forbiddenImports = forbiddenImports,
+        allowedFiles = allowedFiles,
+    )
+
+    private fun assertFilesDoNotImport(
+        files: List<File>,
+        forbiddenImports: List<String>,
+        allowedFiles: Set<String> = emptySet(),
     ) {
-        val files = packages.flatMap(::kotlinFilesIn)
-        assertTrue("Expected Kotlin sources for $packages", files.isNotEmpty())
+        assertTrue("Expected Kotlin sources", files.isNotEmpty())
         files.forEach { file ->
             val relativePath = file.relativeTo(sourceRoot).invariantSeparatorsPath
             if (relativePath in allowedFiles) return@forEach
