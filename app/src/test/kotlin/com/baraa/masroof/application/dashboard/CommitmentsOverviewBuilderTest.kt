@@ -413,6 +413,40 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun editedCommitmentAmount_usesStoredAmountNotSourceTransaction() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val tx = transaction(
+            id = "tx-stc",
+            merchant = "STC",
+            amount = "173",
+            at = start.plusSeconds(60),
+        )
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("200.00", Currency.SAR),
+            sourceTransactionId = tx.id,
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(tx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(Money.of("200.00", Currency.SAR), overview.rows.single().amount)
+        assertEquals(Money.of("200.00", Currency.SAR), overview.total)
+    }
+
+    @Test
     fun foreignCurrencyCommitment_usesSarEquivalentWhenSourceTxMissingFromPeriodList() {
         val commitment = commitment(
             name = "Amazon",

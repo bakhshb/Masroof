@@ -232,12 +232,16 @@ class DashboardProjectionBuilder(
             zoneId = zoneId,
             displayLocale = displayLocale,
         )
+        val commitmentTransactions = buildList {
+            addAll(dedupedTransactions)
+            addAll(commitmentSourceTransactions)
+        }.distinctBy { it.id }
         val commitmentsOverview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,
             commitments = commitments,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
-            transactions = dedupedTransactions,
+            transactions = commitmentTransactions,
             primaryCurrency = primaryCurrency,
             sarEquivalents = commitmentSarEquivalentAmounts,
             zoneId = zoneId,

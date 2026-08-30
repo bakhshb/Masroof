@@ -380,14 +380,28 @@ object CommitmentsOverviewBuilder {
         sourceTransactionId: String,
         transactions: List<FinancialTransaction>,
     ): Money? {
-        transactions.find { it.id == sourceTransactionId }?.let { sourceTx ->
-            TransactionAmountResolver.effectiveAmount(
+        if (amount.currency == primaryCurrency) {
+            return amount
+        }
+        val sourceTx = transactions.find { it.id == sourceTransactionId }
+        if (sourceTx != null) {
+            if (sourceTx.amount.currency != amount.currency) return null
+            val sourceSar = TransactionAmountResolver.effectiveAmount(
                 tx = sourceTx,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
-            )?.let { return it }
+            ) ?: sarEquivalents[sourceTransactionId] ?: return null
+            if (sourceTx.amount.amount.signum() == 0) return null
+            val ratio = amount.amount.divide(
+                sourceTx.amount.amount,
+                Money.SCALE,
+                RoundingMode.HALF_EVEN,
+            )
+            return Money(
+                sourceSar.amount.multiply(ratio).setScale(Money.SCALE, RoundingMode.HALF_EVEN),
+                primaryCurrency,
+            )
         }
-        sarEquivalents[sourceTransactionId]?.let { return it }
-        return if (amount.currency == primaryCurrency) amount else null
+        return sarEquivalents[sourceTransactionId]
     }
 }
