@@ -41,6 +41,7 @@ class DashboardProjectionBuilder(
         enrichedTransactions: List<FinancialTransaction>,
     ): DashboardProjection {
         val reviewRequiredCount = reviewRepository.listRequired().size
+        val commitments = commitmentRepository.listAll()
         val sarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
@@ -57,6 +58,21 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
         )
         val sarEquivalents = sarResolutions.sarAmounts()
+        val periodTransactionIds = dedupedTransactions.mapTo(mutableSetOf()) { it.id }
+        val commitmentSourceTransactions = commitments.mapNotNull { commitment ->
+            if (commitment.sourceTransactionId in periodTransactionIds) {
+                null
+            } else {
+                financialTransactionRepository.getById(commitment.sourceTransactionId)
+            }
+        }
+        val commitmentSarEquivalents = sarEquivalentResolver.resolve(
+            transactions = commitmentSourceTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = primaryCurrency,
+        ).sarAmounts()
+        val commitmentSarEquivalentAmounts = sarEquivalents + commitmentSarEquivalents
 
         val ownedAccounts = accountRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
@@ -218,12 +234,12 @@ class DashboardProjectionBuilder(
         )
         val commitmentsOverview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,
-            commitments = commitmentRepository.listAll(),
+            commitments = commitments,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
             transactions = dedupedTransactions,
             primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
+            sarEquivalents = commitmentSarEquivalentAmounts,
             zoneId = zoneId,
         )
         val merchantSpending = MerchantSpendingOverviewBuilder.build(

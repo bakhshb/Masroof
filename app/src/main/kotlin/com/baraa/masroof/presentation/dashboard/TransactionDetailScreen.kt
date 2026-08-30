@@ -490,5 +490,6 @@ private val MARK_COMMITMENT_ERROR_REASONS = setOf(
     "transaction_not_found",
     "invalid_transaction",
     "already_exists",
+    "create_failed",
 )
 
