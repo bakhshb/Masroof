@@ -215,6 +215,40 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun weeklyCommitment_countsEachDueOccurrenceAndPayment() {
+        val commitment = commitment(
+            name = "Cleaning",
+            amount = Money.of("100.00", Currency.SAR),
+            sourceTransactionId = "tx-cleaning",
+            recurrence = CommitmentRecurrence.WEEKLY,
+            transactionDate = LocalDate.parse("2026-07-28"),
+        )
+        val payment = transaction(
+            id = "payment-cleaning",
+            merchant = "Cleaning",
+            amount = "100",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(5, overview.rows.size)
+        assertEquals(Money.of("500.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("100.00", Currency.SAR), overview.paid)
+        assertEquals(Money.of("400.00", Currency.SAR), overview.remaining)
+        assertEquals(1, overview.rows.count { it.status == CommitmentPaymentStatus.PAID })
+    }
+
+    @Test
     fun refundDoesNotCountAsRecurringCommitmentPayment() {
         val refund = transaction(
             id = "refund-stc",

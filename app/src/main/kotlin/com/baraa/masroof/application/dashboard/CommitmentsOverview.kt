@@ -13,6 +13,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.YearMonth
 
 enum class CommitmentPaymentStatus {
     PAID,
@@ -73,19 +74,16 @@ object CommitmentsOverviewBuilder {
     ): CommitmentsOverview {
         val rows = buildList {
             commitments.filter { it.active }.forEach { commitment ->
-                if (
-                    !isCommitmentDueInPeriod(commitment, salaryPeriod)
-                ) {
-                    return@forEach
-                }
-                buildUserRow(
+                addAll(
+                    buildUserRows(
                     commitment,
                     salaryPeriod,
                     transactions,
                     primaryCurrency,
                     sarEquivalents,
                     zoneId,
-                )?.let(::add)
+                    ),
+                )
             }
             addAll(
                 buildCreditCardRows(
@@ -124,38 +122,50 @@ object CommitmentsOverviewBuilder {
         )
     }
 
-    private fun buildUserRow(
+    private fun buildUserRows(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
         transactions: List<FinancialTransaction>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
-    ): CommitmentDashboardRow? {
+    ): List<CommitmentDashboardRow> {
+        val occurrences = occurrencesInPeriod(commitment, salaryPeriod)
+        if (occurrences.isEmpty()) return emptyList()
         val amount = resolveMoney(
             amount = commitment.amount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             sourceTransactionId = commitment.sourceTransactionId,
             transactions = transactions,
-        ) ?: return null
-        val status = resolveUserStatus(
-            commitment = commitment,
-            salaryPeriod = salaryPeriod,
-            transactions = transactions,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            zoneId = zoneId,
-        )
-        return CommitmentDashboardRow(
-            key = "user:${commitment.id}",
-            source = CommitmentDashboardSource.USER,
-            displayName = commitment.name,
-            amount = amount,
-            dueDate = commitment.dueDate,
-            status = status,
-            userCommitmentId = commitment.id,
-        )
+        ) ?: return emptyList()
+        val paidOccurrenceCount = if (commitment.recurrence == null) {
+            occurrences.size
+        } else {
+            matchingPaymentCount(
+                commitment = commitment,
+                salaryPeriod = salaryPeriod,
+                transactions = transactions,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents,
+                zoneId = zoneId,
+            )
+        }
+        return occurrences.mapIndexed { index, occurrence ->
+            CommitmentDashboardRow(
+                key = "user:${commitment.id}:$occurrence",
+                source = CommitmentDashboardSource.USER,
+                displayName = commitment.name,
+                amount = amount,
+                dueDate = commitment.dueDate,
+                status = if (index < paidOccurrenceCount) {
+                    CommitmentPaymentStatus.PAID
+                } else {
+                    CommitmentPaymentStatus.UNPAID
+                },
+                userCommitmentId = commitment.id,
+            )
+        }
     }
 
     private fun buildCreditCardRows(
@@ -250,18 +260,58 @@ object CommitmentsOverviewBuilder {
     internal fun isCommitmentDueInPeriod(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
-    ): Boolean {
-        val recurrence = commitment.recurrence ?: return isOneTimeCommitmentInPeriod(commitment, salaryPeriod)
-        var occurrence = commitment.transactionDate
-        val increment: (LocalDate) -> LocalDate = when (recurrence) {
-            CommitmentRecurrence.WEEKLY -> { date -> date.plusWeeks(1) }
-            CommitmentRecurrence.MONTHLY -> { date -> date.plusMonths(1) }
-            CommitmentRecurrence.YEARLY -> { date -> date.plusYears(1) }
+    ): Boolean = occurrencesInPeriod(commitment, salaryPeriod).isNotEmpty()
+
+    internal fun occurrencesInPeriod(
+        commitment: Commitment,
+        salaryPeriod: FinancialPeriod,
+    ): List<LocalDate> {
+        val anchor = commitment.transactionDate
+        return when (commitment.recurrence) {
+            null -> listOf(anchor).filter { isDateInPeriod(it, salaryPeriod) }
+            CommitmentRecurrence.WEEKLY -> buildList {
+                var occurrence = anchor
+                while (occurrence.isBefore(salaryPeriod.startDate)) {
+                    occurrence = occurrence.plusWeeks(1)
+                }
+                while (isDateInPeriod(occurrence, salaryPeriod)) {
+                    add(occurrence)
+                    occurrence = occurrence.plusWeeks(1)
+                }
+            }
+            CommitmentRecurrence.MONTHLY -> occurrencesForMonths(
+                anchor = anchor,
+                start = salaryPeriod.startDate,
+                endExclusive = salaryPeriod.endDateExclusive,
+                monthStep = 1,
+            )
+            CommitmentRecurrence.YEARLY -> occurrencesForMonths(
+                anchor = anchor,
+                start = salaryPeriod.startDate,
+                endExclusive = salaryPeriod.endDateExclusive,
+                monthStep = 12,
+            )
         }
-        while (occurrence.isBefore(salaryPeriod.startDate)) {
-            occurrence = increment(occurrence)
+    }
+
+    private fun occurrencesForMonths(
+        anchor: LocalDate,
+        start: LocalDate,
+        endExclusive: LocalDate,
+        monthStep: Long,
+    ): List<LocalDate> = buildList {
+        var month = YearMonth.from(start)
+        val endMonth = YearMonth.from(endExclusive.minusDays(1))
+        while (!month.isAfter(endMonth)) {
+            val monthOffset = (month.year - anchor.year) * 12L + month.monthValue - anchor.monthValue
+            if (monthOffset >= 0 && monthOffset % monthStep == 0L) {
+                val occurrence = month.atDay(minOf(anchor.dayOfMonth, month.lengthOfMonth()))
+                if (isDateInPeriod(occurrence, FinancialPeriod(start, endExclusive))) {
+                    add(occurrence)
+                }
+            }
+            month = month.plusMonths(1)
         }
-        return isDateInPeriod(occurrence, salaryPeriod)
     }
 
     private fun isDateInPeriod(
@@ -273,25 +323,21 @@ object CommitmentsOverviewBuilder {
             anchorDate.isBefore(salaryPeriod.endDateExclusive)
     }
 
-    internal fun resolveUserStatus(
+    private fun matchingPaymentCount(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
         transactions: List<FinancialTransaction>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
-    ): CommitmentPaymentStatus {
-        if (commitment.recurrence == null) {
-            return CommitmentPaymentStatus.PAID
-        }
+    ): Int {
         val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
-        val hasPayment = transactions.any { tx ->
+        return transactions.count { tx ->
             tx.occurredAt >= periodStart &&
                 tx.occurredAt < periodEnd &&
                 matchesCommitmentPayment(tx, commitment, primaryCurrency, sarEquivalents)
         }
-        return if (hasPayment) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID
     }
 
     internal fun matchesCommitmentPayment(
