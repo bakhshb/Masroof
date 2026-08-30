@@ -34,10 +34,29 @@ class CommitmentFromTransactionServiceTest {
         assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
     }
 
-    private fun transaction(id: String): FinancialTransaction =
+    @Test
+    fun createFromTransaction_refundIsRejected() = runBlocking {
+        val refund = transaction(id = "tx-refund", type = FinancialTransactionType.REFUND)
+        val service = CommitmentFromTransactionService(
+            commitmentRepository = ThrowOnDuplicateCommitmentRepository(),
+            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(refund)),
+            zoneId = zone,
+            clock = clock,
+        )
+
+        assertEquals(
+            CommitmentCreationResult.Rejected("invalid_transaction"),
+            service.createFromTransaction(refund.id),
+        )
+    }
+
+    private fun transaction(
+        id: String,
+        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
+    ): FinancialTransaction =
         FinancialTransaction(
             id = id,
-            type = FinancialTransactionType.EXPENSE,
+            type = type,
             amount = Money.of("71.00", Currency.SAR),
             occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
             sourceContainerId = null,

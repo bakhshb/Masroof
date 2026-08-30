@@ -4,6 +4,7 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.CommitmentRepository.CommitmentDraft
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -62,6 +63,13 @@ class CommitmentFromTransactionService(
     }
 
     internal fun buildDraft(transaction: FinancialTransaction): CommitmentDraft? {
+        if (
+            transaction.type != FinancialTransactionType.EXPENSE &&
+            transaction.type != FinancialTransactionType.FEE &&
+            transaction.type != FinancialTransactionType.BILL_PAYMENT
+        ) {
+            return null
+        }
         val name = transaction.merchant?.trim()?.takeIf { it.isNotEmpty() }
             ?: transaction.counterparty?.trim()?.takeIf { it.isNotEmpty() }
             ?: return null
