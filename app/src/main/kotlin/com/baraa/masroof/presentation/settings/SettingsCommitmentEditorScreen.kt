@@ -165,7 +165,7 @@ fun SettingsCommitmentEditorScreen(
                         }
                         if (dueDate != null) {
                             OutlinedButton(onClick = { dueDate = null }) {
-                                Text(stringResource(R.string.settings_cancel))
+                                Text(stringResource(R.string.settings_commitment_due_date_clear))
                             }
                         }
                     }

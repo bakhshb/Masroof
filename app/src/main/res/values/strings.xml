@@ -411,6 +411,7 @@
     <string name="settings_commitment_recurrence_yearly">سنوي</string>
     <string name="settings_commitment_due_date">تاريخ الاستحقاق</string>
     <string name="settings_commitment_due_date_none">بدون تاريخ استحقاق</string>
+    <string name="settings_commitment_due_date_clear">مسح تاريخ الاستحقاق</string>
     <string name="settings_commitment_disable">إيقاف</string>
     <string name="settings_commitment_enable">تفعيل</string>
     <string name="settings_commitment_delete">حذف</string>

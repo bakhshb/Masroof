@@ -189,7 +189,7 @@ object CommitmentsOverviewBuilder {
             CommitmentDashboardRow(
                 key = "credit:${facility.bank.id}:${facility.primaryLast4}",
                 source = CommitmentDashboardSource.CREDIT_CARD,
-                displayName = "Credit ••${facility.primaryLast4}",
+                displayName = facility.primaryLast4,
                 amount = due.amount,
                 dueDate = due.dueDate,
                 status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,

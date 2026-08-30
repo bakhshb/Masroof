@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CommitmentDashboardRow
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
+import com.baraa.masroof.application.dashboard.CommitmentDashboardSource
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofDonutChart
@@ -24,6 +25,7 @@ import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.commitmentDonutPaidFraction
+import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofThemeExtras
@@ -104,6 +106,13 @@ private fun CommitmentDashboardRowItem(
         CommitmentPaymentStatus.PAID -> extended.inflow
         CommitmentPaymentStatus.UNPAID -> extended.liability
     }
+    val displayName = when (row.source) {
+        CommitmentDashboardSource.CREDIT_CARD -> stringResource(
+            R.string.dashboard_credit_card_last4,
+            formatCardLast4(row.creditFacilityKey?.substringAfterLast(':')),
+        )
+        else -> row.displayName
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -112,7 +121,7 @@ private fun CommitmentDashboardRowItem(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                row.displayName,
+                displayName,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             )
             row.dueDate?.let { dueDate ->

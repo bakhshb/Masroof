@@ -405,6 +405,7 @@
     <string name="settings_commitment_recurrence_yearly">Yearly</string>
     <string name="settings_commitment_due_date">Due date</string>
     <string name="settings_commitment_due_date_none">No due date</string>
+    <string name="settings_commitment_due_date_clear">Clear due date</string>
     <string name="settings_commitment_disable">Disable</string>
     <string name="settings_commitment_enable">Enable</string>
     <string name="settings_commitment_delete">Delete</string>
