@@ -204,11 +204,11 @@ fun MasroofInteractiveLineChart(
             .pointerInput(values.size, onPointSelected, mirrorHorizontally) {
                 val onSelect = onPointSelected ?: return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
-                val chartWidth = size.width.toFloat()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pointerId = down.id
                     fun selectAt(touchX: Float) {
+                        val chartWidth = size.width.toFloat()
                         val logicalX = MasroofLineChartLayout.touchXForNearestPoint(
                             touchX = touchX,
                             width = chartWidth,
