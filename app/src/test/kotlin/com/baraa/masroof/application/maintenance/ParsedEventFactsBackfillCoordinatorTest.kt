@@ -57,7 +57,9 @@ class ParsedEventFactsBackfillCoordinatorTest {
     @Test
     fun runIfNeeded_runsAgainWhenSchemaAdvances() = runBlocking {
         var reparseCount = 0
-        val coordinator = coordinator { reparseCount++ }
+        val coordinator = coordinator {
+            reparseCount++
+        }
 
         coordinator.runIfNeeded(currentSchemaVersion = 11)
         coordinator.runIfNeeded(currentSchemaVersion = 12)
@@ -65,12 +67,35 @@ class ParsedEventFactsBackfillCoordinatorTest {
         assertEquals(2, reparseCount)
     }
 
-    private fun coordinator(reparse: suspend () -> Int): ParsedEventFactsBackfillCoordinator {
+    @Test
+    fun runIfNeeded_doesNotMarkCompleteWhenReparseFails() = runBlocking {
+        val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        val coordinator = ParsedEventFactsBackfillCoordinator(
+            prefs = prefs,
+            appLogService = appLogService,
+            reparseAllStoredEvents = {
+                ReparseAllStoredEventsResult(refreshedCount = 0, failedCount = 2)
+            },
+        )
+
+        coordinator.runIfNeeded(currentSchemaVersion = 11)
+        coordinator.runIfNeeded(currentSchemaVersion = 11)
+
+        assertEquals(0, prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0))
+    }
+
+    private fun coordinator(reparse: suspend () -> Unit): ParsedEventFactsBackfillCoordinator {
         val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
         return ParsedEventFactsBackfillCoordinator(
             prefs = prefs,
             appLogService = appLogService,
-            reparseAllStoredEvents = reparse,
+            reparseAllStoredEvents = {
+                reparse()
+                successResult()
+            },
         )
     }
+
+    private fun successResult(refreshedCount: Int = 1) =
+        ReparseAllStoredEventsResult(refreshedCount = refreshedCount, failedCount = 0)
 }

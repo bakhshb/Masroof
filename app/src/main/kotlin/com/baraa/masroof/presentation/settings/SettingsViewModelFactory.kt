@@ -20,7 +20,7 @@ class SettingsViewModelFactory(
             themePreferencesRepository = container.themePreferencesRepository,
             databaseBackupService = container.databaseBackupService,
             refreshReviewQueue = { container.refreshReviewQueue() },
-            reparseStoredEvents = { container.reparseAllStoredEvents() },
+            reparseStoredEvents = { container.reparseAllStoredEvents().refreshedCount },
             importSmsFromInbox = { HistoricalSmsRescanService(container).rescan() },
             permissionStateProvider = permissionStateProvider,
             appVersion = appVersion,
