@@ -95,6 +95,18 @@ abstract class MasroofDatabase : RoomDatabase() {
         /** Must match app/schemas/.../10.json identityHash. */
         const val PREVIOUS_IDENTITY_HASH: String = "7e3a9698a7d188a855b1e6736a1fd073"
 
+        /** Legacy v9 backups (pre bank-neutral parse facts). */
+        const val LEGACY_VERSION_9: Int = 9
+
+        /** Must match app/schemas/.../9.json identityHash. */
+        const val LEGACY_IDENTITY_HASH_9: String = "a673ee53e423dc6952d5514ed2d14206"
+
+        /** Legacy v8 backups (opaque registry entity ids). */
+        const val LEGACY_VERSION_8: Int = 8
+
+        /** Must match app/schemas/.../8.json identityHash. */
+        const val LEGACY_IDENTITY_HASH_8: String = "051d1cf4633e66c7ae6b851428871ab4"
+
         /** Legacy v7 backups (bank hierarchy). */
         const val LEGACY_VERSION_7: Int = 7
 
@@ -124,6 +136,16 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_8_9,
             MIGRATION_9_10,
             MIGRATION_10_11,
+        )
+
+        /** Room versions accepted by [com.baraa.masroof.application.backup.DatabaseBackupService]. */
+        val IMPORTABLE_BACKUP_VERSIONS: Map<Int, String> = mapOf(
+            LEGACY_VERSION_5 to LEGACY_IDENTITY_HASH_5,
+            LEGACY_VERSION_6 to LEGACY_IDENTITY_HASH_6,
+            LEGACY_VERSION_7 to LEGACY_IDENTITY_HASH_7,
+            LEGACY_VERSION_8 to LEGACY_IDENTITY_HASH_8,
+            LEGACY_VERSION_9 to LEGACY_IDENTITY_HASH_9,
+            PREVIOUS_VERSION to PREVIOUS_IDENTITY_HASH,
         )
     }
 }
