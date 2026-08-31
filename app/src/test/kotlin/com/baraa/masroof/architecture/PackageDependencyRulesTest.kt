@@ -74,6 +74,14 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun application_dashboard_doesNotDependOnBank() {
+        assertPackagesDoNotImport(
+            packages = listOf("application/dashboard"),
+            forbiddenImports = listOf("import com.baraa.masroof.bank."),
+        )
+    }
+
+    @Test
     fun presentation_doesNotDependOnDataOrSmsOutsideTemporaryExceptions() {
         assertPackagesDoNotImport(
             packages = listOf("presentation"),
