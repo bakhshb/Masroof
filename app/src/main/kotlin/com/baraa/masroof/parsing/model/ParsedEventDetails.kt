@@ -1,6 +1,7 @@
 package com.baraa.masroof.parsing.model
 
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.LoanType
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -31,4 +32,10 @@ data class ParsedEventDetails(
     val internationalFee: Money? = null,
     /** Foreign amount label when the transaction amount alone is insufficient (e.g. SAR charge line). */
     val labeledForeignAmount: Money? = null,
+    /** Resolved at parse time from financing SMS labels (لـ: …). */
+    val loanType: LoanType? = null,
+    /** Debit-card purchase source account suffix when the SMS states it explicitly. */
+    val debitSourceAccountLast4: String? = null,
+    /** Transfer-in SMS mentions salary-like wording at parse time. */
+    val salaryIncomeWording: Boolean? = null,
 )

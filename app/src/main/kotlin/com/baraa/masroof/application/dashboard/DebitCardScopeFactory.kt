@@ -53,7 +53,6 @@ object DebitCardScopeFactory {
             bank = entry.bank,
             cardLast4 = entry.last4,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         ) ?: return null
         val account = registryAccounts.find {
             it.bank == entry.bank &&

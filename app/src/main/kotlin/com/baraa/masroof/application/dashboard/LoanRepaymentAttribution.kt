@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -50,7 +49,7 @@ object LoanRepaymentAttribution {
         parsedRecordsById: Map<String, ParsedEventRecord>,
     ): String? {
         financingInstallmentRecords(tx, parsedRecordsById).forEach { record ->
-            val loanType = LoanTypeResolver.fromLabel(record.event.counterparty) ?: return@forEach
+            val loanType = record.details.loanType ?: return@forEach
             return FinancialContainerIdFactory.loanId(record.event.bank, loanType)
         }
         return null

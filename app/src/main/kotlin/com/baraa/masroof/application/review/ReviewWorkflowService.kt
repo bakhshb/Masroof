@@ -6,7 +6,6 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
@@ -383,7 +382,7 @@ class ReviewWorkflowService(
                 sourceAccountId to null
 
             FinancialTransactionType.LOAN_REPAYMENT -> {
-                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+                val loanType = record.details.loanType
                     ?: return ReviewWorkflowResult.Rejected("loan_type_missing")
                 maybeConfirmLoanOwned(LoanReference(event.bank, loanType))
                 sourceAccountId to FinancialContainerIdFactory.loanId(event.bank, loanType)

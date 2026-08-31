@@ -17,5 +17,12 @@ value class Bank(val id: String) {
     companion object {
         val BANK_ALJAZIRA: Bank = Bank("BANK_ALJAZIRA")
         val UNKNOWN: Bank = Bank("UNKNOWN")
+
+        fun fromId(id: String): Bank =
+            when (id) {
+                BANK_ALJAZIRA.id -> BANK_ALJAZIRA
+                UNKNOWN.id -> UNKNOWN
+                else -> Bank(id)
+            }
     }
 }

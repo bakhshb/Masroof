@@ -163,6 +163,6 @@ class LoanRepaymentAttributionTest {
                 confidence = Confidence(1.0),
                 parseStatus = ParseStatus.SUCCESS,
             ),
-            details = ParsedEventDetails(),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
         )
 }

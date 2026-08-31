@@ -284,11 +284,7 @@ object CreditCardOverviewBuilder {
         val parts = cardId.split(":")
         val last4 = parts.getOrNull(2).orEmpty()
         val bankId = parts.getOrNull(1).orEmpty()
-        val bank = when (bankId) {
-            Bank.BANK_ALJAZIRA.id -> Bank.BANK_ALJAZIRA
-            Bank.UNKNOWN.id -> Bank.UNKNOWN
-            else -> Bank(bankId)
-        }
+        val bank = Bank.fromId(bankId)
         return CardReference(bank = bank, last4 = last4)
     }
 
