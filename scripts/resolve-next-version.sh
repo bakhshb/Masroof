@@ -72,7 +72,7 @@ if command -v gh >/dev/null 2>&1; then
     if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       STABLE_VERSIONS+=("$v")
     fi
-  done < <(gh release list --limit 1000 --json tagName,isPrerelease -q '.[] | select(.isPrerelease == false) | .tagName' 2>/dev/null || true)
+  done < <(gh release list --limit 1000 --json tagName,isDraft,isPrerelease -q '.[] | select((.isDraft // false) == false and (.isPrerelease // false) == false) | .tagName' 2>/dev/null || true)
 fi
 
 # Add fallback version
@@ -128,7 +128,7 @@ else
       if [[ "$v" =~ ^${NIGHTLY_PREFIX}[.-]([0-9]+)$ ]]; then
         NIGHTLY_NUMBERS+=("${BASH_REMATCH[1]}")
       fi
-    done < <(gh release list --limit 1000 --json tagName -q '.[].tagName' 2>/dev/null || true)
+    done < <(gh release list --limit 1000 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName' 2>/dev/null || true)
   fi
 
   MAX_NIGHTLY=0
@@ -159,13 +159,49 @@ if command -v gh >/dev/null 2>&1; then
     if gh release download "$release_tag" -D "$TMP_DIR" --pattern version.json 2>/dev/null; then
       if [[ -f "$TMP_DIR/version.json" ]] && command -v jq >/dev/null 2>&1; then
         code=$(jq -r '.versionCode // empty' "$TMP_DIR/version.json" 2>/dev/null || true)
-        if [[ "$code" =~ ^[0-9]+$ ]] && (( code > MAX_CODE )); then
-          MAX_CODE=$code
+        if [[ "$code" =~ ^[0-9]+$ ]] && (( code > 0 )); then
+          if (( code > MAX_CODE )); then
+            MAX_CODE=$code
+          fi
+        else
+          echo "Error: Corrupt or invalid versionCode in version.json for release '${release_tag}'" >&2
+          exit 1
         fi
         rm -f "$TMP_DIR/version.json"
       fi
+    else
+      # If download failed, check if version.json is an asset of this release.
+      # If the asset exists, failing to download is a fatal error to prevent duplicate versionCode.
+      has_asset=$(gh release view "$release_tag" --json assets -q '.assets[]?.name' 2>/dev/null | grep -E '^version\.json$' || true)
+      if [[ -n "$has_asset" ]]; then
+        # Retry download up to 3 times
+        download_succeeded=false
+        for attempt in 1 2 3; do
+          if gh release download "$release_tag" -D "$TMP_DIR" --pattern version.json 2>/dev/null; then
+            if [[ -f "$TMP_DIR/version.json" ]] && command -v jq >/dev/null 2>&1; then
+              code=$(jq -r '.versionCode // empty' "$TMP_DIR/version.json" 2>/dev/null || true)
+              if [[ "$code" =~ ^[0-9]+$ ]] && (( code > 0 )); then
+                if (( code > MAX_CODE )); then
+                  MAX_CODE=$code
+                fi
+                rm -f "$TMP_DIR/version.json"
+                download_succeeded=true
+                break
+              else
+                echo "Error: Corrupt or invalid versionCode in version.json for release '${release_tag}'" >&2
+                exit 1
+              fi
+            fi
+          fi
+          sleep 1
+        done
+        if [[ "$download_succeeded" != "true" ]]; then
+          echo "Error: Release '${release_tag}' contains version.json asset but downloading it failed. Aborting to prevent duplicate versionCode." >&2
+          exit 1
+        fi
+      fi
     fi
-  done < <(gh release list --limit 30 --json tagName -q '.[].tagName' 2>/dev/null || true)
+  done < <(gh release list --limit 50 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName' 2>/dev/null || true)
 fi
 
 NEXT_CODE=$((MAX_CODE + 1))

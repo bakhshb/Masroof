@@ -77,12 +77,46 @@ elif [[ "$cmd" == "release" && "$subcmd" == "download" ]]; then
         ;;
     esac
   done
-  code=$(jq -r --arg t "$tag" '.[$t] // empty' "$(dirname "$0")/../codes.json")
-  if [[ -n "$code" ]]; then
-    echo "{\"versionCode\": $code, \"versionName\": \"${tag#v}\"}" > "$dest_dir/version.json"
+  if [[ -f "$(dirname "$0")/../fail_download" ]]; then
+    exit 1
+  fi
+  raw=$(jq -r --arg t "$tag" '.[$t] // empty' "$(dirname "$0")/../codes.json")
+  if [[ -n "$raw" && "$raw" != "null" ]]; then
+    if [[ "$raw" =~ ^\{.*\}$ ]]; then
+      echo "$raw" > "$dest_dir/version.json"
+    else
+      echo "{\"versionCode\": $raw, \"versionName\": \"${tag#v}\"}" > "$dest_dir/version.json"
+    fi
     exit 0
   fi
   exit 1
+elif [[ "$cmd" == "release" && "$subcmd" == "view" ]]; then
+  tag="$1"
+  shift
+  query=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -q|--jq)
+        query="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  raw=$(jq -r --arg t "$tag" '.[$t] // empty' "$(dirname "$0")/../codes.json")
+  if [[ -n "$raw" && "$raw" != "null" ]]; then
+    view_json="{\"assets\":[{\"name\":\"version.json\"}]}"
+  else
+    view_json="{\"assets\":[]}"
+  fi
+  if [[ -n "$query" ]]; then
+    jq -r "$query" <<< "$view_json"
+  else
+    echo "$view_json"
+  fi
+  exit 0
 fi
 EOF
   chmod +x "$TEST_TMP/bin/gh"
@@ -251,6 +285,44 @@ git -C "$ORPHAN_REPO" tag v0.3.18
 git -C "$ORPHAN_REPO" tag v0.3.18-nightly.1
 
 OUT=$(cd "$ORPHAN_REPO" && GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch)
+source "$TEST_TMP/out.env"
+assert_eq "Version Name" "0.3.18" "$version_name"
+assert_eq "Version Code" "71" "$version_code"
+assert_eq "Tag" "v0.3.18" "$tag"
+
+# Test 12: Corrupt versionCode in version.json aborts with error
+echo "Test 12: Corrupt versionCode in version.json aborts"
+RELEASES='[{"tagName":"v0.3.17","isPrerelease":false}]'
+CODES='{"v0.3.17": "{\"versionCode\":\"invalid\",\"versionName\":\"0.3.17\"}"}'
+configure_mock_gh "$RELEASES" "$CODES"
+
+set +e
+OUT=$(GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch 2>&1)
+EXIT_CODE=$?
+set -e
+assert_eq "Corrupt versionCode exit code" "1" "$EXIT_CODE"
+
+# Test 13: Download failure when version.json asset exists aborts to prevent duplicate versionCode
+echo "Test 13: Download failure with existing version.json asset aborts"
+RELEASES='[{"tagName":"v0.3.17","isPrerelease":false}]'
+CODES='{"v0.3.17": 70}'
+configure_mock_gh "$RELEASES" "$CODES"
+touch "$TEST_TMP/fail_download"
+
+set +e
+OUT=$(GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch 2>&1)
+EXIT_CODE=$?
+set -e
+rm -f "$TEST_TMP/fail_download"
+assert_eq "Download failure with asset exit code" "1" "$EXIT_CODE"
+
+# Test 14: Legacy release without version.json asset falls back safely
+echo "Test 14: Legacy release without version.json asset falls back safely"
+RELEASES='[{"tagName":"v0.3.17","isPrerelease":false}]'
+CODES='{}'
+configure_mock_gh "$RELEASES" "$CODES"
+
+OUT=$(GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch)
 source "$TEST_TMP/out.env"
 assert_eq "Version Name" "0.3.18" "$version_name"
 assert_eq "Version Code" "71" "$version_code"
