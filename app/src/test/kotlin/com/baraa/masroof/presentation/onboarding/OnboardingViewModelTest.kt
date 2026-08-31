@@ -255,8 +255,12 @@ class OnboardingViewModelTest {
     @Test
     fun retryAfterProviderError_allowsSecondGatewayCall() = runTest {
         val gateway = FakeImportGateway(
-            initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x")),
-            nextResult = SmsScanResult(scanned = 1, parsed = 1, duplicates = 0),
+            initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.ProviderError("x"),
+            ),
+            nextResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                scanned = 1, parsed = 1, duplicates = 0,
+            ),
         )
         val fixture = Fixture(permissionGranted = true, gateway = gateway)
         advanceUntilIdle()
@@ -311,7 +315,9 @@ class OnboardingViewModelTest {
     fun providerFailure_showsRetryState() = runTest {
         val fixture = Fixture(
             permissionGranted = true,
-            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x"))),
+            gateway = FakeImportGateway(initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.ProviderError("x"),
+            )),
         )
         advanceUntilIdle()
         fixture.vm.onStartClicked()
@@ -325,7 +331,9 @@ class OnboardingViewModelTest {
     fun permissionFailure_returnsPermissionStep() = runTest {
         val fixture = Fixture(
             permissionGranted = true,
-            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.PermissionDenied)),
+            gateway = FakeImportGateway(initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.PermissionDenied,
+            )),
         )
         advanceUntilIdle()
         fixture.vm.onStartClicked()
