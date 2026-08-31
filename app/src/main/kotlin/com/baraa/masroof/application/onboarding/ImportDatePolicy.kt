@@ -1,4 +1,4 @@
-package com.baraa.masroof.presentation.onboarding
+package com.baraa.masroof.application.onboarding
 
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import java.time.Instant
