@@ -48,12 +48,12 @@ case "$FIRST_LINE" in
     ;;
 esac
 
-# 2. Check authorization
+# 2. Check authorization (write/admin access required)
 IS_AUTHORIZED=false
-if [[ "$COMMENT_AUTHOR_ASSOCIATION" == "OWNER" || "$COMMENT_AUTHOR_ASSOCIATION" == "MEMBER" || "$COMMENT_AUTHOR_ASSOCIATION" == "COLLABORATOR" ]]; then
+if [[ "$COMMENT_AUTHOR_ASSOCIATION" == "OWNER" ]]; then
   IS_AUTHORIZED=true
 elif command -v gh >/dev/null 2>&1 && [[ -n "$REPO" && -n "$COMMENT_AUTHOR" ]]; then
-  PERM=$(gh api "repos/${REPO}/collaborators/${COMMENT_AUTHOR}/permission" --jq '.permission' 2>/dev/null || true)
+  PERM=$(gh api "repos/${REPO}/collaborators/${COMMENT_AUTHOR}/permission" 2>/dev/null | jq -r '.permission' || true)
   if [[ "$PERM" == "admin" || "$PERM" == "write" ]]; then
     IS_AUTHORIZED=true
   fi
@@ -63,7 +63,7 @@ if [[ "$IS_AUTHORIZED" != "true" ]]; then
   echo "User '$COMMENT_AUTHOR' ($COMMENT_AUTHOR_ASSOCIATION) is not authorized." >&2
   if [[ -n "${COMMENT_ID:-}" && -n "$REPO" ]] && command -v gh >/dev/null 2>&1; then
     gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" 2>/dev/null || true
-    gh pr comment "$PR_NUMBER" --body "❌ **Permission denied.** Only repository collaborators and owners can trigger release builds." 2>/dev/null || true
+    gh pr comment "$PR_NUMBER" --body "❌ **Permission denied.** Only repository owners and users with write access can trigger release builds." 2>/dev/null || true
   fi
   exit 1
 fi
