@@ -930,7 +930,10 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
-            details = ParsedEventDetails(outstandingBalance = money("33397.25")),
+            details = ParsedEventDetails(
+                outstandingBalance = money("33397.25"),
+                loanType = LoanType.PERSONAL,
+            ),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
 
@@ -970,6 +973,7 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
         val staleFee = com.baraa.masroof.domain.model.FinancialTransaction(
@@ -1017,6 +1021,7 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
 

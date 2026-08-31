@@ -5,13 +5,13 @@ import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -61,6 +61,7 @@ object TransactionAssembler {
         destinationOwnership: OwnershipStatus,
         cardOwnership: OwnershipStatus,
         loanOwnership: OwnershipStatus = OwnershipStatus.UNKNOWN,
+        loanType: LoanType? = null,
         transactionOccurredAt: Instant = receivedAt,
     ): Outcome {
         when (event.messageFamily) {
@@ -87,7 +88,7 @@ object TransactionAssembler {
             }
         }
 
-        val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+        val resolvedLoanType = loanType
         val sourceFacts = accountFacts(event.sourceAccountRef, sourceOwnership)
         val destinationFacts = when (event.messageFamily) {
             MessageFamily.CARD_PAYMENT ->
@@ -95,7 +96,7 @@ object TransactionAssembler {
                     ?: accountFacts(event.destinationAccountRef, destinationOwnership)
 
             MessageFamily.FINANCING_INSTALLMENT ->
-                loanFacts(event.bank, loanType, loanOwnership)
+                loanFacts(event.bank, resolvedLoanType, loanOwnership)
 
             else -> accountFacts(event.destinationAccountRef, destinationOwnership)
         }
@@ -115,7 +116,7 @@ object TransactionAssembler {
                 instrument = instrumentFacts,
                 purchaseChannel = event.purchaseChannel,
                 bankNetworkType = event.bankNetworkType,
-                loanType = loanType,
+                loanType = resolvedLoanType,
             ),
         )
 
@@ -131,6 +132,7 @@ object TransactionAssembler {
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
+                    loanType = resolvedLoanType,
                 )
                 Outcome.Assembled(tx.transaction, tx.rawSmsIds)
             }
@@ -147,6 +149,7 @@ object TransactionAssembler {
                         event = event,
                         linkedEventIds = listOf(event.id),
                         rawSmsIds = listOf(event.rawSmsId),
+                        loanType = resolvedLoanType,
                     )
                     return Outcome.Assembled(tx.transaction, tx.rawSmsIds)
                 }
@@ -411,6 +414,7 @@ object TransactionAssembler {
         event: ParsedEvent,
         linkedEventIds: List<String>,
         rawSmsIds: List<String>,
+        loanType: LoanType? = null,
     ): Built {
         // Resolve durable ids from references only (null for Bank.UNKNOWN / incomplete).
         val durableSourceAccountId = event.sourceAccountRef?.let(FinancialContainerIdFactory::accountId)
@@ -425,12 +429,10 @@ object TransactionAssembler {
             MessageFamily.CARD_PAYMENT ->
                 durableSourceAccountId to durableCardId
 
-            MessageFamily.FINANCING_INSTALLMENT -> {
-                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+            MessageFamily.FINANCING_INSTALLMENT ->
                 durableSourceAccountId to loanType?.let {
                     FinancialContainerIdFactory.loanId(event.bank, it)
                 }
-            }
 
             MessageFamily.REFUND ->
                 // Incoming value to the user's container — never put the receiver in source.

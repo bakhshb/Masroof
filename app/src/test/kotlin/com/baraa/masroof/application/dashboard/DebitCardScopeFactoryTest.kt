@@ -74,7 +74,7 @@ class DebitCardScopeFactoryTest {
             confidence = Confidence(1.0),
             parseStatus = ParseStatus.SUCCESS,
         )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
+        return ParsedEventRecord(event = event, details = ParsedEventDetails(debitSourceAccountLast4 = "3001"))
     }
 
     private fun rawSmsMap(parsedRecords: List<ParsedEventRecord>): Map<String, RawSms> =

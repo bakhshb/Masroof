@@ -61,7 +61,11 @@ class CurrentAccountSummaryCalculatorTest {
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(salaryTx),
             parsedRecords = listOf(
-                parsedRecord("evt-salary", MessageFamily.TRANSFER_IN),
+                parsedRecord(
+                    "evt-salary",
+                    MessageFamily.TRANSFER_IN,
+                    salaryIncomeWording = true,
+                ),
             ),
             rawSmsById = mapOf(
                 "sms-evt-salary" to RawSms(
@@ -497,6 +501,7 @@ class CurrentAccountSummaryCalculatorTest {
                     family = MessageFamily.FINANCING_INSTALLMENT,
                     sourceLast4 = "3001",
                     rawBody = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
+                    loanType = com.baraa.masroof.domain.model.LoanType.PERSONAL,
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
@@ -571,6 +576,8 @@ class CurrentAccountSummaryCalculatorTest {
         sourceLast4: String? = null,
         cardLast4: String? = null,
         rawBody: String? = null,
+        loanType: com.baraa.masroof.domain.model.LoanType? = null,
+        salaryIncomeWording: Boolean? = null,
     ): ParsedEventRecord {
         val event = ParsedEvent(
             id = id,
@@ -590,6 +597,12 @@ class CurrentAccountSummaryCalculatorTest {
             confidence = com.baraa.masroof.domain.model.Confidence(1.0),
             parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
         )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
+        return ParsedEventRecord(
+            event = event,
+            details = ParsedEventDetails(
+                loanType = loanType,
+                salaryIncomeWording = salaryIncomeWording,
+            ),
+        )
     }
 }

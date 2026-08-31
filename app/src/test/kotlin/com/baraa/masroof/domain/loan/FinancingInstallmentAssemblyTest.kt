@@ -47,7 +47,7 @@ class FinancingInstallmentAssemblyTest {
         assertEquals(Money.of("3036.11", Currency.SAR), result.event.amount)
         assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
         assertEquals("تمويل شخصي", result.event.counterparty)
-        assertEquals(LoanType.PERSONAL, LoanTypeResolver.fromLabel(result.event.counterparty))
+        assertEquals(LoanType.PERSONAL, result.details.loanType)
     }
 
     @Test
@@ -68,6 +68,7 @@ class FinancingInstallmentAssemblyTest {
             destinationOwnership = OwnershipStatus.OWNED,
             cardOwnership = OwnershipStatus.UNKNOWN,
             loanOwnership = OwnershipStatus.OWNED,
+            loanType = parsed.details.loanType,
         ) as TransactionAssembler.Outcome.Assembled
 
         assertEquals(FinancialTransactionType.LOAN_REPAYMENT, outcome.transaction.type)

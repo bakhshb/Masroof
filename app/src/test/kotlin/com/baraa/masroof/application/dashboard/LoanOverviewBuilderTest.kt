@@ -67,7 +67,10 @@ class LoanOverviewBuilderTest {
                     confidence = Confidence(1.0),
                     parseStatus = ParseStatus.SUCCESS,
                 ),
-                details = ParsedEventDetails(outstandingBalance = Money.of("33397.25", Currency.SAR)),
+                details = ParsedEventDetails(
+                    outstandingBalance = Money.of("33397.25", Currency.SAR),
+                    loanType = LoanType.PERSONAL,
+                ),
             ),
         )
         val loanContainerId = FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
@@ -137,7 +140,7 @@ class LoanOverviewBuilderTest {
                     confidence = Confidence(1.0),
                     parseStatus = ParseStatus.SUCCESS,
                 ),
-                details = ParsedEventDetails(),
+                details = ParsedEventDetails(loanType = LoanType.PERSONAL),
             ),
         )
         val transactions = listOf(
@@ -208,6 +211,7 @@ class LoanOverviewBuilderTest {
                 details = ParsedEventDetails(
                     outstandingBalance = Money.of("33397.25", Currency.SAR),
                     occurredAtLocal = localTime,
+                    loanType = LoanType.PERSONAL,
                 ),
             ),
         )
@@ -340,7 +344,10 @@ class LoanOverviewBuilderTest {
             confidence = Confidence(1.0),
             parseStatus = ParseStatus.SUCCESS,
         ),
-        details = ParsedEventDetails(outstandingBalance = outstandingBalance),
+        details = ParsedEventDetails(
+            outstandingBalance = outstandingBalance,
+            loanType = LoanType.PERSONAL,
+        ),
     )
 
     private fun rawSms(id: String, receivedAt: Instant) = RawSms(

@@ -188,7 +188,9 @@ class MonthlyFinancialSummaryCalculatorTest {
                 confidence = com.baraa.masroof.domain.model.Confidence(1.0),
                 parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
             ),
-            details = com.baraa.masroof.parsing.model.ParsedEventDetails(),
+            details = com.baraa.masroof.parsing.model.ParsedEventDetails(
+                loanType = com.baraa.masroof.domain.model.LoanType.PERSONAL,
+            ),
         )
         val feeLoan = FinancialTransaction(
             id = "fee-loan",

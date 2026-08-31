@@ -6,6 +6,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
@@ -66,6 +67,9 @@ object ParsedEventMapper {
             internationalFeeCurrency = internationalFeeCurrency,
             labeledForeignAmountDecimal = labeledForeignDecimal,
             labeledForeignAmountCurrency = labeledForeignCurrency,
+            loanType = details.loanType?.name,
+            debitSourceAccountLast4 = details.debitSourceAccountLast4,
+            salaryIncomeWording = details.salaryIncomeWording?.let(::booleanToInt),
         )
     }
 
@@ -130,6 +134,9 @@ object ParsedEventMapper {
                 entity.labeledForeignAmountDecimal,
                 entity.labeledForeignAmountCurrency,
             ),
+            loanType = entity.loanType?.let(::loanType),
+            debitSourceAccountLast4 = entity.debitSourceAccountLast4,
+            salaryIncomeWording = entity.salaryIncomeWording?.let(::intToBoolean),
         )
 
     fun encodeReasons(reasons: List<String>): String {
@@ -155,6 +162,17 @@ object ParsedEventMapper {
         require(bankId != null) { "CardReference bank id missing while last4=$last4" }
         return CardReference(bank = Bank(bankId), last4 = last4)
     }
+
+    private fun booleanToInt(value: Boolean): Int = if (value) 1 else 0
+
+    private fun intToBoolean(value: Int): Boolean = value != 0
+
+    private fun loanType(name: String): LoanType =
+        try {
+            LoanType.valueOf(name)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Unrecognized persisted LoanType value '$name'", e)
+        }
 
     private fun cardSmsChannel(name: String): CardSmsChannel =
         try {

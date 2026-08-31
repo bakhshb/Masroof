@@ -177,7 +177,9 @@ class CreditFacilityOverviewBuilderTest {
                     confidence = com.baraa.masroof.domain.model.Confidence(1.0),
                     parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
                 ),
-                details = com.baraa.masroof.parsing.model.ParsedEventDetails(),
+                details = com.baraa.masroof.parsing.model.ParsedEventDetails(
+                    debitSourceAccountLast4 = "3001",
+                ),
             ),
         )
         val rawSmsById = mapOf(

@@ -352,7 +352,7 @@ class AppContainer(
     suspend fun discoverFromStoredEvents(): Int {
         var count = 0
         for (record in parsedEventRepository.listAll()) {
-            ownershipDiscoveryService.observe(record.event)
+            ownershipDiscoveryService.observe(record.event, record.details.loanType)
             count++
         }
         return count

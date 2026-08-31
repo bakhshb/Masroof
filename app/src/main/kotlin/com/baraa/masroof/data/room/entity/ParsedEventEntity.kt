@@ -73,6 +73,9 @@ data class ParsedEventEntity(
     val internationalFeeCurrency: String?,
     val labeledForeignAmountDecimal: String?,
     val labeledForeignAmountCurrency: String?,
+    val loanType: String?,
+    val debitSourceAccountLast4: String?,
+    val salaryIncomeWording: Int?,
 ) {
     companion object {
         const val CONFIDENCE_REASON_SEPARATOR: Char = '\u001e'
