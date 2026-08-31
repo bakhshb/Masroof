@@ -12,6 +12,7 @@
     "counterparty": "تمويل شخصي",
     "occurredAt": "2026-08-27T01:10:00",
     "parseStatus": "SUCCESS",
-    "outstandingBalance": "33397.25"
+    "outstandingBalance": "33397.25",
+    "loanType": "PERSONAL"
   }
 }

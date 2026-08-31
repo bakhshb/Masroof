@@ -12,7 +12,8 @@
     "destinationAccountLast4": "3001",
     "counterparty": "وزارة الحج والعمرة",
     "occurredAt": "2026-07-27T01:12:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "salaryIncomeWording": true
   },
   "notes": "Parse as TRANSFER_IN only. Salary/income treatment is domain, not parse expected."
 }
