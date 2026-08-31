@@ -97,30 +97,35 @@ class TransactionReconciliationService(
     private suspend fun supplementIncrementalReconcileRecords(
         windowed: List<ParsedEventRecord>,
     ): List<ParsedEventRecord> {
-        val merged = windowed.associateBy { it.event.id }.toMutableMap()
-        val all = effectiveParsedEventProvider?.listAllEffective() ?: parsedEventRepository.listAll()
-        val allById = all.associateBy { it.event.id }
-
-        for (record in all) {
-            if (!record.event.messageFamily.isTransferFamily()) continue
-            if (!financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) {
-                merged.putIfAbsent(record.event.id, record)
-            }
+        val unlinkedTransfers = effectiveParsedEventProvider?.listUnlinkedTransfersEffective()
+            ?: parsedEventRepository.listUnlinkedTransfers()
+        val candidateTransactions = financialTransactionRepository.listByTypes(
+            listOf(
+                FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+                FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                FinancialTransactionType.SELF_TRANSFER,
+            ),
+        ).filter { transaction ->
+            transaction.type != FinancialTransactionType.SELF_TRANSFER ||
+                transaction.linkedParsedEventIds.size == 1
+        }
+        if (unlinkedTransfers.isEmpty() && candidateTransactions.isEmpty()) {
+            return windowed
         }
 
-        for (transaction in financialTransactionRepository.listAll()) {
-            if (transaction.type != FinancialTransactionType.EXTERNAL_TRANSFER_OUT &&
-                transaction.type != FinancialTransactionType.EXTERNAL_TRANSFER_IN
-            ) {
-                continue
-            }
+        val merged = windowed.associateBy { it.event.id }.toMutableMap()
+        for (record in unlinkedTransfers) {
+            merged.putIfAbsent(record.event.id, record)
+        }
+        for (transaction in candidateTransactions) {
             for (parsedEventId in transaction.linkedParsedEventIds) {
-                val record = allById[parsedEventId] ?: continue
+                val record = effectiveParsedEventProvider?.getEffectiveById(parsedEventId)
+                    ?: parsedEventRepository.getById(parsedEventId)
+                    ?: continue
                 if (!record.event.messageFamily.isTransferFamily()) continue
                 merged.putIfAbsent(parsedEventId, record)
             }
         }
-
         return merged.values.toList()
     }
 
@@ -456,12 +461,15 @@ class TransactionReconciliationService(
         records: List<ParsedEventRecord>,
     ): UpgradePassResult {
         val parsedById = records.associateBy { it.event.id }
-        val all = financialTransactionRepository.listAll()
-        val outs = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }
-        val ins = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN }
-        val singleLegSelfTransfers = all.filter {
-            it.type == FinancialTransactionType.SELF_TRANSFER && it.linkedParsedEventIds.size == 1
-        }
+        val outs = financialTransactionRepository.listByTypes(
+            listOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT),
+        )
+        val ins = financialTransactionRepository.listByTypes(
+            listOf(FinancialTransactionType.EXTERNAL_TRANSFER_IN),
+        )
+        val singleLegSelfTransfers = financialTransactionRepository.listByTypes(
+            listOf(FinancialTransactionType.SELF_TRANSFER),
+        ).filter { it.linkedParsedEventIds.size == 1 }
         if (outs.isEmpty() && ins.isEmpty() && singleLegSelfTransfers.isEmpty()) return UpgradePassResult()
 
         data class StaleLeg(

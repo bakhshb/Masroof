@@ -23,6 +23,18 @@ class EffectiveParsedEventProvider(
         return applyCorrections(stored, corrections)
     }
 
+    suspend fun getEffectiveById(id: String): ParsedEventRecord? {
+        val stored = parsedEventRepository.getById(id) ?: return null
+        val corrections = userCorrectionRepository.listForRawSmsId(stored.event.rawSmsId)
+        return applyCorrections(stored, corrections)
+    }
+
+    suspend fun listUnlinkedTransfersEffective(): List<ParsedEventRecord> =
+        parsedEventRepository.listUnlinkedTransfers().map { record ->
+            val corrections = userCorrectionRepository.listForRawSmsId(record.event.rawSmsId)
+            applyCorrections(record, corrections)
+        }
+
     suspend fun listAllEffective(): List<ParsedEventRecord> {
         val stored = parsedEventRepository.listAll()
         return stored.map { record ->

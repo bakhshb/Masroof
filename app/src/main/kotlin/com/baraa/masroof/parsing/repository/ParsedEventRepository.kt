@@ -1,6 +1,7 @@
 package com.baraa.masroof.parsing.repository
 
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import java.time.Instant
 
@@ -36,6 +37,16 @@ interface ParsedEventRepository {
         startInclusive: Instant,
         endExclusive: Instant,
     ): List<ParsedEventRecord>
+
+    /**
+     * Transfer parse rows with no financial-transaction link yet — used to bound
+     * incremental reconciliation without scanning the full backlog.
+     */
+    suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
+        listAll().filter { record ->
+            record.event.messageFamily == MessageFamily.TRANSFER_IN ||
+                record.event.messageFamily == MessageFamily.TRANSFER_OUT
+        }
 }
 
 /**

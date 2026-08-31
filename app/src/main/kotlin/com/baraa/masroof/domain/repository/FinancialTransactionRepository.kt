@@ -1,6 +1,7 @@
 package com.baraa.masroof.domain.repository
 
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.time.Instant
 
 /**
@@ -52,6 +53,14 @@ interface FinancialTransactionRepository {
     suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction?
 
     suspend fun listAll(): List<FinancialTransaction>
+
+    /** Subset lookup for incremental reconciliation without scanning the full ledger. */
+    suspend fun listByTypes(types: Collection<FinancialTransactionType>): List<FinancialTransaction> =
+        if (types.isEmpty()) {
+            emptyList()
+        } else {
+            listAll().filter { it.type in types }
+        }
 
     /**
      * Transactions with occurredAt in `[startInclusive, endExclusive)`, newest first.
