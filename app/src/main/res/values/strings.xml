@@ -192,6 +192,11 @@
     <string name="settings_import_invalid">ملف النسخة غير صالح أو غير متوافق</string>
     <string name="settings_updates_title">تحديث التطبيق</string>
     <string name="settings_updates_hint">للمستودعات العامة يمكن التحقق بدون رمز. للمستودع الخاص على GitHub أدخل رمز وصول للقراءة فقط (PAT). يُحمَّل التحديث من GitHub Releases دون متجر Google Play، ويُعاد التحقق تلقائياً يومياً.</string>
+    <string name="settings_update_channel_title">قناة التحديث</string>
+    <string name="settings_update_channel_stable">المستقرة</string>
+    <string name="settings_update_channel_nightly">التجريبية</string>
+    <string name="settings_update_channel_hint">القناة المستقرة تستقبل الإصدارات الرسمية فقط. التجريبية تستقبل أحدث نسخة تجريبية أو مستقرة.</string>
+    <string name="badge_nightly_release">نسخة تجريبية</string>
     <string name="settings_github_token_label">رمز GitHub (قراءة فقط)</string>
     <string name="settings_github_token_placeholder">ghp_… أو github_pat_…</string>
     <string name="settings_github_token_save">حفظ الرمز</string>

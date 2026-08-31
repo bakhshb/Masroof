@@ -10,9 +10,17 @@ class AppUpdateService(
     private val tokenRepository: GitHubTokenRepository,
     private val releaseClient: GitHubReleaseClient,
     private val updateChecker: UpdateChecker,
+    private val preferencesRepository: UpdateCheckPreferencesRepository,
     private val appLogService: AppLogService,
 ) {
     fun hasConfiguredToken(): Boolean = tokenRepository.hasToken()
+
+    fun getUpdateChannel(): UpdateChannel = preferencesRepository.getUpdateChannel()
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        preferencesRepository.setUpdateChannel(channel)
+        appLogService.info(AppLogCategories.UPDATE, "Update channel set to ${channel.storageValue}")
+    }
 
     fun saveToken(token: String) {
         tokenRepository.setToken(token)
@@ -26,7 +34,8 @@ class AppUpdateService(
 
     fun checkForUpdate(): Result<UpdateCheckResult> {
         val token = tokenRepository.getToken()
-        return releaseClient.fetchLatestManifest(token).fold(
+        val channel = preferencesRepository.getUpdateChannel()
+        return releaseClient.fetchLatestManifest(channel, token).fold(
             onSuccess = { manifest ->
                 Result.success(
                     when (val availability = updateChecker.evaluate(manifest)) {

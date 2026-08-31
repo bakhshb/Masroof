@@ -187,6 +187,11 @@
     <string name="settings_import_invalid">Backup file is invalid or incompatible</string>
     <string name="settings_updates_title">App update</string>
     <string name="settings_updates_hint">Public repos can be checked without a token. For a private GitHub repo, enter a read-only personal access token (PAT). Updates download from GitHub Releases without Google Play, and checks repeat automatically once a day.</string>
+    <string name="settings_update_channel_title">Update channel</string>
+    <string name="settings_update_channel_stable">Stable</string>
+    <string name="settings_update_channel_nightly">Nightly</string>
+    <string name="settings_update_channel_hint">Stable receives official releases only. Nightly receives the latest test or stable build.</string>
+    <string name="badge_nightly_release">Nightly</string>
     <string name="settings_github_token_label">GitHub token (read-only)</string>
     <string name="settings_github_token_placeholder">ghp_… or github_pat_…</string>
     <string name="settings_github_token_save">Save token</string>
