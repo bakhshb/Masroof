@@ -8,17 +8,25 @@ import com.baraa.masroof.bank.aljazira.extraction.BillerExtractor
 import com.baraa.masroof.bank.aljazira.extraction.CardExtractor
 import com.baraa.masroof.bank.aljazira.extraction.CounterpartyExtractor
 import com.baraa.masroof.bank.aljazira.extraction.DateTimeExtractor
-import com.baraa.masroof.bank.aljazira.extraction.LoanLabelExtractor
+import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
+import com.baraa.masroof.bank.aljazira.CreditCardStatementHeuristics
+import com.baraa.masroof.bank.aljazira.extraction.DueDateExtractor
+import com.baraa.masroof.bank.aljazira.extraction.InternationalPurchaseFactsExtractor
 import com.baraa.masroof.bank.aljazira.extraction.MerchantExtractor
+import com.baraa.masroof.bank.aljazira.extraction.LoanLabelExtractor
+import com.baraa.masroof.bank.aljazira.extraction.MoneyTokens
 import com.baraa.masroof.bank.aljazira.extraction.ReferenceExtractor
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.finalize.ParseFinalizer
 import com.baraa.masroof.parsing.model.AmountSourceKind
 import com.baraa.masroof.parsing.model.NormalizedSms
 import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.ParsedEventDraft
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -44,6 +52,7 @@ class AlJaziraMessageParser(
     private val loanLabelExtractor: LoanLabelExtractor = LoanLabelExtractor(),
     private val referenceExtractor: ReferenceExtractor = ReferenceExtractor(),
     private val dateTimeExtractor: DateTimeExtractor = DateTimeExtractor(),
+    private val dueDateExtractor: DueDateExtractor = DueDateExtractor(),
     private val finalizer: ParseFinalizer = ParseFinalizer(DefaultParsedEventValidator()),
 ) : BankMessageParser {
 
@@ -90,6 +99,24 @@ class AlJaziraMessageParser(
             else -> null
         }
 
+        val internationalFacts = InternationalPurchaseFactsExtractor.extract(normalized.comparisonBody)
+        val accountSuffixes = accountExtractor.extractSuffixes(normalized, classification.family)
+        val loanType = when (classification.family) {
+            MessageFamily.FINANCING_INSTALLMENT ->
+                AlJaziraLoanTypeMapper.fromFinancingLabel(counterparty)
+            else -> null
+        }
+        val debitSourceAccountLast4 = when {
+            classification.family == MessageFamily.PURCHASE && card != null ->
+                accountSuffixes.sourceLast4
+            else -> null
+        }
+        val salaryIncomeWording = when (classification.family) {
+            MessageFamily.TRANSFER_IN ->
+                AlJaziraSalaryIncomeHeuristics.containsSalaryWording(normalized.comparisonBody)
+            else -> null
+        }
+
         val details = ParsedEventDetails(
             transactionReference = reference,
             availableBalance = balances.availableBalance,
@@ -97,6 +124,14 @@ class AlJaziraMessageParser(
             biller = biller.biller,
             billerCode = biller.billerCode,
             occurredAtLocal = occurredLocal,
+            cardSmsChannel = resolveCardSmsChannel(normalized.comparisonBody),
+            paymentDueDate = dueDateExtractor.extract(normalized),
+            exchangeRate = internationalFacts?.exchangeRate,
+            internationalFee = internationalFacts?.internationalFee,
+            labeledForeignAmount = extractLabeledForeignAmount(normalized.comparisonBody),
+            loanType = loanType,
+            debitSourceAccountLast4 = debitSourceAccountLast4,
+            salaryIncomeWording = salaryIncomeWording,
         )
 
         val confidence = Confidence(
@@ -139,6 +174,19 @@ class AlJaziraMessageParser(
         MessageFamily.UNKNOWN -> ParseStatus.REVIEW_REQUIRED
         else -> ParseStatus.SUCCESS
     }
+
+    private fun resolveCardSmsChannel(body: String): CardSmsChannel? =
+        when {
+            CreditCardStatementHeuristics.isStatementSms(body) -> CardSmsChannel.STATEMENT
+            CreditCardMessageHeuristics.isCreditCardSms(body) -> CardSmsChannel.CREDIT
+            CreditCardMessageHeuristics.isDebitCardSms(body) -> CardSmsChannel.DEBIT
+            else -> null
+        }
+
+    private fun extractLabeledForeignAmount(body: String) =
+        MoneyTokens.moneyAfterLabel.find(body)
+            ?.let(MoneyTokens::parseMoneyFromMatch)
+            ?.takeIf { it.currency.convertsToSar() && it.currency != Currency.SAR }
 
     private fun MessageFamily.isNonFinancialFamily(): Boolean = when (this) {
         MessageFamily.OTP,

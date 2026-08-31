@@ -13,6 +13,8 @@
     "cardLast4": "2210",
     "merchant": "TEST_GROCER",
     "occurredAt": "2026-08-01T11:05:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "cardSmsChannel": "DEBIT",
+    "debitSourceAccountLast4": "3001"
   }
 }

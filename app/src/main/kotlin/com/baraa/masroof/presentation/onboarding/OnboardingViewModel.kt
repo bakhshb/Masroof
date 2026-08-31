@@ -9,15 +9,10 @@ import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportFailure
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
+import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
-import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.repository.AccountRegistryRepository
-import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,10 +28,7 @@ import java.time.ZoneId
 class OnboardingViewModel(
     private val onboardingPrefs: OnboardingPreferencesRepository,
     private val historicalImportGateway: HistoricalImportGateway,
-    private val accountRegistryRepository: AccountRegistryRepository,
-    private val cardRegistryRepository: CardRegistryRepository,
-    private val ownershipConfirmationService: OwnershipConfirmationService,
-    private val reviewRepository: ReviewRepository,
+    private val onboardingOwnershipWorkflow: OnboardingOwnershipWorkflow,
     private val discoverFromStoredEvents: suspend () -> Int,
     private val refreshReviewQueue: suspend () -> Unit,
     private val databaseBackupService: DatabaseBackupGateway,
@@ -277,9 +269,9 @@ class OnboardingViewModel(
             try {
                 val ref = AccountReference(candidate.bank, candidate.suffix)
                 if (owned) {
-                    ownershipConfirmationService.confirmAccountOwned(ref)
+                    onboardingOwnershipWorkflow.confirmAccountOwned(ref)
                 } else {
-                    ownershipConfirmationService.markAccountExternal(ref)
+                    onboardingOwnershipWorkflow.markAccountExternal(ref)
                 }
                 refreshReviewQueue()
                 loadCandidatesAndCounts()
@@ -294,9 +286,9 @@ class OnboardingViewModel(
             try {
                 val ref = CardReference(candidate.bank, candidate.suffix)
                 if (owned) {
-                    ownershipConfirmationService.confirmCardOwned(ref)
+                    onboardingOwnershipWorkflow.confirmCardOwned(ref)
                 } else {
-                    ownershipConfirmationService.markCardExternal(ref)
+                    onboardingOwnershipWorkflow.markCardExternal(ref)
                 }
                 refreshReviewQueue()
                 loadCandidatesAndCounts()
@@ -308,7 +300,7 @@ class OnboardingViewModel(
 
     fun finalizeOnboarding() {
         viewModelScope.launch {
-            if (hasUnknownCandidatesInRepositories()) {
+            if (onboardingOwnershipWorkflow.loadSnapshot().hasUnknownCandidates) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
                 return@launch
             }
@@ -330,52 +322,35 @@ class OnboardingViewModel(
         }
     }
 
-    private suspend fun hasUnknownCandidatesInRepositories(): Boolean {
-        val hasUnknownAccounts = accountRegistryRepository.listAll().any {
-            it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN
-        }
-        val hasUnknownCards = cardRegistryRepository.listAll().any {
-            it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.UNKNOWN
-        }
-        return hasUnknownAccounts || hasUnknownCards
-    }
-
     fun enterApp() {
         _uiState.update { it.copy(step = OnboardingStep.HOME) }
     }
 
     private suspend fun loadCandidatesAndCounts() {
-        val accounts = accountRegistryRepository.listAll()
-            .filter { it.bank != Bank.UNKNOWN }
-            .map {
-                OwnershipCandidateUi(
-                    kind = OwnershipCandidateUi.CandidateKind.ACCOUNT,
-                    bank = it.bank,
-                    suffix = it.maskedNumber,
-                    ownership = it.ownership,
-                )
-            }
-            .sortedBy { it.suffix }
-        val cards = cardRegistryRepository.listAll()
-            .filter { it.bank != Bank.UNKNOWN }
-            .map {
-                OwnershipCandidateUi(
-                    kind = OwnershipCandidateUi.CandidateKind.CARD,
-                    bank = it.bank,
-                    suffix = it.last4,
-                    ownership = it.ownership,
-                )
-            }
-            .sortedBy { it.suffix }
-        val reviewCount = reviewRepository.listRequired().size
+        val snapshot = onboardingOwnershipWorkflow.loadSnapshot()
         _uiState.update {
             it.copy(
-                accounts = accounts,
-                cards = cards,
-                ownedAccountsCount = accounts.count { c -> c.ownership == OwnershipStatus.OWNED },
-                ownedCardsCount = cards.count { c -> c.ownership == OwnershipStatus.OWNED },
-                reviewRequiredCount = reviewCount,
+                accounts = snapshot.accounts.map(::toOwnershipCandidateUi),
+                cards = snapshot.cards.map(::toOwnershipCandidateUi),
+                ownedAccountsCount = snapshot.ownedAccountsCount,
+                ownedCardsCount = snapshot.ownedCardsCount,
+                reviewRequiredCount = snapshot.reviewRequiredCount,
             )
         }
     }
+
+    private fun toOwnershipCandidateUi(
+        candidate: OnboardingOwnershipWorkflow.OwnershipCandidate,
+    ): OwnershipCandidateUi =
+        OwnershipCandidateUi(
+            kind = when (candidate.kind) {
+                OnboardingOwnershipWorkflow.CandidateKind.ACCOUNT ->
+                    OwnershipCandidateUi.CandidateKind.ACCOUNT
+                OnboardingOwnershipWorkflow.CandidateKind.CARD ->
+                    OwnershipCandidateUi.CandidateKind.CARD
+            },
+            bank = candidate.bank,
+            suffix = candidate.suffix,
+            ownership = candidate.ownership,
+        )
 }

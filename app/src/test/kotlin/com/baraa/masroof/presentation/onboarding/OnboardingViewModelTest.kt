@@ -22,8 +22,8 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.CompletableDeferred
-import com.baraa.masroof.sms.scanner.SmsScanFailure
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.sms.SmsScanFailure
+import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -511,10 +511,12 @@ AccountRegistryEntry.forTest(
             return OnboardingViewModel(
                 onboardingPrefs = prefs,
                 historicalImportGateway = gateway,
-                accountRegistryRepository = accountRepo,
-                cardRegistryRepository = cardRepo,
-                ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo, NoOpLoanRegistryRepository),
-                reviewRepository = reviewRepo,
+                onboardingOwnershipWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                    .onboardingOwnershipWorkflow(
+                        accounts = accountRepo,
+                        cards = cardRepo,
+                        reviewRepository = reviewRepo,
+                    ),
                 discoverFromStoredEvents = {
                     if (discoverShouldFail) error("discover failed")
                     0

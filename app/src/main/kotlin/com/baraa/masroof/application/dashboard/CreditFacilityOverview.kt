@@ -89,7 +89,6 @@ object CreditFacilityOverviewBuilder {
                             bank = entry.bank,
                             cardLast4 = entry.last4,
                             parsedRecords = parsedRecords,
-                            rawSmsById = rawSmsById,
                         ),
                     network = entry.cardNetwork,
                     salaryPeriodSpendingNet = debitSpendingByCardKey[cardKey]
@@ -212,7 +211,6 @@ object CreditFacilityOverviewBuilder {
                 bank = entry.bank,
                 cardLast4 = entry.last4,
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             )
             ?: return null
         val accountEntry = registryAccounts.find {

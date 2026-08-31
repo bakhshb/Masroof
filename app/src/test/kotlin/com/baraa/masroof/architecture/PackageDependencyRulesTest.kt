@@ -70,13 +70,14 @@ class PackageDependencyRulesTest {
         assertPackagesDoNotImport(
             packages = listOf("sms"),
             forbiddenImports = listOf("import com.baraa.masroof.application."),
-            allowedFiles = setOf(
-                // PR 4 — move ProcessRawSms orchestration to application.
-                "sms/ingestion/SmsIngestionService.kt",
-                // PR 4 — logging moves behind the application intake boundary.
-                "sms/scanner/HistoricalSmsScanner.kt",
-                "sms/receiver/IncomingSmsReceiver.kt",
-            ),
+        )
+    }
+
+    @Test
+    fun application_dashboard_doesNotDependOnBank() {
+        assertPackagesDoNotImport(
+            packages = listOf("application/dashboard"),
+            forbiddenImports = listOf("import com.baraa.masroof.bank."),
         )
     }
 
@@ -88,10 +89,7 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.data.",
                 "import com.baraa.masroof.sms.",
             ),
-            allowedFiles = setOf(
-                // PR 8 — move locale bootstrap behind an application boundary.
-                "presentation/locale/AppLocaleContext.kt",
-            ),
+            allowedFiles = emptySet(),
         )
     }
 
@@ -105,16 +103,32 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.domain.repository.",
                 "import com.baraa.masroof.domain.rules.",
             ),
-            allowedFiles = setOf(
-                // PR 7 — review/settings/registry workflow application facades.
-                "presentation/review/ReviewViewModel.kt",
-                "presentation/settings/SettingsViewModel.kt",
-                // PR 8 — dashboard/onboarding/notification workflow facades.
-                "presentation/dashboard/DashboardViewModel.kt",
-                "presentation/notification/NotificationCenterViewModel.kt",
-                "presentation/onboarding/OnboardingViewModel.kt",
-            ),
+            allowedFiles = emptySet(),
         )
+    }
+
+    @Test
+    fun domain_loan_hasNoProductionSources() {
+        val productionSources = kotlinFilesIn("domain/loan")
+        assertTrue(
+            "Loan label mapping belongs in bank adapters at parse time",
+            productionSources.isEmpty(),
+        )
+    }
+
+    @Test
+    fun application_dashboard_doesNotMapArabicLoanLabels() {
+        val forbidden = listOf("تمويل شخصي", "سيارة", "عقار")
+        kotlinFilesIn("application/dashboard").forEach { file ->
+            val relativePath = file.relativeTo(sourceRoot).invariantSeparatorsPath
+            val source = file.readText()
+            forbidden.forEach { label ->
+                assertFalse(
+                    "$relativePath must not map Arabic loan labels; use ParsedEventDetails.loanType",
+                    label in source,
+                )
+            }
+        }
     }
 
     private fun assertPackagesDoNotImport(

@@ -6,6 +6,7 @@ import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.mapper.FinancialTransactionMapper
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import java.math.BigDecimal
@@ -79,6 +80,11 @@ class RoomFinancialTransactionRepository(
 
     override suspend fun listAll(): List<FinancialTransaction> =
         dao.listAll().map { reconstruct(it) }
+
+    override suspend fun listByTypes(types: Collection<FinancialTransactionType>): List<FinancialTransaction> {
+        if (types.isEmpty()) return emptyList()
+        return dao.listByTypes(types.map { it.name }).map { reconstruct(it) }
+    }
 
     override suspend fun listOccurredBetween(
         startInclusive: Instant,

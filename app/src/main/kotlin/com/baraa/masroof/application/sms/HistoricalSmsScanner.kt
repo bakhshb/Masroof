@@ -1,5 +1,7 @@
-package com.baraa.masroof.sms.scanner
+package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogLevel
@@ -8,8 +10,6 @@ import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
-import com.baraa.masroof.sms.ingestion.SmsIngestionResult
-import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import java.time.Instant
 
@@ -41,7 +41,7 @@ sealed interface SmsScanFailure {
 }
 
 /**
- * Historical inbox scan → shared [SmsIngestionService].
+ * Historical inbox scan → shared [ProcessRawSmsUseCase].
  *
  * Processes rows incrementally (oldest → newest). Catches permission/provider
  * failures from both sequence creation and lazy iteration, preserving partial
@@ -49,7 +49,7 @@ sealed interface SmsScanFailure {
  */
 class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
-    private val ingestionService: SmsIngestionService,
+    private val processRawSms: ProcessRawSmsUseCase,
     private val appLogService: AppLogService? = null,
     private val onScanComplete: (suspend () -> Unit)? = null,
 ) {
@@ -102,7 +102,7 @@ class HistoricalSmsScanner(
                             continue
                         }
 
-                        when (val outcome = ingestionService.ingest(rawSms, logOutcome = false)) {
+                        when (val outcome = processRawSms.ingest(rawSms, logOutcome = false)) {
                             is SmsIngestionResult.Duplicate -> duplicates++
                             is SmsIngestionResult.NotRelevant -> notRelevant++
                             is SmsIngestionResult.Parsed -> {

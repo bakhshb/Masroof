@@ -32,8 +32,8 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.sms.ingestion.SmsIngestionResult
-import com.baraa.masroof.sms.ingestion.SmsIngestionService
+import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -82,7 +82,7 @@ class IntraBankSelfTransferIngestionTest {
   private lateinit var accounts: RoomAccountRegistryRepository
   private lateinit var cards: RoomCardRegistryRepository
   private lateinit var confirmation: OwnershipConfirmationService
-  private lateinit var ingestion: SmsIngestionService
+  private lateinit var ingestion: ProcessRawSmsUseCase
   private lateinit var reviewWorkflow: ReviewWorkflowService
 
   @Before
@@ -113,7 +113,7 @@ class IntraBankSelfTransferIngestionTest {
       financialTransactionRepository = ftRepo,
       clock = InstantClock.System,
     )
-    ingestion = SmsIngestionService(
+    ingestion = ProcessRawSmsUseCase(
       rawSmsRepository = rawRepo,
       parsedEventRepository = parsedRepo,
       bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),

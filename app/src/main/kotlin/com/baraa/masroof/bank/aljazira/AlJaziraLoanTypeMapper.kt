@@ -1,12 +1,12 @@
-package com.baraa.masroof.domain.loan
+package com.baraa.masroof.bank.aljazira
 
 import com.baraa.masroof.domain.model.LoanType
 
 /**
- * Maps AlJazira financing SMS labels (لـ: …) to [LoanType].
+ * Maps Bank AlJazira financing SMS labels (لـ: …) to [LoanType] at parse time.
  */
-object LoanTypeResolver {
-    fun fromLabel(label: String?): LoanType? {
+object AlJaziraLoanTypeMapper {
+    fun fromFinancingLabel(label: String?): LoanType? {
         val normalized = label?.trim().orEmpty()
         if (normalized.isEmpty()) return null
         return when {

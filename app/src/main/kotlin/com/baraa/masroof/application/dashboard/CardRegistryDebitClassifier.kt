@@ -1,10 +1,11 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.model.isCreditCardSms
+import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
@@ -27,7 +28,7 @@ object CardRegistryDebitClassifier {
         }
         if (entry.cardNetwork == CardNetwork.MADA) return true
         if (entry.linkedAccount != null) return true
-        return inferDebitFromSms(entry, parsedRecords, rawSmsById)
+        return inferDebitFromSms(entry, parsedRecords)
     }
 
     fun isCreditRegistryEntry(
@@ -41,15 +42,13 @@ object CardRegistryDebitClassifier {
     private fun inferDebitFromSms(
         entry: CardRegistryEntry,
         parsedRecords: List<ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
     ): Boolean {
         for (record in parsedRecords) {
             val event = record.event
             if (event.bank != entry.bank) continue
             if (event.cardRef?.last4 != entry.last4) continue
-            val body = rawSmsById[event.rawSmsId]?.body ?: continue
-            if (CreditCardMessageHeuristics.isCreditCardSms(body)) continue
-            if (CreditCardMessageHeuristics.isDebitCardSms(body)) return true
+            if (record.details.isCreditCardSms()) continue
+            if (record.details.isDebitCardSms()) return true
         }
         return false
     }

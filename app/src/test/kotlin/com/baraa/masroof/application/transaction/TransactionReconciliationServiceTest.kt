@@ -380,6 +380,92 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun reconcileAfterParsedEvent_healsStaleExternalPairOutsideReceivedWindow() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        val occurredAt = LocalDateTime.parse("2026-08-01T12:00:00")
+        val outAt = Instant.parse("2026-08-01T12:00:00Z")
+        val inAt = outAt.plus(TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(3))
+        persistEvent(
+            smsId = "sms-out-stale",
+            at = outAt,
+            details = ParsedEventDetails(occurredAtLocal = occurredAt),
+            event = event(
+                id = "pe-out-stale",
+                rawSmsId = "sms-out-stale",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                counterparty = "براء بخش",
+            ),
+        )
+        val outgoing = parsedRepo.findByRawSmsId("sms-out-stale")!!.event
+        reconciliation.reconcileAfterParsedEvent(outgoing)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftRepo.listAll().single().type)
+
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-in-stale",
+            at = inAt,
+            details = ParsedEventDetails(occurredAtLocal = occurredAt.plusMinutes(2)),
+            event = event(
+                id = "pe-in-stale",
+                rawSmsId = "sms-in-stale",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        val incoming = parsedRepo.findByRawSmsId("sms-in-stale")!!.event
+        reconciliation.reconcileAfterParsedEvent(incoming)
+
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in-stale", "sms-out-stale"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
+    fun reconcileAfterParsedEvent_pairsSelfTransferWithinWindow() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-out-inc",
+            event = event(
+                id = "pe-out-inc",
+                rawSmsId = "sms-out-inc",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                counterparty = "براء بخش",
+            ),
+        )
+        persistEvent(
+            smsId = "sms-in-inc",
+            event = event(
+                id = "pe-in-inc",
+                rawSmsId = "sms-in-inc",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        val incoming = parsedRepo.findByRawSmsId("sms-in-inc")!!.event
+        reconciliation.reconcileAfterParsedEvent(incoming)
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in-inc", "sms-out-inc"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
     fun outgoingUnknownWithoutCounterpart_postsExternalOut() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         persistEvent(
@@ -930,7 +1016,10 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
-            details = ParsedEventDetails(outstandingBalance = money("33397.25")),
+            details = ParsedEventDetails(
+                outstandingBalance = money("33397.25"),
+                loanType = LoanType.PERSONAL,
+            ),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
 
@@ -970,6 +1059,7 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
         val staleFee = com.baraa.masroof.domain.model.FinancialTransaction(
@@ -1017,6 +1107,7 @@ class TransactionReconciliationServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
             at = Instant.parse("2026-08-27T01:10:00Z"),
         )
 

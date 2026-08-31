@@ -731,6 +731,7 @@ class ReviewWorkflowServiceTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
             ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
         )
         reviewRepo.upsertRequired(
             rawSmsId = "sms-loan",

@@ -2,7 +2,7 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
-import com.baraa.masroof.bank.aljazira.extraction.CardExtractor
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
@@ -60,11 +60,7 @@ object CardTransactionInvolvementResolver {
     private fun cardKeyFromEvent(
         record: ParsedEventRecord,
         rawSmsById: Map<String, RawSms>,
-    ): String? {
-        record.event.cardRef?.toCardKey()?.let { return it }
-        val body = rawSmsById[record.event.rawSmsId]?.body ?: return null
-        return CardExtractor.extractFromText(body, record.event.bank)?.toCardKey()
-    }
+    ): String? = record.event.cardRef?.toCardKey()
 
     private fun CardReference.toCardKey(): String? {
         val digits = last4 ?: return null
@@ -76,13 +72,7 @@ object CardTransactionInvolvementResolver {
     fun cardContainerId(cardKey: String): String? {
         val parts = cardKey.split(":", limit = 2)
         if (parts.size != 2) return null
-        val bank = when (parts[0]) {
-            com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA.id ->
-                com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA
-            com.baraa.masroof.domain.model.Bank.UNKNOWN.id ->
-                com.baraa.masroof.domain.model.Bank.UNKNOWN
-            else -> com.baraa.masroof.domain.model.Bank(parts[0])
-        }
+        val bank = Bank.fromId(parts[0])
         return FinancialContainerIdFactory.cardId(bank, parts[1])
     }
 }
