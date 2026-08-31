@@ -1,0 +1,38 @@
+name: PR Slash Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  handle-command:
+    if: >-
+      github.event.issue.pull_request != null && (
+        startsWith(github.event.comment.body, '/release') ||
+        startsWith(github.event.comment.body, '/nightly')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Handle PR slash command
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+          REPO: ${{ github.repository }}
+        run: |
+          chmod +x scripts/handle-pr-comment.sh
+          ./scripts/handle-pr-comment.sh

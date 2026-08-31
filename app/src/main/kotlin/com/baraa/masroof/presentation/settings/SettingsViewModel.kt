@@ -14,7 +14,9 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
+import com.baraa.masroof.application.update.InstalledBuildInfo
 import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.application.update.UpdateManifest
@@ -65,6 +67,7 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             appVersion = appVersion,
+            isNightlyBuild = InstalledBuildInfo.isNightlyBuild(appVersion),
             languageTag = appLocaleRepository.getLanguageTag(),
             themeMode = themePreferencesRepository.getThemeMode(),
         ),
@@ -88,6 +91,8 @@ class SettingsViewModel(
                     languageTag = appLocaleRepository.getLanguageTag(),
                     themeMode = themePreferencesRepository.getThemeMode(),
                     githubTokenConfigured = appUpdateService.hasConfiguredToken(),
+                    updateChannel = appUpdateService.getUpdateChannel(),
+                    isNightlyBuild = InstalledBuildInfo.isNightlyBuild(appVersion),
                     smsPermissionGranted = permissionStateProvider(),
                 )
             }
@@ -422,6 +427,20 @@ class SettingsViewModel(
                 updateMessage = null,
             )
         }
+    }
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        if (channel == appUpdateService.getUpdateChannel()) return
+        appUpdateService.setUpdateChannel(channel)
+        updateCheckCoordinator.clearPendingUpdate()
+        _uiState.update {
+            it.copy(
+                updateChannel = channel,
+                updateState = AppUpdateUiState.Idle,
+                updateMessage = null,
+            )
+        }
+        checkForUpdates(silent = true)
     }
 
     fun checkForUpdates(silent: Boolean = false) {

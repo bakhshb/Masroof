@@ -7,6 +7,7 @@ import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.application.update.ApkIntegrityVerifier
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
@@ -94,6 +95,14 @@ class SettingsViewModelTest {
         val vm = viewModel(themeMode = ThemeMode.SYSTEM)
         vm.setThemeMode(ThemeMode.DARK)
         assertEquals(ThemeMode.DARK, vm.uiState.value.themeMode)
+    }
+
+    @Test
+    fun setUpdateChannel_updatesState() = runTest {
+        val vm = viewModel()
+        vm.setUpdateChannel(UpdateChannel.NIGHTLY)
+        advanceUntilIdle()
+        assertEquals(UpdateChannel.NIGHTLY, vm.uiState.value.updateChannel)
     }
 
     @Test

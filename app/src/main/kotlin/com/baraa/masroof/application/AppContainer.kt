@@ -443,6 +443,7 @@ class AppContainer(
                     repo = BuildConfig.GITHUB_REPO,
                 ),
             updateChecker = UpdateChecker(installedVersionCode = BuildConfig.VERSION_CODE),
+            preferencesRepository = updateCheckPreferencesRepository,
             appLogService = appLogService,
         )
     }
