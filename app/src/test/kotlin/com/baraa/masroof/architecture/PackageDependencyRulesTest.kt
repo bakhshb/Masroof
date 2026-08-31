@@ -59,8 +59,6 @@ class PackageDependencyRulesTest {
             packages = listOf("application"),
             forbiddenImports = listOf("import com.baraa.masroof.presentation."),
             allowedFiles = setOf(
-                // PR 3 — move ImportDatePolicy inward.
-                "application/onboarding/HistoricalSmsRescanService.kt",
                 // Bootstrap exception — composition root may wire all layers.
                 "application/AppContainer.kt",
             ),

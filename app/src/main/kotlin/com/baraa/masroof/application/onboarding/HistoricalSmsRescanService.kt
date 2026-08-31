@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.onboarding
 
 import com.baraa.masroof.application.AppContainer
-import com.baraa.masroof.presentation.onboarding.ImportDatePolicy
 import com.baraa.masroof.sms.scanner.SmsScanResult
 import java.time.Instant
 import java.time.ZoneId
