@@ -18,7 +18,7 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
