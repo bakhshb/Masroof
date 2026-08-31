@@ -232,6 +232,30 @@ assert_eq "Version Name" "0.4.0-nightly.1" "$version_name"
 assert_eq "Version Code" "71" "$version_code"
 assert_eq "Tag" "v0.4.0-nightly.1" "$tag"
 
+# Test 11: Orphan git tags without published releases are ignored
+echo "Test 11: Orphan git tags without published releases are ignored"
+RELEASES='[{"tagName":"v0.3.17","isPrerelease":false}]'
+CODES='{"v0.3.17": 70}'
+configure_mock_gh "$RELEASES" "$CODES"
+
+# Create orphan tags that would previously cause version skipping
+ORPHAN_REPO="$TEST_TMP/orphan-repo"
+mkdir -p "$ORPHAN_REPO"
+git -C "$ORPHAN_REPO" init -q
+git -C "$ORPHAN_REPO" config user.email "test@example.com"
+git -C "$ORPHAN_REPO" config user.name "Test"
+echo "test" > "$ORPHAN_REPO/README.md"
+git -C "$ORPHAN_REPO" add README.md
+git -C "$ORPHAN_REPO" commit -q -m "init"
+git -C "$ORPHAN_REPO" tag v0.3.18
+git -C "$ORPHAN_REPO" tag v0.3.18-nightly.1
+
+OUT=$(cd "$ORPHAN_REPO" && GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch)
+source "$TEST_TMP/out.env"
+assert_eq "Version Name" "0.3.18" "$version_name"
+assert_eq "Version Code" "71" "$version_code"
+assert_eq "Tag" "v0.3.18" "$tag"
+
 echo ""
 echo "=== Test Summary: $PASSED passed, $FAILED failed ==="
 if [[ $FAILED -gt 0 ]]; then

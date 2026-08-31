@@ -60,10 +60,10 @@ if [[ -f "$GRADLE_FILE" ]]; then
   fi
 fi
 
-# 2. Collect all known stable tags and find latest stable release
+# 2. Collect published stable releases only (ignore orphan git tags)
 STABLE_VERSIONS=()
 
-# Collect from GitHub releases if gh is available
+# Collect from published GitHub releases if gh is available
 if command -v gh >/dev/null 2>&1; then
   while IFS= read -r tag; do
     [[ -z "$tag" ]] && continue
@@ -74,15 +74,6 @@ if command -v gh >/dev/null 2>&1; then
     fi
   done < <(gh release list --limit 1000 --json tagName,isPrerelease -q '.[] | select(.isPrerelease == false) | .tagName' 2>/dev/null || true)
 fi
-
-# Also collect from git tags
-while IFS= read -r tag; do
-  [[ -z "$tag" ]] && continue
-  v="${tag#v}"
-  if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    STABLE_VERSIONS+=("$v")
-  fi
-done < <(git tag -l 2>/dev/null || true)
 
 # Add fallback version
 STABLE_VERSIONS+=("$FALLBACK_NAME")
@@ -129,7 +120,7 @@ else
   NIGHTLY_NUMBERS=()
   NIGHTLY_PREFIX="${NEXT_STABLE}-nightly"
 
-  # Check GitHub releases for matching nightlies
+  # Check published GitHub releases for matching nightlies (ignore orphan git tags)
   if command -v gh >/dev/null 2>&1; then
     while IFS= read -r tag; do
       [[ -z "$tag" ]] && continue
@@ -139,15 +130,6 @@ else
       fi
     done < <(gh release list --limit 1000 --json tagName -q '.[].tagName' 2>/dev/null || true)
   fi
-
-  # Check git tags for matching nightlies
-  while IFS= read -r tag; do
-    [[ -z "$tag" ]] && continue
-    v="${tag#v}"
-    if [[ "$v" =~ ^${NIGHTLY_PREFIX}[.-]([0-9]+)$ ]]; then
-      NIGHTLY_NUMBERS+=("${BASH_REMATCH[1]}")
-    fi
-  done < <(git tag -l 2>/dev/null || true)
 
   MAX_NIGHTLY=0
   for num in "${NIGHTLY_NUMBERS[@]:-}"; do
