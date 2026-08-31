@@ -15,7 +15,7 @@ import com.baraa.masroof.data.room.MasroofDatabase
 class ParsedEventFactsBackfillCoordinator(
     private val prefs: SharedPreferences,
     private val appLogService: AppLogService,
-    private val reparseAllStoredEvents: suspend () -> Int,
+    private val reparseAllStoredEvents: suspend () -> ReparseAllStoredEventsResult,
 ) {
     suspend fun runIfNeeded(currentSchemaVersion: Int = MasroofDatabase.VERSION) {
         val lastReparsedVersion = prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0)
@@ -25,13 +25,20 @@ class ParsedEventFactsBackfillCoordinator(
             AppLogCategories.PARSE,
             "Schema facts backfill started: v$lastReparsedVersion -> v$currentSchemaVersion",
         )
-        val refreshed = reparseAllStoredEvents()
+        val result = reparseAllStoredEvents()
+        if (!result.succeeded) {
+            appLogService.warn(
+                AppLogCategories.PARSE,
+                "Schema facts backfill incomplete: ${result.failedCount} events failed; will retry on next launch",
+            )
+            return
+        }
         prefs.edit()
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, currentSchemaVersion)
             .apply()
         appLogService.info(
             AppLogCategories.PARSE,
-            "Schema facts backfill finished: $refreshed events refreshed",
+            "Schema facts backfill finished: ${result.refreshedCount} events refreshed",
         )
     }
 }

@@ -38,6 +38,7 @@ import com.baraa.masroof.application.locale.AppLocaleBootstrap
 import com.baraa.masroof.application.locale.AppLocaleContextFactory
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
+import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -88,7 +89,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Minimal manual composition root for P6–P9.
@@ -416,15 +417,16 @@ class AppContainer(
      * Re-parses every stored RawSms that already has a ParsedEvent row.
      * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
      */
-    suspend fun reparseAllStoredEvents(): Int {
+    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult {
         appLogService.info(AppLogCategories.PARSE, "Reparse started")
-        var count = 0
+        var refreshedCount = 0
+        var failedCount = 0
         for (record in parsedEventRepository.listAll()) {
             val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
             when (processRawSmsUseCase.reparseStored(raw)) {
                 is SmsIngestionResult.Duplicate -> Unit
-                is SmsIngestionResult.Failed -> Unit
-                else -> count++
+                is SmsIngestionResult.Failed -> failedCount++
+                else -> refreshedCount++
             }
         }
         discoverFromStoredEvents()
@@ -435,8 +437,14 @@ class AppContainer(
             repository = financialTransactionRepository,
         )
         refreshReviewQueue()
-        appLogService.info(AppLogCategories.PARSE, "Reparse finished: $count events refreshed")
-        return count
+        appLogService.info(
+            AppLogCategories.PARSE,
+            "Reparse finished: $refreshedCount refreshed, $failedCount failed",
+        )
+        return ReparseAllStoredEventsResult(
+            refreshedCount = refreshedCount,
+            failedCount = failedCount,
+        )
     }
 
     fun close() {
@@ -521,7 +529,7 @@ class AppContainer(
     }
 
     fun runStartupMaintenance() {
-        applicationScope.launch {
+        runBlocking(Dispatchers.IO) {
             parsedEventFactsBackfillCoordinator.runIfNeeded()
         }
     }
