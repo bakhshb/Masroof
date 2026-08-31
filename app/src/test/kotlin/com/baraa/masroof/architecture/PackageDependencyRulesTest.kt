@@ -70,13 +70,6 @@ class PackageDependencyRulesTest {
         assertPackagesDoNotImport(
             packages = listOf("sms"),
             forbiddenImports = listOf("import com.baraa.masroof.application."),
-            allowedFiles = setOf(
-                // PR 4 — move ProcessRawSms orchestration to application.
-                "sms/ingestion/SmsIngestionService.kt",
-                // PR 4 — logging moves behind the application intake boundary.
-                "sms/scanner/HistoricalSmsScanner.kt",
-                "sms/receiver/IncomingSmsReceiver.kt",
-            ),
         )
     }
 

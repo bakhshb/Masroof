@@ -5,16 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import com.baraa.masroof.MasroofApplication
-import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import kotlinx.coroutines.launch
 
 /**
  * Receives [Telephony.Sms.Intents.SMS_RECEIVED_ACTION] and hands off to the
- * shared [SmsIngestionService].
+ * application [com.baraa.masroof.application.sms.LiveSmsIntake] boundary.
  *
  * Multipart PDUs are combined into one RawSms body via [ReceivedSmsAssembler].
  * [com.baraa.masroof.domain.model.RawSms.receivedAt] uses the application
@@ -65,14 +62,9 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         }
 
         val pendingResult = goAsync()
-        val ingestion: SmsIngestionService = app.container.smsIngestionService
         app.container.applicationScope.launch {
             try {
-                app.container.appLogService.info(
-                    AppLogCategories.SMS,
-                    "Live SMS received from ${AppLogFormatting.maskSender(assembled.sender)}",
-                )
-                ingestion.ingest(rawSms)
+                app.container.liveSmsIntake.ingest(rawSms)
             } finally {
                 pendingResult.finish()
             }

@@ -1,13 +1,15 @@
-package com.baraa.masroof.sms.ingestion
+package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.ReconciliationReport
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
@@ -22,14 +24,14 @@ import kotlinx.coroutines.sync.withLock
 import java.time.Duration
 
 /**
- * Shared RawSms → persist → parse → store pipeline used by historical scan
- * and live BroadcastReceiver. Idempotent: duplicates do not re-parse.
+ * RawSms → persist → parse → store pipeline used by historical scan and live intake.
+ * Idempotent: duplicates do not re-parse.
  *
  * Optional [ownershipDiscovery], [reconciliation], and [reviewQueueUpdater] run
  * after a ParsedEvent is saved. Failures in those derived steps do not roll back
  * RawSms/ParsedEvent (or already-persisted FinancialTransactions).
  */
-class SmsIngestionService(
+class ProcessRawSmsUseCase(
     private val rawSmsRepository: RawSmsRepository,
     private val parsedEventRepository: ParsedEventRepository,
     private val bankSmsRegistry: BankSmsRegistry,
@@ -293,7 +295,7 @@ class SmsIngestionService(
 
     private fun logParsedOutcome(
         rawSms: RawSms,
-        family: com.baraa.masroof.domain.model.MessageFamily,
+        family: MessageFamily,
         outcome: String,
     ) {
         appLogService?.info(
@@ -326,9 +328,7 @@ class SmsIngestionService(
         }
     }
 
-    private suspend fun reconcileDerived(
-        event: ParsedEvent,
-    ): com.baraa.masroof.application.transaction.ReconciliationReport? {
+    private suspend fun reconcileDerived(event: ParsedEvent): ReconciliationReport? {
         val svc = reconciliation ?: return null
         return try {
             svc.reconcileAfterParsedEventDetailed(event)
@@ -340,9 +340,7 @@ class SmsIngestionService(
         }
     }
 
-    private suspend fun refreshReviewQueue(
-        report: com.baraa.masroof.application.transaction.ReconciliationReport,
-    ) {
+    private suspend fun refreshReviewQueue(report: ReconciliationReport) {
         val updater = reviewQueueUpdater ?: return
         try {
             updater.applyReport(report)

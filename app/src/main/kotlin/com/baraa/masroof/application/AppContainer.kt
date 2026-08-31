@@ -70,9 +70,10 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
-import com.baraa.masroof.sms.ingestion.SmsIngestionResult
-import com.baraa.masroof.sms.ingestion.SmsIngestionService
-import com.baraa.masroof.sms.scanner.HistoricalSmsScanner
+import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
+import com.baraa.masroof.application.sms.HistoricalSmsScanner
+import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -314,8 +315,8 @@ class AppContainer(
             adapters = listOf(alJaziraSmsAdapter),
         )
 
-    val smsIngestionService: SmsIngestionService =
-        SmsIngestionService(
+    val processRawSmsUseCase: ProcessRawSmsUseCase =
+        ProcessRawSmsUseCase(
             rawSmsRepository = rawSmsRepository,
             parsedEventRepository = parsedEventRepository,
             bankSmsRegistry = bankSmsRegistry,
@@ -325,13 +326,19 @@ class AppContainer(
             appLogService = appLogService,
         )
 
+    val liveSmsIntake: LiveSmsIntake =
+        LiveSmsIntake(
+            processRawSms = processRawSmsUseCase,
+            appLogService = appLogService,
+        )
+
     val smsDataSource: SmsDataSource =
         AndroidSmsDataSource(appContext.contentResolver)
 
     val historicalSmsScanner: HistoricalSmsScanner =
         HistoricalSmsScanner(
             dataSource = smsDataSource,
-            ingestionService = smsIngestionService,
+            processRawSms = processRawSmsUseCase,
             appLogService = appLogService,
             onScanComplete = {
                 reconcileStoredEvents()
@@ -366,7 +373,7 @@ class AppContainer(
         var count = 0
         for (record in parsedEventRepository.listAll()) {
             val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
-            when (smsIngestionService.reparseStored(raw)) {
+            when (processRawSmsUseCase.reparseStored(raw)) {
                 is SmsIngestionResult.Duplicate -> Unit
                 is SmsIngestionResult.Failed -> Unit
                 else -> count++

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.logging
 
+import com.baraa.masroof.application.sms.SmsScanResult
 import com.baraa.masroof.domain.model.MessageFamily
 
 object AppLogFormatting {
@@ -17,7 +18,7 @@ object AppLogFormatting {
 
     fun messageFamilyLabel(family: MessageFamily): String = family.name.lowercase()
 
-    fun scanSummary(result: com.baraa.masroof.sms.scanner.SmsScanResult): String =
+    fun scanSummary(result: SmsScanResult): String =
         buildString {
             append("scanned=${result.scanned}")
             append(" inserted=${result.inserted}")
