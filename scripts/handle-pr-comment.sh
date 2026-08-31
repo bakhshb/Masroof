@@ -70,13 +70,12 @@ fi
 
 # 3. Verify PR is merged
 if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
-  PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,merged,mergeCommit,headRefOid 2>/dev/null || true)
-  if [[ -z "$PR_JSON" ]]; then
-    echo "Could not fetch PR #$PR_NUMBER details" >&2
+  PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,mergedAt,mergeCommit,headRefOid 2>&1) || {
+    echo "Could not fetch PR #$PR_NUMBER details: ${PR_JSON}" >&2
     exit 1
-  fi
+  }
 
-  IS_MERGED=$(echo "$PR_JSON" | jq -r '.merged // false')
+  IS_MERGED=$(echo "$PR_JSON" | jq -r 'if .state == "MERGED" then "true" else "false" end')
   if [[ "$IS_MERGED" != "true" ]]; then
     echo "PR #$PR_NUMBER is not merged." >&2
     if [[ -n "${COMMENT_ID:-}" ]]; then
