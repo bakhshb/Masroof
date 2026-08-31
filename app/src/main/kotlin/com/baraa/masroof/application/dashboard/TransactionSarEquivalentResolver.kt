@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.bank.aljazira.extraction.InternationalPurchaseFactsExtractor
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -27,7 +26,7 @@ class TransactionSarEquivalentResolver(
             if (tx.amount.currency == primaryCurrency) continue
             if (!tx.amount.currency.convertsToSar()) continue
 
-            val rawSmsBody = linkedRawSmsBody(tx, parsedByEventId, rawSmsById)
+            val linkedRecord = linkedParsedRecord(tx, parsedByEventId)
             val includeFee = tx.type != FinancialTransactionType.REFUND
 
             if (tx.appliedExchangeRate != null) {
@@ -36,16 +35,18 @@ class TransactionSarEquivalentResolver(
                     exchangeRate = tx.appliedExchangeRate,
                     source = tx.exchangeRateSource ?: ExchangeRateSource.SMS,
                     primaryCurrency = primaryCurrency,
-                    rawSmsBody = rawSmsBody,
+                    internationalFee = if (includeFee && tx.exchangeRateSource == ExchangeRateSource.SMS) {
+                        linkedRecord?.details?.internationalFee
+                    } else {
+                        null
+                    },
                     includeFee = includeFee,
                 )?.let { result[tx.id] = it }
                 continue
             }
 
-            if (rawSmsBody == null) continue
-
-            val smsFacts = InternationalPurchaseFactsExtractor.extract(rawSmsBody)
-            if (smsFacts != null) {
+            val smsFacts = linkedRecord?.details
+            if (smsFacts?.exchangeRate != null) {
                 ForeignPurchaseSarConverter.foreignToSar(
                     foreignAmount = tx.amount,
                     exchangeRate = smsFacts.exchangeRate,
@@ -98,34 +99,24 @@ class TransactionSarEquivalentResolver(
         return result
     }
 
-    private fun linkedRawSmsBody(
+    private fun linkedParsedRecord(
         tx: FinancialTransaction,
         parsedByEventId: Map<String, ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
-    ): String? {
-        val rawSmsId = tx.linkedParsedEventIds.firstOrNull()?.let { eventId ->
-            parsedByEventId[eventId]?.event?.rawSmsId
-        } ?: return null
-        return rawSmsById[rawSmsId]?.body
-    }
+    ): ParsedEventRecord? =
+        tx.linkedParsedEventIds.firstNotNullOfOrNull { eventId -> parsedByEventId[eventId] }
 
     private fun resolutionFromRate(
         tx: FinancialTransaction,
         exchangeRate: java.math.BigDecimal,
         source: ExchangeRateSource,
         primaryCurrency: Currency,
-        rawSmsBody: String?,
+        internationalFee: Money?,
         includeFee: Boolean,
     ): SarEquivalentResolution? {
-        val internationalFee = if (includeFee && source == ExchangeRateSource.SMS && rawSmsBody != null) {
-            InternationalPurchaseFactsExtractor.extract(rawSmsBody)?.internationalFee
-        } else {
-            null
-        }
         val sar = ForeignPurchaseSarConverter.foreignToSar(
             foreignAmount = tx.amount,
             exchangeRate = exchangeRate,
-            internationalFee = internationalFee,
+            internationalFee = if (includeFee) internationalFee else null,
             targetCurrency = primaryCurrency,
         ) ?: return null
         return SarEquivalentResolution(

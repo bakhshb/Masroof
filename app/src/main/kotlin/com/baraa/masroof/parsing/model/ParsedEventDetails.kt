@@ -1,6 +1,8 @@
 package com.baraa.masroof.parsing.model
 
 import com.baraa.masroof.core.money.Money
+import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
@@ -23,4 +25,10 @@ data class ParsedEventDetails(
     val biller: String? = null,
     val billerCode: String? = null,
     val occurredAtLocal: LocalDateTime? = null,
+    val cardSmsChannel: CardSmsChannel? = null,
+    val paymentDueDate: LocalDate? = null,
+    val exchangeRate: BigDecimal? = null,
+    val internationalFee: Money? = null,
+    /** Foreign amount label when the transaction amount alone is insufficient (e.g. SAR charge line). */
+    val labeledForeignAmount: Money? = null,
 )

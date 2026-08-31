@@ -80,7 +80,7 @@ class Migration8To9Test {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(9, room.openHelper.writableDatabase.version)
+            assertEquals(MasroofDatabase.VERSION, room.openHelper.writableDatabase.version)
 
             val loanRepo = RoomLoanRegistryRepository.from(room)
             val loans = loanRepo.listAll()

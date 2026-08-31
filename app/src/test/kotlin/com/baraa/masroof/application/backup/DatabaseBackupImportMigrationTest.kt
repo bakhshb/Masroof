@@ -67,7 +67,7 @@ class DatabaseBackupImportMigrationTest {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(9, migrated.openHelper.writableDatabase.version)
+            assertEquals(MasroofDatabase.VERSION, migrated.openHelper.writableDatabase.version)
             val cardRepo = RoomCardRegistryRepository.from(migrated)
             val loaded = cardRepo.get(CardReference(Bank.BANK_ALJAZIRA, "7271"))!!
             assertEquals(OwnershipStatus.OWNED, loaded.ownership)
