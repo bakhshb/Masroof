@@ -36,6 +36,8 @@ import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.application.locale.AppLocaleBootstrap
 import com.baraa.masroof.application.locale.AppLocaleContextFactory
+import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -86,6 +88,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Minimal manual composition root for P6–P9.
@@ -503,5 +506,22 @@ class AppContainer(
 
     val apkInstaller: ApkInstaller by lazy {
         ApkInstaller(appContext)
+    }
+
+    private val parsedEventFactsBackfillCoordinator: ParsedEventFactsBackfillCoordinator by lazy {
+        ParsedEventFactsBackfillCoordinator(
+            prefs = appContext.getSharedPreferences(
+                MaintenancePreferences.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+            appLogService = appLogService,
+            reparseAllStoredEvents = { reparseAllStoredEvents() },
+        )
+    }
+
+    fun runStartupMaintenance() {
+        applicationScope.launch {
+            parsedEventFactsBackfillCoordinator.runIfNeeded()
+        }
     }
 }

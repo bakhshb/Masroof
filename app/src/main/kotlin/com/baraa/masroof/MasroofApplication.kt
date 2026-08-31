@@ -23,6 +23,7 @@ class MasroofApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.runStartupMaintenance()
         UpdateCheckScheduler.schedule(this)
     }
 
