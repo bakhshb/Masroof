@@ -80,7 +80,7 @@ if [[ "\$1" == "api" && "\$2" == *"collaborators"* ]]; then
   echo '{"permission":"write"}'
   exit 0
 elif [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
@@ -111,7 +111,7 @@ if [[ "\$1" == "api" && "\$2" == *"collaborators"* ]]; then
   echo '{"permission":"maintain"}'
   exit 0
 elif [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
@@ -139,7 +139,7 @@ echo "Test 3: Unmerged PR rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "pr" && "$2" == "view" ]]; then
-  echo '{"state":"OPEN","merged":false,"mergeCommit":null,"headRefOid":"abc1234"}'
+  echo '{"state":"OPEN","mergedAt":null,"mergeCommit":null,"headRefOid":"abc1234"}'
   exit 0
 fi
 EOF
@@ -157,7 +157,7 @@ DISPATCH_ARGS_FILE="$TEST_TMP/dispatch.args"
 cat > "$TEST_TMP/bin/gh" << EOF
 #!/usr/bin/env bash
 if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
@@ -190,7 +190,7 @@ echo "Test 4b: Merged PR with identical main tip accepted"
 cat > "$TEST_TMP/bin/gh" << EOF
 #!/usr/bin/env bash
 if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"main-sha-99999"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"main-sha-99999"},"headRefOid":"abc1234"}'
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
@@ -236,7 +236,7 @@ echo "Test 8: Merge commit not on main rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "pr" && "$2" == "view" ]]; then
-  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"stale-merge-sha"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"stale-merge-sha"},"headRefOid":"abc1234"}'
   exit 0
 elif [[ "$1" == "api" && "$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
