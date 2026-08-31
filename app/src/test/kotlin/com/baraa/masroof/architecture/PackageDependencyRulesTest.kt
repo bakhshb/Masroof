@@ -89,11 +89,6 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.sms.",
             ),
             allowedFiles = setOf(
-                // PR 2 — expose scan outcomes through application contracts.
-                "presentation/dashboard/DashboardViewModel.kt",
-                "presentation/onboarding/OnboardingModels.kt",
-                "presentation/onboarding/OnboardingViewModel.kt",
-                "presentation/settings/SettingsViewModel.kt",
                 // PR 8 — move locale bootstrap behind an application boundary.
                 "presentation/locale/AppLocaleContext.kt",
             ),
