@@ -39,7 +39,6 @@ assert_eq "Invalid command exit code" "1" "$EXIT_CODE"
 
 # Test 2: Unauthorized user rejected
 echo "Test 2: Unauthorized user rejected"
-# Mock gh that returns no collaborator permission
 cat > "$TEST_TMP/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "api" && "$2" == *"collaborators"* ]]; then
@@ -72,13 +71,19 @@ EXIT_CODE=$?
 set -e
 assert_eq "Unmerged PR exit code" "1" "$EXIT_CODE"
 
-# Test 4: Merged PR accepted and triggers workflow dispatch
-echo "Test 4: Merged PR with /release accepted"
+# Test 4: Merged PR accepted and triggers workflow dispatch from main tip
+echo "Test 4: Merged PR with /release accepted and builds main tip"
 DISPATCH_ARGS_FILE="$TEST_TMP/dispatch.args"
 cat > "$TEST_TMP/bin/gh" << EOF
 #!/usr/bin/env bash
 if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
   echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
+  echo '{"object":{"sha":"main-sha-99999"}}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
+  echo '{"status":"behind"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -98,7 +103,7 @@ DISPATCHED=$(cat "$DISPATCH_ARGS_FILE")
 assert_eq "Workflow name" "release.yml" "$(echo "$DISPATCHED" | awk '{print $3}')"
 assert_eq "Has type=release" "1" "$(echo "$DISPATCHED" | grep -c 'type=release' || true)"
 assert_eq "Has bump=patch" "1" "$(echo "$DISPATCHED" | grep -c 'bump=patch' || true)"
-assert_eq "Has target SHA" "1" "$(echo "$DISPATCHED" | grep -c 'ref=sha-merge-12345' || true)"
+assert_eq "Uses main tip SHA" "1" "$(echo "$DISPATCHED" | grep -c 'ref=main-sha-99999' || true)"
 
 # Test 5: /release minor
 echo "Test 5: Merged PR with /release minor"
@@ -117,6 +122,31 @@ echo "Test 7: Merged PR with /nightly"
 COMMENT_BODY="/nightly" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="owner" COMMENT_AUTHOR_ASSOCIATION="OWNER" REPO="test/repo" "$SCRIPT" >/dev/null
 DISPATCHED=$(cat "$DISPATCH_ARGS_FILE")
 assert_eq "Has type=nightly" "1" "$(echo "$DISPATCHED" | grep -c 'type=nightly' || true)"
+
+# Test 8: Merge commit not on main is rejected
+echo "Test 8: Merge commit not on main rejected"
+cat > "$TEST_TMP/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "pr" && "$2" == "view" ]]; then
+  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"stale-merge-sha"},"headRefOid":"abc1234"}'
+  exit 0
+elif [[ "$1" == "api" && "$2" == *"/git/ref/heads/main" ]]; then
+  echo '{"object":{"sha":"main-sha-99999"}}'
+  exit 0
+elif [[ "$1" == "api" && "$2" == *"/compare/"* ]]; then
+  echo '{"status":"diverged"}'
+  exit 0
+elif [[ "$1" == "api" || "$1" == "pr" ]]; then
+  exit 0
+fi
+EOF
+chmod +x "$TEST_TMP/bin/gh"
+
+set +e
+OUT=$(COMMENT_BODY="/release" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="owner" COMMENT_AUTHOR_ASSOCIATION="OWNER" REPO="test/repo" "$SCRIPT" 2>&1)
+EXIT_CODE=$?
+set -e
+assert_eq "Stale merge not on main exit code" "1" "$EXIT_CODE"
 
 echo ""
 echo "=== Test Summary: $PASSED passed, $FAILED failed ==="

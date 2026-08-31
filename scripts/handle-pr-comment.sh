@@ -86,9 +86,35 @@ if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
     exit 1
   fi
 
-  TARGET_SHA=$(echo "$PR_JSON" | jq -r '.mergeCommit.oid // .headRefOid // "main"')
+  TARGET_SHA=$(echo "$PR_JSON" | jq -r '.mergeCommit.oid // .headRefOid // empty')
+  if [[ -z "$TARGET_SHA" ]]; then
+    echo "Could not resolve merge commit for PR #$PR_NUMBER" >&2
+    exit 1
+  fi
+
+  MAIN_SHA=$(gh api "repos/${REPO}/git/ref/heads/main" 2>/dev/null | jq -r '.object.sha' || true)
+  if [[ -z "$MAIN_SHA" || "$MAIN_SHA" == "null" ]]; then
+    echo "Could not resolve current main branch tip" >&2
+    exit 1
+  fi
+
+  COMPARE_STATUS=$(gh api "repos/${REPO}/compare/${TARGET_SHA}...${MAIN_SHA}" 2>/dev/null | jq -r '.status' || true)
+  if [[ "$COMPARE_STATUS" != "identical" && "$COMPARE_STATUS" != "behind" ]]; then
+    echo "PR #$PR_NUMBER merge commit is not contained in main (status=${COMPARE_STATUS})." >&2
+    if [[ -n "${COMMENT_ID:-}" ]]; then
+      gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" 2>/dev/null || true
+    fi
+    gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **Cannot publish from this PR.** Its merge commit is not on \`main\`. Merge to \`main\` first, then run \`/${TYPE}\` on that merged PR." 2>/dev/null || true
+    exit 1
+  fi
+
+  # Always build from the current main tip so releases never omit newer merged commits.
+  TARGET_SHA="$MAIN_SHA"
+  MERGE_SHA=$(echo "$PR_JSON" | jq -r '.mergeCommit.oid // empty')
+  MAIN_AHEAD_OF_PR=$([[ "$MERGE_SHA" != "$MAIN_SHA" ]] && echo "true" || echo "false")
 else
   TARGET_SHA="main"
+  MAIN_AHEAD_OF_PR="false"
 fi
 
 # 4. React with 'eyes' to confirm command acceptance
@@ -109,7 +135,11 @@ if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
     -f comment_id="${COMMENT_ID:-}"
 
   SHORT_SHA="${TARGET_SHA:0:7}"
-  gh pr comment "$PR_NUMBER" --repo "$REPO" --body "⏳ **Accepted \`${FIRST_LINE}\` command.** Queued \`${TYPE}\` build for commit \`${SHORT_SHA}\`..." 2>/dev/null || true
+  if [[ "$MAIN_AHEAD_OF_PR" == "true" ]]; then
+    gh pr comment "$PR_NUMBER" --repo "$REPO" --body "⏳ **Accepted \`${FIRST_LINE}\` command.** \`main\` has newer commits since this PR merged; queued \`${TYPE}\` build from current \`main\` tip \`${SHORT_SHA}\`..." 2>/dev/null || true
+  else
+    gh pr comment "$PR_NUMBER" --repo "$REPO" --body "⏳ **Accepted \`${FIRST_LINE}\` command.** Queued \`${TYPE}\` build for \`main\` at \`${SHORT_SHA}\`..." 2>/dev/null || true
+  fi
 fi
 
 echo "Successfully triggered release for PR #$PR_NUMBER"
