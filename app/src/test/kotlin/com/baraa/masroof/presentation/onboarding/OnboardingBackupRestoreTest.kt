@@ -71,14 +71,12 @@ class OnboardingBackupRestoreTest {
             historicalImportGateway = HistoricalImportGateway {
                 com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 0, parsed = 0, duplicates = 0)
             },
-            accountRegistryRepository = accounts,
-            cardRegistryRepository = cards,
-            ownershipConfirmationService = OwnershipConfirmationService(
-                accountRegistry = accounts,
-                cardRegistry = cards,
-                loanRegistry = NoOpLoanRegistryRepository,
-            ),
-            reviewRepository = EmptyReviewRepo(),
+            onboardingOwnershipWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .onboardingOwnershipWorkflow(
+                    accounts = accounts,
+                    cards = cards,
+                    reviewRepository = EmptyReviewRepo(),
+                ),
             discoverFromStoredEvents = { 0 },
             refreshReviewQueue = {},
             databaseBackupService = backup,

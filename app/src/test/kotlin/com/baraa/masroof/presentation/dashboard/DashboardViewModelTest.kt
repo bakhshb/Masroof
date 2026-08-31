@@ -617,6 +617,8 @@ class DashboardViewModelTest {
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
         accountRegistry: com.baraa.masroof.domain.repository.AccountRegistryRepository = FakeAccountRegistry(),
+        periodClock: java.time.Clock = clock,
+        periodZoneId: java.time.ZoneId = zone,
         layoutPreferencesRepository: DashboardLayoutPreferencesRepository = FakeLayoutPreferencesRepository(),
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
@@ -668,8 +670,13 @@ class DashboardViewModelTest {
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
-            cardRegistryRepository = cardRegistry,
-            accountRegistryRepository = accountRegistry,
+            dashboardRegistryWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .dashboardRegistryWorkflow(cards = cardRegistry, accounts = accountRegistry),
+            dashboardPeriodWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .dashboardPeriodWorkflow(
+                    now = periodClock.instant(),
+                    zoneId = periodZoneId,
+                ),
             layoutPreferencesRepository = layoutPreferencesRepository,
             rescanService = rescanService,
             smsEvidenceLoader = smsEvidenceLoader,
@@ -793,7 +800,6 @@ class DashboardViewModelTest {
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
-            clock = clock,
         )
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

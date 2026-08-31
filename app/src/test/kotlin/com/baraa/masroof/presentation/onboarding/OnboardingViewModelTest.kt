@@ -511,10 +511,12 @@ AccountRegistryEntry.forTest(
             return OnboardingViewModel(
                 onboardingPrefs = prefs,
                 historicalImportGateway = gateway,
-                accountRegistryRepository = accountRepo,
-                cardRegistryRepository = cardRepo,
-                ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo, NoOpLoanRegistryRepository),
-                reviewRepository = reviewRepo,
+                onboardingOwnershipWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                    .onboardingOwnershipWorkflow(
+                        accounts = accountRepo,
+                        cards = cardRepo,
+                        reviewRepository = reviewRepo,
+                    ),
                 discoverFromStoredEvents = {
                     if (discoverShouldFail) error("discover failed")
                     0

@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
+import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
+import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
@@ -18,6 +20,7 @@ import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkflow
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
@@ -33,6 +36,7 @@ import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import okhttp3.OkHttpClient
+import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.BankSmsRegistry
@@ -274,6 +278,30 @@ class AppContainer(
             accountRegistryRepository = accountRegistryRepository,
             loanRegistryRepository = loanRegistryRepository,
             ownershipConfirmationService = ownershipConfirmationService,
+        )
+
+    val dashboardPeriodWorkflow: DashboardPeriodWorkflow =
+        DashboardPeriodWorkflow(clock = clock)
+
+    val dashboardRegistryWorkflow: DashboardRegistryWorkflow =
+        DashboardRegistryWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+        )
+
+    val notificationCenterMetricsWorkflow: NotificationCenterMetricsWorkflow =
+        NotificationCenterMetricsWorkflow(
+            reviewRepository = reviewRepository,
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+        )
+
+    val onboardingOwnershipWorkflow: OnboardingOwnershipWorkflow =
+        OnboardingOwnershipWorkflow(
+            accountRegistryRepository = accountRegistryRepository,
+            cardRegistryRepository = cardRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
+            reviewRepository = reviewRepository,
         )
 
     val transactionReclassificationService: TransactionReclassificationService =

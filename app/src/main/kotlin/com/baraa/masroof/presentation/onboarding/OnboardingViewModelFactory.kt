@@ -20,10 +20,7 @@ class OnboardingViewModelFactory(
                 historicalImportGateway = HistoricalImportGateway { after ->
                     container.historicalSmsScanner.scan(after).toHistoricalImportResult()
                 },
-                accountRegistryRepository = container.accountRegistryRepository,
-                cardRegistryRepository = container.cardRegistryRepository,
-                ownershipConfirmationService = container.ownershipConfirmationService,
-                reviewRepository = container.reviewRepository,
+                onboardingOwnershipWorkflow = container.onboardingOwnershipWorkflow,
                 discoverFromStoredEvents = { container.discoverFromStoredEvents() },
                 refreshReviewQueue = { container.refreshReviewQueue() },
                 databaseBackupService = container.databaseBackupService,
