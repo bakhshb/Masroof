@@ -29,6 +29,8 @@ trap 'rm -rf "$TEST_TMP"' EXIT
 mkdir -p "$TEST_TMP/bin"
 export PATH="$TEST_TMP/bin:$PATH"
 
+MERGED_TO_MAIN_JSON='{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234","baseRefName":"main"}'
+
 # Test 1: Invalid command syntax should exit with non-zero
 echo "Test 1: Invalid command syntax rejected"
 set +e
@@ -80,13 +82,31 @@ if [[ "\$1" == "api" && "\$2" == *"collaborators"* ]]; then
   echo '{"permission":"write"}'
   exit 0
 elif [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '${MERGED_TO_MAIN_JSON}'
+  exit 0
+elif [[ "\$1" == "repo" && "\$2" == "view" ]]; then
+  shift 2
+  query=""
+  while [[ \$# -gt 0 ]]; do
+    case "\$1" in
+      -q|--jq)
+        query="\$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  json='{"defaultBranchRef":{"name":"main"}}'
+  if [[ -n "\$query" ]]; then
+    echo "\$json" | jq -r "\$query"
+  else
+    echo "\$json"
+  fi
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
-  exit 0
-elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
-  echo '{"status":"identical"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -111,13 +131,31 @@ if [[ "\$1" == "api" && "\$2" == *"collaborators"* ]]; then
   echo '{"permission":"maintain"}'
   exit 0
 elif [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '${MERGED_TO_MAIN_JSON}'
+  exit 0
+elif [[ "\$1" == "repo" && "\$2" == "view" ]]; then
+  shift 2
+  query=""
+  while [[ \$# -gt 0 ]]; do
+    case "\$1" in
+      -q|--jq)
+        query="\$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  json='{"defaultBranchRef":{"name":"main"}}'
+  if [[ -n "\$query" ]]; then
+    echo "\$json" | jq -r "\$query"
+  else
+    echo "\$json"
+  fi
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
-  exit 0
-elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
-  echo '{"status":"identical"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -139,7 +177,7 @@ echo "Test 3: Unmerged PR rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "pr" && "$2" == "view" ]]; then
-  echo '{"state":"OPEN","mergedAt":null,"mergeCommit":null,"headRefOid":"abc1234"}'
+  echo '{"state":"OPEN","mergedAt":null,"mergeCommit":null,"headRefOid":"abc1234","baseRefName":"main"}'
   exit 0
 fi
 EOF
@@ -157,13 +195,31 @@ DISPATCH_ARGS_FILE="$TEST_TMP/dispatch.args"
 cat > "$TEST_TMP/bin/gh" << EOF
 #!/usr/bin/env bash
 if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  echo '${MERGED_TO_MAIN_JSON}'
+  exit 0
+elif [[ "\$1" == "repo" && "\$2" == "view" ]]; then
+  shift 2
+  query=""
+  while [[ \$# -gt 0 ]]; do
+    case "\$1" in
+      -q|--jq)
+        query="\$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  json='{"defaultBranchRef":{"name":"main"}}'
+  if [[ -n "\$query" ]]; then
+    echo "\$json" | jq -r "\$query"
+  else
+    echo "\$json"
+  fi
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
-  exit 0
-elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
-  echo '{"status":"ahead"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -190,13 +246,31 @@ echo "Test 4b: Merged PR with identical main tip accepted"
 cat > "$TEST_TMP/bin/gh" << EOF
 #!/usr/bin/env bash
 if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
-  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"main-sha-99999"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"main-sha-99999"},"headRefOid":"abc1234","baseRefName":"main"}'
+  exit 0
+elif [[ "\$1" == "repo" && "\$2" == "view" ]]; then
+  shift 2
+  query=""
+  while [[ \$# -gt 0 ]]; do
+    case "\$1" in
+      -q|--jq)
+        query="\$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  json='{"defaultBranchRef":{"name":"main"}}'
+  if [[ -n "\$query" ]]; then
+    echo "\$json" | jq -r "\$query"
+  else
+    echo "\$json"
+  fi
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
-  exit 0
-elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
-  echo '{"status":"identical"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -231,18 +305,33 @@ COMMENT_BODY="/nightly" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="owner" C
 DISPATCHED=$(cat "$DISPATCH_ARGS_FILE")
 assert_eq "Has type=nightly" "1" "$(echo "$DISPATCHED" | grep -c 'type=nightly' || true)"
 
-# Test 8: Merge commit not on main is rejected
-echo "Test 8: Merge commit not on main rejected"
+# Test 8: PR merged into a feature branch (not main) is rejected
+echo "Test 8: PR merged into feature branch rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "pr" && "$2" == "view" ]]; then
-  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"stale-merge-sha"},"headRefOid":"abc1234"}'
+  echo '{"state":"MERGED","mergedAt":"2026-08-31T00:00:00Z","mergeCommit":{"oid":"feature-merge-sha"},"headRefOid":"abc1234","baseRefName":"cursor/feature-branch"}'
   exit 0
-elif [[ "$1" == "api" && "$2" == *"/git/ref/heads/main" ]]; then
-  echo '{"object":{"sha":"main-sha-99999"}}'
-  exit 0
-elif [[ "$1" == "api" && "$2" == *"/compare/"* ]]; then
-  echo '{"status":"diverged"}'
+elif [[ "$1" == "repo" && "$2" == "view" ]]; then
+  shift 2
+  query=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -q|--jq)
+        query="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  json='{"defaultBranchRef":{"name":"main"}}'
+  if [[ -n "$query" ]]; then
+    echo "$json" | jq -r "$query"
+  else
+    echo "$json"
+  fi
   exit 0
 elif [[ "$1" == "api" || "$1" == "pr" ]]; then
   exit 0
@@ -254,7 +343,7 @@ set +e
 OUT=$(COMMENT_BODY="/release" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="owner" COMMENT_AUTHOR_ASSOCIATION="OWNER" REPO="test/repo" "$SCRIPT" 2>&1)
 EXIT_CODE=$?
 set -e
-assert_eq "Stale merge not on main exit code" "1" "$EXIT_CODE"
+assert_eq "Feature branch merge exit code" "1" "$EXIT_CODE"
 
 echo ""
 echo "=== Test Summary: $PASSED passed, $FAILED failed ==="
