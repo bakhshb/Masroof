@@ -79,6 +79,7 @@ class CoreEvidenceRepositoryContractTest {
             id = initial.id,
             resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
             resolvedAt = now.plusSeconds(1),
+            resolvedTransactionId = null,
         )!!
         val afterRefresh = reviews.upsertRequired(
             rawSmsId = "sms-1",
