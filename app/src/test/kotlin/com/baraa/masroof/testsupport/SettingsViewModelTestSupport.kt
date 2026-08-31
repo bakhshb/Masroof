@@ -150,6 +150,11 @@ internal object SettingsViewModelTestSupport {
             override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
             override suspend fun listAll() =
                 emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
+
+            override suspend fun listReceivedBetween(
+                startInclusive: java.time.Instant,
+                endExclusive: java.time.Instant,
+            ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
         }
 
     internal fun emptyAccountRegistry(): AccountRegistryRepository =

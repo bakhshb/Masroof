@@ -720,6 +720,11 @@ class DashboardViewModelTest {
                         override suspend fun findByRawSmsId(rawSmsId: String) = null
                         override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
                         override suspend fun listAll() = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
+
+                        override suspend fun listReceivedBetween(
+                            startInclusive: java.time.Instant,
+                            endExclusive: java.time.Instant,
+                        ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
                     },
                     object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
                         override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit

@@ -2,6 +2,7 @@ package com.baraa.masroof.parsing.repository
 
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
+import java.time.Instant
 
 /**
  * Parsing-facing persistence for structured parse output.
@@ -26,6 +27,15 @@ interface ParsedEventRepository {
 
     /** All persisted parse results (for ownership discovery backlog). */
     suspend fun listAll(): List<ParsedEventRecord>
+
+    /**
+     * Parse results whose [com.baraa.masroof.domain.model.RawSms.receivedAt] falls in
+     * `[startInclusive, endExclusive)` — used for incremental reconciliation windows.
+     */
+    suspend fun listReceivedBetween(
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<ParsedEventRecord>
 }
 
 /**
