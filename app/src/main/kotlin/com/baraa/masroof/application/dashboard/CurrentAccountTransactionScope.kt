@@ -1,12 +1,12 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class CurrentAccountTransactionScope(
@@ -237,8 +237,7 @@ data class CurrentAccountTransactionScope(
             rawSmsById: Map<String, RawSms>,
         ): Boolean =
             tx.linkedParsedEventIds.mapNotNull { parsedRecordsById[it] }.any { record ->
-                val body = rawSmsById[record.event.rawSmsId]?.body.orEmpty()
-                if (!CreditCardMessageHeuristics.isDebitCardSms(body)) return@any false
+                if (!record.details.isDebitCardSms()) return@any false
                 when (record.event.messageFamily) {
                     MessageFamily.PURCHASE,
                     MessageFamily.WITHDRAWAL,

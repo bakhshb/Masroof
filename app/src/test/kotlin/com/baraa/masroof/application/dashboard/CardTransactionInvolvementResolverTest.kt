@@ -90,7 +90,7 @@ class CardTransactionInvolvementResolverTest {
     }
 
     @Test
-    fun buildIndex_fallsBackToSmsBodyWhenParsedCardRefMissing() {
+    fun buildIndex_doesNotInferCardFromSmsBodyWhenParsedCardRefMissing() {
         val txWithParsedRef = transaction(
             id = "atm",
             source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
@@ -126,10 +126,7 @@ class CardTransactionInvolvementResolverTest {
             rawSmsById = rawSmsById,
         )
 
-        assertEquals(
-            setOf(CardTransactionInvolvementResolver.cardKey(Bank.BANK_ALJAZIRA.id, "8219")),
-            index["atm"],
-        )
+        assertEquals(emptySet<String>(), index["atm"])
     }
 
     private fun parsedRecordWithoutCardRef(

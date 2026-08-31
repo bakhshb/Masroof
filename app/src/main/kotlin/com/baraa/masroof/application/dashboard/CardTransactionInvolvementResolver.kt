@@ -2,7 +2,6 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
-import com.baraa.masroof.bank.aljazira.extraction.CardExtractor
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
@@ -60,11 +59,7 @@ object CardTransactionInvolvementResolver {
     private fun cardKeyFromEvent(
         record: ParsedEventRecord,
         rawSmsById: Map<String, RawSms>,
-    ): String? {
-        record.event.cardRef?.toCardKey()?.let { return it }
-        val body = rawSmsById[record.event.rawSmsId]?.body ?: return null
-        return CardExtractor.extractFromText(body, record.event.bank)?.toCardKey()
-    }
+    ): String? = record.event.cardRef?.toCardKey()
 
     private fun CardReference.toCardKey(): String? {
         val digits = last4 ?: return null

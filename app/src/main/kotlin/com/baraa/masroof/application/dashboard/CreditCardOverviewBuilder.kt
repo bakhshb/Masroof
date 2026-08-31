@@ -1,9 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
-import com.baraa.masroof.bank.aljazira.CreditCardStatementHeuristics
-import com.baraa.masroof.bank.aljazira.extraction.DueDateExtractor
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -16,6 +13,8 @@ import com.baraa.masroof.domain.period.CreditCardStatementPolicy
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.model.isCreditCardSms
+import com.baraa.masroof.parsing.model.isStatementSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.Instant
 import java.time.LocalDate
@@ -27,8 +26,6 @@ import java.util.Locale
  * Builds all credit-card rows with statement-cycle and salary-period spending per card.
  */
 object CreditCardOverviewBuilder {
-    private val dueDateExtractor = DueDateExtractor()
-
     private fun dayMonthFormatter(locale: Locale): DateTimeFormatter =
         DateTimeFormatter.ofPattern("d MMMM", locale)
 
@@ -63,12 +60,12 @@ object CreditCardOverviewBuilder {
             val cardRef = event.cardRef ?: continue
             val cardId = FinancialContainerIdFactory.cardId(cardRef) ?: continue
             val raw = rawSmsById[event.rawSmsId] ?: continue
-            if (!CreditCardMessageHeuristics.isCreditCardSms(raw.body)) continue
+            val details = record.details
+            if (!details.isCreditCardSms()) continue
 
             creditCardMeta[cardId] = cardRef
             val at = event.occurredAt ?: raw.receivedAt
-            val details = record.details
-            val isStatement = CreditCardStatementHeuristics.isStatementSms(raw.body)
+            val isStatement = details.isStatementSms()
             if (
                 isStatement ||
                 details.availableBalance != null ||
@@ -80,7 +77,7 @@ object CreditCardOverviewBuilder {
                     updatedAt = at,
                     details = details,
                     isStatement = isStatement,
-                    dueDate = dueDateExtractor.extractFromText(raw.body),
+                    dueDate = details.paymentDueDate,
                 )
             }
         }
@@ -212,8 +209,8 @@ object CreditCardOverviewBuilder {
         periodEndExclusive: Instant,
     ): Instant {
         val latestStatement = parsedRecords.mapNotNull { record ->
+            if (!record.details.isStatementSms()) return@mapNotNull null
             val raw = rawSmsById[record.event.rawSmsId] ?: return@mapNotNull null
-            if (!CreditCardStatementHeuristics.isStatementSms(raw.body)) return@mapNotNull null
             val at = record.event.occurredAt ?: raw.receivedAt
             if (!at.isBefore(periodEndExclusive)) return@mapNotNull null
             at

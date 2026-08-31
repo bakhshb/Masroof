@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertFalse
@@ -63,7 +64,7 @@ class CardRegistryDebitClassifierTest {
             بطاقة مدى: 8219
             بمبلغ: 127.00 SAR
         """.trimIndent()
-        val parsed = parsedRecord(last4 = "8219", body = body)
+        val parsed = parsedRecord(last4 = "8219", body = body, channel = CardSmsChannel.DEBIT)
         val rawSmsById = mapOf(
             parsed.event.rawSmsId to RawSms(
                 id = parsed.event.rawSmsId,
@@ -109,7 +110,7 @@ class CardRegistryDebitClassifierTest {
             الرصيد المتاح: 14569.09 SAR
             إجمالي المبلغ المستحق:3921.11 SAR
         """.trimIndent()
-        val parsed = parsedRecord(last4 = "7271", body = body)
+        val parsed = parsedRecord(last4 = "7271", body = body, channel = CardSmsChannel.CREDIT)
         val rawSmsById = mapOf(
             parsed.event.rawSmsId to RawSms(
                 id = parsed.event.rawSmsId,
@@ -156,7 +157,11 @@ class CardRegistryDebitClassifierTest {
             lastSeenRawSmsId = "sms",
         )
 
-    private fun parsedRecord(last4: String, body: String): ParsedEventRecord {
+    private fun parsedRecord(
+        last4: String,
+        body: String,
+        channel: CardSmsChannel? = null,
+    ): ParsedEventRecord {
         val event = ParsedEvent(
             id = "evt-$last4",
             rawSmsId = "sms-$last4",
@@ -175,6 +180,6 @@ class CardRegistryDebitClassifierTest {
             confidence = Confidence(1.0),
             parseStatus = ParseStatus.SUCCESS,
         )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
+        return ParsedEventRecord(event = event, details = ParsedEventDetails(cardSmsChannel = channel))
     }
 }

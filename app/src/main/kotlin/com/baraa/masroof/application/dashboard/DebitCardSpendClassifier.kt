@@ -1,11 +1,11 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.bank.aljazira.CreditCardMessageHeuristics
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
@@ -95,8 +95,7 @@ object DebitCardSpendClassifier {
         record: ParsedEventRecord,
         context: AccountFlowClassificationContext,
     ): Boolean {
-        val body = smsBody(record, context)
-        if (!CreditCardMessageHeuristics.isDebitCardSms(body)) return false
+        if (!record.details.isDebitCardSms()) return false
         return when (record.event.messageFamily) {
             MessageFamily.PURCHASE,
             MessageFamily.WITHDRAWAL,

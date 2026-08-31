@@ -65,6 +65,14 @@ data class ParsedEventEntity(
     val billerCode: String?,
     /** ISO-8601 local date-time text; no timezone conversion. */
     val occurredAtLocal: String?,
+    val cardSmsChannel: String?,
+    /** ISO-8601 local date text. */
+    val paymentDueDate: String?,
+    val exchangeRate: String?,
+    val internationalFeeDecimal: String?,
+    val internationalFeeCurrency: String?,
+    val labeledForeignAmountDecimal: String?,
+    val labeledForeignAmountCurrency: String?,
 ) {
     companion object {
         const val CONFIDENCE_REASON_SEPARATOR: Char = '\u001e'

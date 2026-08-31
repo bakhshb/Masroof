@@ -71,7 +71,13 @@ class TransactionSarEquivalentResolverTest {
         val resolution = resolver.resolve(
             transactions = listOf(refundTx),
             parsedRecords = listOf(
-                ParsedEventRecord(purchaseEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
+                ParsedEventRecord(
+                    purchaseEvent,
+                    com.baraa.masroof.parsing.model.ParsedEventDetails(
+                        exchangeRate = BigDecimal("3.756957"),
+                        internationalFee = Money.of("1.99", Currency.SAR),
+                    ),
+                ),
                 ParsedEventRecord(refundEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
             ),
             rawSmsById = mapOf(
