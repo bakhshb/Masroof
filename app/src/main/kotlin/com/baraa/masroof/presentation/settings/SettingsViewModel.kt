@@ -357,7 +357,8 @@ class SettingsViewModel(
                 )
                 appLogService.info(
                     AppLogCategories.SETTINGS,
-                    "SMS import finished: ${AppLogFormatting.scanSummary(result)}",
+                    "SMS import finished: scanned=${result.scanned}, inserted=${result.inserted}, " +
+                        "parsed=${result.parsed}, failed=${result.failed}",
                 )
                 _uiState.update {
                     it.copy(
