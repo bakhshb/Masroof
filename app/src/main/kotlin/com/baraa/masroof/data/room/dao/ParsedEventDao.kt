@@ -27,6 +27,20 @@ interface ParsedEventDao {
     @Query("SELECT * FROM parsed_event ORDER BY id")
     suspend fun listAll(): List<ParsedEventEntity>
 
+    @Query(
+        """
+        SELECT pe.* FROM parsed_event pe
+        INNER JOIN raw_sms rs ON pe.rawSmsId = rs.id
+        WHERE rs.receivedAtEpochMillis >= :startInclusiveMillis
+          AND rs.receivedAtEpochMillis < :endExclusiveMillis
+        ORDER BY pe.id
+        """,
+    )
+    suspend fun listReceivedBetween(
+        startInclusiveMillis: Long,
+        endExclusiveMillis: Long,
+    ): List<ParsedEventEntity>
+
     /**
      * Replace the current parse result for a RawSms (same or new event id).
      * Deletes any existing row for [entity.rawSmsId], then inserts [entity].

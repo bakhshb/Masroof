@@ -25,6 +25,7 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import java.time.Instant
 import java.time.ZoneId
 
 /**
@@ -71,15 +72,23 @@ class TransactionReconciliationService(
     suspend fun reconcileAfterParsedEvent(event: ParsedEvent): ReconciliationSummary =
         reconcileAfterParsedEventDetailed(event).summary
 
-    suspend fun reconcileAfterParsedEventDetailed(_event: ParsedEvent): ReconciliationReport {
-        // Full backlog reconcile keeps pair matching correct after live ingest.
-        val records = loadRecords()
+    suspend fun reconcileAfterParsedEventDetailed(event: ParsedEvent): ReconciliationReport {
+        val records = loadRecordsAround(event)
         return reconcileRecordsDetailed(records)
     }
 
     private suspend fun loadRecords(): List<ParsedEventRecord> =
         effectiveParsedEventProvider?.listAllEffective()
             ?: parsedEventRepository.listAll()
+
+    private suspend fun loadRecordsAround(event: ParsedEvent): List<ParsedEventRecord> {
+        val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return loadRecords()
+        val window = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
+        val startInclusive = receivedAt.minus(window)
+        val endExclusive = receivedAt.plus(window).plusMillis(1)
+        return effectiveParsedEventProvider?.listEffectiveReceivedBetween(startInclusive, endExclusive)
+            ?: parsedEventRepository.listReceivedBetween(startInclusive, endExclusive)
+    }
 
     private suspend fun reconcileRecordsDetailed(
         records: List<ParsedEventRecord>,

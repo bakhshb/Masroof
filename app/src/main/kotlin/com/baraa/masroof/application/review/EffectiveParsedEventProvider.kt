@@ -31,6 +31,17 @@ class EffectiveParsedEventProvider(
         }
     }
 
+    suspend fun listEffectiveReceivedBetween(
+        startInclusive: java.time.Instant,
+        endExclusive: java.time.Instant,
+    ): List<ParsedEventRecord> {
+        val stored = parsedEventRepository.listReceivedBetween(startInclusive, endExclusive)
+        return stored.map { record ->
+            val corrections = userCorrectionRepository.listForRawSmsId(record.event.rawSmsId)
+            applyCorrections(record, corrections)
+        }
+    }
+
     fun applyCorrections(
         record: ParsedEventRecord,
         corrections: List<UserCorrection>,

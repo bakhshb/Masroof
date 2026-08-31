@@ -380,6 +380,43 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun reconcileAfterParsedEvent_pairsSelfTransferWithinWindow() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-out-inc",
+            event = event(
+                id = "pe-out-inc",
+                rawSmsId = "sms-out-inc",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                counterparty = "براء بخش",
+            ),
+        )
+        persistEvent(
+            smsId = "sms-in-inc",
+            event = event(
+                id = "pe-in-inc",
+                rawSmsId = "sms-in-inc",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        val incoming = parsedRepo.findByRawSmsId("sms-in-inc")!!.event
+        reconciliation.reconcileAfterParsedEvent(incoming)
+        assertEquals(1, ftRepo.listAll().size)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(setOf("sms-in-inc", "sms-out-inc"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
     fun outgoingUnknownWithoutCounterpart_postsExternalOut() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         persistEvent(
