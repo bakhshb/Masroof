@@ -45,6 +45,10 @@ subcmd="$2"
 shift 2
 
 if [[ "$cmd" == "release" && "$subcmd" == "list" ]]; then
+  if [[ -f "$(dirname "$0")/../fail_release_list" ]]; then
+    echo "mock gh release list failed" >&2
+    exit 1
+  fi
   query=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -327,6 +331,20 @@ source "$TEST_TMP/out.env"
 assert_eq "Version Name" "0.3.18" "$version_name"
 assert_eq "Version Code" "71" "$version_code"
 assert_eq "Tag" "v0.3.18" "$tag"
+
+# Test 15: gh release list failure aborts to prevent duplicate versions
+echo "Test 15: gh release list failure aborts"
+RELEASES='[{"tagName":"v0.3.17","isPrerelease":false}]'
+CODES='{"v0.3.17": 70}'
+configure_mock_gh "$RELEASES" "$CODES"
+touch "$TEST_TMP/fail_release_list"
+
+set +e
+OUT=$(GITHUB_OUTPUT="$TEST_TMP/out.env" "$SCRIPT" --type release --bump patch 2>&1)
+EXIT_CODE=$?
+set -e
+rm -f "$TEST_TMP/fail_release_list"
+assert_eq "Release list failure exit code" "1" "$EXIT_CODE"
 
 echo ""
 echo "=== Test Summary: $PASSED passed, $FAILED failed ==="

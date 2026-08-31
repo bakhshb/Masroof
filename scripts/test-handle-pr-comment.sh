@@ -103,6 +103,37 @@ EXIT_CODE=$?
 set -e
 assert_eq "Write collaborator exit code" "0" "$EXIT_CODE"
 
+# Test 2d: Maintain collaborator accepted
+echo "Test 2d: Maintain collaborator accepted"
+cat > "$TEST_TMP/bin/gh" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "api" && "\$2" == *"collaborators"* ]]; then
+  echo '{"permission":"maintain"}'
+  exit 0
+elif [[ "\$1" == "pr" && "\$2" == "view" ]]; then
+  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"sha-merge-12345"},"headRefOid":"abc1234"}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
+  echo '{"object":{"sha":"main-sha-99999"}}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
+  echo '{"status":"identical"}'
+  exit 0
+elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
+  echo "\$@" > "$DISPATCH_ARGS_FILE"
+  exit 0
+elif [[ "\$1" == "api" || "\$1" == "pr" ]]; then
+  exit 0
+fi
+EOF
+chmod +x "$TEST_TMP/bin/gh"
+
+set +e
+OUT=$(COMMENT_BODY="/release" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="maintainer" COMMENT_AUTHOR_ASSOCIATION="COLLABORATOR" REPO="test/repo" "$SCRIPT" 2>&1)
+EXIT_CODE=$?
+set -e
+assert_eq "Maintain collaborator exit code" "0" "$EXIT_CODE"
+
 # Test 3: Unmerged PR rejected
 echo "Test 3: Unmerged PR rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'

@@ -60,11 +60,27 @@ if [[ -f "$GRADLE_FILE" ]]; then
   fi
 fi
 
+# Fail fast when gh release list errors; empty output is valid (fresh repo).
+list_release_tags_or_fail() {
+  local output=""
+  local exit_code=0
+  output=$(gh release list "$@" 2>&1) || exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    echo "Error: Failed to list GitHub releases (exit ${exit_code}). Aborting to prevent duplicate versions." >&2
+    [[ -n "$output" ]] && echo "$output" >&2
+    exit 1
+  fi
+  if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+  fi
+}
+
 # 2. Collect published stable releases only (ignore orphan git tags)
 STABLE_VERSIONS=()
 
 # Collect from published GitHub releases if gh is available
 if command -v gh >/dev/null 2>&1; then
+  STABLE_RELEASE_TAGS=$(list_release_tags_or_fail --limit 1000 --json tagName,isDraft,isPrerelease -q '.[] | select((.isDraft // false) == false and (.isPrerelease // false) == false) | .tagName')
   while IFS= read -r tag; do
     [[ -z "$tag" ]] && continue
     # Strip leading 'v'
@@ -72,7 +88,7 @@ if command -v gh >/dev/null 2>&1; then
     if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       STABLE_VERSIONS+=("$v")
     fi
-  done < <(gh release list --limit 1000 --json tagName,isDraft,isPrerelease -q '.[] | select((.isDraft // false) == false and (.isPrerelease // false) == false) | .tagName' 2>/dev/null || true)
+  done <<< "$STABLE_RELEASE_TAGS"
 fi
 
 # Add fallback version
@@ -122,13 +138,14 @@ else
 
   # Check published GitHub releases for matching nightlies (ignore orphan git tags)
   if command -v gh >/dev/null 2>&1; then
+    NIGHTLY_RELEASE_TAGS=$(list_release_tags_or_fail --limit 1000 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName')
     while IFS= read -r tag; do
       [[ -z "$tag" ]] && continue
       v="${tag#v}"
       if [[ "$v" =~ ^${NIGHTLY_PREFIX}[.-]([0-9]+)$ ]]; then
         NIGHTLY_NUMBERS+=("${BASH_REMATCH[1]}")
       fi
-    done < <(gh release list --limit 1000 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName' 2>/dev/null || true)
+    done <<< "$NIGHTLY_RELEASE_TAGS"
   fi
 
   MAX_NIGHTLY=0
@@ -154,6 +171,7 @@ trap cleanup EXIT
 
 if command -v gh >/dev/null 2>&1; then
   # Inspect top releases (newest first) to find max versionCode from version.json
+  VERSION_CODE_RELEASE_TAGS=$(list_release_tags_or_fail --limit 50 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName')
   while IFS= read -r release_tag; do
     [[ -z "$release_tag" ]] && continue
     if gh release download "$release_tag" -D "$TMP_DIR" --pattern version.json 2>/dev/null; then
@@ -201,7 +219,7 @@ if command -v gh >/dev/null 2>&1; then
         fi
       fi
     fi
-  done < <(gh release list --limit 50 --json tagName,isDraft -q '.[] | select((.isDraft // false) == false) | .tagName' 2>/dev/null || true)
+  done <<< "$VERSION_CODE_RELEASE_TAGS"
 fi
 
 NEXT_CODE=$((MAX_CODE + 1))
