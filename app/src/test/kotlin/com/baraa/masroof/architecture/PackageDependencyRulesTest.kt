@@ -89,10 +89,7 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.data.",
                 "import com.baraa.masroof.sms.",
             ),
-            allowedFiles = setOf(
-                // PR 8 — move locale bootstrap behind an application boundary.
-                "presentation/locale/AppLocaleContext.kt",
-            ),
+            allowedFiles = emptySet(),
         )
     }
 
