@@ -1,6 +1,70 @@
 # Release and in-app updates
 
-Masroof release APKs are built in **GitHub Actions** when you **merge to `main`** with a **new version** (see [CI.md](CI.md)). The app checks for updates using your personal GitHub token and installs APKs without Google Play.
+Masroof releases and nightly builds are published via **GitHub Actions** using **PR slash commands** on merged pull requests or manual workflow dispatch. You do **not** need to manually edit `app/build.gradle.kts` or open version-bump PRs.
+
+The app checks for updates using your personal GitHub token and installs APKs directly without Google Play.
+
+## Development and publishing workflow
+
+```text
+PR → CI checks pass → Review & Approve → Merge to main
+```
+
+After your PR is merged, you can publish a build by commenting on the merged PR:
+
+### 1. Test build (Nightly)
+Comment on the merged PR:
+```text
+/nightly
+```
+- Creates a GitHub **Pre-release** tagged `v<next-version>-nightly.<n>` (e.g. `v0.3.18-nightly.1`).
+- Bumps global `versionCode` monotonically.
+- Will **not** prompt regular stable users to update.
+
+### 2. Stable release (Patch)
+Comment on the merged PR:
+```text
+/release
+```
+- Or `/release patch`.
+- Calculates the next semantic patch release (e.g. `v0.3.17` $\rightarrow$ `v0.3.18`).
+- Bumps global `versionCode` monotonically.
+- Creates an official GitHub Release and signed APK.
+- Prompted to stable users via in-app update.
+
+### 3. Minor and major releases
+Comment on the merged PR:
+```text
+/release minor
+```
+- Bumps the minor segment (e.g. `v0.3.17` $\rightarrow$ `v0.4.0`).
+
+```text
+/release major
+```
+- Bumps the major segment (e.g. `v0.3.17` $\rightarrow$ `v1.0.0`).
+
+---
+
+## Secondary option: Manual workflow dispatch
+
+You can also trigger builds directly from the GitHub Actions UI:
+1. Go to **Actions → Release → Run workflow**.
+2. Select **Release type**: `release` or `nightly`.
+3. Select **Version bump**: `patch`, `minor`, or `major`.
+4. (Optional) Provide a target commit ref or branch (defaults to `main`).
+5. Click **Run workflow**.
+
+---
+
+## Feedback on PRs
+
+When you post a slash command on a merged PR:
+1. **Validation & Acceptance**: The workflow checks your permissions and PR merge status, then reacts with `👀` and posts a status acknowledgement.
+2. **Rejection**: If the command is posted on an unmerged PR or by an unauthorized user, the workflow reacts with `-1` and posts an explanation comment.
+3. **Publishing Success**: Once the build, signing, and verification succeed, the workflow reacts with `🚀` and posts a comment with the new version, `versionCode`, release notes link, and APK filename.
+
+---
 
 ## One-time setup
 
@@ -24,18 +88,15 @@ From the repo root, with [GitHub CLI](https://cli.github.com/) logged in as the 
 ./scripts/upload-release-secrets.sh
 ```
 
-This creates `release.keystore`, `keystore.properties`, and uploads four secrets to GitHub. Those files are gitignored — do not commit them.
+This creates `release.keystore`, `keystore.properties`, and uploads four secrets to GitHub Actions:
+- `RELEASE_KEYSTORE_BASE64`
+- `RELEASE_KEYSTORE_PASSWORD`
+- `RELEASE_KEY_ALIAS`
+- `RELEASE_KEY_PASSWORD`
 
 **Option B — manual**
 
-In the repository: **Settings → Secrets and variables → Actions**, add:
-
-| Secret | Value |
-|--------|--------|
-| `RELEASE_KEYSTORE_BASE64` | `base64 -w0 release.keystore` (Linux) or `base64 release.keystore` (macOS) |
-| `RELEASE_KEYSTORE_PASSWORD` | Keystore password |
-| `RELEASE_KEY_ALIAS` | `masroof` |
-| `RELEASE_KEY_PASSWORD` | Key password |
+In repository **Settings → Secrets and variables → Actions**, add the four secrets above.
 
 ### 3. Create a GitHub read-only token (for your phone)
 
@@ -45,31 +106,7 @@ In the repository: **Settings → Secrets and variables → Actions**, add:
 
 The token is stored in app-private storage on the device and is never committed to the repo.
 
-### 4. Branch protection (recommended)
-
-See [CI.md](CI.md) — require **CI** to pass before merging to `main`.
-
-## Development vs shipping
-
-### Feature merges (no version bump)
-
-Merge feature PRs without changing `app/build.gradle.kts`. The **Release** workflow still runs on each merge to `main` and finishes **green**, but **skips** building an APK when the version is unchanged.
-
-### Releasing a new version
-
-When you are ready to ship:
-
-1. Bump **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts`, or run:
-   ```bash
-   ./scripts/bump-version.sh
-   ```
-2. Open a PR (version-only or with final changes).
-3. Wait for **CI** to pass → merge to `main`.
-4. **Release** publishes a signed APK and `version.json` on GitHub Releases.
-
-**`versionCode` must be greater than the latest published release** (check `version.json` on the latest GitHub Release). If you set a new `versionName` but forget to bump `versionCode`, Release fails with a clear error.
-
-Do not reuse a `versionCode` lower than an already-shipped release — Android will reject the APK as a downgrade and in-app update will report “up to date”.
+---
 
 ## Updating the app on your phone
 
@@ -78,6 +115,8 @@ Do not reuse a `versionCode` lower than an already-shipped release — Android w
 3. Tap **Check for updates** (or wait for an automatic check on first launch after onboarding).
 4. **Download update** → **Install update**.
 5. If prompted, allow **Install unknown apps** for Masroof.
+
+---
 
 ## Local release build (optional)
 
@@ -88,9 +127,3 @@ cp keystore.properties.example keystore.properties
 ```
 
 Output: `app/build/outputs/apk/release/app-release.apk`
-
-## Notes
-
-- **Debug APK → release APK**: different signing keys; uninstall the debug build first, then install release.
-- **Private repo**: only devices with a valid read token can fetch updates.
-- **versionCode** must strictly increase on every store/release APK. Published `v0.2.50` used code `53`; any new release must use `54` or higher.
