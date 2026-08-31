@@ -68,12 +68,15 @@ if [[ "$IS_AUTHORIZED" != "true" ]]; then
   exit 1
 fi
 
-# 3. Verify PR is merged
+# 3. Verify PR is merged into the default branch (main)
 if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
-  PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,mergedAt,mergeCommit,headRefOid 2>&1) || {
+  PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,mergedAt,mergeCommit,headRefOid,baseRefName 2>&1) || {
     echo "Could not fetch PR #$PR_NUMBER details: ${PR_JSON}" >&2
     exit 1
   }
+
+  DEFAULT_BRANCH=$(gh repo view "$REPO" --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo "main")
+  BASE_REF=$(echo "$PR_JSON" | jq -r '.baseRefName // empty')
 
   IS_MERGED=$(echo "$PR_JSON" | jq -r 'if .state == "MERGED" then "true" else "false" end')
   if [[ "$IS_MERGED" != "true" ]]; then
@@ -85,33 +88,25 @@ if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
     exit 1
   fi
 
-  TARGET_SHA=$(echo "$PR_JSON" | jq -r '.mergeCommit.oid // .headRefOid // empty')
-  if [[ -z "$TARGET_SHA" ]]; then
-    echo "Could not resolve merge commit for PR #$PR_NUMBER" >&2
-    exit 1
-  fi
-
-  MAIN_SHA=$(gh api "repos/${REPO}/git/ref/heads/main" 2>/dev/null | jq -r '.object.sha' || true)
-  if [[ -z "$MAIN_SHA" || "$MAIN_SHA" == "null" ]]; then
-    echo "Could not resolve current main branch tip" >&2
-    exit 1
-  fi
-
-  COMPARE_STATUS=$(gh api "repos/${REPO}/compare/${TARGET_SHA}...${MAIN_SHA}" 2>/dev/null | jq -r '.status' || true)
-  # ahead = main tip has commits after this PR's merge; identical = merge is current main tip.
-  if [[ "$COMPARE_STATUS" != "identical" && "$COMPARE_STATUS" != "ahead" ]]; then
-    echo "PR #$PR_NUMBER merge commit is not contained in main (status=${COMPARE_STATUS})." >&2
+  if [[ -z "$BASE_REF" || "$BASE_REF" != "$DEFAULT_BRANCH" ]]; then
+    echo "PR #$PR_NUMBER was merged into '${BASE_REF:-unknown}', not '${DEFAULT_BRANCH}'." >&2
     if [[ -n "${COMMENT_ID:-}" ]]; then
       gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" 2>/dev/null || true
     fi
-    gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **Cannot publish from this PR.** Its merge commit is not on \`main\`. Merge to \`main\` first, then run \`/${TYPE}\` on that merged PR." 2>/dev/null || true
+    gh pr comment "$PR_NUMBER" --repo "$REPO" --body "❌ **Cannot publish from this PR.** It was merged into \`${BASE_REF:-unknown}\`, not \`${DEFAULT_BRANCH}\`. Open a PR targeting \`${DEFAULT_BRANCH}\`, merge it, then run \`/${TYPE}\` on that merged PR." 2>/dev/null || true
     exit 1
   fi
 
-  # Always build from the current main tip so releases never omit newer merged commits.
+  MAIN_SHA=$(gh api "repos/${REPO}/git/ref/heads/${DEFAULT_BRANCH}" 2>/dev/null | jq -r '.object.sha' || true)
+  if [[ -z "$MAIN_SHA" || "$MAIN_SHA" == "null" ]]; then
+    echo "Could not resolve current ${DEFAULT_BRANCH} branch tip" >&2
+    exit 1
+  fi
+
+  # Always build from the current default-branch tip so releases never omit newer merged commits.
   TARGET_SHA="$MAIN_SHA"
   MERGE_SHA=$(echo "$PR_JSON" | jq -r '.mergeCommit.oid // empty')
-  MAIN_AHEAD_OF_PR=$([[ "$MERGE_SHA" != "$MAIN_SHA" ]] && echo "true" || echo "false")
+  MAIN_AHEAD_OF_PR=$([[ -n "$MERGE_SHA" && "$MERGE_SHA" != "$MAIN_SHA" ]] && echo "true" || echo "false")
 else
   TARGET_SHA="main"
   MAIN_AHEAD_OF_PR="false"
