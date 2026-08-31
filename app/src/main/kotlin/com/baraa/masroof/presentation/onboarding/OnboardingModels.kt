@@ -2,8 +2,8 @@ package com.baraa.masroof.presentation.onboarding
 
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.sms.scanner.SmsScanFailure
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.onboarding.HistoricalImportFailure
+import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import java.time.LocalDate
 
 enum class OnboardingStep {
@@ -26,9 +26,9 @@ enum class ImportDateOption {
 sealed interface ImportState {
     data object Idle : ImportState
     data object Scanning : ImportState
-    data class Completed(val result: SmsScanResult) : ImportState
-    data class PermissionError(val result: SmsScanResult) : ImportState
-    data class ProviderError(val result: SmsScanResult) : ImportState
+    data class Completed(val result: HistoricalImportResult) : ImportState
+    data class PermissionError(val result: HistoricalImportResult) : ImportState
+    data class ProviderError(val result: HistoricalImportResult) : ImportState
 }
 
 data class OwnershipCandidateUi(
@@ -71,9 +71,9 @@ enum class OnboardingError {
     BACKUP_RESTORE_INVALID,
 }
 
-internal fun SmsScanResult.toImportState(): ImportState =
+internal fun HistoricalImportResult.toImportState(): ImportState =
     when (failure) {
         null -> ImportState.Completed(this)
-        SmsScanFailure.PermissionDenied -> ImportState.PermissionError(this)
-        is SmsScanFailure.ProviderError -> ImportState.ProviderError(this)
+        HistoricalImportFailure.PermissionDenied -> ImportState.PermissionError(this)
+        is HistoricalImportFailure.ProviderError -> ImportState.ProviderError(this)
     }

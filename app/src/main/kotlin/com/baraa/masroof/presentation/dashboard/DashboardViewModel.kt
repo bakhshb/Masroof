@@ -29,9 +29,9 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.sms.scanner.SmsScanResult
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
+import com.baraa.masroof.application.onboarding.HistoricalImportResult
+import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
+import com.baraa.masroof.application.onboarding.userOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -52,7 +52,7 @@ class DashboardViewModel(
     private val cardRegistryRepository: CardRegistryRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val layoutPreferencesRepository: DashboardLayoutPreferencesRepository,
-    private val rescanService: suspend () -> SmsScanResult,
+    private val rescanService: suspend () -> HistoricalImportResult,
     private val reclassificationService: TransactionReclassificationService,
     private val ignoreService: TransactionIgnoreService,
     private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
@@ -268,16 +268,16 @@ class DashboardViewModel(
         _uiState.update { it.copy(smsPermissionGranted = permissionStateProvider()) }
     }
 
-    private fun mapRescanStatus(result: SmsScanResult): SmsRescanStatus =
-        when (SmsScanUserOutcomeMapper.map(result)) {
-            SmsScanUserOutcome.PERMISSION_DENIED -> SmsRescanStatus.PERMISSION_DENIED
-            SmsScanUserOutcome.FAILED -> SmsRescanStatus.FAILED
-            SmsScanUserOutcome.NO_MESSAGES -> SmsRescanStatus.NO_MESSAGES
-            SmsScanUserOutcome.NO_BANK_SMS -> SmsRescanStatus.NO_BANK_SMS
-            SmsScanUserOutcome.OK -> SmsRescanStatus.OK
-            SmsScanUserOutcome.ALREADY_UP_TO_DATE -> SmsRescanStatus.ALREADY_UP_TO_DATE
-            SmsScanUserOutcome.NEEDS_REVIEW -> SmsRescanStatus.NEEDS_REVIEW
-            SmsScanUserOutcome.NO_NEW_TRANSACTIONS -> SmsRescanStatus.NO_TRANSACTIONS
+    private fun mapRescanStatus(result: HistoricalImportResult): SmsRescanStatus =
+        when (result.userOutcome()) {
+            HistoricalImportUserOutcome.PERMISSION_DENIED -> SmsRescanStatus.PERMISSION_DENIED
+            HistoricalImportUserOutcome.FAILED -> SmsRescanStatus.FAILED
+            HistoricalImportUserOutcome.NO_MESSAGES -> SmsRescanStatus.NO_MESSAGES
+            HistoricalImportUserOutcome.NO_BANK_SMS -> SmsRescanStatus.NO_BANK_SMS
+            HistoricalImportUserOutcome.OK -> SmsRescanStatus.OK
+            HistoricalImportUserOutcome.ALREADY_UP_TO_DATE -> SmsRescanStatus.ALREADY_UP_TO_DATE
+            HistoricalImportUserOutcome.NEEDS_REVIEW -> SmsRescanStatus.NEEDS_REVIEW
+            HistoricalImportUserOutcome.NO_NEW_TRANSACTIONS -> SmsRescanStatus.NO_TRANSACTIONS
         }
 
     fun openTransactionDetail(transactionId: String) {

@@ -69,7 +69,7 @@ class OnboardingBackupRestoreTest {
                 override fun setHistoricalImportCompleted(completed: Boolean) = Unit
             },
             historicalImportGateway = HistoricalImportGateway {
-                SmsScanResult(scanned = 0, parsed = 0, duplicates = 0)
+                com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 0, parsed = 0, duplicates = 0)
             },
             accountRegistryRepository = accounts,
             cardRegistryRepository = cards,
