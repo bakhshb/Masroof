@@ -23,8 +23,8 @@ class TransactionMatcherTest {
 
     @Test
     fun matchesUniqueCandidatesWithSameReferenceAtWindowBoundary() {
-        val outgoing = outgoing(reference = "ref-1", localTime = localTime)
-        val incoming = incoming(reference = "ref-1", localTime = localTime.plusMinutes(10))
+        val outgoing = outgoing(reference = "ref-1", localTime = defaultLocalTime)
+        val incoming = incoming(reference = "ref-1", localTime = defaultLocalTime.plusMinutes(10))
 
         assertEquals(
             listOf(TransferMatchPair(outgoing, incoming)),
@@ -47,7 +47,7 @@ class TransactionMatcherTest {
 
     @Test
     fun doesNotMatchWhenOneCandidateUsesReceivedTimeAndOtherUsesLocalTime() {
-        val outgoing = outgoing(reference = "ref-1", localTime = localTime)
+        val outgoing = outgoing(reference = "ref-1", localTime = defaultLocalTime)
         val incoming = incoming(reference = "ref-1", localTime = null)
 
         assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
@@ -83,7 +83,7 @@ class TransactionMatcherTest {
         id: String = "out",
         rawSmsId: String = "raw-out",
         reference: String?,
-        localTime: LocalDateTime? = this.localTime,
+        localTime: LocalDateTime? = defaultLocalTime,
         source: AccountReference = AccountReference(Bank.BANK_ALJAZIRA, "1001"),
         destination: AccountReference = AccountReference(Bank.UNKNOWN, "2002"),
         network: BankNetworkType? = BankNetworkType.INTER_BANK,
@@ -104,7 +104,7 @@ class TransactionMatcherTest {
         id: String = "in",
         rawSmsId: String = "raw-in",
         reference: String?,
-        localTime: LocalDateTime? = this.localTime,
+        localTime: LocalDateTime? = defaultLocalTime,
         amount: Money = sarTen,
         source: AccountReference? = null,
         destination: AccountReference = AccountReference(Bank("D360"), "2002"),
@@ -162,7 +162,7 @@ class TransactionMatcherTest {
     )
 
     private companion object {
-        val localTime: LocalDateTime = LocalDateTime.parse("2026-08-10T12:00:00")
+        val defaultLocalTime: LocalDateTime = LocalDateTime.parse("2026-08-10T12:00:00")
         val sarTen: Money = Money.of(BigDecimal.TEN, Currency.SAR)
     }
 }
