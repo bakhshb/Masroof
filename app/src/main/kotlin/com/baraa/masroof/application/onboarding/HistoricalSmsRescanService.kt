@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.onboarding
 
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.sms.scanner.SmsScanResult
 import java.time.Instant
 import java.time.ZoneId
 
@@ -11,7 +12,7 @@ class HistoricalSmsRescanService(
     private val container: AppContainer,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
-    suspend fun rescan(): HistoricalImportResult {
+    suspend fun rescan(): SmsScanResult {
         val epoch = container.onboardingPreferencesRepository.getHistoricalImportStartEpochMillis()
         val receivedAfter = epoch?.let(Instant::ofEpochMilli)
             ?: ImportDatePolicy.toStartOfDayInstant(
@@ -25,6 +26,6 @@ class HistoricalSmsRescanService(
         if (result.failure == null) {
             container.reparseAllStoredEvents()
         }
-        return result.toHistoricalImportResult()
+        return result
     }
 }
