@@ -15,10 +15,7 @@ class SettingsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(SettingsViewModel::class.java))
         return SettingsViewModel(
-            cardRegistryRepository = container.cardRegistryRepository,
-            accountRegistryRepository = container.accountRegistryRepository,
-            loanRegistryRepository = container.loanRegistryRepository,
-            ownershipConfirmationService = container.ownershipConfirmationService,
+            settingsRegistryWorkflow = container.settingsRegistryWorkflow,
             appLocaleRepository = container.appLocaleRepository,
             themePreferencesRepository = container.themePreferencesRepository,
             databaseBackupService = container.databaseBackupService,

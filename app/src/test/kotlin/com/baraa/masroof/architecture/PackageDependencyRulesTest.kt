@@ -107,9 +107,6 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.domain.rules.",
             ),
             allowedFiles = setOf(
-                // PR 7 — review/settings/registry workflow application facades.
-                "presentation/review/ReviewViewModel.kt",
-                "presentation/settings/SettingsViewModel.kt",
                 // PR 8 — dashboard/onboarding/notification workflow facades.
                 "presentation/dashboard/DashboardViewModel.kt",
                 "presentation/notification/NotificationCenterViewModel.kt",

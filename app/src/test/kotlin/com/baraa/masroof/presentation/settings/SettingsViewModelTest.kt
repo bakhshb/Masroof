@@ -15,7 +15,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanRegistryEntry
@@ -442,13 +442,10 @@ class SettingsViewModelTest {
             SettingsViewModelTestFixtures.updateCheckCoordinator(appUpdateService = appUpdateService),
     ): SettingsViewModel =
         SettingsViewModel(
-            cardRegistryRepository = cards,
-            accountRegistryRepository = accounts,
-            loanRegistryRepository = loans,
-            ownershipConfirmationService = OwnershipConfirmationService(
-                accountRegistry = accounts,
-                cardRegistry = cards,
-                loanRegistry = loans,
+            settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(
+                cards = cards,
+                accounts = accounts,
+                loans = loans,
             ),
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
