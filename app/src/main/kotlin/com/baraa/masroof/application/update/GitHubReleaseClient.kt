@@ -83,18 +83,35 @@ class GitHubReleaseClient(
         token: String?,
         tokenWasProvided: Boolean,
     ): Result<String> {
+        val tag = ReleaseAssets.tagForVersionName(manifest.versionName)
+        fetchReleaseByTag(tag, token, tokenWasProvided)
+            .getOrNull()
+            ?.let { release -> ReleaseAssets.findApkAssetUrl(release, manifest.apkFileName) }
+            ?.let { return Result.success(it) }
+
         val releases = fetchRecentReleases(token, tokenWasProvided).getOrElse { return Result.failure(it) }
         for (release in releases) {
-            val assets = release.jsonObject["assets"]?.jsonArray ?: continue
-            val apkAsset = assets.firstOrNull { asset ->
-                asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull == manifest.apkFileName
-            }?.jsonObject
-            val downloadUrl = apkAsset?.get("url")?.jsonPrimitive?.contentOrNull
+            val downloadUrl = ReleaseAssets.findApkAssetUrl(release.jsonObject, manifest.apkFileName)
             if (downloadUrl != null) {
                 return Result.success(downloadUrl)
             }
         }
         return Result.failure(IllegalStateException("APK asset not found: ${manifest.apkFileName}"))
+    }
+
+    private fun fetchReleaseByTag(
+        tag: String,
+        token: String?,
+        tokenWasProvided: Boolean,
+    ): Result<JsonObject> {
+        val request =
+            authorizedRequest(token)
+                .url("https://api.github.com/repos/$owner/$repo/releases/tags/$tag")
+                .header("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+
+        return executeJsonObject(request, tokenWasProvided)
     }
 
     private fun fetchLatestRelease(token: String?, tokenWasProvided: Boolean): Result<JsonObject> {
