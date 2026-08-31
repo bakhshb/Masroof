@@ -7,6 +7,8 @@ import android.net.Uri
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
+import com.baraa.masroof.application.onboarding.HistoricalImportFailure
+import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
@@ -16,8 +18,6 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.sms.scanner.SmsScanFailure
-import com.baraa.masroof.sms.scanner.SmsScanResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -235,7 +235,7 @@ class OnboardingViewModel(
                             _uiState.update {
                                 it.copy(
                                     importState = ImportState.ProviderError(
-                                        SmsScanResult(failure = SmsScanFailure.ProviderError("post_scan_setup_failed")),
+                                        HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("post_scan_setup_failed")),
                                     ),
                                     error = OnboardingError.IMPORT_FAILED,
                                 )
@@ -263,7 +263,7 @@ class OnboardingViewModel(
                 _uiState.update {
                     it.copy(
                                 importState = ImportState.ProviderError(
-                                    SmsScanResult(failure = SmsScanFailure.ProviderError("scan_failed")),
+                                    HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("scan_failed")),
                                 ),
                         error = OnboardingError.IMPORT_FAILED,
                     )
