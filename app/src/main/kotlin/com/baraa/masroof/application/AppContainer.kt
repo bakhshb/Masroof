@@ -34,7 +34,8 @@ import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
-import com.baraa.masroof.presentation.locale.AppLocaleContext
+import com.baraa.masroof.application.locale.AppLocaleBootstrap
+import com.baraa.masroof.application.locale.AppLocaleContextFactory
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -149,9 +150,9 @@ class AppContainer(
     val applicationContext: Context get() = appContext
 
     val localizedApplicationContext: Context
-        get() = AppLocaleContext.wrap(
+        get() = AppLocaleContextFactory.wrap(
             appContext,
-            AppLocaleContext.readStoredLanguageTag(appContext),
+            AppLocaleBootstrap.readStoredLanguageTag(appContext),
         )
 
     val onboardingPreferencesRepository: OnboardingPreferencesRepository =
