@@ -85,11 +85,12 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.runBlocking
 
 /**
  * Minimal manual composition root for P6–P9.
@@ -528,9 +529,21 @@ class AppContainer(
         )
     }
 
+    private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
+
     fun runStartupMaintenance() {
-        runBlocking(Dispatchers.IO) {
-            parsedEventFactsBackfillCoordinator.runIfNeeded()
+        applicationScope.async {
+            try {
+                parsedEventFactsBackfillCoordinator.runIfNeeded()
+            } finally {
+                if (!startupMaintenanceCompletion.isCompleted) {
+                    startupMaintenanceCompletion.complete(Unit)
+                }
+            }
         }
+    }
+
+    suspend fun awaitStartupMaintenance() {
+        startupMaintenanceCompletion.await()
     }
 }

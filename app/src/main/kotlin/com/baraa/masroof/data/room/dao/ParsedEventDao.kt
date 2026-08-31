@@ -41,6 +41,19 @@ interface ParsedEventDao {
         endExclusiveMillis: Long,
     ): List<ParsedEventEntity>
 
+    @Query(
+        """
+        SELECT pe.* FROM parsed_event pe
+        WHERE pe.messageFamily IN ('TRANSFER_IN', 'TRANSFER_OUT')
+          AND NOT EXISTS (
+            SELECT 1 FROM financial_transaction_raw_sms_link link
+            WHERE link.rawSmsId = pe.rawSmsId
+          )
+        ORDER BY pe.id
+        """,
+    )
+    suspend fun listUnlinkedTransfers(): List<ParsedEventEntity>
+
     /**
      * Replace the current parse result for a RawSms (same or new event id).
      * Deletes any existing row for [entity.rawSmsId], then inserts [entity].

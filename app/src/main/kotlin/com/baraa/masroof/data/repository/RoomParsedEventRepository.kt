@@ -36,4 +36,7 @@ class RoomParsedEventRepository(
             startInclusiveMillis = startInclusive.toEpochMilli(),
             endExclusiveMillis = endExclusive.toEpochMilli(),
         ).map(ParsedEventMapper::toRecord)
+
+    override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
+        dao.listUnlinkedTransfers().map(ParsedEventMapper::toRecord)
 }
