@@ -132,7 +132,7 @@ elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
   echo '{"object":{"sha":"main-sha-99999"}}'
   exit 0
 elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
-  echo '{"status":"behind"}'
+  echo '{"status":"ahead"}'
   exit 0
 elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
   echo "\$@" > "$DISPATCH_ARGS_FILE"
@@ -153,6 +153,34 @@ assert_eq "Workflow name" "release.yml" "$(echo "$DISPATCHED" | awk '{print $3}'
 assert_eq "Has type=release" "1" "$(echo "$DISPATCHED" | grep -c 'type=release' || true)"
 assert_eq "Has bump=patch" "1" "$(echo "$DISPATCHED" | grep -c 'bump=patch' || true)"
 assert_eq "Uses main tip SHA" "1" "$(echo "$DISPATCHED" | grep -c 'ref=main-sha-99999' || true)"
+
+# Test 4b: Identical merge and main tip also accepted
+echo "Test 4b: Merged PR with identical main tip accepted"
+cat > "$TEST_TMP/bin/gh" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "pr" && "\$2" == "view" ]]; then
+  echo '{"state":"MERGED","merged":true,"mergeCommit":{"oid":"main-sha-99999"},"headRefOid":"abc1234"}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/git/ref/heads/main" ]]; then
+  echo '{"object":{"sha":"main-sha-99999"}}'
+  exit 0
+elif [[ "\$1" == "api" && "\$2" == *"/compare/"* ]]; then
+  echo '{"status":"identical"}'
+  exit 0
+elif [[ "\$1" == "workflow" && "\$2" == "run" ]]; then
+  echo "\$@" > "$DISPATCH_ARGS_FILE"
+  exit 0
+elif [[ "\$1" == "api" || "\$1" == "pr" ]]; then
+  exit 0
+fi
+EOF
+chmod +x "$TEST_TMP/bin/gh"
+
+set +e
+OUT=$(COMMENT_BODY="/release" PR_NUMBER="42" COMMENT_ID="999" COMMENT_AUTHOR="owner" COMMENT_AUTHOR_ASSOCIATION="OWNER" REPO="test/repo" "$SCRIPT" 2>&1)
+EXIT_CODE=$?
+set -e
+assert_eq "Identical main tip exit code" "0" "$EXIT_CODE"
 
 # Test 5: /release minor
 echo "Test 5: Merged PR with /release minor"

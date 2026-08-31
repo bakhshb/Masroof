@@ -99,7 +99,8 @@ if command -v gh >/dev/null 2>&1 && [[ -n "$REPO" ]]; then
   fi
 
   COMPARE_STATUS=$(gh api "repos/${REPO}/compare/${TARGET_SHA}...${MAIN_SHA}" 2>/dev/null | jq -r '.status' || true)
-  if [[ "$COMPARE_STATUS" != "identical" && "$COMPARE_STATUS" != "behind" ]]; then
+  # ahead = main tip has commits after this PR's merge; identical = merge is current main tip.
+  if [[ "$COMPARE_STATUS" != "identical" && "$COMPARE_STATUS" != "ahead" ]]; then
     echo "PR #$PR_NUMBER merge commit is not contained in main (status=${COMPARE_STATUS})." >&2
     if [[ -n "${COMMENT_ID:-}" ]]; then
       gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" 2>/dev/null || true
