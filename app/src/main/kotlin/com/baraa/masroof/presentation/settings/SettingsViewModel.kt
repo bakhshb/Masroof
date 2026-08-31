@@ -18,9 +18,9 @@ import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.application.update.UpdateManifest
-import com.baraa.masroof.sms.scanner.SmsScanResult
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
+import com.baraa.masroof.application.onboarding.HistoricalImportResult
+import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
+import com.baraa.masroof.application.onboarding.userOutcome
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
@@ -52,7 +52,7 @@ class SettingsViewModel(
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
-    private val importSmsFromInbox: suspend () -> SmsScanResult,
+    private val importSmsFromInbox: suspend () -> HistoricalImportResult,
     private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
     private val appUpdateService: AppUpdateService,
@@ -383,16 +383,16 @@ class SettingsViewModel(
         _uiState.update { it.copy(smsImportMessage = null) }
     }
 
-    private fun mapSmsImportMessage(result: SmsScanResult): SmsImportMessage =
-        when (SmsScanUserOutcomeMapper.map(result)) {
-            SmsScanUserOutcome.PERMISSION_DENIED -> SmsImportMessage.PERMISSION_DENIED
-            SmsScanUserOutcome.FAILED -> SmsImportMessage.FAILED
-            SmsScanUserOutcome.NO_MESSAGES -> SmsImportMessage.NO_MESSAGES
-            SmsScanUserOutcome.NO_BANK_SMS -> SmsImportMessage.NO_BANK_SMS
-            SmsScanUserOutcome.OK -> SmsImportMessage.OK
-            SmsScanUserOutcome.ALREADY_UP_TO_DATE -> SmsImportMessage.ALREADY_UP_TO_DATE
-            SmsScanUserOutcome.NEEDS_REVIEW -> SmsImportMessage.NEEDS_REVIEW
-            SmsScanUserOutcome.NO_NEW_TRANSACTIONS -> SmsImportMessage.NO_TRANSACTIONS
+    private fun mapSmsImportMessage(result: HistoricalImportResult): SmsImportMessage =
+        when (result.userOutcome()) {
+            HistoricalImportUserOutcome.PERMISSION_DENIED -> SmsImportMessage.PERMISSION_DENIED
+            HistoricalImportUserOutcome.FAILED -> SmsImportMessage.FAILED
+            HistoricalImportUserOutcome.NO_MESSAGES -> SmsImportMessage.NO_MESSAGES
+            HistoricalImportUserOutcome.NO_BANK_SMS -> SmsImportMessage.NO_BANK_SMS
+            HistoricalImportUserOutcome.OK -> SmsImportMessage.OK
+            HistoricalImportUserOutcome.ALREADY_UP_TO_DATE -> SmsImportMessage.ALREADY_UP_TO_DATE
+            HistoricalImportUserOutcome.NEEDS_REVIEW -> SmsImportMessage.NEEDS_REVIEW
+            HistoricalImportUserOutcome.NO_NEW_TRANSACTIONS -> SmsImportMessage.NO_TRANSACTIONS
         }
 
     fun clearUpdateMessage() {
