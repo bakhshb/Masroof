@@ -8,8 +8,10 @@ import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesReposit
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -258,6 +260,20 @@ class AppContainer(
             manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
             appLogService = appLogService,
+        )
+
+    val reviewOwnershipWorkflow: ReviewOwnershipWorkflow =
+        ReviewOwnershipWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
+        )
+
+    val settingsRegistryWorkflow: SettingsRegistryWorkflow =
+        SettingsRegistryWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+            loanRegistryRepository = loanRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
         )
 
     val transactionReclassificationService: TransactionReclassificationService =
