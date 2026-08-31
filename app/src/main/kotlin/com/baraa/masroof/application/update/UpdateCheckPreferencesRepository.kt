@@ -17,9 +17,17 @@ class UpdateCheckPreferencesRepository(
         prefs.edit().putLong(KEY_LAST_ATTEMPT_MS, epochMs).apply()
     }
 
+    fun getUpdateChannel(): UpdateChannel =
+        UpdateChannel.fromStorageValue(prefs.getString(KEY_UPDATE_CHANNEL, null))
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        prefs.edit().putString(KEY_UPDATE_CHANNEL, channel.storageValue).apply()
+    }
+
     companion object {
         const val PREFS_NAME: String = "update_check_prefs"
         private const val KEY_LAST_CHECK_MS: String = "last_check_epoch_ms"
         private const val KEY_LAST_ATTEMPT_MS: String = "last_attempt_epoch_ms"
+        private const val KEY_UPDATE_CHANNEL: String = "update_channel"
     }
 }

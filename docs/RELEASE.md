@@ -111,10 +111,15 @@ The token is stored in app-private storage on the device and is never committed 
 ## Updating the app on your phone
 
 1. Open Masroof → **Settings → About**.
-2. Ensure your GitHub token is saved.
-3. Tap **Check for updates** (or wait for an automatic check on first launch after onboarding).
-4. **Download update** → **Install update**.
-5. If prompted, allow **Install unknown apps** for Masroof.
+2. Choose your **update channel**:
+   - **Stable**: official releases only.
+   - **Nightly**: latest test or stable build (highest `versionCode`).
+3. Ensure your GitHub token is saved.
+4. Tap **Check for updates** (or wait for an automatic check on first launch after onboarding).
+5. **Download update** → **Install update**.
+6. If prompted, allow **Install unknown apps** for Masroof.
+
+If you are running a nightly build, **About** shows a **نسخة تجريبية** badge (Arabic) / **Nightly** badge (English).
 
 ---
 
