@@ -85,9 +85,47 @@ class TransactionReconciliationService(
         val window = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
         val startInclusive = receivedAt.minus(window)
         val endExclusive = receivedAt.plus(window).plusMillis(1)
-        return effectiveParsedEventProvider?.listEffectiveReceivedBetween(startInclusive, endExclusive)
+        val windowed = effectiveParsedEventProvider?.listEffectiveReceivedBetween(startInclusive, endExclusive)
             ?: parsedEventRepository.listReceivedBetween(startInclusive, endExclusive)
+        return supplementIncrementalReconcileRecords(windowed)
     }
+
+    /**
+     * Keeps incremental reconciliation bounded to a received-at window while still
+     * loading transfer legs that pairing and stale external-upgrade passes require.
+     */
+    private suspend fun supplementIncrementalReconcileRecords(
+        windowed: List<ParsedEventRecord>,
+    ): List<ParsedEventRecord> {
+        val merged = windowed.associateBy { it.event.id }.toMutableMap()
+        val all = effectiveParsedEventProvider?.listAllEffective() ?: parsedEventRepository.listAll()
+        val allById = all.associateBy { it.event.id }
+
+        for (record in all) {
+            if (!record.event.messageFamily.isTransferFamily()) continue
+            if (!financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) {
+                merged.putIfAbsent(record.event.id, record)
+            }
+        }
+
+        for (transaction in financialTransactionRepository.listAll()) {
+            if (transaction.type != FinancialTransactionType.EXTERNAL_TRANSFER_OUT &&
+                transaction.type != FinancialTransactionType.EXTERNAL_TRANSFER_IN
+            ) {
+                continue
+            }
+            for (parsedEventId in transaction.linkedParsedEventIds) {
+                val record = allById[parsedEventId] ?: continue
+                if (!record.event.messageFamily.isTransferFamily()) continue
+                merged.putIfAbsent(parsedEventId, record)
+            }
+        }
+
+        return merged.values.toList()
+    }
+
+    private fun MessageFamily.isTransferFamily(): Boolean =
+        this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
     private suspend fun reconcileRecordsDetailed(
         records: List<ParsedEventRecord>,
@@ -421,10 +459,13 @@ class TransactionReconciliationService(
         val all = financialTransactionRepository.listAll()
         val outs = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }
         val ins = all.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN }
-        if (outs.isEmpty() || ins.isEmpty()) return UpgradePassResult()
+        val singleLegSelfTransfers = all.filter {
+            it.type == FinancialTransactionType.SELF_TRANSFER && it.linkedParsedEventIds.size == 1
+        }
+        if (outs.isEmpty() && ins.isEmpty() && singleLegSelfTransfers.isEmpty()) return UpgradePassResult()
 
         data class StaleLeg(
-            val transaction: FinancialTransaction,
+            val transaction: FinancialTransaction?,
             val event: ParsedEvent,
             val record: ParsedEventRecord?,
         )
@@ -446,8 +487,39 @@ class TransactionReconciliationService(
                 )
             }
 
-        val outLegs = staleLegs(outs, MessageFamily.TRANSFER_OUT)
-        val inLegs = staleLegs(ins, MessageFamily.TRANSFER_IN)
+        val unlinkedOutLegs = mutableListOf<StaleLeg>()
+        val unlinkedInLegs = mutableListOf<StaleLeg>()
+        for (record in records) {
+            val event = record.event
+            if (!event.messageFamily.isTransferFamily()) continue
+            if (event.bankNetworkType != BankNetworkType.INTRA_BANK) continue
+            if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
+            val leg = StaleLeg(transaction = null, event = event, record = record)
+            when (event.messageFamily) {
+                MessageFamily.TRANSFER_OUT -> unlinkedOutLegs += leg
+                MessageFamily.TRANSFER_IN -> unlinkedInLegs += leg
+                else -> Unit
+            }
+        }
+
+        val outLegs = (
+            staleLegs(outs, MessageFamily.TRANSFER_OUT) +
+                staleLegs(singleLegSelfTransfers, MessageFamily.TRANSFER_OUT) +
+                unlinkedOutLegs
+            )
+            .associateBy { it.event.id }
+            .values
+            .toList()
+        val inLegs = (
+            staleLegs(ins, MessageFamily.TRANSFER_IN) +
+                staleLegs(singleLegSelfTransfers, MessageFamily.TRANSFER_IN) +
+                unlinkedInLegs
+            )
+            .associateBy { it.event.id }
+            .values
+            .toList()
+        if (outLegs.isEmpty() || inLegs.isEmpty()) return UpgradePassResult()
+
         val outByEventId = outLegs.associateBy { it.event.id }
         val inByEventId = inLegs.associateBy { it.event.id }
 
@@ -463,7 +535,8 @@ class TransactionReconciliationService(
                         transactionReference = leg.record?.details?.transactionReference,
                         occurredAtLocal = leg.record?.details?.occurredAtLocal,
                         receivedAt = rawSmsRepository.getById(leg.event.rawSmsId)?.receivedAt
-                            ?: leg.transaction.occurredAt,
+                            ?: leg.transaction?.occurredAt
+                            ?: continue,
                         sourceOwnership = sourceOwn,
                         destinationOwnership = destOwn,
                     ),
@@ -485,6 +558,10 @@ class TransactionReconciliationService(
         for (pair in pairs) {
             val outLeg = outByEventId[pair.outgoing.event.id] ?: continue
             val inLeg = inByEventId[pair.incoming.event.id] ?: continue
+            val hasStaleExternal =
+                outLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+                    inLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
+            if (!hasStaleExternal) continue
             val sourceOwn = pair.outgoing.sourceOwnership
             val destOwn = pair.incoming.destinationOwnership
 
