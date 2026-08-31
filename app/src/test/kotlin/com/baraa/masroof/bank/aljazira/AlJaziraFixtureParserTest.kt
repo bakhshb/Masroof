@@ -13,16 +13,21 @@ import com.baraa.masroof.domain.model.TransferOwnershipType
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixture
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureLoader
 import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @RunWith(Parameterized::class)
@@ -88,6 +93,32 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
             assertEquals(fixture.id, LocalDateTime.parse(expected.occurredAt), d.occurredAtLocal)
             // Must not invent Instant/UTC from offset-less local SMS time.
             assertNull(fixture.id, e.occurredAt)
+        }
+
+        expected.cardSmsChannel?.let { channel ->
+            assertEquals(fixture.id, CardSmsChannel.valueOf(channel), d.cardSmsChannel)
+        }
+        expected.paymentDueDate?.let { due ->
+            assertEquals(fixture.id, LocalDate.parse(due), d.paymentDueDate)
+        }
+        expected.exchangeRate?.let { rate ->
+            assertEquals(fixture.id, BigDecimal(rate), d.exchangeRate)
+        }
+        expected.internationalFee?.let { fee ->
+            assertEquals(fixture.id, Money.of(fee, Currency.SAR), d.internationalFee)
+        }
+        if (expected.labeledForeignAmount != null) {
+            val currency = expected.labeledForeignCurrency?.let { Currency.valueOf(it) } ?: Currency.SAR
+            assertEquals(fixture.id, Money.of(expected.labeledForeignAmount, currency), d.labeledForeignAmount)
+        }
+        expected.loanType?.let { loanType ->
+            assertEquals(fixture.id, LoanType.valueOf(loanType), d.loanType)
+        }
+        expected.debitSourceAccountLast4?.let { last4 ->
+            assertEquals(fixture.id, last4, d.debitSourceAccountLast4)
+        }
+        expected.salaryIncomeWording?.let { wording ->
+            assertEquals(fixture.id, wording, d.salaryIncomeWording)
         }
 
         assertFalse(result.toString().contains("SELF_TRANSFER"))

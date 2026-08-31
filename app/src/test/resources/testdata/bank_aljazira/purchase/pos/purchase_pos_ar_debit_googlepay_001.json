@@ -12,6 +12,7 @@
     "cardLast4": "8219",
     "merchant": "MALAYSIA FOODS RESTA",
     "occurredAt": "2026-08-03T13:24:00",
-    "parseStatus": "SUCCESS"
+    "parseStatus": "SUCCESS",
+    "cardSmsChannel": "DEBIT"
   }
 }
