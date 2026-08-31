@@ -12,9 +12,7 @@ class NotificationCenterViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(NotificationCenterViewModel::class.java))
         return NotificationCenterViewModel(
-            reviewRepository = container.reviewRepository,
-            cardRegistryRepository = container.cardRegistryRepository,
-            accountRegistryRepository = container.accountRegistryRepository,
+            notificationCenterMetricsWorkflow = container.notificationCenterMetricsWorkflow,
             notificationCenterService = container.notificationCenterService,
             permissionStateProvider = permissionStateProvider,
         ) as T
