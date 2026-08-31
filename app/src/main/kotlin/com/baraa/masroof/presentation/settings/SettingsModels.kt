@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.application.theme.ThemeMode
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
@@ -132,6 +133,8 @@ data class SettingsUiState(
     val backupMessage: BackupMessage? = null,
     val error: SettingsError? = null,
     val githubTokenConfigured: Boolean = false,
+    val updateChannel: UpdateChannel = UpdateChannel.STABLE,
+    val isNightlyBuild: Boolean = false,
     val updateState: AppUpdateUiState = AppUpdateUiState.Idle,
     val updateMessage: AppUpdateMessage? = null,
     val exportingLogs: Boolean = false,

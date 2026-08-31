@@ -3,10 +3,13 @@ package com.baraa.masroof.presentation.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -15,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -28,12 +32,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.R
+import com.baraa.masroof.application.update.UpdateChannel
+import com.baraa.masroof.presentation.common.MasroofBadge
+import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -44,6 +52,8 @@ import com.baraa.masroof.presentation.common.MasroofLogo
 @Composable
 fun SettingsAboutScreen(
     appVersion: String,
+    isNightlyBuild: Boolean,
+    updateChannel: UpdateChannel,
     githubTokenConfigured: Boolean,
     updateState: AppUpdateUiState,
     updateMessage: AppUpdateMessage?,
@@ -53,6 +63,7 @@ fun SettingsAboutScreen(
     onOpenDesignCatalog: () -> Unit = {},
     onSaveGithubToken: (String) -> Unit,
     onClearGithubToken: () -> Unit,
+    onSelectUpdateChannel: (UpdateChannel) -> Unit,
     onCheckForUpdates: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
@@ -96,6 +107,12 @@ fun SettingsAboutScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (isNightlyBuild) {
+                MasroofBadge(
+                    text = stringResource(R.string.badge_nightly_release),
+                    accent = MasroofCardAccent.Liability,
+                )
+            }
             Text(
                 stringResource(R.string.settings_about_tagline),
                 style = MaterialTheme.typography.bodyMedium,
@@ -133,6 +150,8 @@ fun SettingsAboutScreen(
             }
 
             UpdateSectionCard(
+                updateChannel = updateChannel,
+                onSelectUpdateChannel = onSelectUpdateChannel,
                 githubTokenConfigured = githubTokenConfigured,
                 tokenInput = tokenInput,
                 onTokenInputChange = { tokenInput = it },
@@ -160,6 +179,8 @@ fun SettingsAboutScreen(
 
 @Composable
 private fun UpdateSectionCard(
+    updateChannel: UpdateChannel,
+    onSelectUpdateChannel: (UpdateChannel) -> Unit,
     githubTokenConfigured: Boolean,
     tokenInput: String,
     onTokenInputChange: (String) -> Unit,
@@ -180,6 +201,29 @@ private fun UpdateSectionCard(
             Text(
                 stringResource(R.string.settings_updates_hint),
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Text(
+                stringResource(R.string.settings_update_channel_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            UpdateChannelOption(
+                channel = UpdateChannel.STABLE,
+                label = stringResource(R.string.settings_update_channel_stable),
+                selectedChannel = updateChannel,
+                onSelectChannel = onSelectUpdateChannel,
+            )
+            UpdateChannelOption(
+                channel = UpdateChannel.NIGHTLY,
+                label = stringResource(R.string.settings_update_channel_nightly),
+                selectedChannel = updateChannel,
+                onSelectChannel = onSelectUpdateChannel,
+            )
+            Text(
+                stringResource(R.string.settings_update_channel_hint),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
@@ -304,6 +348,36 @@ private fun UpdateSectionCard(
                     }
             }
         }
+    }
+}
+
+@Composable
+private fun UpdateChannelOption(
+    channel: UpdateChannel,
+    label: String,
+    selectedChannel: UpdateChannel,
+    onSelectChannel: (UpdateChannel) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = channel == selectedChannel,
+                onClick = { onSelectChannel(channel) },
+                role = Role.RadioButton,
+            )
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = channel == selectedChannel,
+            onClick = { onSelectChannel(channel) },
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 8.dp),
+        )
     }
 }
 

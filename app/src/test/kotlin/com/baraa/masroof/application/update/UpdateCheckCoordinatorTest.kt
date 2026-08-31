@@ -168,6 +168,7 @@ class UpdateCheckCoordinatorTest {
             },
             releaseClient = GitHubReleaseClient(OkHttpClient(), "bakhshb", "Masroof"),
             updateChecker = UpdateChecker(installedVersionCode = 4),
+            preferencesRepository = preferencesRepository,
             appLogService = appLogService,
         )
 }
