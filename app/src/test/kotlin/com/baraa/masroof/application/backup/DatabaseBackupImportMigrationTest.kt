@@ -22,6 +22,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -35,11 +36,20 @@ import java.util.zip.ZipOutputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class DatabaseBackupImportMigrationTest {
+    @Before
+    fun clearMaintenancePreferences() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(MasroofDatabase.NAME)
+        context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+    }
+
     @Test
     fun importV5Backup_resetsParseFactsBackfillMarker() {
         runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.deleteDatabase(MasroofDatabase.NAME)
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
@@ -60,18 +70,20 @@ class DatabaseBackupImportMigrationTest {
             closeDatabase = { liveDatabase.close() },
             appVersionName = "test",
             clockEpochMillis = { 1_700_000_000_000L },
-            restartProcess = { restartRequested.set(true) },
+            restartProcess = {
+                assertEquals(
+                    0,
+                    context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+                        .getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
+                )
+                restartRequested.set(true)
+            },
         )
 
         val outcome = backupService.importFrom(Uri.fromFile(backupZip))
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
-        assertEquals(
-            0,
-            context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-                .getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
-        )
 
         backupZip.delete()
         v5DbFile.delete()
