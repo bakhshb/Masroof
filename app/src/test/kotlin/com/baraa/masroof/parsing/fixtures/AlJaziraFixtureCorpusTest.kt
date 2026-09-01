@@ -33,6 +33,8 @@ class AlJaziraFixtureCorpusTest {
         )
         val allowedChannels = setOf("POS", "ONLINE", "UNKNOWN")
         val allowedNetworks = setOf("INTRA_BANK", "INTER_BANK", "UNKNOWN")
+        val allowedCardSmsChannels = setOf("DEBIT", "CREDIT", "STATEMENT")
+        val allowedLoanTypes = setOf("PERSONAL", "AUTO", "MORTGAGE")
 
         fixtures.forEach { fixture ->
             assertTrue(fixture.id.isNotBlank())
@@ -43,6 +45,8 @@ class AlJaziraFixtureCorpusTest {
             assertTrue(fixture.expected.parseStatus in allowedStatuses)
             fixture.expected.purchaseChannel?.let { assertTrue(it in allowedChannels) }
             fixture.expected.bankNetworkType?.let { assertTrue(it in allowedNetworks) }
+            fixture.expected.cardSmsChannel?.let { assertTrue(it in allowedCardSmsChannels) }
+            fixture.expected.loanType?.let { assertTrue(it in allowedLoanTypes) }
         }
     }
 
@@ -65,6 +69,9 @@ class AlJaziraFixtureCorpusTest {
         assertTrue(ids.contains("transfer_out_inter_ar_001"))
         assertTrue(ids.contains("transfer_in_intra_ar_001"))
         assertTrue(ids.contains("purchase_pos_ar_debit_001"))
+        assertTrue(ids.contains("transfer_in_salary_ar_001"))
+        assertTrue(ids.contains("financing_installment_ar_001"))
+        assertTrue(ids.contains("statement_ar_001"))
         assertTrue(ids.contains("otp_ar_001"))
 
         val ccPurchase = fixtures.first { it.id == "purchase_pos_ar_cc_001" }
@@ -96,6 +103,23 @@ class AlJaziraFixtureCorpusTest {
         val otp = fixtures.first { it.id == "otp_ar_001" }
         assertEquals("OTP", otp.expected.messageFamily)
         assertEquals("NON_FINANCIAL", otp.expected.parseStatus)
+    }
+
+    @Test
+    fun fixtureSchema_canExpressDashboardParseFacts() {
+        val salary = fixtures.first { it.id == "transfer_in_salary_ar_001" }
+        assertEquals(true, salary.expected.salaryIncomeWording)
+
+        val financing = fixtures.first { it.id == "financing_installment_ar_001" }
+        assertEquals("PERSONAL", financing.expected.loanType)
+
+        val debitPos = fixtures.first { it.id == "purchase_pos_ar_debit_001" }
+        assertEquals("DEBIT", debitPos.expected.cardSmsChannel)
+        assertEquals("3001", debitPos.expected.debitSourceAccountLast4)
+
+        val statement = fixtures.first { it.id == "statement_ar_001" }
+        assertEquals("STATEMENT", statement.expected.cardSmsChannel)
+        assertEquals("2026-08-15", statement.expected.paymentDueDate)
     }
 
     @Test

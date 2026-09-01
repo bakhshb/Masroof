@@ -1,0 +1,13 @@
+{
+  "id": "statement_ar_001",
+  "sender": "AlJazira",
+  "body": "إصدار كشف حساب\nالمبلغ المستحق: 3921.11 SAR\nتاريخ الاستحقاق: 15/08/2026",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "NON_FINANCIAL",
+    "parseStatus": "NON_FINANCIAL",
+    "cardSmsChannel": "STATEMENT",
+    "paymentDueDate": "2026-08-15"
+  },
+  "notes": "Credit card statement notice; dashboard due facts live on ParsedEventDetails."
+}

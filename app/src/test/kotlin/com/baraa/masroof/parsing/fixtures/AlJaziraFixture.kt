@@ -42,4 +42,14 @@ data class AlJaziraFixtureExpected(
     val outstandingBalance: String? = null,
     val occurredAt: String? = null,
     val parseStatus: String,
+    val cardSmsChannel: String? = null,
+    /** ISO-8601 local date. */
+    val paymentDueDate: String? = null,
+    val exchangeRate: String? = null,
+    val internationalFee: String? = null,
+    val labeledForeignAmount: String? = null,
+    val labeledForeignCurrency: String? = null,
+    val loanType: String? = null,
+    val debitSourceAccountLast4: String? = null,
+    val salaryIncomeWording: Boolean? = null,
 )
