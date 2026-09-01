@@ -6,7 +6,7 @@ TARGET_REF="${1:-main}"
 SKIP_CI_CHECK="${SKIP_CI_CHECK:-false}"
 REPO="${GITHUB_REPOSITORY:-}"
 MAX_AGE_DAYS="${CI_CHECK_MAX_AGE_DAYS:-7}"
-CI_JOB_NAME="${CI_JOB_NAME:-build-lint-test}"
+CI_JOB_NAMES="${CI_JOB_NAMES:-unit-test static-analysis}"
 
 if [[ "$SKIP_CI_CHECK" == "true" ]]; then
   echo "SKIP_CI_CHECK=true — skipping CI verification."
@@ -32,47 +32,61 @@ resolve_sha() {
   gh api "repos/${REPO}/git/ref/heads/${ref}" --jq '.object.sha'
 }
 
-TARGET_SHA="$(resolve_sha "$TARGET_REF")"
-echo "Verifying CI job '${CI_JOB_NAME}' succeeded on ${TARGET_SHA:0:7}..."
+verify_job() {
+  local job_name="$1"
+  local target_sha="$2"
+  local check_runs_json="$3"
 
-CHECK_RUNS_JSON=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
-MATCHING_COUNT=$(echo "$CHECK_RUNS_JSON" | jq --arg name "$CI_JOB_NAME" '[.check_runs[] | select(.name == $name)] | length')
+  echo "Verifying CI job '${job_name}' succeeded on ${target_sha:0:7}..."
 
-if [[ "$MATCHING_COUNT" -eq 0 ]]; then
-  echo "No '${CI_JOB_NAME}' check run found for commit ${TARGET_SHA}." >&2
-  echo "Wait for CI on main to finish after merge, then retry /nightly or /release." >&2
-  exit 1
-fi
+  local matching_count
+  matching_count=$(echo "$check_runs_json" | jq --arg name "$job_name" '[.check_runs[] | select(.name == $name)] | length')
 
-LATEST=$(echo "$CHECK_RUNS_JSON" | jq --arg name "$CI_JOB_NAME" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at) | last')
-STATUS=$(echo "$LATEST" | jq -r '.status')
-CONCLUSION=$(echo "$LATEST" | jq -r '.conclusion // empty')
-COMPLETED_AT=$(echo "$LATEST" | jq -r '.completed_at // empty')
-HTML_URL=$(echo "$LATEST" | jq -r '.html_url // empty')
-
-if [[ "$STATUS" != "completed" ]]; then
-  echo "CI check '${CI_JOB_NAME}' is still ${STATUS}." >&2
-  echo "Wait for CI to complete: ${HTML_URL}" >&2
-  exit 1
-fi
-
-if [[ "$CONCLUSION" != "success" ]]; then
-  echo "CI check '${CI_JOB_NAME}' concluded with '${CONCLUSION}'." >&2
-  echo "Fix CI or re-run checks before publishing: ${HTML_URL}" >&2
-  exit 1
-fi
-
-if [[ -n "$COMPLETED_AT" && "$COMPLETED_AT" != "null" ]]; then
-  COMPLETED_EPOCH=$(date -d "$COMPLETED_AT" +%s)
-  NOW_EPOCH=$(date +%s)
-  MAX_AGE_SECONDS=$((MAX_AGE_DAYS * 24 * 60 * 60))
-  AGE=$((NOW_EPOCH - COMPLETED_EPOCH))
-  if [[ "$AGE" -gt "$MAX_AGE_SECONDS" ]]; then
-    echo "CI check is older than ${MAX_AGE_DAYS} days (completed ${COMPLETED_AT})." >&2
-    echo "Re-run CI on main or merge a new commit before publishing." >&2
-    exit 1
+  if [[ "$matching_count" -eq 0 ]]; then
+    echo "No '${job_name}' check run found for commit ${target_sha}." >&2
+    echo "Wait for CI on main to finish after merge, then retry /nightly or /release." >&2
+    return 1
   fi
-fi
 
-echo "CI verified: ${CI_JOB_NAME} succeeded at ${COMPLETED_AT}"
-echo "Check run: ${HTML_URL}"
+  local latest status conclusion completed_at html_url
+  latest=$(echo "$check_runs_json" | jq --arg name "$job_name" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at) | last')
+  status=$(echo "$latest" | jq -r '.status')
+  conclusion=$(echo "$latest" | jq -r '.conclusion // empty')
+  completed_at=$(echo "$latest" | jq -r '.completed_at // empty')
+  html_url=$(echo "$latest" | jq -r '.html_url // empty')
+
+  if [[ "$status" != "completed" ]]; then
+    echo "CI check '${job_name}' is still ${status}." >&2
+    echo "Wait for CI to complete: ${html_url}" >&2
+    return 1
+  fi
+
+  if [[ "$conclusion" != "success" ]]; then
+    echo "CI check '${job_name}' concluded with '${conclusion}'." >&2
+    echo "Fix CI or re-run checks before publishing: ${html_url}" >&2
+    return 1
+  fi
+
+  if [[ -n "$completed_at" && "$completed_at" != "null" ]]; then
+    local completed_epoch now_epoch max_age_seconds age
+    completed_epoch=$(date -d "$completed_at" +%s)
+    now_epoch=$(date +%s)
+    max_age_seconds=$((MAX_AGE_DAYS * 24 * 60 * 60))
+    age=$((now_epoch - completed_epoch))
+    if [[ "$age" -gt "$max_age_seconds" ]]; then
+      echo "CI check '${job_name}' is older than ${MAX_AGE_DAYS} days (completed ${completed_at})." >&2
+      echo "Re-run CI on main or merge a new commit before publishing." >&2
+      return 1
+    fi
+  fi
+
+  echo "CI verified: ${job_name} succeeded at ${completed_at}"
+  echo "Check run: ${html_url}"
+}
+
+TARGET_SHA="$(resolve_sha "$TARGET_REF")"
+CHECK_RUNS_JSON=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
+
+for job_name in $CI_JOB_NAMES; do
+  verify_job "$job_name" "$TARGET_SHA" "$CHECK_RUNS_JSON"
+done
