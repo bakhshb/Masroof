@@ -26,7 +26,7 @@ class ReviewViewModelFactory(
             reparseStoredSms = { rawSmsId ->
                 val raw = container.rawSmsRepository.getById(rawSmsId)
                 if (raw != null) {
-                    container.smsIngestionService.reparseStored(raw)
+                    container.processRawSmsUseCase.reparseStored(raw)
                     container.refreshReviewQueue()
                 }
             },

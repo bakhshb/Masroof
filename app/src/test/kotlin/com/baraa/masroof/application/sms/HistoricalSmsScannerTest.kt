@@ -1,8 +1,9 @@
-package com.baraa.masroof.sms.scanner
+package com.baraa.masroof.application.sms
 
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
@@ -16,7 +17,6 @@ import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
-import com.baraa.masroof.sms.ingestion.SmsIngestionService
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -35,7 +35,7 @@ import java.time.Instant
 class HistoricalSmsScannerTest {
 
     private lateinit var db: MasroofDatabase
-    private lateinit var ingestion: SmsIngestionService
+    private lateinit var processRawSms: ProcessRawSmsUseCase
 
     @Before
     fun setUp() {
@@ -43,7 +43,7 @@ class HistoricalSmsScannerTest {
         db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        ingestion = SmsIngestionService(
+        processRawSms = ProcessRawSmsUseCase(
             rawSmsRepository = RoomRawSmsRepository(db.rawSmsDao()),
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
             bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),
@@ -72,7 +72,7 @@ class HistoricalSmsScannerTest {
             ),
             onQuery = { receivedAfter -> order += "after=${receivedAfter?.toEpochMilli()}" },
         )
-        val result = HistoricalSmsScanner(source, ingestion).scan(receivedAfter = after)
+        val result = HistoricalSmsScanner(source, processRawSms).scan(receivedAfter = after)
         assertEquals(listOf("after=${after.toEpochMilli()}"), order)
         assertEquals(4, result.scanned)
         assertEquals(1, result.parsed)
@@ -88,7 +88,7 @@ class HistoricalSmsScannerTest {
         val source = object : SmsDataSource {
             override fun queryInbox(receivedAfter: Instant?) = throw SmsPermissionException()
         }
-        val result = HistoricalSmsScanner(source, ingestion).scan()
+        val result = HistoricalSmsScanner(source, processRawSms).scan()
         assertEquals(SmsScanFailure.PermissionDenied, result.failure)
         assertEquals(0, result.scanned)
     }
@@ -99,7 +99,7 @@ class HistoricalSmsScannerTest {
             override fun queryInbox(receivedAfter: Instant?) =
                 throw SmsProviderException("boom")
         }
-        val result = HistoricalSmsScanner(source, ingestion).scan()
+        val result = HistoricalSmsScanner(source, processRawSms).scan()
         assertTrue(result.failure is SmsScanFailure.ProviderError)
         assertEquals(0, result.scanned)
     }
@@ -111,7 +111,7 @@ class HistoricalSmsScannerTest {
                 throw SmsPermissionException("lazy")
             }
         }
-        val result = HistoricalSmsScanner(source, ingestion).scan()
+        val result = HistoricalSmsScanner(source, processRawSms).scan()
         assertEquals(SmsScanFailure.PermissionDenied, result.failure)
         assertEquals(0, result.scanned)
     }
@@ -132,7 +132,7 @@ class HistoricalSmsScannerTest {
                 throw SmsProviderException("cursor died")
             }
         }
-        val result = HistoricalSmsScanner(source, ingestion).scan()
+        val result = HistoricalSmsScanner(source, processRawSms).scan()
         assertTrue(result.failure is SmsScanFailure.ProviderError)
         assertEquals(1, result.scanned)
         assertEquals(1, result.parsed)
@@ -145,7 +145,7 @@ class HistoricalSmsScannerTest {
             ProviderSmsRecord("1", "AlJazira", purchaseBody(), Instant.parse("2026-08-01T00:00:00Z")),
         )
         val source = FakeSmsDataSource(listOf(good, InboxRow.Malformed, InboxRow.Malformed))
-        val result = HistoricalSmsScanner(source, ingestion).scan()
+        val result = HistoricalSmsScanner(source, processRawSms).scan()
         assertEquals(3, result.scanned)
         assertEquals(2, result.skippedMalformed)
         assertEquals(1, result.parsed)
@@ -170,7 +170,7 @@ class HistoricalSmsScannerTest {
                 lookingForLiveRow: Boolean,
             ): RawSms? = null
         }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = failingRawRepo,
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
             bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter())),
@@ -198,7 +198,7 @@ class HistoricalSmsScannerTest {
     @Test
     fun failedWithPersistedRawSmsId_incrementsInsertedAndFailed() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("parse boom") }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = RoomRawSmsRepository(db.rawSmsDao()),
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
             bankSmsRegistry = BankSmsRegistry(listOf(AlJaziraSmsAdapter(pipeline = exploding))),

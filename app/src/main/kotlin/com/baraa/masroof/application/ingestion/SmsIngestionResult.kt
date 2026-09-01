@@ -1,12 +1,11 @@
-package com.baraa.masroof.sms.ingestion
+package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.validator.ValidationFinding
 
 /**
- * Explicit outcome of ingesting one [RawSms] / provider SMS.
+ * Explicit outcome of ingesting one [com.baraa.masroof.domain.model.RawSms] / provider SMS.
  * Expected duplicate / unsupported cases are not exceptions.
  */
 sealed interface SmsIngestionResult {

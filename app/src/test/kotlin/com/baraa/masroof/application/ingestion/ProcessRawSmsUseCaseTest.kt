@@ -1,4 +1,4 @@
-package com.baraa.masroof.sms.ingestion
+package com.baraa.masroof.application.ingestion
 
 import android.content.Context
 import androidx.room.Room
@@ -59,12 +59,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
-class SmsIngestionServiceTest {
+class ProcessRawSmsUseCaseTest {
 
     private lateinit var db: MasroofDatabase
     private lateinit var rawRepo: RoomRawSmsRepository
     private lateinit var parsedRepo: RoomParsedEventRepository
-    private lateinit var service: SmsIngestionService
+    private lateinit var useCase: ProcessRawSmsUseCase
     private val parseCalls = AtomicInteger(0)
 
     @Before
@@ -80,7 +80,7 @@ class SmsIngestionServiceTest {
             parseCalls.incrementAndGet()
             AlJaziraParsingPipeline().parse(input)
         }
-        service = SmsIngestionService(
+        useCase = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(pipeline = countingGateway),
@@ -95,7 +95,7 @@ class SmsIngestionServiceTest {
     @Test
     fun firstAlJaziraMessage_insertsAndPersistsParsedEvent() = runBlocking {
         val raw = aljaziraPurchase(id = "android-sms:1", deviceId = "1")
-        val result = service.ingest(raw)
+        val result = useCase.ingest(raw)
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(raw, rawRepo.getById(raw.id))
         val record = parsedRepo.findByRawSmsId(raw.id)!!
@@ -108,9 +108,9 @@ class SmsIngestionServiceTest {
     @Test
     fun duplicate_doesNotReparseOrDuplicateEvent() = runBlocking {
         val raw = aljaziraPurchase(id = "android-sms:2", deviceId = "2")
-        assertTrue(service.ingest(raw) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(raw) is SmsIngestionResult.Parsed)
         assertEquals(1, parseCalls.get())
-        assertEquals(SmsIngestionResult.Duplicate, service.ingest(raw))
+        assertEquals(SmsIngestionResult.Duplicate, useCase.ingest(raw))
         assertEquals(1, parseCalls.get())
         assertEquals(1, db.rawSmsDao().count())
         assertEquals(1, db.parsedEventDao().count())
@@ -127,7 +127,7 @@ class SmsIngestionServiceTest {
             deviceMessageId = "3",
             bodyHash = SmsBodyHasher.sha256Hex(body),
         )
-        val result = service.ingest(raw)
+        val result = useCase.ingest(raw)
         assertTrue(result is SmsIngestionResult.ReviewRequired)
         assertEquals(
             ParseStatus.REVIEW_REQUIRED,
@@ -146,7 +146,7 @@ class SmsIngestionServiceTest {
             deviceMessageId = "4",
             bodyHash = SmsBodyHasher.sha256Hex(body),
         )
-        val result = service.ingest(raw)
+        val result = useCase.ingest(raw)
         assertTrue(result is SmsIngestionResult.NonFinancial)
         assertEquals(ParseStatus.NON_FINANCIAL, parsedRepo.findByRawSmsId(raw.id)!!.event.parseStatus)
         assertNull(parsedRepo.findByRawSmsId(raw.id)!!.event.amount)
@@ -164,7 +164,7 @@ class SmsIngestionServiceTest {
                 deviceMessageId = null,
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             )
-            val result = service.ingest(raw)
+            val result = useCase.ingest(raw)
             assertTrue(result is SmsIngestionResult.NotRelevant)
             assertEquals(
                 "sender_not_recognized_as_bank_aljazira",
@@ -179,9 +179,9 @@ class SmsIngestionServiceTest {
     @Test
     fun reparseStored_alJaziraPurchase_runsParserAgain() = runBlocking {
         val raw = aljaziraPurchase(id = "android-sms:reparse", deviceId = "reparse")
-        assertTrue(service.ingest(raw) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(raw) is SmsIngestionResult.Parsed)
         parseCalls.set(0)
-        val result = service.reparseStored(raw)
+        val result = useCase.reparseStored(raw)
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(Money.of("51.99", Currency.SAR), (result as SmsIngestionResult.Parsed).event.amount)
         assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
@@ -191,7 +191,7 @@ class SmsIngestionServiceTest {
     @Test
     fun reparseStored_doesNotReapplyIngestDetection() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("reparse-boom") }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
@@ -234,7 +234,7 @@ class SmsIngestionServiceTest {
     @Test
     fun reparseStored_rawSmsWithoutParsedEvent_stillInvokesParser() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("reparse-no-event-boom") }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
@@ -258,7 +258,7 @@ class SmsIngestionServiceTest {
     @Test
     fun parserFailure_keepsRawSmsAndReturnsFailed() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("boom") }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
@@ -273,7 +273,7 @@ class SmsIngestionServiceTest {
     @Test
     fun parserCancellation_propagates() = runBlocking {
         val cancelling = SmsParseGateway { throw CancellationException("cancel") }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(pipeline = cancelling),
@@ -300,7 +300,7 @@ class SmsIngestionServiceTest {
             override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
             override suspend fun listAll(): List<ParsedEventRecord> = emptyList()
         }
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = failingParsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
@@ -324,8 +324,8 @@ class SmsIngestionServiceTest {
         )
         assertTrue(live.id != historical.id)
         assertEquals(live.bodyHash, historical.bodyHash)
-        assertTrue(service.ingest(live) is SmsIngestionResult.Parsed)
-        assertEquals(SmsIngestionResult.Duplicate, service.ingest(historical))
+        assertTrue(useCase.ingest(live) is SmsIngestionResult.Parsed)
+        assertEquals(SmsIngestionResult.Duplicate, useCase.ingest(historical))
         assertEquals(1, db.rawSmsDao().count())
         assertEquals(1, parseCalls.get())
     }
@@ -339,8 +339,8 @@ class SmsIngestionServiceTest {
         val b = AndroidSmsMapper.toRawSms(
             ProviderSmsRecord("11", "AlJazira", body, Instant.parse("2026-08-10T12:00:02Z")),
         )
-        assertTrue(service.ingest(a) is SmsIngestionResult.Parsed)
-        assertTrue(service.ingest(b) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(a) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(b) is SmsIngestionResult.Parsed)
         assertEquals(2, db.rawSmsDao().count())
         assertEquals(2, parseCalls.get())
     }
@@ -354,8 +354,8 @@ class SmsIngestionServiceTest {
         val b = AndroidSmsMapper.toRawSms(
             ProviderSmsRecord(null, "AlJazira", body, Instant.parse("2026-08-10T12:00:02Z")),
         )
-        assertTrue(service.ingest(a) is SmsIngestionResult.Parsed)
-        assertTrue(service.ingest(b) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(a) is SmsIngestionResult.Parsed)
+        assertTrue(useCase.ingest(b) is SmsIngestionResult.Parsed)
         assertEquals(2, db.rawSmsDao().count())
     }
 
@@ -414,7 +414,7 @@ class SmsIngestionServiceTest {
             financialTransactionRepository = throwingFtRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
@@ -469,7 +469,7 @@ class SmsIngestionServiceTest {
             financialTransactionRepository = ftRepo,
             clock = InstantClock.System,
         )
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
@@ -526,7 +526,7 @@ class SmsIngestionServiceTest {
             financialTransactionRepository = ftRepo,
             clock = InstantClock.System,
         )
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
@@ -589,7 +589,7 @@ class SmsIngestionServiceTest {
             financialTransactionRepository = cancellingFtRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
         )
-        val svc = SmsIngestionService(
+        val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
@@ -621,7 +621,7 @@ class SmsIngestionServiceTest {
             ProviderSmsRecord(null, "AlJazira", combined, Instant.parse("2026-08-03T14:32:00Z")),
         )
         assertEquals(combined, raw.body)
-        val result = service.ingest(raw) as SmsIngestionResult.Parsed
+        val result = useCase.ingest(raw) as SmsIngestionResult.Parsed
         assertEquals(Money.of("51.99", Currency.SAR), result.event.amount)
         assertEquals("7271", result.event.cardRef?.last4)
         assertEquals(1, db.rawSmsDao().count())

@@ -1,7 +1,7 @@
 package com.baraa.masroof.application.onboarding
 
-import com.baraa.masroof.sms.scanner.SmsScanFailure
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.sms.SmsScanFailure
+import com.baraa.masroof.application.sms.SmsScanResult
 
 /**
  * Application-facing outcome of a historical SMS import.
