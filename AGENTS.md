@@ -10,11 +10,30 @@
 - App navigation lives in `presentation/navigation/` (`MasroofRoot`, `HomeDestination`, `SettingsDestination`).
 - Debug builds expose a design catalog at **Settings → About → Design catalog** (`presentation/debug/DesignCatalogScreen.kt`) for previewing tokens and shared components.
 
+## Architecture (follow on every feature)
+
+**Layers:** `presentation` → `application` → `domain` / `parsing` / `data` / `sms` / `bank`. Dependencies point inward. Rules are enforced in `PackageDependencyRulesTest` — do not add exceptions; fix the import instead.
+
+**ViewModels:** Call `application/*Workflow` facades only. No direct use of `domain.repository`, `domain.ownership`, or `domain.period` from presentation.
+
+**SMS:** Live intake = `IncomingSmsReceiver` → `LiveSmsIntake` → `ProcessRawSmsUseCase`. Historical scan = `application/sms/HistoricalSmsScanner`. Do not add orchestration under `sms/`.
+
+**Parsing vs dashboard:** Bank-specific logic stays in `bank/*` parsers. Populate `ParsedEventDetails` at parse time (`cardSmsChannel`, balances, due dates, etc.). Dashboard code in `application/dashboard/*` reads persisted facts only — never re-parse SMS text and never import `bank.*`.
+
+**Room changes:** Migration + mapper + parser population + migration test. If existing users need the new column filled, wire backfill (see `ParsedEventFactsBackfillCoordinator`). Device-test after schema/backfill merges.
+
+**New bank:** Implement `BankSmsAdapterContract` + fixture tests under `testdata/`.
+
+**PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.
+
+**Deep reference:** `docs/ARCHITECTURE.md`, `docs/REWRITE_DECISIONS.md`
+
 ## Dashboard calculations
 
 - All money totals live in `application/dashboard/*Builder` and `*Calculator`.
 - Compose screens in `presentation/dashboard` must display pre-computed values only.
 - Do not sum transactions, classify Mada vs credit, or aggregate spending inside Composables.
+- Classify card type via `ParsedEventDetails.cardSmsChannel` — not SMS body text in dashboard code.
 - Use helpers such as `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, and `AccountsSummary.totalInflow`.
 - Credit facility due is one value per facility (primary + supplementaries share the statement due).
 - Mada (debit) cards have salary-period spending only — no statement due.
