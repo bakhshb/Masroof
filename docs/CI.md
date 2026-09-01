@@ -4,7 +4,7 @@ Masroof uses GitHub Actions for continuous integration and automated slash-comma
 
 | Workflow | When | What |
 |----------|------|------|
-| **CI** (`ci.yml`) | Pull request or push → `main` | Runs `testDebugUnitTest`, `lintDebug`, `detekt` |
+| **CI** (`ci.yml`) | Pull request or push → `main` | Parallel jobs: `unit-test` (`testDebugUnitTest`) and `static-analysis` (`lintDebug`, `detekt`) |
 | **PR Slash Commands** (`pr-commands.yml`) | Comment on PR (`/release`, `/nightly`) | Authenticates commenter, checks PR merge status, dispatches Release |
 | **Release** (`release.yml`) | Workflow dispatch or PR slash command | Verifies green CI on target commit, builds signed APK, tags commit, publishes GitHub Release |
 
@@ -21,7 +21,7 @@ Masroof uses GitHub Actions for continuous integration and automated slash-comma
 
 ## Publishing builds after merge
 
-After merging a PR, wait for the **main** CI check (`build-lint-test`) to succeed, then comment on the merged PR to publish. Release builds **do not re-run** the full test suite; they verify the target commit already has green CI, then build and sign the APK.
+After merging a PR, wait for **main** CI checks (`unit-test` and `static-analysis`) to succeed, then comment on the merged PR to publish. Release builds **do not re-run** the full test suite; they verify the target commit already has green CI, then build and sign the APK.
 
 ### Want a test build?
 Comment:
@@ -49,7 +49,7 @@ Comment:
 
 - **Zero-code bumps**: Version names and version codes are dynamically resolved and passed via Gradle CLI (`-PappVersionName` and `-PappVersionCode`). No version commits are pushed back to the repo.
 - **Unmerged PR protection**: `/release` and `/nightly` commands on open/unmerged PRs are rejected.
-- **CI gate before publish**: Release verifies the target commit has a successful `build-lint-test` check from the **CI** workflow (within 7 days). If main CI is still running or failed, publish is blocked.
+- **CI gate before publish**: Release verifies the target commit has successful `unit-test` and `static-analysis` checks from the **CI** workflow (within 7 days). If main CI is still running or failed, publish is blocked.
 - **Serialized publishing**: All publishing jobs run under the `masroof-publish` concurrency group with `cancel-in-progress: false` to ensure no two concurrent builds can generate conflicting versions or version codes.
 - **Tagging safety**: Git tags are created and pushed only **after** the APK is signed and verification succeeds.
 - **Authorization**: Only repository owners, members, and write collaborators can trigger release workflows.
