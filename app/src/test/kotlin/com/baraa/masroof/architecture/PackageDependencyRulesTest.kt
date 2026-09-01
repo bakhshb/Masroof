@@ -106,12 +106,7 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.domain.repository.",
                 "import com.baraa.masroof.domain.rules.",
             ),
-            allowedFiles = setOf(
-                // PR 8 — dashboard/onboarding/notification workflow facades.
-                "presentation/dashboard/DashboardViewModel.kt",
-                "presentation/notification/NotificationCenterViewModel.kt",
-                "presentation/onboarding/OnboardingViewModel.kt",
-            ),
+            allowedFiles = emptySet(),
         )
     }
 
