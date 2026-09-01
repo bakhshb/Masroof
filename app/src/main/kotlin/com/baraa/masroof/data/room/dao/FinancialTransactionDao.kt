@@ -71,6 +71,15 @@ interface FinancialTransactionDao {
     @Query(
         """
         SELECT * FROM financial_transaction
+        WHERE type IN (:types)
+        ORDER BY occurredAtEpochMillis, id
+        """,
+    )
+    suspend fun listByTypes(types: List<String>): List<FinancialTransactionEntity>
+
+    @Query(
+        """
+        SELECT * FROM financial_transaction
         WHERE occurredAtEpochMillis >= :startInclusiveEpochMillis
           AND occurredAtEpochMillis < :endExclusiveEpochMillis
         ORDER BY occurredAtEpochMillis DESC, id DESC

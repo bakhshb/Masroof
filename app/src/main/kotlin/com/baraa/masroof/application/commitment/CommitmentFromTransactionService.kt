@@ -62,12 +62,15 @@ class CommitmentFromTransactionService(
         return CommitmentCreationResult.Success
     }
 
+    companion object {
+        fun canMarkAsCommitment(type: FinancialTransactionType): Boolean =
+            type == FinancialTransactionType.EXPENSE ||
+                type == FinancialTransactionType.FEE ||
+                type == FinancialTransactionType.BILL_PAYMENT
+    }
+
     internal fun buildDraft(transaction: FinancialTransaction): CommitmentDraft? {
-        if (
-            transaction.type != FinancialTransactionType.EXPENSE &&
-            transaction.type != FinancialTransactionType.FEE &&
-            transaction.type != FinancialTransactionType.BILL_PAYMENT
-        ) {
+        if (!canMarkAsCommitment(transaction.type)) {
             return null
         }
         val name = transaction.merchant?.trim()?.takeIf { it.isNotEmpty() }

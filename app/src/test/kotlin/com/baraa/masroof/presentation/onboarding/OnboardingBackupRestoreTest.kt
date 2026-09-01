@@ -18,7 +18,7 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -69,16 +69,14 @@ class OnboardingBackupRestoreTest {
                 override fun setHistoricalImportCompleted(completed: Boolean) = Unit
             },
             historicalImportGateway = HistoricalImportGateway {
-                SmsScanResult(scanned = 0, parsed = 0, duplicates = 0)
+                com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 0, parsed = 0, duplicates = 0)
             },
-            accountRegistryRepository = accounts,
-            cardRegistryRepository = cards,
-            ownershipConfirmationService = OwnershipConfirmationService(
-                accountRegistry = accounts,
-                cardRegistry = cards,
-                loanRegistry = NoOpLoanRegistryRepository,
-            ),
-            reviewRepository = EmptyReviewRepo(),
+            onboardingOwnershipWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .onboardingOwnershipWorkflow(
+                    accounts = accounts,
+                    cards = cards,
+                    reviewRepository = EmptyReviewRepo(),
+                ),
             discoverFromStoredEvents = { 0 },
             refreshReviewQueue = {},
             databaseBackupService = backup,

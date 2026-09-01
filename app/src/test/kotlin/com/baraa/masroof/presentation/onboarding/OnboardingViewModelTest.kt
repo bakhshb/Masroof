@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.onboarding
 
+import com.baraa.masroof.application.onboarding.ImportDatePolicy
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
@@ -21,8 +22,8 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.CompletableDeferred
-import com.baraa.masroof.sms.scanner.SmsScanFailure
-import com.baraa.masroof.sms.scanner.SmsScanResult
+import com.baraa.masroof.application.sms.SmsScanFailure
+import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -254,8 +255,12 @@ class OnboardingViewModelTest {
     @Test
     fun retryAfterProviderError_allowsSecondGatewayCall() = runTest {
         val gateway = FakeImportGateway(
-            initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x")),
-            nextResult = SmsScanResult(scanned = 1, parsed = 1, duplicates = 0),
+            initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.ProviderError("x"),
+            ),
+            nextResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                scanned = 1, parsed = 1, duplicates = 0,
+            ),
         )
         val fixture = Fixture(permissionGranted = true, gateway = gateway)
         advanceUntilIdle()
@@ -310,7 +315,9 @@ class OnboardingViewModelTest {
     fun providerFailure_showsRetryState() = runTest {
         val fixture = Fixture(
             permissionGranted = true,
-            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.ProviderError("x"))),
+            gateway = FakeImportGateway(initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.ProviderError("x"),
+            )),
         )
         advanceUntilIdle()
         fixture.vm.onStartClicked()
@@ -324,7 +331,9 @@ class OnboardingViewModelTest {
     fun permissionFailure_returnsPermissionStep() = runTest {
         val fixture = Fixture(
             permissionGranted = true,
-            gateway = FakeImportGateway(initialResult = SmsScanResult(failure = SmsScanFailure.PermissionDenied)),
+            gateway = FakeImportGateway(initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(
+                failure = com.baraa.masroof.application.onboarding.HistoricalImportFailure.PermissionDenied,
+            )),
         )
         advanceUntilIdle()
         fixture.vm.onStartClicked()
@@ -502,10 +511,12 @@ AccountRegistryEntry.forTest(
             return OnboardingViewModel(
                 onboardingPrefs = prefs,
                 historicalImportGateway = gateway,
-                accountRegistryRepository = accountRepo,
-                cardRegistryRepository = cardRepo,
-                ownershipConfirmationService = OwnershipConfirmationService(accountRepo, cardRepo, NoOpLoanRegistryRepository),
-                reviewRepository = reviewRepo,
+                onboardingOwnershipWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                    .onboardingOwnershipWorkflow(
+                        accounts = accountRepo,
+                        cards = cardRepo,
+                        reviewRepository = reviewRepo,
+                    ),
                 discoverFromStoredEvents = {
                     if (discoverShouldFail) error("discover failed")
                     0
@@ -556,15 +567,16 @@ AccountRegistryEntry.forTest(
     }
 
     private class FakeImportGateway(
-        initialResult: SmsScanResult = SmsScanResult(scanned = 10, parsed = 6, duplicates = 2),
-        private val nextResult: SmsScanResult? = null,
+        initialResult: com.baraa.masroof.application.onboarding.HistoricalImportResult =
+            com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 10, parsed = 6, duplicates = 2),
+        private val nextResult: com.baraa.masroof.application.onboarding.HistoricalImportResult? = null,
         private val blockFirstCall: Boolean = false,
     ) : HistoricalImportGateway {
-        private var result: SmsScanResult = initialResult
+        private var result: com.baraa.masroof.application.onboarding.HistoricalImportResult = initialResult
         private var blocked: CompletableDeferred<Unit>? = null
         var lastReceivedAfter: Instant? = null
         var calls: Int = 0
-        override suspend fun scan(receivedAfter: Instant?): SmsScanResult {
+        override suspend fun scan(receivedAfter: Instant?): com.baraa.masroof.application.onboarding.HistoricalImportResult {
             calls++
             lastReceivedAfter = receivedAfter
             if (blockFirstCall && calls == 1) {

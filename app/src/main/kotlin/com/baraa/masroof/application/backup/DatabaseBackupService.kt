@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
@@ -84,12 +85,7 @@ class DatabaseBackupService(
                 BackupPackageCodec.decodeManifest(manifestFile.readText())
             }.getOrElse { return@withContext BackupImportOutcome.InvalidPackage }
 
-            val importableVersions = mapOf(
-                MasroofDatabase.LEGACY_VERSION_5 to MasroofDatabase.LEGACY_IDENTITY_HASH_5,
-                MasroofDatabase.LEGACY_VERSION_6 to MasroofDatabase.LEGACY_IDENTITY_HASH_6,
-                MasroofDatabase.LEGACY_VERSION_7 to MasroofDatabase.LEGACY_IDENTITY_HASH_7,
-                MasroofDatabase.PREVIOUS_VERSION to MasroofDatabase.PREVIOUS_IDENTITY_HASH,
-            )
+            val importableVersions = MasroofDatabase.IMPORTABLE_BACKUP_VERSIONS
             if (!BackupPackageCodec.validateManifestForImport(
                     manifest = manifest,
                     targetRoomVersion = MasroofDatabase.VERSION,
@@ -123,6 +119,7 @@ class DatabaseBackupService(
             deleteSidecarFiles(liveDb)
             dbFile.copyTo(liveDb, overwrite = true)
             restorePreferences(preferences)
+            resetParseFactsBackfillMarker()
             restartProcess()
             appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
             BackupImportOutcome.SuccessNeedsRestart
@@ -215,6 +212,13 @@ class DatabaseBackupService(
             SharedPrefsThemePreferencesRepository.KEY_THEME_MODE,
             ThemeMode.fromStorage(snapshot.themeMode).name,
         ).commit()
+    }
+
+    private fun resetParseFactsBackfillMarker() {
+        appContext.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION)
+            .commit()
     }
 
     private fun writeZip(staging: File, destination: Uri) {

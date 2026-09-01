@@ -45,6 +45,12 @@ internal object SettingsViewModelTestFixtures {
             tokenRepository = tokenRepository,
             releaseClient = GitHubReleaseClient(OkHttpClient(), "bakhshb", "Masroof"),
             updateChecker = UpdateChecker(installedVersionCode = 4),
+            preferencesRepository = UpdateCheckPreferencesRepository(
+                context.getSharedPreferences(
+                    UpdateCheckPreferencesRepository.PREFS_NAME,
+                    Context.MODE_PRIVATE,
+                ),
+            ),
             appLogService = appLogService,
         )
     }

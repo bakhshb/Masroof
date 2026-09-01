@@ -13,6 +13,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.presentation.dashboard.DashboardUiState
@@ -156,7 +157,9 @@ class MadaDebitCardsDashboardVisibilityTest {
             الرصيد المتاح: 14569.09 SAR
             إجمالي المبلغ المستحق:3921.11 SAR
         """.trimIndent()
-        val parsedRecords = listOf(parsedMadaPurchase("evt-7271", "sms-7271", "7271"))
+        val parsedRecords = listOf(
+            parsedMadaPurchase("evt-7271", "sms-7271", "7271", CardSmsChannel.CREDIT),
+        )
         val rawSmsById = mapOf("sms-7271" to rawSms("sms-7271", ramadanCreditBody))
 
         assertFalse(
@@ -215,7 +218,12 @@ class MadaDebitCardsDashboardVisibilityTest {
             currency = Currency.SAR,
         )
 
-    private fun parsedMadaPurchase(eventId: String, smsId: String, last4: String): ParsedEventRecord =
+    private fun parsedMadaPurchase(
+        eventId: String,
+        smsId: String,
+        last4: String,
+        channel: CardSmsChannel = CardSmsChannel.DEBIT,
+    ): ParsedEventRecord =
         ParsedEventRecord(
             event = ParsedEvent(
                 id = eventId,
@@ -235,7 +243,7 @@ class MadaDebitCardsDashboardVisibilityTest {
                 confidence = Confidence(1.0),
                 parseStatus = ParseStatus.SUCCESS,
             ),
-            details = ParsedEventDetails(),
+            details = ParsedEventDetails(cardSmsChannel = channel),
         )
 
     private fun rawSms(id: String, body: String): RawSms =

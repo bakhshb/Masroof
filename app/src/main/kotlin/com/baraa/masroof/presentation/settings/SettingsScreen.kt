@@ -313,6 +313,8 @@ fun SettingsRoute(
 
         SettingsDestination.About -> SettingsAboutScreen(
             appVersion = state.appVersion,
+            isNightlyBuild = state.isNightlyBuild,
+            updateChannel = state.updateChannel,
             githubTokenConfigured = state.githubTokenConfigured,
             updateState = state.updateState,
             updateMessage = state.updateMessage,
@@ -322,6 +324,7 @@ fun SettingsRoute(
             onOpenDesignCatalog = { navigateTo(SettingsDestination.DesignCatalog) },
             onSaveGithubToken = viewModel::saveGithubToken,
             onClearGithubToken = viewModel::clearGithubToken,
+            onSelectUpdateChannel = viewModel::setUpdateChannel,
             onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
             onDownloadUpdate = viewModel::downloadUpdate,
             onInstallUpdate = viewModel::installPendingUpdate,

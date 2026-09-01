@@ -4,39 +4,16 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * User-defined commitments linked to source transactions.
+ * Parsed-event dashboard facts: card SMS channel, payment due date, and international purchase fields.
  */
 val MIGRATION_9_10: Migration = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS `commitment` (
-                `id` TEXT NOT NULL,
-                `name` TEXT NOT NULL,
-                `amountDecimal` TEXT NOT NULL,
-                `amountCurrency` TEXT NOT NULL,
-                `transactionDateIso` TEXT NOT NULL,
-                `recurrence` TEXT,
-                `dueDateIso` TEXT,
-                `active` INTEGER NOT NULL,
-                `sourceTransactionId` TEXT NOT NULL,
-                `createdAtEpochMillis` INTEGER NOT NULL,
-                `updatedAtEpochMillis` INTEGER NOT NULL,
-                PRIMARY KEY(`id`)
-            )
-            """.trimIndent(),
-        )
-        db.execSQL(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS `index_commitment_sourceTransactionId`
-            ON `commitment` (`sourceTransactionId`)
-            """.trimIndent(),
-        )
-        db.execSQL(
-            """
-            CREATE INDEX IF NOT EXISTS `index_commitment_active`
-            ON `commitment` (`active`)
-            """.trimIndent(),
-        )
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN cardSmsChannel TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN paymentDueDate TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN exchangeRate TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN internationalFeeDecimal TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN internationalFeeCurrency TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN labeledForeignAmountDecimal TEXT")
+        db.execSQL("ALTER TABLE parsed_event ADD COLUMN labeledForeignAmountCurrency TEXT")
     }
 }

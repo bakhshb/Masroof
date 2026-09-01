@@ -9,12 +9,11 @@ import org.junit.Test
 class ForeignPurchaseSarConverterTest {
     @Test
     fun usdPurchase_convertsWithFee() {
-        val body = """
-            بمبلغ: USD 23.00
-            رسوم العمليات الدولية: 1.99
-            سعر الصرف: 3.756957
-        """.trimIndent()
-        val sar = ForeignPurchaseSarConverter.toSarEquivalent(Money.of("23.00", Currency.USD), body)
+        val sar = ForeignPurchaseSarConverter.toSarEquivalent(
+            foreignAmount = Money.of("23.00", Currency.USD),
+            exchangeRate = java.math.BigDecimal("3.756957"),
+            internationalFee = Money.of("1.99", Currency.SAR),
+        )
         assertNotNull(sar)
         assertEquals(Currency.SAR, sar!!.currency)
         // 23 * 3.756957 = 86.409011 + 1.99 fee
@@ -23,13 +22,9 @@ class ForeignPurchaseSarConverterTest {
 
     @Test
     fun usdRefund_withoutFeeWhenRateInSameSms() {
-        val body = """
-            مبلغ: 6.51 USD
-            سعر الصرف: 3.756957
-        """.trimIndent()
         val sar = ForeignPurchaseSarConverter.toSarEquivalent(
             foreignAmount = Money.of("6.51", Currency.USD),
-            rawSmsBody = body,
+            exchangeRate = java.math.BigDecimal("3.756957"),
             includeInternationalFee = false,
         )
         assertNotNull(sar)

@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import com.baraa.masroof.R
+import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
@@ -409,7 +410,7 @@ fun TransactionDetailScreen(
                 Text(stringResource(R.string.transaction_detail_edit_category))
             }
 
-            if (!isCommitted) {
+            if (!isCommitted && CommitmentFromTransactionService.canMarkAsCommitment(transaction.type)) {
                 IconTextButtonOutlined(
                     onClick = { showMarkCommitmentConfirmDialog = true },
                     enabled = !actionInProgress,

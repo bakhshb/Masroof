@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
+import com.baraa.masroof.application.onboarding.toHistoricalImportResult
 
 class OnboardingViewModelFactory(
     private val container: AppContainer,
@@ -17,12 +18,9 @@ class OnboardingViewModelFactory(
             return OnboardingViewModel(
                 onboardingPrefs = onboardingPreferencesRepository,
                 historicalImportGateway = HistoricalImportGateway { after ->
-                    container.historicalSmsScanner.scan(after)
+                    container.historicalSmsScanner.scan(after).toHistoricalImportResult()
                 },
-                accountRegistryRepository = container.accountRegistryRepository,
-                cardRegistryRepository = container.cardRegistryRepository,
-                ownershipConfirmationService = container.ownershipConfirmationService,
-                reviewRepository = container.reviewRepository,
+                onboardingOwnershipWorkflow = container.onboardingOwnershipWorkflow,
                 discoverFromStoredEvents = { container.discoverFromStoredEvents() },
                 refreshReviewQueue = { container.refreshReviewQueue() },
                 databaseBackupService = container.databaseBackupService,

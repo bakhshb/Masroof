@@ -18,6 +18,8 @@ import com.baraa.masroof.application.dashboard.CommitmentDashboardRow
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
 import com.baraa.masroof.application.dashboard.CommitmentDashboardSource
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
+import com.baraa.masroof.presentation.common.MasroofAmountRole
+import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofDonutChart
 import com.baraa.masroof.presentation.common.MasroofIcons
@@ -133,9 +135,9 @@ private fun CommitmentDashboardRowItem(
             }
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(
-                formatLocalizedMoney(row.amount),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            MasroofAmountText(
+                amount = formatLocalizedMoney(row.amount),
+                role = MasroofAmountRole.List,
             )
             Text(
                 statusLabel,

@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.presentation.common.IconTextButtonOutlined
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -47,7 +48,7 @@ fun SettingsCommitmentEditorScreen(
     commitment: ManagedCommitmentUi,
     saving: Boolean,
     onBack: () -> Unit,
-    onSave: (CommitmentEditorDraft) -> Unit,
+    onSave: (SettingsCommitmentsWorkflow.CommitmentEditorDraft) -> Unit,
     onToggleActive: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -176,7 +177,7 @@ fun SettingsCommitmentEditorScreen(
                 onClick = {
                     val parsedAmount = amountText.trim().toBigDecimalOrNull() ?: return@IconTextButtonOutlined
                     onSave(
-                        CommitmentEditorDraft(
+                        SettingsCommitmentsWorkflow.CommitmentEditorDraft(
                             name = name.trim(),
                             amount = Money(parsedAmount.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN), commitment.amount.currency),
                             transactionDate = LocalDate.parse(transactionDate),
@@ -280,11 +281,3 @@ private fun CommitmentDatePickerDialog(
         DatePicker(state = pickerState)
     }
 }
-
-data class CommitmentEditorDraft(
-    val name: String,
-    val amount: Money,
-    val transactionDate: LocalDate,
-    val recurrence: CommitmentRecurrence?,
-    val dueDate: LocalDate?,
-)

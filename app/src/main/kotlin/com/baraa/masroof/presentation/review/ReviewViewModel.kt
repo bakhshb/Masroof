@@ -9,15 +9,13 @@ import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.RestoreResult
 import com.baraa.masroof.application.transaction.TransactionRestoreService
+import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.presentation.dashboard.MoneyUiFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,8 +29,7 @@ import java.time.format.DateTimeFormatter
 class ReviewViewModel(
     private val reviewWorkflowService: ReviewWorkflowService,
     private val detailLoader: ReviewDetailLoader,
-    private val cardRegistryRepository: CardRegistryRepository,
-    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val reviewOwnershipWorkflow: ReviewOwnershipWorkflow,
     private val transactionRestoreService: TransactionRestoreService,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
@@ -244,9 +241,9 @@ class ReviewViewModel(
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             try {
                 if (owned) {
-                    ownershipConfirmationService.confirmCardOwned(cardRef)
+                    reviewOwnershipWorkflow.confirmCardOwned(cardRef)
                 } else {
-                    ownershipConfirmationService.markCardExternal(cardRef)
+                    reviewOwnershipWorkflow.markCardExternal(cardRef)
                 }
                 refreshReviewQueue()
                 val reviewId = _uiState.value.selectedDetail?.id
@@ -419,7 +416,7 @@ class ReviewViewModel(
         val ownershipCard = if (!ignored && review.reasons.any { it in OWNERSHIP_CARD_REASONS }) {
             detail.cardRef?.takeIf { cardRef ->
                 cardRef.last4 != null &&
-                    cardRegistryRepository.resolve(cardRef) == OwnershipStatus.UNKNOWN
+                    reviewOwnershipWorkflow.isCardOwnershipUnknown(cardRef)
             }
         } else {
             null

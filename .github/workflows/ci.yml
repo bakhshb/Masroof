@@ -4,15 +4,18 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-lint-test:
+  unit-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -23,6 +26,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -33,5 +37,32 @@ jobs:
       - name: Configure local SDK path
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
-      - name: Lint, detekt, and test
-        run: ./gradlew testDebugUnitTest lintDebug detekt --stacktrace
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
+      - name: Lint and detekt
+        run: ./gradlew lintDebug detekt --stacktrace

@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
@@ -90,14 +91,14 @@ class CreditCardOverviewBuilderTest {
             parsedRecords = listOf(
                 ParsedEventRecord(
                     parsedEvent("pe-7271", purchase7271, card7271, purchaseAt),
-                    ParsedEventDetails(
+                    creditPurchaseDetails(
                         availableBalance = Money.of("14569.09", Currency.SAR),
                         outstandingBalance = Money.of("3921.11", Currency.SAR),
                     ),
                 ),
                 ParsedEventRecord(
                     parsedEvent("pe-3478", purchase3478, card3478, Instant.parse("2026-08-11T16:40:00Z")),
-                    ParsedEventDetails(
+                    creditPurchaseDetails(
                         availableBalance = Money.of("14644.09", Currency.SAR),
                         outstandingBalance = Money.of("500.00", Currency.SAR),
                     ),
@@ -110,7 +111,10 @@ class CreditCardOverviewBuilderTest {
                         at = statementAt,
                         family = MessageFamily.NON_FINANCIAL,
                     ),
-                    ParsedEventDetails(outstandingBalance = Money.of("0.00", Currency.SAR)),
+                    statementDetails(
+                        outstandingBalance = Money.of("0.00", Currency.SAR),
+                        paymentDueDate = LocalDate.parse("2026-09-07"),
+                    ),
                 ),
             ),
             rawSmsById = mapOf(
@@ -177,7 +181,7 @@ class CreditCardOverviewBuilderTest {
                 val raw = purchaseSms("sms-$last4", last4)
                 ParsedEventRecord(
                     parsedEvent("pe-$last4", raw, card, purchaseAt),
-                    ParsedEventDetails(
+                    creditPurchaseDetails(
                         availableBalance = Money.of("10242.76", Currency.SAR),
                         outstandingBalance = sharedAccountDue,
                     ),
@@ -226,7 +230,7 @@ class CreditCardOverviewBuilderTest {
             parsedRecords = listOf(
                 ParsedEventRecord(
                     parsedEvent("pe-7271", purchaseSms, card7271, purchaseAt),
-                    ParsedEventDetails(availableBalance = Money.of("14569.09", Currency.SAR)),
+                    creditPurchaseDetails(availableBalance = Money.of("14569.09", Currency.SAR)),
                 ),
             ),
             rawSmsById = mapOf(purchaseSms.id to purchaseSms),
@@ -261,7 +265,7 @@ class CreditCardOverviewBuilderTest {
             parsedRecords = listOf(
                 ParsedEventRecord(
                     parsedEvent("pe-mada", raw, card, at),
-                    ParsedEventDetails(),
+                    ParsedEventDetails(cardSmsChannel = CardSmsChannel.DEBIT),
                 ),
             ),
             rawSmsById = mapOf(raw.id to raw),
@@ -321,4 +325,24 @@ class CreditCardOverviewBuilderTest {
             ParseStatus.SUCCESS
         },
     )
+
+    private fun creditPurchaseDetails(
+        availableBalance: Money? = null,
+        outstandingBalance: Money? = null,
+    ): ParsedEventDetails =
+        ParsedEventDetails(
+            cardSmsChannel = CardSmsChannel.CREDIT,
+            availableBalance = availableBalance,
+            outstandingBalance = outstandingBalance,
+        )
+
+    private fun statementDetails(
+        outstandingBalance: Money?,
+        paymentDueDate: LocalDate,
+    ): ParsedEventDetails =
+        ParsedEventDetails(
+            cardSmsChannel = CardSmsChannel.STATEMENT,
+            outstandingBalance = outstandingBalance,
+            paymentDueDate = paymentDueDate,
+        )
 }

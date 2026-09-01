@@ -14,13 +14,17 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.AppUpdateService
 import com.baraa.masroof.application.update.ApkInstaller
+import com.baraa.masroof.application.update.InstalledBuildInfo
 import com.baraa.masroof.application.update.PrivateRepoRequiresTokenException
+import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckResult
 import com.baraa.masroof.application.update.UpdateManifest
-import com.baraa.masroof.sms.scanner.SmsScanResult
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcome
-import com.baraa.masroof.sms.scanner.SmsScanUserOutcomeMapper
+import com.baraa.masroof.application.onboarding.HistoricalImportResult
+import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
+import com.baraa.masroof.application.onboarding.userOutcome
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
+import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
@@ -30,11 +34,6 @@ import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.repository.AccountRegistryRepository
-import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.domain.repository.CommitmentRepository
-import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,17 +44,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SettingsViewModel(
-    private val cardRegistryRepository: CardRegistryRepository,
-    private val accountRegistryRepository: AccountRegistryRepository,
-    private val loanRegistryRepository: LoanRegistryRepository,
-    private val commitmentRepository: CommitmentRepository,
-    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val settingsRegistryWorkflow: SettingsRegistryWorkflow,
+    private val settingsCommitmentsWorkflow: SettingsCommitmentsWorkflow,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredEvents: suspend () -> Int,
-    private val importSmsFromInbox: suspend () -> SmsScanResult,
+    private val importSmsFromInbox: suspend () -> HistoricalImportResult,
     private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
     private val appUpdateService: AppUpdateService,
@@ -68,6 +64,7 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             appVersion = appVersion,
+            isNightlyBuild = InstalledBuildInfo.isNightlyBuild(appVersion),
             languageTag = appLocaleRepository.getLanguageTag(),
             themeMode = themePreferencesRepository.getThemeMode(),
         ),
@@ -91,17 +88,20 @@ class SettingsViewModel(
                     languageTag = appLocaleRepository.getLanguageTag(),
                     themeMode = themePreferencesRepository.getThemeMode(),
                     githubTokenConfigured = appUpdateService.hasConfiguredToken(),
+                    updateChannel = appUpdateService.getUpdateChannel(),
+                    isNightlyBuild = InstalledBuildInfo.isNightlyBuild(appVersion),
                     smsPermissionGranted = permissionStateProvider(),
                 )
             }
             restorePendingUpdateState()
             try {
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
-                applyCommitments(commitmentRepository.listAll())
+                applyCommitments(settingsCommitmentsWorkflow.listAll())
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -152,7 +152,7 @@ class SettingsViewModel(
         val target = _uiState.value.renameCardTarget ?: return
         dismissRenameCard()
         updateCardMetadata(target) {
-            cardRegistryRepository.updateDisplayName(
+            settingsRegistryWorkflow.updateCardDisplayName(
                 CardReference(target.bank, target.last4),
                 name.trim().ifEmpty { null },
             )
@@ -171,7 +171,7 @@ class SettingsViewModel(
         val target = _uiState.value.renameAccountTarget ?: return
         dismissRenameAccount()
         updateAccountMetadata(target) {
-            accountRegistryRepository.updateDisplayName(
+            settingsRegistryWorkflow.updateAccountDisplayName(
                 AccountReference(target.bank, target.maskedNumber),
                 name.trim().ifEmpty { null },
             )
@@ -190,7 +190,7 @@ class SettingsViewModel(
         val target = _uiState.value.cardNetworkTarget ?: return
         dismissCardNetworkPicker()
         updateCardMetadata(target) {
-            cardRegistryRepository.updateCardNetwork(
+            settingsRegistryWorkflow.updateCardNetwork(
                 CardReference(target.bank, target.last4),
                 network,
             )
@@ -208,14 +208,14 @@ class SettingsViewModel(
     fun setPrimaryCard(card: ManagedCardUi) {
         dismissCardRolePicker()
         updateCardMetadata(card) {
-            cardRegistryRepository.setPrimaryCard(CardReference(card.bank, card.last4))
+            settingsRegistryWorkflow.setPrimaryCard(CardReference(card.bank, card.last4))
         }
     }
 
     fun setSupplementaryCard(card: ManagedCardUi, primaryLast4: String) {
         dismissCardRolePicker()
         updateCardMetadata(card) {
-            cardRegistryRepository.setSupplementaryCard(
+            settingsRegistryWorkflow.setSupplementaryCard(
                 CardReference(card.bank, card.last4),
                 primaryLast4,
             )
@@ -225,7 +225,7 @@ class SettingsViewModel(
     fun clearCardRole(card: ManagedCardUi) {
         dismissCardRolePicker()
         updateCardMetadata(card) {
-            cardRegistryRepository.clearCardRole(CardReference(card.bank, card.last4))
+            settingsRegistryWorkflow.clearCardRole(CardReference(card.bank, card.last4))
         }
     }
 
@@ -240,7 +240,7 @@ class SettingsViewModel(
     fun linkDebitToAccount(card: ManagedCardUi, account: ManagedAccountUi) {
         dismissLinkDebitCard()
         updateCardMetadata(card) {
-            cardRegistryRepository.linkDebitToAccount(
+            settingsRegistryWorkflow.linkDebitToAccount(
                 CardReference(card.bank, card.last4),
                 AccountReference(account.bank, account.maskedNumber),
             )
@@ -249,7 +249,7 @@ class SettingsViewModel(
 
     fun markCardAsDebit(card: ManagedCardUi) {
         updateCardMetadata(card) {
-            cardRegistryRepository.markAsDebit(CardReference(card.bank, card.last4))
+            settingsRegistryWorkflow.markCardAsDebit(CardReference(card.bank, card.last4))
         }
     }
 
@@ -324,10 +324,11 @@ class SettingsViewModel(
             try {
                 val count = reparseStoredEvents()
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
                 _uiState.update { it.copy(reparsingStored = false) }
@@ -354,14 +355,16 @@ class SettingsViewModel(
             try {
                 val result = importSmsFromInbox()
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 appLogService.info(
                     AppLogCategories.SETTINGS,
-                    "SMS import finished: ${AppLogFormatting.scanSummary(result)}",
+                    "SMS import finished: scanned=${result.scanned}, inserted=${result.inserted}, " +
+                        "parsed=${result.parsed}, failed=${result.failed}",
                 )
                 _uiState.update {
                     it.copy(
@@ -387,16 +390,16 @@ class SettingsViewModel(
         _uiState.update { it.copy(smsImportMessage = null) }
     }
 
-    private fun mapSmsImportMessage(result: SmsScanResult): SmsImportMessage =
-        when (SmsScanUserOutcomeMapper.map(result)) {
-            SmsScanUserOutcome.PERMISSION_DENIED -> SmsImportMessage.PERMISSION_DENIED
-            SmsScanUserOutcome.FAILED -> SmsImportMessage.FAILED
-            SmsScanUserOutcome.NO_MESSAGES -> SmsImportMessage.NO_MESSAGES
-            SmsScanUserOutcome.NO_BANK_SMS -> SmsImportMessage.NO_BANK_SMS
-            SmsScanUserOutcome.OK -> SmsImportMessage.OK
-            SmsScanUserOutcome.ALREADY_UP_TO_DATE -> SmsImportMessage.ALREADY_UP_TO_DATE
-            SmsScanUserOutcome.NEEDS_REVIEW -> SmsImportMessage.NEEDS_REVIEW
-            SmsScanUserOutcome.NO_NEW_TRANSACTIONS -> SmsImportMessage.NO_TRANSACTIONS
+    private fun mapSmsImportMessage(result: HistoricalImportResult): SmsImportMessage =
+        when (result.userOutcome()) {
+            HistoricalImportUserOutcome.PERMISSION_DENIED -> SmsImportMessage.PERMISSION_DENIED
+            HistoricalImportUserOutcome.FAILED -> SmsImportMessage.FAILED
+            HistoricalImportUserOutcome.NO_MESSAGES -> SmsImportMessage.NO_MESSAGES
+            HistoricalImportUserOutcome.NO_BANK_SMS -> SmsImportMessage.NO_BANK_SMS
+            HistoricalImportUserOutcome.OK -> SmsImportMessage.OK
+            HistoricalImportUserOutcome.ALREADY_UP_TO_DATE -> SmsImportMessage.ALREADY_UP_TO_DATE
+            HistoricalImportUserOutcome.NEEDS_REVIEW -> SmsImportMessage.NEEDS_REVIEW
+            HistoricalImportUserOutcome.NO_NEW_TRANSACTIONS -> SmsImportMessage.NO_TRANSACTIONS
         }
 
     fun clearUpdateMessage() {
@@ -425,6 +428,20 @@ class SettingsViewModel(
                 updateMessage = null,
             )
         }
+    }
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        if (channel == appUpdateService.getUpdateChannel()) return
+        appUpdateService.setUpdateChannel(channel)
+        updateCheckCoordinator.clearPendingUpdate()
+        _uiState.update {
+            it.copy(
+                updateChannel = channel,
+                updateState = AppUpdateUiState.Idle,
+                updateMessage = null,
+            )
+        }
+        checkForUpdates(silent = true)
     }
 
     fun checkForUpdates(silent: Boolean = false) {
@@ -713,10 +730,11 @@ class SettingsViewModel(
             try {
                 action()
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -734,10 +752,11 @@ class SettingsViewModel(
             try {
                 action()
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -755,15 +774,16 @@ class SettingsViewModel(
             try {
                 val ref = CardReference(card.bank, card.last4)
                 if (owned) {
-                    ownershipConfirmationService.confirmCardOwned(ref)
+                    settingsRegistryWorkflow.confirmCardOwned(ref)
                 } else {
-                    ownershipConfirmationService.markCardExternal(ref)
+                    settingsRegistryWorkflow.markCardExternal(ref)
                 }
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -781,15 +801,16 @@ class SettingsViewModel(
             try {
                 val ref = AccountReference(account.bank, account.maskedNumber)
                 if (owned) {
-                    ownershipConfirmationService.confirmAccountOwned(ref)
+                    settingsRegistryWorkflow.confirmAccountOwned(ref)
                 } else {
-                    ownershipConfirmationService.markAccountExternal(ref)
+                    settingsRegistryWorkflow.markAccountExternal(ref)
                 }
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -807,15 +828,16 @@ class SettingsViewModel(
             try {
                 val ref = LoanReference(loan.bank, loan.loanType)
                 if (owned) {
-                    ownershipConfirmationService.confirmLoanOwned(ref)
+                    settingsRegistryWorkflow.confirmLoanOwned(ref)
                 } else {
-                    ownershipConfirmationService.markLoanExternal(ref)
+                    settingsRegistryWorkflow.markLoanExternal(ref)
                 }
                 refreshReviewQueue()
+                val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
-                    cards = cardRegistryRepository.listAll(),
-                    accounts = accountRegistryRepository.listAll(),
-                    loans = loanRegistryRepository.listAll(),
+                    cards = snapshot.cards,
+                    accounts = snapshot.accounts,
+                    loans = snapshot.loans,
                 )
                 _uiState.update { it.copy(updating = false) }
             } catch (ce: CancellationException) {
@@ -885,23 +907,12 @@ class SettingsViewModel(
         }
     }
 
-    fun saveCommitment(commitmentId: String, draft: CommitmentEditorDraft) {
+    fun saveCommitment(commitmentId: String, draft: SettingsCommitmentsWorkflow.CommitmentEditorDraft) {
         viewModelScope.launch {
             _uiState.update { it.copy(savingCommitment = true) }
             try {
-                val existing = commitmentRepository.get(commitmentId) ?: return@launch
-                val now = java.time.Instant.now()
-                commitmentRepository.update(
-                    existing.copy(
-                        name = draft.name,
-                        amount = draft.amount,
-                        transactionDate = draft.transactionDate,
-                        recurrence = draft.recurrence,
-                        dueDate = draft.dueDate,
-                        updatedAt = now,
-                    ),
-                )
-                applyCommitments(commitmentRepository.listAll())
+                settingsCommitmentsWorkflow.update(commitmentId, draft)
+                applyCommitments(settingsCommitmentsWorkflow.listAll())
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -914,16 +925,15 @@ class SettingsViewModel(
 
     fun toggleCommitmentActive(commitmentId: String) {
         viewModelScope.launch {
-            val existing = commitmentRepository.get(commitmentId) ?: return@launch
-            commitmentRepository.setActive(commitmentId, active = !existing.active)
-            applyCommitments(commitmentRepository.listAll())
+            settingsCommitmentsWorkflow.toggleActive(commitmentId)
+            applyCommitments(settingsCommitmentsWorkflow.listAll())
         }
     }
 
     fun deleteCommitment(commitmentId: String, onDeleted: () -> Unit = {}) {
         viewModelScope.launch {
-            commitmentRepository.delete(commitmentId)
-            applyCommitments(commitmentRepository.listAll())
+            settingsCommitmentsWorkflow.delete(commitmentId)
+            applyCommitments(settingsCommitmentsWorkflow.listAll())
             onDeleted()
         }
     }
@@ -1133,7 +1143,7 @@ class SettingsViewModel(
 
     fun setAccountType(account: ManagedAccountUi, accountType: AccountType) {
         updateAccountMetadata(account) {
-            accountRegistryRepository.updateAccountType(
+            settingsRegistryWorkflow.updateAccountType(
                 AccountReference(account.bank, account.maskedNumber),
                 accountType,
             )

@@ -6,12 +6,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.data.repository.RoomCommitmentRepository
-import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
-import com.baraa.masroof.domain.model.Commitment
-import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.data.room.mapper.ParsedEventMapper
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.parsing.model.CardSmsChannel
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -23,14 +28,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.time.Instant
+import java.math.BigDecimal
 import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class Migration9To10Test {
     @Test
-    fun migrate9To10_createsCommitmentTable() = runBlocking {
+    fun migrate9To10_preservesParsedEventsAndAddsDashboardFactColumns() = runBlocking {
         val schema9 = java.io.File("schemas/com.baraa.masroof.data.room.MasroofDatabase/9.json")
         assertTrue(schema9.isFile)
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -56,7 +61,80 @@ class Migration9To10Test {
                 .build(),
         )
 
+        val event = ParsedEvent(
+            id = "evt-1",
+            rawSmsId = "sms-1",
+            bank = Bank.BANK_ALJAZIRA,
+            messageFamily = MessageFamily.PURCHASE,
+            direction = MoneyDirection.OUTGOING,
+            amount = Money.of("51.99", Currency.SAR),
+            purchaseChannel = null,
+            sourceAccountRef = null,
+            destinationAccountRef = null,
+            cardRef = null,
+            merchant = "SHOP",
+            counterparty = null,
+            occurredAt = null,
+            bankNetworkType = null,
+            confidence = Confidence(1.0),
+            parseStatus = ParseStatus.SUCCESS,
+        )
+
         openHelper.writableDatabase.use { db ->
+            db.execSQL(
+                """
+                INSERT INTO raw_sms (id, sender, body, receivedAtEpochMillis, deviceMessageId, bodyHash, dedupeKey)
+                VALUES ('sms-1', 'AlJazira', 'body', 1, '1', 'hash', 'key')
+                """.trimIndent(),
+            )
+            val entity = ParsedEventMapper.toEntity(event, ParsedEventDetails())
+            db.execSQL(
+                """
+                INSERT INTO parsed_event (
+                    id, rawSmsId, bankId, messageFamily, direction,
+                    amountDecimal, amountCurrency, purchaseChannel,
+                    sourceAccountBankId, sourceAccountMaskedNumber,
+                    destinationAccountBankId, destinationAccountMaskedNumber,
+                    cardBankId, cardLast4, merchant, counterparty,
+                    occurredAtEpochMillis, bankNetworkType,
+                    confidenceScore, confidenceReasons, parseStatus,
+                    transactionReference, availableBalanceDecimal, availableBalanceCurrency,
+                    outstandingBalanceDecimal, outstandingBalanceCurrency,
+                    biller, billerCode, occurredAtLocal
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf(
+                    entity.id,
+                    entity.rawSmsId,
+                    entity.bankId,
+                    entity.messageFamily,
+                    entity.direction,
+                    entity.amountDecimal,
+                    entity.amountCurrency,
+                    entity.purchaseChannel,
+                    entity.sourceAccountBankId,
+                    entity.sourceAccountMaskedNumber,
+                    entity.destinationAccountBankId,
+                    entity.destinationAccountMaskedNumber,
+                    entity.cardBankId,
+                    entity.cardLast4,
+                    entity.merchant,
+                    entity.counterparty,
+                    entity.occurredAtEpochMillis,
+                    entity.bankNetworkType,
+                    entity.confidenceScore,
+                    entity.confidenceReasons,
+                    entity.parseStatus,
+                    entity.transactionReference,
+                    entity.availableBalanceDecimal,
+                    entity.availableBalanceCurrency,
+                    entity.outstandingBalanceDecimal,
+                    entity.outstandingBalanceCurrency,
+                    entity.biller,
+                    entity.billerCode,
+                    entity.occurredAtLocal,
+                ),
+            )
             assertEquals(9, db.version)
         }
         openHelper.close()
@@ -66,31 +144,29 @@ class Migration9To10Test {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(10, room.openHelper.writableDatabase.version)
-
-            val repo = RoomCommitmentRepository.from(room)
-            val now = Instant.parse("2026-08-01T00:00:00Z")
-            val commitment = Commitment(
-                id = RegistryEntityIdFactory.newCommitmentId(),
-                name = "Netflix",
-                amount = Money.of("71.00", Currency.SAR),
-                transactionDate = LocalDate.parse("2026-08-01"),
-                recurrence = CommitmentRecurrence.MONTHLY,
-                dueDate = LocalDate.parse("2026-08-05"),
-                active = true,
-                sourceTransactionId = "tx-1",
-                createdAt = now,
-                updatedAt = now,
+            assertEquals(MasroofDatabase.VERSION, room.openHelper.writableDatabase.version)
+            val record = room.parsedEventDao().getById("evt-1")!!
+            val mapped = ParsedEventMapper.toRecord(record)
+            assertEquals(event, mapped.event)
+            assertEquals(ParsedEventDetails(), mapped.details)
+            room.parsedEventDao().replaceForRawSms(
+                ParsedEventMapper.toEntity(
+                    event,
+                    ParsedEventDetails(
+                        cardSmsChannel = CardSmsChannel.CREDIT,
+                        paymentDueDate = LocalDate.parse("2026-09-07"),
+                        exchangeRate = BigDecimal("3.756957"),
+                        internationalFee = Money.of("1.99", Currency.SAR),
+                        labeledForeignAmount = Money.of("23.00", Currency.USD),
+                    ),
+                ),
             )
-            repo.create(commitment)
-
-            val loaded = repo.get(commitment.id)!!
-            assertEquals("Netflix", loaded.name)
-            assertEquals(CommitmentRecurrence.MONTHLY, loaded.recurrence)
-            assertEquals("tx-1", loaded.sourceTransactionId)
-            assertEquals(1, repo.listActive().size)
+            val refreshed = ParsedEventMapper.toRecord(room.parsedEventDao().getById("evt-1")!!)
+            assertEquals(CardSmsChannel.CREDIT, refreshed.details.cardSmsChannel)
+            assertEquals(LocalDate.parse("2026-09-07"), refreshed.details.paymentDueDate)
         } finally {
             room.close()
+            context.deleteDatabase(dbName)
         }
     }
 

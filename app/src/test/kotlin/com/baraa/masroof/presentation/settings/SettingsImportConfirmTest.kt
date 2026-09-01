@@ -12,7 +12,8 @@ import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
@@ -80,14 +81,13 @@ class SettingsImportConfirmTest {
 
     private fun viewModel(backup: DatabaseBackupGateway): SettingsViewModel =
         SettingsViewModel(
-            cardRegistryRepository = EmptyCards(),
-            accountRegistryRepository = EmptyAccounts(),
-            loanRegistryRepository = NoOpLoanRegistryRepository,
-            commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
-            ownershipConfirmationService = OwnershipConfirmationService(
-                accountRegistry = EmptyAccounts(),
-                cardRegistry = EmptyCards(),
-                loanRegistry = NoOpLoanRegistryRepository,
+            settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(
+                cards = EmptyCards(),
+                accounts = EmptyAccounts(),
+                loans = NoOpLoanRegistryRepository,
+            ),
+            settingsCommitmentsWorkflow = SettingsCommitmentsWorkflow(
+                commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
             appLocaleRepository = object : AppLocaleRepository {
                 override fun getLanguageTag() = AppLocale.DEFAULT_TAG
@@ -100,7 +100,7 @@ class SettingsImportConfirmTest {
             databaseBackupService = backup,
             refreshReviewQueue = {},
             reparseStoredEvents = { 0 },
-            importSmsFromInbox = { com.baraa.masroof.sms.scanner.SmsScanResult() },
+            importSmsFromInbox = { com.baraa.masroof.application.onboarding.HistoricalImportResult() },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
             appUpdateService = SettingsViewModelTestFixtures.appUpdateService(),

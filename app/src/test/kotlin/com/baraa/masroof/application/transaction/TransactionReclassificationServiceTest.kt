@@ -186,7 +186,7 @@ class TransactionReclassificationServiceTest {
             bankNetworkType = null,
             confidence = Confidence(1.0),
         )
-        parsedRepo.save(event, ParsedEventDetails())
+        parsedRepo.save(event, ParsedEventDetails(loanType = LoanType.PERSONAL))
         val tx = FinancialTransaction(
             id = TransactionIdFactory.fromRawSmsIds(listOf(smsId)),
             type = FinancialTransactionType.FEE,

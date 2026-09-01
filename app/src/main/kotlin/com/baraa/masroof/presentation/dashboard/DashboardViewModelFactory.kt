@@ -5,22 +5,20 @@ import androidx.lifecycle.ViewModelProvider
 import com.baraa.masroof.application.onboarding.HistoricalSmsRescanService
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.AppContainer
-import java.time.Clock
 import java.time.ZoneId
 
 class DashboardViewModelFactory(
     private val container: AppContainer,
     private val permissionStateProvider: () -> Boolean,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(DashboardViewModel::class.java))
         return DashboardViewModel(
             overviewLoader = container.dashboardService,
-            cardRegistryRepository = container.cardRegistryRepository,
-            accountRegistryRepository = container.accountRegistryRepository,
+            dashboardRegistryWorkflow = container.dashboardRegistryWorkflow,
+            dashboardPeriodWorkflow = container.dashboardPeriodWorkflow,
             layoutPreferencesRepository = container.dashboardLayoutPreferencesRepository,
             rescanService = { HistoricalSmsRescanService(container).rescan() },
             reclassificationService = container.transactionReclassificationService,
@@ -36,7 +34,6 @@ class DashboardViewModelFactory(
             appLocaleRepository = container.appLocaleRepository,
             appLogService = container.appLogService,
             zoneId = zoneId,
-            clock = clock,
         ) as T
     }
 }

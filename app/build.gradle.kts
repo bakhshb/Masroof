@@ -15,8 +15,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val appVersionName = "0.3.18"
-val appVersionCode = 71
+val appVersionName =
+    project.findProperty("appVersionName") as? String
+        ?: "0.3.18"
+val appVersionCode =
+    (project.findProperty("appVersionCode") as? String)?.toIntOrNull()
+        ?: 71
 val githubOwner = "bakhshb"
 val githubRepo = "Masroof"
 
@@ -92,6 +96,10 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+            it.forkEvery = 50
+        }
     }
 
     // Room schema export for migrations (new rewrite schema only).

@@ -1,67 +1,127 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      type:
+        description: 'Release type (release or nightly)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - nightly
+      bump:
+        description: 'Version bump segment (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      ref:
+        description: 'Target commit SHA or branch'
+        required: false
+        default: 'main'
+        type: string
+      pr_number:
+        description: 'Associated PR number for feedback (optional)'
+        required: false
+        default: ''
+        type: string
+      comment_id:
+        description: 'Associated comment ID for reaction (optional)'
+        required: false
+        default: ''
+        type: string
+      skip_ci_check:
+        description: 'Skip green CI gate (emergency manual dispatch only)'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      type:
+        description: 'Release type (release or nightly)'
+        required: true
+        type: string
+        default: 'release'
+      bump:
+        description: 'Version bump segment (patch, minor, major)'
+        required: false
+        type: string
+        default: 'patch'
+      ref:
+        description: 'Target commit SHA or branch'
+        required: false
+        type: string
+        default: 'main'
+      pr_number:
+        description: 'Associated PR number for feedback (optional)'
+        required: false
+        type: string
+        default: ''
+      comment_id:
+        description: 'Associated comment ID for reaction (optional)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
+  pull-requests: write
+  issues: write
+  checks: read
 
 concurrency:
-  group: release-${{ github.workflow }}
+  group: masroof-publish
   cancel-in-progress: false
 
 jobs:
-  release:
-    if: >-
-      github.event_name != 'push' ||
-      !startsWith(github.event.head_commit.message, 'chore: bump version')
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
 
     steps:
-      - name: Checkout
+      - name: Checkout target commit
         uses: actions/checkout@v4
         with:
-          token: ${{ github.token }}
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve version and tag
-        id: version
-        run: |
-          VERSION_NAME=$(grep 'val appVersionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'val appVersionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF_NAME}"
-          else
-            TAG="v${VERSION_NAME}"
-          fi
-          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
-          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Release target: ${TAG} (${VERSION_NAME}, code ${VERSION_CODE})"
-
-      - name: Determine release action
-        id: release_plan
+      - name: Verify CI passed on target commit
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_REF: ${{ inputs.ref || 'main' }}
+          SKIP_CI_CHECK: ${{ inputs.skip_ci_check || 'false' }}
         run: |
-          chmod +x scripts/resolve-release-action.sh
-          ./scripts/resolve-release-action.sh "${{ steps.version.outputs.tag }}"
+          chmod +x scripts/verify-ci-status.sh
+          ./scripts/verify-ci-status.sh "$TARGET_REF"
+
+      - name: Resolve target version and versionCode
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/resolve-next-version.sh
+          ./scripts/resolve-next-version.sh --type "${{ inputs.type || 'release' }}" --bump "${{ inputs.bump || 'patch' }}"
 
       - name: Set up JDK 17
-        if: steps.release_plan.outputs.action == 'build'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure local SDK path
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
       - name: Decode release keystore
-        if: steps.release_plan.outputs.action == 'build'
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
@@ -72,7 +132,6 @@ jobs:
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
 
       - name: Create keystore.properties
-        if: steps.release_plan.outputs.action == 'build'
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -85,19 +144,27 @@ jobs:
           keyPassword=${RELEASE_KEY_PASSWORD}
           EOF
 
-      - name: Build release APK
-        if: steps.release_plan.outputs.action == 'build'
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Build signed release APK
+        run: |
+          ./gradlew assembleRelease --no-daemon \
+            -PappVersionName="${{ steps.version.outputs.version_name }}" \
+            -PappVersionCode="${{ steps.version.outputs.version_code }}"
 
-      - name: Prepare release artifacts
-        if: steps.release_plan.outputs.action == 'build'
+      - name: Verify APK and prepare artifacts
+        id: artifacts
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
           VERSION_CODE="${{ steps.version.outputs.version_code }}"
           APK_PATH="app/build/outputs/apk/release/app-release.apk"
-          RELEASE_APK="masroof-${VERSION_NAME}.apk"
+          if [[ ! -f "$APK_PATH" ]]; then
+            echo "Error: Release APK not found at $APK_PATH"
+            exit 1
+          fi
+
+          RELEASE_APK="${{ steps.version.outputs.apk_file_name }}"
           cp "$APK_PATH" "$RELEASE_APK"
           SHA256=$(sha256sum "$RELEASE_APK" | awk '{print $1}')
+
           cat > version.json <<EOF
           {
             "versionCode": ${VERSION_CODE},
@@ -106,24 +173,76 @@ jobs:
             "sha256": "${SHA256}"
           }
           EOF
+          echo "Generated version.json:"
           cat version.json
 
       - name: Publish GitHub Release
-        if: steps.release_plan.outputs.action == 'build'
+        id: gh_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ inputs.ref || 'main' }}
+          prerelease: ${{ steps.version.outputs.is_prerelease == 'true' }}
           files: |
             masroof-*.apk
             version.json
           generate_release_notes: true
 
-      - name: Release summary
+      - name: Report success to PR
+        if: success() && inputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_ID: ${{ inputs.comment_id }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          APK_FILE: ${{ steps.version.outputs.apk_file_name }}
+          IS_PRERELEASE: ${{ steps.version.outputs.is_prerelease }}
+          TYPE: ${{ inputs.type }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ -n "$COMMENT_ID" ]]; then
+            gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="rocket" || true
+          fi
+          RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
+          cat <<EOF > /tmp/pr_success.md
+          🚀 **Masroof ${TAG} published!**
+          - **Type:** \`${TYPE}\` (prerelease: \`${IS_PRERELEASE}\`)
+          - **Version:** \`${VERSION_NAME}\`
+          - **Version Code:** \`${VERSION_CODE}\`
+          - **APK:** \`${APK_FILE}\`
+          - **Release Notes:** [${TAG}](${RELEASE_URL})
+          EOF
+          gh pr comment "$PR_NUMBER" --body-file /tmp/pr_success.md || true
+
+      - name: Report failure to PR
+        if: failure() && inputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_ID: ${{ inputs.comment_id }}
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ -n "$COMMENT_ID" ]]; then
+            gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" || true
+          fi
+          gh pr comment "$PR_NUMBER" --body "❌ **Release build failed.** Check [workflow run logs](${RUN_URL}) for details." || true
+
+      - name: Publish summary
         if: always()
         run: |
           {
-            echo "### Release result"
+            echo "### Publishing summary"
             echo ""
-            echo "${{ steps.release_plan.outputs.reason }}"
+            echo "- **Status:** ${{ job.status }}"
+            echo "- **Type:** ${{ inputs.type }}"
+            echo "- **Bump:** ${{ inputs.bump }}"
+            echo "- **Ref:** ${{ inputs.ref }}"
+            echo "- **Tag:** ${{ steps.version.outputs.tag }}"
+            echo "- **Version Name:** ${{ steps.version.outputs.version_name }}"
+            echo "- **Version Code:** ${{ steps.version.outputs.version_code }}"
+            echo "- **Prerelease:** ${{ steps.version.outputs.is_prerelease }}"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,10 +1,10 @@
 package com.baraa.masroof.domain.ownership
 
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -29,7 +29,7 @@ class OwnershipDiscoveryService(
     /**
      * Observe user-side container candidates from one parsed event.
      */
-    suspend fun observe(event: ParsedEvent) {
+    suspend fun observe(event: ParsedEvent, loanType: LoanType? = null) {
         val accounts = mutableListOf<AccountReference>()
         val cards = mutableListOf<CardReference>()
         val loans = mutableListOf<LoanReference>()
@@ -56,9 +56,7 @@ class OwnershipDiscoveryService(
 
             MessageFamily.FINANCING_INSTALLMENT -> {
                 event.sourceAccountRef?.let(accounts::add)
-                LoanTypeResolver.fromLabel(event.counterparty)?.let { loanType ->
-                    loans += LoanReference(event.bank, loanType)
-                }
+                loanType?.let { loans += LoanReference(event.bank, it) }
             }
 
             MessageFamily.CARD_PAYMENT -> {

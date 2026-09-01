@@ -27,4 +27,16 @@ class RoomParsedEventRepository(
 
     override suspend fun listAll(): List<ParsedEventRecord> =
         dao.listAll().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listReceivedBetween(
+        startInclusive: java.time.Instant,
+        endExclusive: java.time.Instant,
+    ): List<ParsedEventRecord> =
+        dao.listReceivedBetween(
+            startInclusiveMillis = startInclusive.toEpochMilli(),
+            endExclusiveMillis = endExclusive.toEpochMilli(),
+        ).map(ParsedEventMapper::toRecord)
+
+    override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
+        dao.listUnlinkedTransfers().map(ParsedEventMapper::toRecord)
 }

@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
@@ -98,6 +99,6 @@ class TransactionEffectiveTypeTest {
                 confidence = Confidence(1.0),
                 parseStatus = ParseStatus.SUCCESS,
             ),
-            details = ParsedEventDetails(),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
         )
 }

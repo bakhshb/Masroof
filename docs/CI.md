@@ -1,73 +1,56 @@
 # CI and release pipeline
 
-Masroof uses two GitHub Actions workflows:
+Masroof uses GitHub Actions for continuous integration and automated slash-command-driven releases.
 
 | Workflow | When | What |
 |----------|------|------|
-| **CI** | Pull request → `main` | `testDebugUnitTest`, `lintDebug`, `detekt` |
-| **Release** | Push to `main` (after merge) | Signed `assembleRelease` + GitHub Release |
+| **CI** (`ci.yml`) | Pull request or push → `main` | Parallel jobs: `unit-test` (`testDebugUnitTest`) and `static-analysis` (`lintDebug`, `detekt`) |
+| **PR Slash Commands** (`pr-commands.yml`) | Comment on PR (`/release`, `/nightly`) | Authenticates commenter, checks PR merge status, dispatches Release |
+| **Release** (`release.yml`) | Workflow dispatch or PR slash command | Verifies green CI on target commit, builds signed APK, tags commit, publishes GitHub Release |
 
-There is **no** CI run on every `main` push anymore — only the release job runs after merge.
+---
 
-## Flow
+## Daily development workflow
 
+1. **Feature branch**: Create branch and commit code changes. No manual version bumping in `app/build.gradle.kts`.
+2. **Open PR**: Open a PR targeting `main`. **CI** runs tests and lint checks automatically.
+3. **Review & Merge**: Review changes and merge the PR into `main`. **CI runs again on `main`** after merge.
+4. **Publish**: After **main CI is green**, comment `/nightly` or `/release` on the merged PR.
+
+---
+
+## Publishing builds after merge
+
+After merging a PR, wait for **main** CI checks (`unit-test` and `static-analysis`) to succeed, then comment on the merged PR to publish. Release builds **do not re-run** the full test suite; they verify the target commit already has green CI, then build and sign the APK.
+
+### Want a test build?
+Comment:
 ```text
-Branch → open PR → CI runs (must pass)
-       → merge PR → Release runs on main
-       → if version bumped for a new release → APK on GitHub Releases
-       → if version unchanged → release skipped (green, no new APK)
+/nightly
 ```
+- Builds pre-release APK tagged `v<next-version>-nightly.<n>`.
+- Monotonically increments global `versionCode`.
+- Does not notify regular stable users.
 
-## Day-to-day development
+### Ready for stable?
+Comment:
+```text
+/release
+```
+- Or `/release patch` (e.g. `v0.3.17` $\rightarrow$ `v0.3.18`).
+- For minor bumps: `/release minor` (e.g. `v0.3.17` $\rightarrow$ `v0.4.0`).
+- For major bumps: `/release major` (e.g. `v0.3.17` $\rightarrow$ `v1.0.0`).
+- Publishes official release with signed APK and `version.json`.
+- Notifies users via in-app update checker.
 
-1. Open feature PRs with code changes only — **no version bump required**.
-2. Wait for **CI** to pass → merge to `main`.
-3. **Release** runs and finishes **green** with no new APK when the version in `app/build.gradle.kts` is unchanged.
+---
 
-Merge as many feature PRs as you like before shipping.
+## Safety and concurrency
 
-## Shipping a new version
-
-When you are ready to publish an APK:
-
-1. Bump **`appVersionName`** and **`appVersionCode`** in `app/build.gradle.kts` (or run `./scripts/bump-version.sh`).
-2. Open a PR with the version bump (alone or with final changes).
-3. Wait for **CI** to pass → merge to `main`.
-4. **Release** builds the signed APK and publishes a GitHub Release.
-
-Update on your phone via Settings → About or wait for in-app update check.
-
-## What you do once (already done if you followed RELEASE.md)
-
-| Task | Status |
-|------|--------|
-| Generate release keystore | `./scripts/generate-release-keystore.sh` |
-| Upload keystore secrets to GitHub | `./scripts/upload-release-secrets.sh` |
-| GitHub PAT on phone for updates | Settings → About → App update |
-
-## Branch protection (recommended, manual in GitHub)
-
-Repo → **Settings → Branches → Add rule** for `main`:
-
-- Require a pull request before merging
-- Require status check: **CI** / `build-lint-test`
-
-Then merges are blocked until tests pass.
-
-## Manual release
-
-**Actions → Release → Run workflow** still works if you need to retry without a new merge.
-
-Pushing a `v*` tag still triggers Release (optional; not required for normal flow).
-
-## Release troubleshooting
-
-| Symptom | Meaning | Fix |
-|---------|---------|-----|
-| Release **green**, no new APK, summary says “already published” | Version unchanged — expected after feature merges | Bump version when ready to ship |
-| Release **red**, “versionCode … not greater than latest published” | New `versionName` but `versionCode` was not bumped | Bump both in `app/build.gradle.kts` |
-| Release **red** on keystore / build step | Signing or compile failure | Check Actions logs and secrets |
-
-## PR artifacts
-
-PR CI does not build or upload a debug APK. Installable builds come from **Release** after merge to `main`, or run **Actions → Release → Run workflow** manually.
+- **Zero-code bumps**: Version names and version codes are dynamically resolved and passed via Gradle CLI (`-PappVersionName` and `-PappVersionCode`). No version commits are pushed back to the repo.
+- **Unmerged PR protection**: `/release` and `/nightly` commands on open/unmerged PRs are rejected.
+- **CI gate before publish**: Release verifies the target commit has successful `unit-test` and `static-analysis` checks from the **CI** workflow (within 7 days). If main CI is still running or failed, publish is blocked.
+- **Serialized publishing**: All publishing jobs run under the `masroof-publish` concurrency group with `cancel-in-progress: false` to ensure no two concurrent builds can generate conflicting versions or version codes.
+- **Tagging safety**: Git tags are created and pushed only **after** the APK is signed and verification succeeds.
+- **Authorization**: Only repository owners, members, and write collaborators can trigger release workflows.
+- **Emergency manual dispatch**: Workflow dispatch can set `skip_ci_check` to bypass the CI gate (use only when necessary).
