@@ -26,6 +26,8 @@
 
 **PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.
 
+**Release CI:** Full tests run in PR/main **CI** only. Do not add `testDebugUnitTest` back to `release.yml`; release verifies green CI then builds the APK.
+
 **Deep reference:** `docs/ARCHITECTURE.md`, `docs/REWRITE_DECISIONS.md`
 
 ## Dashboard calculations
