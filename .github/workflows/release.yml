@@ -81,7 +81,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
 
     steps:
       - name: Checkout target commit
@@ -92,10 +92,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify CI passed on target commit
+        id: verify_ci
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_REF: ${{ inputs.ref || 'main' }}
           SKIP_CI_CHECK: ${{ inputs.skip_ci_check || 'false' }}
+          CI_WAIT_TIMEOUT_SECONDS: 2400
         run: |
           chmod +x scripts/verify-ci-status.sh
           ./scripts/verify-ci-status.sh "$TARGET_REF"
@@ -229,7 +231,11 @@ jobs:
           if [[ -n "$COMMENT_ID" ]]; then
             gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" || true
           fi
-          gh pr comment "$PR_NUMBER" --body "❌ **Release build failed.** Check [workflow run logs](${RUN_URL}) for details." || true
+          if [[ "${{ steps.verify_ci.outcome }}" == "failure" ]]; then
+            gh pr comment "$PR_NUMBER" --body "❌ **Release blocked:** main CI was not green on the target commit (or timed out waiting). Check [workflow run logs](${RUN_URL}), wait for **CI** on \`main\` to pass, then comment \`/nightly\` or \`/release\` again." || true
+          else
+            gh pr comment "$PR_NUMBER" --body "❌ **Release build failed.** Check [workflow run logs](${RUN_URL}) for details." || true
+          fi
 
       - name: Publish summary
         if: always()

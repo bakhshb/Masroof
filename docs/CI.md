@@ -49,7 +49,7 @@ Comment:
 
 - **Zero-code bumps**: Version names and version codes are dynamically resolved and passed via Gradle CLI (`-PappVersionName` and `-PappVersionCode`). No version commits are pushed back to the repo.
 - **Unmerged PR protection**: `/release` and `/nightly` commands on open/unmerged PRs are rejected.
-- **CI gate before publish**: Release verifies the target commit has a successful `build-lint-test` check from the **CI** workflow (within 7 days). If main CI is still running or failed, publish is blocked.
+- **CI gate before publish**: Release waits for the target commit's `build-lint-test` check to finish (up to 40 minutes), then verifies success within 7 days. If main CI is still running right after merge, release queues until CI completes instead of failing immediately.
 - **Serialized publishing**: All publishing jobs run under the `masroof-publish` concurrency group with `cancel-in-progress: false` to ensure no two concurrent builds can generate conflicting versions or version codes.
 - **Tagging safety**: Git tags are created and pushed only **after** the APK is signed and verification succeeds.
 - **Authorization**: Only repository owners, members, and write collaborators can trigger release workflows.

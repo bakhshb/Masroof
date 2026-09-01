@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Verifies that the CI workflow succeeded on the target commit before publishing.
+# Waits for in-progress CI (e.g. right after merge) up to CI_WAIT_TIMEOUT_SECONDS.
 set -euo pipefail
 
 TARGET_REF="${1:-main}"
@@ -7,6 +8,8 @@ SKIP_CI_CHECK="${SKIP_CI_CHECK:-false}"
 REPO="${GITHUB_REPOSITORY:-}"
 MAX_AGE_DAYS="${CI_CHECK_MAX_AGE_DAYS:-7}"
 CI_JOB_NAME="${CI_JOB_NAME:-build-lint-test}"
+WAIT_TIMEOUT_SECONDS="${CI_WAIT_TIMEOUT_SECONDS:-2400}"
+POLL_INTERVAL_SECONDS="${CI_POLL_INTERVAL_SECONDS:-30}"
 
 if [[ "$SKIP_CI_CHECK" == "true" ]]; then
   echo "SKIP_CI_CHECK=true — skipping CI verification."
@@ -32,29 +35,48 @@ resolve_sha() {
   gh api "repos/${REPO}/git/ref/heads/${ref}" --jq '.object.sha'
 }
 
+fetch_latest_check_json() {
+  local check_runs_json
+  check_runs_json=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
+  echo "$check_runs_json" | jq --arg name "$CI_JOB_NAME" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at) | last // empty'
+}
+
 TARGET_SHA="$(resolve_sha "$TARGET_REF")"
 echo "Verifying CI job '${CI_JOB_NAME}' succeeded on ${TARGET_SHA:0:7}..."
+echo "Will wait up to ${WAIT_TIMEOUT_SECONDS}s for CI to finish if still running."
 
-CHECK_RUNS_JSON=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
-MATCHING_COUNT=$(echo "$CHECK_RUNS_JSON" | jq --arg name "$CI_JOB_NAME" '[.check_runs[] | select(.name == $name)] | length')
+START_EPOCH=$(date +%s)
 
-if [[ "$MATCHING_COUNT" -eq 0 ]]; then
-  echo "No '${CI_JOB_NAME}' check run found for commit ${TARGET_SHA}." >&2
-  echo "Wait for CI on main to finish after merge, then retry /nightly or /release." >&2
-  exit 1
-fi
+while true; do
+  ELAPSED=$(( $(date +%s) - START_EPOCH ))
+  if [[ "$ELAPSED" -gt "$WAIT_TIMEOUT_SECONDS" ]]; then
+    echo "Timed out after ${WAIT_TIMEOUT_SECONDS}s waiting for '${CI_JOB_NAME}' on ${TARGET_SHA:0:7}." >&2
+    exit 1
+  fi
 
-LATEST=$(echo "$CHECK_RUNS_JSON" | jq --arg name "$CI_JOB_NAME" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at) | last')
-STATUS=$(echo "$LATEST" | jq -r '.status')
-CONCLUSION=$(echo "$LATEST" | jq -r '.conclusion // empty')
-COMPLETED_AT=$(echo "$LATEST" | jq -r '.completed_at // empty')
-HTML_URL=$(echo "$LATEST" | jq -r '.html_url // empty')
+  LATEST="$(fetch_latest_check_json)"
+  if [[ -z "$LATEST" || "$LATEST" == "null" ]]; then
+    echo "No '${CI_JOB_NAME}' check run yet (${ELAPSED}s elapsed). Waiting..."
+    sleep "$POLL_INTERVAL_SECONDS"
+    continue
+  fi
 
-if [[ "$STATUS" != "completed" ]]; then
-  echo "CI check '${CI_JOB_NAME}' is still ${STATUS}." >&2
-  echo "Wait for CI to complete: ${HTML_URL}" >&2
-  exit 1
-fi
+  STATUS=$(echo "$LATEST" | jq -r '.status')
+  CONCLUSION=$(echo "$LATEST" | jq -r '.conclusion // empty')
+  COMPLETED_AT=$(echo "$LATEST" | jq -r '.completed_at // empty')
+  HTML_URL=$(echo "$LATEST" | jq -r '.html_url // empty')
+
+  if [[ "$STATUS" == "queued" || "$STATUS" == "in_progress" ]]; then
+    echo "CI check '${CI_JOB_NAME}' is ${STATUS} (${ELAPSED}s elapsed). Waiting..."
+  elif [[ "$STATUS" != "completed" ]]; then
+    echo "CI check '${CI_JOB_NAME}' has unexpected status '${STATUS}'." >&2
+    exit 1
+  else
+    break
+  fi
+
+  sleep "$POLL_INTERVAL_SECONDS"
+done
 
 if [[ "$CONCLUSION" != "success" ]]; then
   echo "CI check '${CI_JOB_NAME}' concluded with '${CONCLUSION}'." >&2
