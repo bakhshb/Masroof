@@ -617,6 +617,8 @@ class DashboardViewModelTest {
         loader: FakeLoader,
         cardRegistry: com.baraa.masroof.domain.repository.CardRegistryRepository = FakeCardRegistry(),
         accountRegistry: com.baraa.masroof.domain.repository.AccountRegistryRepository = FakeAccountRegistry(),
+        periodClock: java.time.Clock = clock,
+        periodZoneId: java.time.ZoneId = zone,
         layoutPreferencesRepository: DashboardLayoutPreferencesRepository = FakeLayoutPreferencesRepository(),
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
@@ -668,8 +670,13 @@ class DashboardViewModelTest {
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
-            cardRegistryRepository = cardRegistry,
-            accountRegistryRepository = accountRegistry,
+            dashboardRegistryWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .dashboardRegistryWorkflow(cards = cardRegistry, accounts = accountRegistry),
+            dashboardPeriodWorkflow = com.baraa.masroof.testsupport.PresentationWorkflowTestSupport
+                .dashboardPeriodWorkflow(
+                    now = periodClock.instant(),
+                    zoneId = periodZoneId,
+                ),
             layoutPreferencesRepository = layoutPreferencesRepository,
             rescanService = rescanService,
             smsEvidenceLoader = smsEvidenceLoader,
@@ -713,6 +720,11 @@ class DashboardViewModelTest {
                         override suspend fun findByRawSmsId(rawSmsId: String) = null
                         override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
                         override suspend fun listAll() = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
+
+                        override suspend fun listReceivedBetween(
+                            startInclusive: java.time.Instant,
+                            endExclusive: java.time.Instant,
+                        ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
                     },
                     object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
                         override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
@@ -793,7 +805,6 @@ class DashboardViewModelTest {
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
-            clock = clock,
         )
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

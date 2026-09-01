@@ -299,6 +299,11 @@ class ProcessRawSmsUseCaseTest {
             override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
             override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
             override suspend fun listAll(): List<ParsedEventRecord> = emptyList()
+
+            override suspend fun listReceivedBetween(
+                startInclusive: java.time.Instant,
+                endExclusive: java.time.Instant,
+            ): List<ParsedEventRecord> = emptyList()
         }
         val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,

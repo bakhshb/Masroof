@@ -5,17 +5,22 @@ import androidx.room.Room
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
+import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
+import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkflow
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
@@ -29,8 +34,13 @@ import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
-import com.baraa.masroof.presentation.locale.AppLocaleContext
+import com.baraa.masroof.application.locale.AppLocaleBootstrap
+import com.baraa.masroof.application.locale.AppLocaleContextFactory
+import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
+import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import okhttp3.OkHttpClient
+import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.BankSmsRegistry
@@ -75,9 +85,11 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 
 /**
@@ -143,9 +155,9 @@ class AppContainer(
     val applicationContext: Context get() = appContext
 
     val localizedApplicationContext: Context
-        get() = AppLocaleContext.wrap(
+        get() = AppLocaleContextFactory.wrap(
             appContext,
-            AppLocaleContext.readStoredLanguageTag(appContext),
+            AppLocaleBootstrap.readStoredLanguageTag(appContext),
         )
 
     val onboardingPreferencesRepository: OnboardingPreferencesRepository =
@@ -260,6 +272,44 @@ class AppContainer(
             appLogService = appLogService,
         )
 
+    val reviewOwnershipWorkflow: ReviewOwnershipWorkflow =
+        ReviewOwnershipWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
+        )
+
+    val settingsRegistryWorkflow: SettingsRegistryWorkflow =
+        SettingsRegistryWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+            loanRegistryRepository = loanRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
+        )
+
+    val dashboardPeriodWorkflow: DashboardPeriodWorkflow =
+        DashboardPeriodWorkflow(clock = clock)
+
+    val dashboardRegistryWorkflow: DashboardRegistryWorkflow =
+        DashboardRegistryWorkflow(
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+        )
+
+    val notificationCenterMetricsWorkflow: NotificationCenterMetricsWorkflow =
+        NotificationCenterMetricsWorkflow(
+            reviewRepository = reviewRepository,
+            cardRegistryRepository = cardRegistryRepository,
+            accountRegistryRepository = accountRegistryRepository,
+        )
+
+    val onboardingOwnershipWorkflow: OnboardingOwnershipWorkflow =
+        OnboardingOwnershipWorkflow(
+            accountRegistryRepository = accountRegistryRepository,
+            cardRegistryRepository = cardRegistryRepository,
+            ownershipConfirmationService = ownershipConfirmationService,
+            reviewRepository = reviewRepository,
+        )
+
     val transactionReclassificationService: TransactionReclassificationService =
         TransactionReclassificationService(
             financialTransactionRepository = financialTransactionRepository,
@@ -368,15 +418,16 @@ class AppContainer(
      * Re-parses every stored RawSms that already has a ParsedEvent row.
      * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
      */
-    suspend fun reparseAllStoredEvents(): Int {
+    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult {
         appLogService.info(AppLogCategories.PARSE, "Reparse started")
-        var count = 0
+        var refreshedCount = 0
+        var failedCount = 0
         for (record in parsedEventRepository.listAll()) {
             val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
             when (processRawSmsUseCase.reparseStored(raw)) {
                 is SmsIngestionResult.Duplicate -> Unit
-                is SmsIngestionResult.Failed -> Unit
-                else -> count++
+                is SmsIngestionResult.Failed -> failedCount++
+                else -> refreshedCount++
             }
         }
         discoverFromStoredEvents()
@@ -387,8 +438,14 @@ class AppContainer(
             repository = financialTransactionRepository,
         )
         refreshReviewQueue()
-        appLogService.info(AppLogCategories.PARSE, "Reparse finished: $count events refreshed")
-        return count
+        appLogService.info(
+            AppLogCategories.PARSE,
+            "Reparse finished: $refreshedCount refreshed, $failedCount failed",
+        )
+        return ReparseAllStoredEventsResult(
+            refreshedCount = refreshedCount,
+            failedCount = failedCount,
+        )
     }
 
     fun close() {
@@ -459,5 +516,34 @@ class AppContainer(
 
     val apkInstaller: ApkInstaller by lazy {
         ApkInstaller(appContext)
+    }
+
+    private val parsedEventFactsBackfillCoordinator: ParsedEventFactsBackfillCoordinator by lazy {
+        ParsedEventFactsBackfillCoordinator(
+            prefs = appContext.getSharedPreferences(
+                MaintenancePreferences.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+            appLogService = appLogService,
+            reparseAllStoredEvents = { reparseAllStoredEvents() },
+        )
+    }
+
+    private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
+
+    fun runStartupMaintenance() {
+        applicationScope.async {
+            try {
+                parsedEventFactsBackfillCoordinator.runIfNeeded()
+            } finally {
+                if (!startupMaintenanceCompletion.isCompleted) {
+                    startupMaintenanceCompletion.complete(Unit)
+                }
+            }
+        }
+    }
+
+    suspend fun awaitStartupMaintenance() {
+        startupMaintenanceCompletion.await()
     }
 }

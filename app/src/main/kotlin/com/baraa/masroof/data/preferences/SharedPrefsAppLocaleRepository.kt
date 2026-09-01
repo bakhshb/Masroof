@@ -2,6 +2,7 @@ package com.baraa.masroof.data.preferences
 
 import android.content.SharedPreferences
 import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.locale.AppLocalePreferences
 import com.baraa.masroof.application.locale.AppLocaleRepository
 
 class SharedPrefsAppLocaleRepository(
@@ -19,7 +20,7 @@ class SharedPrefsAppLocaleRepository(
     }
 
     companion object {
-        const val PREFS_NAME: String = "app_locale_prefs"
-        const val KEY_LANGUAGE_TAG: String = "language_tag"
+        const val PREFS_NAME: String = AppLocalePreferences.PREFS_NAME
+        const val KEY_LANGUAGE_TAG: String = AppLocalePreferences.KEY_LANGUAGE_TAG
     }
 }

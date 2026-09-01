@@ -1,11 +1,13 @@
 package com.baraa.masroof.testsupport
 
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
@@ -20,6 +22,22 @@ import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 
 internal object SettingsViewModelTestSupport {
+    fun settingsRegistryWorkflow(
+        cards: CardRegistryRepository = emptyCardRegistry(),
+        accounts: AccountRegistryRepository = emptyAccountRegistry(),
+        loans: com.baraa.masroof.domain.repository.LoanRegistryRepository = NoOpLoanRegistryRepository,
+    ): SettingsRegistryWorkflow =
+        SettingsRegistryWorkflow(
+            cardRegistryRepository = cards,
+            accountRegistryRepository = accounts,
+            loanRegistryRepository = loans,
+            ownershipConfirmationService = OwnershipConfirmationService(
+                accountRegistry = accounts,
+                cardRegistry = cards,
+                loanRegistry = loans,
+            ),
+        )
+
     fun noOpRestoreService(): TransactionRestoreService =
         TransactionRestoreService(
             reviewRepository = emptyReviewRepository(),
@@ -132,6 +150,11 @@ internal object SettingsViewModelTestSupport {
             override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
             override suspend fun listAll() =
                 emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
+
+            override suspend fun listReceivedBetween(
+                startInclusive: java.time.Instant,
+                endExclusive: java.time.Instant,
+            ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
         }
 
     internal fun emptyAccountRegistry(): AccountRegistryRepository =

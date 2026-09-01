@@ -89,10 +89,7 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.data.",
                 "import com.baraa.masroof.sms.",
             ),
-            allowedFiles = setOf(
-                // PR 8 — move locale bootstrap behind an application boundary.
-                "presentation/locale/AppLocaleContext.kt",
-            ),
+            allowedFiles = emptySet(),
         )
     }
 
@@ -106,15 +103,7 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.domain.repository.",
                 "import com.baraa.masroof.domain.rules.",
             ),
-            allowedFiles = setOf(
-                // PR 7 — review/settings/registry workflow application facades.
-                "presentation/review/ReviewViewModel.kt",
-                "presentation/settings/SettingsViewModel.kt",
-                // PR 8 — dashboard/onboarding/notification workflow facades.
-                "presentation/dashboard/DashboardViewModel.kt",
-                "presentation/notification/NotificationCenterViewModel.kt",
-                "presentation/onboarding/OnboardingViewModel.kt",
-            ),
+            allowedFiles = emptySet(),
         )
     }
 
