@@ -2,6 +2,7 @@ package com.baraa.masroof
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import androidx.work.Configuration
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.update.UpdateCheckScheduler
@@ -23,8 +24,10 @@ class MasroofApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        container.runStartupMaintenance()
-        UpdateCheckScheduler.schedule(this)
+        if (!isRobolectricUnitTest()) {
+            container.runStartupMaintenance()
+            UpdateCheckScheduler.schedule(this)
+        }
     }
 
     override val workManagerConfiguration: Configuration
@@ -36,4 +39,7 @@ class MasroofApplication : Application(), Configuration.Provider {
         }
         super.onTerminate()
     }
+
+    private fun isRobolectricUnitTest(): Boolean =
+        Build.FINGERPRINT.equals("robolectric", ignoreCase = true)
 }

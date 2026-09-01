@@ -96,6 +96,10 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+            it.forkEvery = 50
+        }
     }
 
     // Room schema export for migrations (new rewrite schema only).

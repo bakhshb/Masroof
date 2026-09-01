@@ -88,9 +88,11 @@ import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Minimal manual composition root for P6–P9.
@@ -449,6 +451,10 @@ class AppContainer(
     }
 
     fun close() {
+        startupMaintenanceJob?.cancel()
+        runBlocking(Dispatchers.IO) {
+            startupMaintenanceJob?.join()
+        }
         applicationScope.cancel()
         database.close()
     }
@@ -530,9 +536,10 @@ class AppContainer(
     }
 
     private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
+    private var startupMaintenanceJob: Job? = null
 
     fun runStartupMaintenance() {
-        applicationScope.async {
+        startupMaintenanceJob = applicationScope.launch {
             try {
                 parsedEventFactsBackfillCoordinator.runIfNeeded()
             } finally {
