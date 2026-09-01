@@ -7,10 +7,10 @@ The app checks for updates using your personal GitHub token and installs APKs di
 ## Development and publishing workflow
 
 ```text
-PR → CI checks pass → Review & Approve → Merge to main
+PR → CI checks pass → Review & Approve → Merge to main → main CI green → /nightly or /release
 ```
 
-After your PR is merged, you can publish a build by commenting on the merged PR:
+After your PR is merged and **main CI succeeds**, publish by commenting on the merged PR:
 
 ### 1. Test build (Nightly)
 Comment on the merged PR:
@@ -53,7 +53,10 @@ You can also trigger builds directly from the GitHub Actions UI:
 2. Select **Release type**: `release` or `nightly`.
 3. Select **Version bump**: `patch`, `minor`, or `major`.
 4. (Optional) Provide a target commit ref or branch (defaults to `main`).
-5. Click **Run workflow**.
+5. (Optional) Set **Skip green CI gate** only for emergencies.
+6. Click **Run workflow**.
+
+Release verifies the target commit has a successful **CI** check, then builds the signed APK. It does **not** re-run the full test suite.
 
 ---
 

@@ -35,6 +35,11 @@ on:
         required: false
         default: ''
         type: string
+      skip_ci_check:
+        description: 'Skip green CI gate (emergency manual dispatch only)'
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       type:
@@ -67,6 +72,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  checks: read
 
 concurrency:
   group: masroof-publish
@@ -75,7 +81,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
 
     steps:
       - name: Checkout target commit
@@ -84,6 +90,15 @@ jobs:
           ref: ${{ inputs.ref || 'main' }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify CI passed on target commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_REF: ${{ inputs.ref || 'main' }}
+          SKIP_CI_CHECK: ${{ inputs.skip_ci_check || 'false' }}
+        run: |
+          chmod +x scripts/verify-ci-status.sh
+          ./scripts/verify-ci-status.sh "$TARGET_REF"
 
       - name: Resolve target version and versionCode
         id: version
@@ -105,12 +120,6 @@ jobs:
 
       - name: Configure local SDK path
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
-
-      - name: Run tests and verification
-        run: |
-          ./gradlew testDebugUnitTest lintDebug detekt --stacktrace \
-            -PappVersionName="${{ steps.version.outputs.version_name }}" \
-            -PappVersionCode="${{ steps.version.outputs.version_code }}"
 
       - name: Decode release keystore
         env:
