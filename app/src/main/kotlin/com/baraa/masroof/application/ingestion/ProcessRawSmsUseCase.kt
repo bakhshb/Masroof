@@ -10,6 +10,7 @@ import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
@@ -187,7 +188,7 @@ class ProcessRawSmsUseCase(
         when (parseResult) {
             is ParseResult.Success -> {
                 parsedEventRepository.save(parseResult.event, parseResult.details)
-                afterParsedEvent(parseResult.event)
+                afterParsedEvent(parseResult.event, parseResult.details.loanType)
                 if (logOutcome) {
                     logParsedOutcome(rawSms, parseResult.event.messageFamily, "parsed")
                 }
@@ -201,7 +202,7 @@ class ProcessRawSmsUseCase(
             is ParseResult.Partial -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    afterParsedEvent(parseResult.event)
+                    afterParsedEvent(parseResult.event, parseResult.details.loanType)
                     if (logOutcome) {
                         logParsedOutcome(rawSms, parseResult.event.messageFamily, "parsed_partial")
                     }
@@ -227,7 +228,7 @@ class ProcessRawSmsUseCase(
             is ParseResult.ReviewRequired -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    afterParsedEvent(parseResult.event)
+                    afterParsedEvent(parseResult.event, parseResult.details.loanType)
                     if (logOutcome) {
                         logParsedOutcome(rawSms, parseResult.event.messageFamily, "review_required")
                     }
@@ -248,7 +249,7 @@ class ProcessRawSmsUseCase(
             is ParseResult.NonFinancial -> {
                 if (parseResult.event != null) {
                     parsedEventRepository.save(parseResult.event, parseResult.details)
-                    afterParsedEvent(parseResult.event)
+                    afterParsedEvent(parseResult.event, parseResult.details.loanType)
                     if (logOutcome) {
                         logParsedOutcome(rawSms, parseResult.event.messageFamily, "non_financial")
                     }
@@ -311,16 +312,19 @@ class ProcessRawSmsUseCase(
         )
     }
 
-    private suspend fun afterParsedEvent(event: ParsedEvent) {
-        discoverOwnership(event)
+    private suspend fun afterParsedEvent(event: ParsedEvent, loanType: LoanType?) {
+        discoverOwnership(event, loanType)
         val report = reconcileDerived(event) ?: return
         refreshReviewQueue(report)
     }
 
-    private suspend fun discoverOwnership(event: ParsedEvent) {
+    private suspend fun discoverOwnership(
+        event: ParsedEvent,
+        loanType: LoanType?,
+    ) {
         val discovery = ownershipDiscovery ?: return
         try {
-            discovery.observe(event)
+            discovery.observe(event, loanType)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

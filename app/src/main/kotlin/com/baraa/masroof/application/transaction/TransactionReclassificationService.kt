@@ -5,7 +5,6 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
@@ -105,7 +104,7 @@ class TransactionReclassificationService(
                 if (ownershipResolver.resolveAccount(sourceRef) != OwnershipStatus.OWNED) {
                     return ReclassificationResult.Rejected("source_not_owned")
                 }
-                val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+                val loanType = record.details.loanType
                     ?: return ReclassificationResult.Rejected("loan_type_missing")
                 val loanRef = LoanReference(event.bank, loanType)
                 maybeConfirmLoanOwned(loanRef)

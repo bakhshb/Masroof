@@ -65,7 +65,7 @@ object AccountFlowClassifier {
                     return emptyList()
                 }
                 listOf(
-                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
+                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById)) {
                         FlowAssignment.Income(FlowIncomeCategory.SALARY)
                     } else {
                         FlowAssignment.Income(FlowIncomeCategory.OTHER_INCOME)
@@ -78,7 +78,7 @@ object AccountFlowClassifier {
                     return emptyList()
                 }
                 listOf(
-                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById, rawSmsById)) {
+                    if (SalaryIncomeHeuristics.isSalaryIncome(tx, parsedRecordsById)) {
                         FlowAssignment.Income(FlowIncomeCategory.SALARY)
                     } else {
                         FlowAssignment.Income(FlowIncomeCategory.EXTERNAL_TRANSFER_IN)

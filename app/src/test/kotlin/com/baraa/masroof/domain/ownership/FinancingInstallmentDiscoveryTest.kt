@@ -75,6 +75,7 @@ class FinancingInstallmentDiscoveryTest {
                 confidence = Confidence(0.95, listOf("financing_installment")),
                 parseStatus = ParseStatus.SUCCESS,
             ),
+            loanType = LoanType.PERSONAL,
         )
 
         assertEquals(OwnershipStatus.UNKNOWN, RoomAccountRegistryRepository.from(db).resolve(source))

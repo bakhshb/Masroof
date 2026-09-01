@@ -19,6 +19,7 @@ import com.baraa.masroof.bank.aljazira.extraction.ReferenceExtractor
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.finalize.ParseFinalizer
@@ -99,6 +100,22 @@ class AlJaziraMessageParser(
         }
 
         val internationalFacts = InternationalPurchaseFactsExtractor.extract(normalized.comparisonBody)
+        val accountSuffixes = accountExtractor.extractSuffixes(normalized, classification.family)
+        val loanType = when (classification.family) {
+            MessageFamily.FINANCING_INSTALLMENT ->
+                AlJaziraLoanTypeMapper.fromFinancingLabel(counterparty)
+            else -> null
+        }
+        val debitSourceAccountLast4 = when {
+            classification.family == MessageFamily.PURCHASE && card != null ->
+                accountSuffixes.sourceLast4
+            else -> null
+        }
+        val salaryIncomeWording = when (classification.family) {
+            MessageFamily.TRANSFER_IN ->
+                AlJaziraSalaryIncomeHeuristics.containsSalaryWording(normalized.comparisonBody)
+            else -> null
+        }
 
         val details = ParsedEventDetails(
             transactionReference = reference,
@@ -112,6 +129,9 @@ class AlJaziraMessageParser(
             exchangeRate = internationalFacts?.exchangeRate,
             internationalFee = internationalFacts?.internationalFee,
             labeledForeignAmount = extractLabeledForeignAmount(normalized.comparisonBody),
+            loanType = loanType,
+            debitSourceAccountLast4 = debitSourceAccountLast4,
+            salaryIncomeWording = salaryIncomeWording,
         )
 
         val confidence = Confidence(

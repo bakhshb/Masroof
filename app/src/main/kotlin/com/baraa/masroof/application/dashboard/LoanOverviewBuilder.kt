@@ -4,7 +4,6 @@ import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionTiming
-import com.baraa.masroof.domain.loan.LoanTypeResolver
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.model.LoanType
@@ -103,7 +102,7 @@ object LoanOverviewBuilder {
         parsedRecords.forEach { record ->
             val event = record.event
             if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return@forEach
-            val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return@forEach
+            val loanType = record.details.loanType ?: return@forEach
             val balance = record.details.outstandingBalance ?: return@forEach
             val raw = rawSmsById[event.rawSmsId] ?: return@forEach
             val occurredAt = TransactionTiming.effectiveOccurredAt(

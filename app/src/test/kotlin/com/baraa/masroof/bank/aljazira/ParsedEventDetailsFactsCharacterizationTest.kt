@@ -1,6 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -59,6 +60,40 @@ class ParsedEventDetailsFactsCharacterizationTest {
     }
 
     @Test
+    fun financingInstallment_populatesLoanType() {
+        val body = """
+            خصم: قسط تمويل
+            من: 3001
+            القسط: SAR 3,036.11
+            لـ: تمويل شخصي
+        """.trimIndent()
+        val details = parseDetails(body)
+        assertEquals(LoanType.PERSONAL, details.loanType)
+    }
+
+    @Test
+    fun madaPurchaseWithSourceAccount_populatesDebitSourceAccountLast4() {
+        val body = """
+            شراء من نقاط البيع
+            بطاقة مدى: 2210
+            خصمت من حساب: 3001
+            بمبلغ: 51.99 SAR
+        """.trimIndent()
+        val details = parseDetails(body)
+        assertEquals("3001", details.debitSourceAccountLast4)
+    }
+
+    @Test
+    fun salaryTransferIn_populatesSalaryIncomeWording() {
+        val body = """
+            حوالة واردة راتب
+            مبلغ: SAR 3,191.68
+        """.trimIndent()
+        val details = parseDetails(body)
+        assertEquals(true, details.salaryIncomeWording)
+    }
+
+    @Test
     fun statementSms_populatesStatementChannelAndDueDate() {
         val body = """
             إصدار كشف حساب
@@ -88,6 +123,13 @@ class ParsedEventDetailsFactsCharacterizationTest {
             is ParseResult.NonFinancial -> result.details
             else -> error("Unexpected parse result: $result")
         }.also { details ->
-            assertTrue(details.cardSmsChannel != null || details.exchangeRate != null || details.paymentDueDate != null)
+            assertTrue(
+                details.cardSmsChannel != null ||
+                    details.exchangeRate != null ||
+                    details.paymentDueDate != null ||
+                    details.loanType != null ||
+                    details.debitSourceAccountLast4 != null ||
+                    details.salaryIncomeWording != null,
+            )
         }
 }

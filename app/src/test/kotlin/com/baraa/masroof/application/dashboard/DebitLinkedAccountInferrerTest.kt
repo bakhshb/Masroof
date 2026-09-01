@@ -7,7 +7,6 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
@@ -17,14 +16,13 @@ import java.time.Instant
 
 class DebitLinkedAccountInferrerTest {
     @Test
-    fun inferAccountLast4_fromPurchaseSms() {
+    fun inferAccountLast4_fromPersistedFact() {
         val parsedRecords = listOf(
             parsedRecord(
                 cardLast4 = "2210",
-                body = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
+                debitSourceAccountLast4 = "3001",
             ),
         )
-        val rawSmsById = rawSmsMap(parsedRecords)
 
         assertEquals(
             "3001",
@@ -32,32 +30,32 @@ class DebitLinkedAccountInferrerTest {
                 bank = Bank.BANK_ALJAZIRA,
                 cardLast4 = "2210",
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
         )
     }
 
     @Test
-    fun inferAccountLast4_nullWhenSmsOmitsAccount() {
+    fun inferAccountLast4_nullWhenFactMissing() {
         val parsedRecords = listOf(
             parsedRecord(
                 cardLast4 = "8219",
-                body = "شراء عبر نقاط البيع (Google Pay)\nبطاقة مدى: 8219",
+                debitSourceAccountLast4 = null,
             ),
         )
-        val rawSmsById = rawSmsMap(parsedRecords)
 
         assertNull(
             DebitLinkedAccountInferrer.inferAccountLast4(
                 bank = Bank.BANK_ALJAZIRA,
                 cardLast4 = "8219",
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
         )
     }
 
-    private fun parsedRecord(cardLast4: String, body: String): ParsedEventRecord {
+    private fun parsedRecord(
+        cardLast4: String,
+        debitSourceAccountLast4: String?,
+    ): ParsedEventRecord {
         val event = ParsedEvent(
             id = "evt-$cardLast4",
             rawSmsId = "sms-$cardLast4",
@@ -70,24 +68,15 @@ class DebitLinkedAccountInferrerTest {
             sourceAccountRef = null,
             destinationAccountRef = null,
             merchant = null,
-            counterparty = body,
+            counterparty = null,
             occurredAt = Instant.parse("2026-08-03T10:24:00Z"),
             bankNetworkType = null,
             confidence = Confidence(1.0),
             parseStatus = ParseStatus.SUCCESS,
         )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
+        return ParsedEventRecord(
+            event = event,
+            details = ParsedEventDetails(debitSourceAccountLast4 = debitSourceAccountLast4),
+        )
     }
-
-    private fun rawSmsMap(parsedRecords: List<ParsedEventRecord>): Map<String, RawSms> =
-        parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
 }

@@ -118,6 +118,30 @@ class PackageDependencyRulesTest {
         )
     }
 
+    @Test
+    fun domain_loan_hasNoProductionSources() {
+        val productionSources = kotlinFilesIn("domain/loan")
+        assertTrue(
+            "Loan label mapping belongs in bank adapters at parse time",
+            productionSources.isEmpty(),
+        )
+    }
+
+    @Test
+    fun application_dashboard_doesNotMapArabicLoanLabels() {
+        val forbidden = listOf("تمويل شخصي", "سيارة", "عقار")
+        kotlinFilesIn("application/dashboard").forEach { file ->
+            val relativePath = file.relativeTo(sourceRoot).invariantSeparatorsPath
+            val source = file.readText()
+            forbidden.forEach { label ->
+                assertFalse(
+                    "$relativePath must not map Arabic loan labels; use ParsedEventDetails.loanType",
+                    label in source,
+                )
+            }
+        }
+    }
+
     private fun assertPackagesDoNotImport(
         packages: List<String>,
         forbiddenImports: List<String>,

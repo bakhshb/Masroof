@@ -9,7 +9,7 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.loan.LoanTypeResolver
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -139,8 +139,8 @@ class TransactionReconciliationService(
                 ?: OwnershipStatus.UNKNOWN
             val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
                 ?: OwnershipStatus.UNKNOWN
-            maybeAutoConfirmLoanOwnership(event, sourceOwn)
-            val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+            maybeAutoConfirmLoanOwnership(event, sourceOwn, record.details.loanType)
+            val loanType = record.details.loanType
             val loanOwn = loanType?.let {
                 ownershipResolver.resolveLoan(LoanReference(event.bank, it))
             } ?: OwnershipStatus.UNKNOWN
@@ -158,6 +158,7 @@ class TransactionReconciliationService(
                             destinationOwnership = destOwn,
                             cardOwnership = cardOwn,
                             loanOwnership = loanOwn,
+                            loanType = loanType,
                             transactionOccurredAt = transactionOccurredAt,
                         ),
                     )
@@ -219,6 +220,7 @@ class TransactionReconciliationService(
                                 destinationOwnership = destOwn,
                                 cardOwnership = cardOwn,
                                 loanOwnership = loanOwn,
+                                loanType = loanType,
                                 transactionOccurredAt = transactionOccurredAt,
                             ),
                         )
@@ -546,8 +548,8 @@ class TransactionReconciliationService(
                 ?: OwnershipStatus.UNKNOWN
             val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
                 ?: OwnershipStatus.UNKNOWN
-            maybeAutoConfirmLoanOwnership(event, sourceOwn)
-            val loanType = LoanTypeResolver.fromLabel(event.counterparty)
+            maybeAutoConfirmLoanOwnership(event, sourceOwn, record.details.loanType)
+            val loanType = record.details.loanType
             val loanOwn = loanType?.let {
                 ownershipResolver.resolveLoan(LoanReference(event.bank, it))
             } ?: OwnershipStatus.UNKNOWN
@@ -565,6 +567,7 @@ class TransactionReconciliationService(
                     destinationOwnership = destOwn,
                     cardOwnership = cardOwn,
                     loanOwnership = loanOwn,
+                    loanType = loanType,
                     transactionOccurredAt = transactionOccurredAt,
                 )
             ) {
@@ -722,11 +725,12 @@ class TransactionReconciliationService(
     private suspend fun maybeAutoConfirmLoanOwnership(
         event: ParsedEvent,
         sourceOwnership: OwnershipStatus,
+        loanType: LoanType?,
     ) {
         if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return
         if (sourceOwnership != OwnershipStatus.OWNED) return
-        val loanType = LoanTypeResolver.fromLabel(event.counterparty) ?: return
-        val reference = LoanReference(event.bank, loanType)
+        val resolvedLoanType = loanType ?: return
+        val reference = LoanReference(event.bank, resolvedLoanType)
         if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
         ownershipConfirmationService?.confirmLoanOwned(reference)
     }
