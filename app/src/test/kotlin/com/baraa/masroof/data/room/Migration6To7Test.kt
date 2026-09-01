@@ -107,7 +107,7 @@ class Migration6To7Test {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(9, room.openHelper.writableDatabase.version)
+            assertEquals(MasroofDatabase.VERSION, room.openHelper.writableDatabase.version)
 
             val accountRepo = RoomAccountRegistryRepository.from(room)
             val cardRepo = RoomCardRegistryRepository.from(room)

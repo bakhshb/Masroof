@@ -11,6 +11,7 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.Instant
@@ -22,6 +23,10 @@ object ParsedEventMapper {
         val (availableDecimal, availableCurrency) = MoneyPersistence.toColumns(details.availableBalance)
         val (outstandingDecimal, outstandingCurrency) =
             MoneyPersistence.toColumns(details.outstandingBalance)
+        val (internationalFeeDecimal, internationalFeeCurrency) =
+            MoneyPersistence.toColumns(details.internationalFee)
+        val (labeledForeignDecimal, labeledForeignCurrency) =
+            MoneyPersistence.toColumns(details.labeledForeignAmount)
 
         return ParsedEventEntity(
             id = event.id,
@@ -54,6 +59,13 @@ object ParsedEventMapper {
             billerCode = details.billerCode,
             // LocalDateTime.toString() is ISO-8601 local; preserves fractional seconds.
             occurredAtLocal = details.occurredAtLocal?.toString(),
+            cardSmsChannel = details.cardSmsChannel?.name,
+            paymentDueDate = details.paymentDueDate?.toString(),
+            exchangeRate = details.exchangeRate?.toPlainString(),
+            internationalFeeDecimal = internationalFeeDecimal,
+            internationalFeeCurrency = internationalFeeCurrency,
+            labeledForeignAmountDecimal = labeledForeignDecimal,
+            labeledForeignAmountCurrency = labeledForeignCurrency,
         )
     }
 
@@ -107,6 +119,17 @@ object ParsedEventMapper {
             biller = entity.biller,
             billerCode = entity.billerCode,
             occurredAtLocal = entity.occurredAtLocal?.let { LocalDateTime.parse(it) },
+            cardSmsChannel = entity.cardSmsChannel?.let { cardSmsChannel(it) },
+            paymentDueDate = entity.paymentDueDate?.let { java.time.LocalDate.parse(it) },
+            exchangeRate = entity.exchangeRate?.toBigDecimalOrNull(),
+            internationalFee = MoneyPersistence.fromColumns(
+                entity.internationalFeeDecimal,
+                entity.internationalFeeCurrency,
+            ),
+            labeledForeignAmount = MoneyPersistence.fromColumns(
+                entity.labeledForeignAmountDecimal,
+                entity.labeledForeignAmountCurrency,
+            ),
         )
 
     fun encodeReasons(reasons: List<String>): String {
@@ -132,6 +155,13 @@ object ParsedEventMapper {
         require(bankId != null) { "CardReference bank id missing while last4=$last4" }
         return CardReference(bank = Bank(bankId), last4 = last4)
     }
+
+    private fun cardSmsChannel(name: String): CardSmsChannel =
+        try {
+            CardSmsChannel.valueOf(name)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Unrecognized persisted CardSmsChannel value '$name'", e)
+        }
 
     private fun <E : Enum<E>> enumValue(type: Class<E>, name: String): E =
         try {

@@ -1,7 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.bank.aljazira.extraction.InternationalPurchaseFactsExtractor
-import com.baraa.masroof.bank.aljazira.extraction.MoneyTokens
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -9,7 +7,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * Merchant + currency → exchange-rate evidence mined from earlier SMS that included سعر الصرف.
+ * Merchant + currency → exchange-rate evidence from persisted parse-time facts.
  */
 class HistoricalExchangeRateIndex private constructor(
     private val ratesByMerchant: Map<String, Map<Currency, BigDecimal>>,
@@ -36,15 +34,15 @@ class HistoricalExchangeRateIndex private constructor(
                     ?.let(MerchantNameNormalizer::key)
                     ?.takeIf { it.isNotBlank() }
                     ?: continue
-                val body = rawSmsById[record.event.rawSmsId]?.body ?: continue
                 val currency = record.event.amount?.currency?.takeIf { it.convertsToSar() }
-                    ?: foreignCurrencyFromSms(body)
+                    ?: record.details.labeledForeignAmount?.currency?.takeIf { it.convertsToSar() }
                     ?: continue
-                val rate = InternationalPurchaseFactsExtractor.extract(body)?.exchangeRate ?: continue
+                val rate = record.details.exchangeRate ?: continue
                 val occurredAt = record.details.occurredAtLocal
                     ?.atZone(java.time.ZoneId.systemDefault())
                     ?.toInstant()
                     ?: record.event.occurredAt
+                    ?: rawSmsById[record.event.rawSmsId]?.receivedAt
                 val merchantRates = latest.getOrPut(merchant) { mutableMapOf() }
                 val existing = merchantRates[currency]
                 if (existing == null || isNewer(occurredAt, existing.second)) {
@@ -62,12 +60,6 @@ class HistoricalExchangeRateIndex private constructor(
             if (candidate == null) return current == null
             if (current == null) return true
             return candidate.isAfter(current)
-        }
-
-        private fun foreignCurrencyFromSms(body: String): Currency? {
-            val match = MoneyTokens.moneyAfterLabel.find(body) ?: return null
-            val money = MoneyTokens.parseMoneyFromMatch(match) ?: return null
-            return money.currency.takeIf { it.convertsToSar() }
         }
     }
 }
