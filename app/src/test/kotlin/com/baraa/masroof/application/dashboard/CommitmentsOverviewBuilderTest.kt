@@ -473,6 +473,52 @@ class CommitmentsOverviewBuilderTest {
         assertEquals(Money.of("93.75", Currency.SAR), overview.total)
     }
 
+    @Test
+    fun foreignCurrencyCommitment_matchesLaterPaymentUsingEditedAmount() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val sourceTx = FinancialTransaction(
+            id = "tx-usd",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("25.00", Currency.USD),
+            occurredAt = start.minusSeconds(3600),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "Amazon",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = emptyList(),
+        )
+        val paymentTx = transaction(
+            id = "tx-payment",
+            merchant = "Amazon",
+            amount = "112.50",
+            at = start.plusSeconds(120),
+        )
+        val commitment = commitment(
+            name = "Amazon",
+            amount = Money.of("30.00", Currency.USD),
+            sourceTransactionId = sourceTx.id,
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(sourceTx, paymentTx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = mapOf(sourceTx.id to Money.of("93.75", Currency.SAR)),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+        assertEquals(Money.of("112.50", Currency.SAR), overview.rows.single().amount)
+    }
+
     private fun commitment(
         name: String,
         amount: Money,

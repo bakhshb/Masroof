@@ -336,7 +336,13 @@ object CommitmentsOverviewBuilder {
         return transactions.count { tx ->
             tx.occurredAt >= periodStart &&
                 tx.occurredAt < periodEnd &&
-                matchesCommitmentPayment(tx, commitment, primaryCurrency, sarEquivalents)
+                matchesCommitmentPayment(
+                    transaction = tx,
+                    commitment = commitment,
+                    primaryCurrency = primaryCurrency,
+                    sarEquivalents = sarEquivalents,
+                    transactions = transactions,
+                )
         }
     }
 
@@ -345,6 +351,7 @@ object CommitmentsOverviewBuilder {
         commitment: Commitment,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
+        transactions: List<FinancialTransaction>,
     ): Boolean {
         if (
             transaction.type != FinancialTransactionType.EXPENSE &&
@@ -364,7 +371,7 @@ object CommitmentsOverviewBuilder {
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             sourceTransactionId = commitment.sourceTransactionId,
-            transactions = listOf(transaction),
+            transactions = transactions,
         ) ?: return false
         if (txAmount.amount.compareTo(commitmentAmount.amount) != 0) return false
         val txName = transaction.merchant?.trim()?.lowercase()
