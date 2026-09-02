@@ -418,7 +418,7 @@ fun TransactionDetailScreen(
                     text = stringResource(R.string.transaction_detail_mark_commitment),
                     modifier = Modifier.fillMaxWidth(),
                 )
-            } else {
+            } else if (isCommitted) {
                 Text(
                     stringResource(R.string.transaction_detail_mark_commitment_already),
                     style = MaterialTheme.typography.bodyMedium,
