@@ -29,6 +29,7 @@ class SettingsCommitmentsWorkflow(
 
     suspend fun update(commitmentId: String, draft: CommitmentEditorDraft) {
         val existing = commitmentRepository.get(commitmentId) ?: return
+        if (draft.amount.amount.signum() <= 0) return
         val now = clock.now()
         commitmentRepository.update(
             existing.copy(

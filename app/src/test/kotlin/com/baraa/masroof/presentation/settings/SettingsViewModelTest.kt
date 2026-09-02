@@ -483,6 +483,29 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun saveCommitment_rejectsNonPositiveAmount() = runTest {
+        val commitment = sampleCommitment()
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.saveCommitment(
+            commitment.id,
+            SettingsCommitmentsWorkflow.CommitmentEditorDraft(
+                name = commitment.name,
+                amount = Money.of("0.00", Currency.SAR),
+                transactionDate = commitment.transactionDate,
+                recurrence = commitment.recurrence,
+                dueDate = commitment.dueDate,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(Money.of("71.00", Currency.SAR), repo.get(commitment.id)!!.amount)
+    }
+
+    @Test
     fun toggleCommitmentActive_movesBetweenLists() = runTest {
         val commitment = sampleCommitment(active = true)
         val repo = MutableCommitmentRepository(listOf(commitment))

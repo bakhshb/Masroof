@@ -62,6 +62,8 @@ fun SettingsCommitmentEditorScreen(
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var showTransactionDatePicker by rememberSaveable { mutableStateOf(false) }
     var showDueDatePicker by rememberSaveable { mutableStateOf(false) }
+    val parsedAmount = amountText.trim().toBigDecimalOrNull()
+    val canSave = !saving && name.isNotBlank() && parsedAmount != null && parsedAmount.signum() > 0
 
     if (showDeleteConfirm) {
         AlertDialog(
@@ -175,18 +177,19 @@ fun SettingsCommitmentEditorScreen(
 
             IconTextButtonOutlined(
                 onClick = {
-                    val parsedAmount = amountText.trim().toBigDecimalOrNull() ?: return@IconTextButtonOutlined
+                    val amount = parsedAmount ?: return@IconTextButtonOutlined
+                    if (amount.signum() <= 0) return@IconTextButtonOutlined
                     onSave(
                         SettingsCommitmentsWorkflow.CommitmentEditorDraft(
                             name = name.trim(),
-                            amount = Money(parsedAmount.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN), commitment.amount.currency),
+                            amount = Money(amount.setScale(Money.SCALE, java.math.RoundingMode.HALF_EVEN), commitment.amount.currency),
                             transactionDate = LocalDate.parse(transactionDate),
                             recurrence = recurrence?.let { CommitmentRecurrence.valueOf(it) },
                             dueDate = dueDate?.let(LocalDate::parse),
                         ),
                     )
                 },
-                enabled = !saving && name.isNotBlank() && amountText.isNotBlank(),
+                enabled = canSave,
                 icon = MasroofIcons.reviewQueue,
                 text = stringResource(R.string.settings_commitment_save),
                 modifier = Modifier.fillMaxWidth(),

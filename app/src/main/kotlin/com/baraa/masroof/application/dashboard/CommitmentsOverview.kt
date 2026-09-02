@@ -360,7 +360,6 @@ object CommitmentsOverviewBuilder {
         ) {
             return false
         }
-        if (transaction.id == commitment.sourceTransactionId) return true
         val txAmount = TransactionAmountResolver.effectiveAmount(
             tx = transaction,
             primaryCurrency = primaryCurrency,
@@ -374,6 +373,7 @@ object CommitmentsOverviewBuilder {
             transactions = transactions,
         ) ?: return false
         if (txAmount.amount.compareTo(commitmentAmount.amount) != 0) return false
+        if (transaction.id == commitment.sourceTransactionId) return true
         val txName = transaction.merchant?.trim()?.lowercase()
             ?: transaction.counterparty?.trim()?.lowercase()
             ?: return false
