@@ -72,16 +72,18 @@ object CommitmentsOverviewBuilder {
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
     ): CommitmentsOverview {
+        val consumedPaymentTransactionIds = mutableSetOf<String>()
         val rows = buildList {
-            commitments.filter { it.active }.forEach { commitment ->
+            commitments.filter { it.active }.sortedBy { it.id }.forEach { commitment ->
                 addAll(
                     buildUserRows(
-                    commitment,
-                    salaryPeriod,
-                    transactions,
-                    primaryCurrency,
-                    sarEquivalents,
-                    zoneId,
+                        commitment = commitment,
+                        salaryPeriod = salaryPeriod,
+                        transactions = transactions,
+                        primaryCurrency = primaryCurrency,
+                        sarEquivalents = sarEquivalents,
+                        zoneId = zoneId,
+                        consumedPaymentTransactionIds = consumedPaymentTransactionIds,
                     ),
                 )
             }
@@ -129,6 +131,7 @@ object CommitmentsOverviewBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
+        consumedPaymentTransactionIds: MutableSet<String>,
     ): List<CommitmentDashboardRow> {
         val occurrences = occurrencesInPeriod(commitment, salaryPeriod)
         if (occurrences.isEmpty()) return emptyList()
@@ -149,6 +152,7 @@ object CommitmentsOverviewBuilder {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
                 zoneId = zoneId,
+                consumedPaymentTransactionIds = consumedPaymentTransactionIds,
             )
         }
         return occurrences.mapIndexed { index, occurrence ->
@@ -336,20 +340,29 @@ object CommitmentsOverviewBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
+        consumedPaymentTransactionIds: MutableSet<String>,
     ): Int {
         val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
-        return transactions.count { tx ->
-            tx.occurredAt >= periodStart &&
-                tx.occurredAt < periodEnd &&
-                matchesCommitmentPayment(
+        var matched = 0
+        transactions.forEach { tx ->
+            if (tx.occurredAt < periodStart || tx.occurredAt >= periodEnd) return@forEach
+            if (tx.id in consumedPaymentTransactionIds) return@forEach
+            if (
+                !matchesCommitmentPayment(
                     transaction = tx,
                     commitment = commitment,
                     primaryCurrency = primaryCurrency,
                     sarEquivalents = sarEquivalents,
                     transactions = transactions,
                 )
+            ) {
+                return@forEach
+            }
+            consumedPaymentTransactionIds.add(tx.id)
+            matched++
         }
+        return matched
     }
 
     internal fun matchesCommitmentPayment(

@@ -374,6 +374,48 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun duplicateRecurringCommitments_shareSingleInPeriodPayment() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val payment = transaction(
+            id = "payment-netflix",
+            merchant = "Netflix",
+            amount = "71",
+            at = start.plusSeconds(120),
+        )
+        val first = commitment(
+            id = "cmt_first",
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = "tx-netflix-1",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val second = commitment(
+            id = "cmt_second",
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = "tx-netflix-2",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(first, second),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(2, overview.rows.size)
+        assertEquals(1, overview.rows.count { it.status == CommitmentPaymentStatus.PAID })
+        assertEquals(1, overview.rows.count { it.status == CommitmentPaymentStatus.UNPAID })
+        assertEquals(Money.of("71.00", Currency.SAR), overview.paid)
+        assertEquals(Money.of("71.00", Currency.SAR), overview.remaining)
+    }
+
+    @Test
     fun inactiveCommitments_areExcluded() {
         val overview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,
@@ -624,10 +666,11 @@ class CommitmentsOverviewBuilderTest {
         recurrence: CommitmentRecurrence? = null,
         active: Boolean = true,
         transactionDate: LocalDate = LocalDate.parse("2026-08-01"),
+        id: String = RegistryEntityIdFactory.newCommitmentId(),
     ): Commitment {
         val now = Instant.parse("2026-08-01T00:00:00Z")
         return Commitment(
-            id = RegistryEntityIdFactory.newCommitmentId(),
+            id = id,
             name = name,
             amount = amount,
             transactionDate = transactionDate,
