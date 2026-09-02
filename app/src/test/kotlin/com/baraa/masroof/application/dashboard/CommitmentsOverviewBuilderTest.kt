@@ -519,6 +519,43 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun paidOffLoanWithoutPeriodPayment_isOmitted() {
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(
+                facilities = emptyList(),
+                debitCards = emptyList(),
+                currency = Currency.SAR,
+            ),
+            loansOverview = LoansOverview(
+                loans = listOf(
+                    LoanOverview(
+                        bank = Bank.BANK_ALJAZIRA,
+                        loanType = LoanType.PERSONAL,
+                        displayLabel = "Personal loan",
+                        remainingBalance = Money.zero(Currency.SAR),
+                        remainingBalanceAsOf = Instant.parse("2026-08-01T00:00:00Z"),
+                        latestInstallmentAmount = Money.of("900.00", Currency.SAR),
+                        latestInstallmentAsOf = Instant.parse("2026-07-27T00:00:00Z"),
+                        salaryPeriodPayment = SignedMoneyAmount.zero(Currency.SAR),
+                        salaryPeriodLabel = "27 July",
+                    ),
+                ),
+                salaryPeriodLabel = "27 July",
+                currency = Currency.SAR,
+            ),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertTrue(overview.rows.isEmpty())
+        assertEquals(Money.zero(Currency.SAR), overview.total)
+    }
+
+    @Test
     fun editedCommitmentAmount_usesStoredAmountNotSourceTransaction() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val tx = transaction(

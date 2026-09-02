@@ -244,6 +244,9 @@ object CommitmentsOverviewBuilder {
     ): List<CommitmentDashboardRow> =
         loansOverview.loans.mapNotNull { loan ->
             val paid = loan.salaryPeriodPayment.amount.signum() > 0
+            if (!paid && loan.remainingBalance?.amount?.signum() == 0) {
+                return@mapNotNull null
+            }
             val amount = when {
                 paid -> Money(loan.salaryPeriodPayment.amount, loan.salaryPeriodPayment.currency)
                 loan.latestInstallmentAmount != null -> loan.latestInstallmentAmount
