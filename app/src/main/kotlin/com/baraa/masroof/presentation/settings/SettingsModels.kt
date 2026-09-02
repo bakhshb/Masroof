@@ -124,6 +124,7 @@ data class SettingsUiState(
     val loans: List<ManagedLoanUi> = emptyList(),
     val activeCommitments: List<ManagedCommitmentUi> = emptyList(),
     val disabledCommitments: List<ManagedCommitmentUi> = emptyList(),
+    val commitmentsLoaded: Boolean = false,
     val savingCommitment: Boolean = false,
     val bankTrees: List<SettingsBankTreeUi> = emptyList(),
     val bankSummaries: List<SettingsBankSummaryUi> = emptyList(),

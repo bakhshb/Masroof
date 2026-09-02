@@ -178,12 +178,14 @@ fun SettingsRoute(
 
                 state.loading -> SettingsCommitmentsLoadingScreen(onBack = { popOrExit() })
 
-                else -> {
+                state.commitmentsLoaded -> {
                     LaunchedEffect(current.commitmentId) {
                         destinationStack = replaceSettingsTop(destinationStack, SettingsDestination.MyCommitments)
                     }
                     SettingsCommitmentsLoadingScreen(onBack = { popOrExit() })
                 }
+
+                else -> SettingsCommitmentsLoadingScreen(onBack = { popOrExit() })
             }
         }
 

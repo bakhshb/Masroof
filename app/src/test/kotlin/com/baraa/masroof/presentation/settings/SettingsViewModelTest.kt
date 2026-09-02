@@ -453,6 +453,8 @@ class SettingsViewModelTest {
         assertEquals(commitment.id, vm.uiState.value.activeCommitments.single().id)
         assertEquals(1, vm.uiState.value.disabledCommitments.size)
         assertEquals(disabled.id, vm.uiState.value.disabledCommitments.single().id)
+        assertTrue(vm.uiState.value.commitmentsLoaded)
+        assertEquals(commitment.id, vm.commitmentById(commitment.id)?.id)
     }
 
     @Test

@@ -96,16 +96,23 @@ class SettingsViewModel(
             restorePendingUpdateState()
             try {
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
+                val commitments = settingsCommitmentsWorkflow.listAll()
                 applyRegistries(
                     cards = snapshot.cards,
                     accounts = snapshot.accounts,
                     loans = snapshot.loans,
+                    commitments = commitments,
                 )
-                applyCommitments(settingsCommitmentsWorkflow.listAll())
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
-                _uiState.update { it.copy(loading = false, error = SettingsError.UPDATE_FAILED) }
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        commitmentsLoaded = true,
+                        error = SettingsError.UPDATE_FAILED,
+                    )
+                }
             }
         }
     }
@@ -948,6 +955,7 @@ class SettingsViewModel(
             it.copy(
                 activeCommitments = items.filter { item -> item.active },
                 disabledCommitments = items.filter { item -> !item.active },
+                commitmentsLoaded = true,
             )
         }
     }
@@ -968,6 +976,7 @@ class SettingsViewModel(
         cards: List<com.baraa.masroof.domain.model.CardRegistryEntry>,
         accounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
         loans: List<com.baraa.masroof.domain.model.LoanRegistryEntry>,
+        commitments: List<Commitment>? = null,
     ) {
         val cardItems = cards
             .filter { it.bank != Bank.UNKNOWN }
@@ -1012,6 +1021,7 @@ class SettingsViewModel(
             }
         val followedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED }
         val followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED }
+        val commitmentItems = commitments?.map(::toManagedCommitmentUi)
         _uiState.update {
             it.copy(
                 loading = false,
@@ -1022,6 +1032,9 @@ class SettingsViewModel(
                 unregisteredAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.UNKNOWN },
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
                 loans = loanItems,
+                activeCommitments = commitmentItems?.filter { item -> item.active } ?: it.activeCommitments,
+                disabledCommitments = commitmentItems?.filter { item -> !item.active } ?: it.disabledCommitments,
+                commitmentsLoaded = commitments?.let { true } ?: it.commitmentsLoaded,
                 bankTrees = buildBankTrees(
                     cards = followedCards,
                     accounts = followedAccounts,
