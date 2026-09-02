@@ -310,6 +310,41 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun paidCreditCardStatement_doesNotReappearUnpaidInLaterSalaryPeriod() {
+        val facility = creditFacility(
+            due = Money.of("500.00", Currency.SAR),
+            last4 = "1234",
+        )
+        val payment = transaction(
+            id = "payment-card",
+            merchant = "Card payment",
+            amount = "500",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+        )
+        val laterPeriod = FinancialPeriod(
+            startDate = LocalDate.parse("2026-08-27"),
+            endDateExclusive = LocalDate.parse("2026-09-27"),
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = laterPeriod,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertTrue(overview.rows.isEmpty())
+        assertEquals(Money.zero(Currency.SAR), overview.total)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
+    }
+
+    @Test
     fun inactiveCommitments_areExcluded() {
         val overview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,

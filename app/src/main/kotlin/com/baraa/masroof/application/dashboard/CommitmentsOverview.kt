@@ -178,14 +178,14 @@ object CommitmentsOverviewBuilder {
     ): List<CommitmentDashboardRow> =
         creditFacilities.facilities.mapNotNull { facility ->
             val due = facility.facilityDue ?: return@mapNotNull null
-            val paid = creditFacilityPaymentAmount(
+            if (!isStatementDueInPeriod(due, salaryPeriod, zoneId)) return@mapNotNull null
+            val paid = hasSatisfiedFacilityDue(
                 facility = facility,
-                salaryPeriod = salaryPeriod,
+                due = due,
                 transactions = transactions,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
-                zoneId = zoneId,
-            ).amount >= due.amount.amount
+            )
             CommitmentDashboardRow(
                 key = "credit:${facility.bank.id}:${facility.primaryLast4}",
                 source = CommitmentDashboardSource.CREDIT_CARD,
@@ -197,25 +197,30 @@ object CommitmentsOverviewBuilder {
             )
         }
 
-    private fun creditFacilityPaymentAmount(
-        facility: CreditFacilityOverview,
+    private fun isStatementDueInPeriod(
+        due: StatementDueSnapshot,
         salaryPeriod: FinancialPeriod,
+        zoneId: ZoneId,
+    ): Boolean {
+        val dueDate = due.dueDate ?: due.updatedAt.atZone(zoneId).toLocalDate()
+        return isDateInPeriod(dueDate, salaryPeriod)
+    }
+
+    private fun hasSatisfiedFacilityDue(
+        facility: CreditFacilityOverview,
+        due: StatementDueSnapshot,
         transactions: List<FinancialTransaction>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
-        zoneId: ZoneId,
-    ): Money {
+    ): Boolean {
         val cardIds = facility.allCards.mapNotNull { card ->
             FinancialContainerIdFactory.cardId(card.bank, card.last4)
         }.toSet()
-        val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
-        val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
-        return transactions.fold(Money.zero(primaryCurrency)) { total, transaction ->
+        val paid = transactions.fold(Money.zero(primaryCurrency)) { total, transaction ->
             if (
                 transaction.type != FinancialTransactionType.CREDIT_CARD_PAYMENT ||
                 transaction.destinationContainerId !in cardIds ||
-                transaction.occurredAt < periodStart ||
-                transaction.occurredAt >= periodEnd
+                transaction.occurredAt.isBefore(due.updatedAt)
             ) {
                 total
             } else {
@@ -227,6 +232,7 @@ object CommitmentsOverviewBuilder {
                 if (amount == null) total else total + amount
             }
         }
+        return paid.amount >= due.amount.amount
     }
 
     private fun buildLoanRows(
