@@ -197,7 +197,7 @@ object CommitmentsOverviewBuilder {
             )
         }
 
-    private fun isStatementDueInPeriod(
+    internal fun isStatementDueInPeriod(
         due: StatementDueSnapshot,
         salaryPeriod: FinancialPeriod,
         zoneId: ZoneId,

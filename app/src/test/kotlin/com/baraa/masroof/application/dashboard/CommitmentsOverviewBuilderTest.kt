@@ -345,6 +345,35 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun paidCreditCardStatement_countsPaymentBeforeSalaryPeriodStart() {
+        val facility = creditFacility(
+            due = Money.of("500.00", Currency.SAR),
+            last4 = "1234",
+        )
+        val payment = transaction(
+            id = "payment-card",
+            merchant = "Card payment",
+            amount = "500",
+            at = Instant.parse("2026-07-26T12:00:00Z"),
+            type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+    }
+
+    @Test
     fun inactiveCommitments_areExcluded() {
         val overview = CommitmentsOverviewBuilder.build(
             salaryPeriod = period,
