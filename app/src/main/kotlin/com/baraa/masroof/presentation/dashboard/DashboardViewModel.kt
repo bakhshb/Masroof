@@ -8,7 +8,10 @@ import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.commitment.CommitmentCreationResult
-import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
+import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
+import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
+import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
+import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
 import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
@@ -27,13 +30,9 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
-import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
-import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
 import com.baraa.masroof.application.onboarding.userOutcome
-import com.baraa.masroof.domain.repository.CommitmentRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -55,8 +54,7 @@ class DashboardViewModel(
     private val rescanService: suspend () -> HistoricalImportResult,
     private val reclassificationService: TransactionReclassificationService,
     private val ignoreService: TransactionIgnoreService,
-    private val commitmentFromTransactionService: CommitmentFromTransactionService,
-    private val commitmentRepository: CommitmentRepository,
+    private val dashboardCommitmentsWorkflow: DashboardCommitmentsWorkflow,
     private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
     private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
@@ -378,7 +376,7 @@ class DashboardViewModel(
                 )
             }
             val result = try {
-                commitmentFromTransactionService.createFromTransaction(transactionId)
+                dashboardCommitmentsWorkflow.createFromTransaction(transactionId)
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
@@ -508,7 +506,7 @@ class DashboardViewModel(
                     registryAccounts = loadOwnedAccounts(),
                     periodSummaries = overview.ownedAccountPeriodSummaries,
                 )
-                val committedIds = commitmentRepository.listAll().map { it.sourceTransactionId }.toSet()
+                val committedIds = dashboardCommitmentsWorkflow.committedSourceTransactionIds()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch

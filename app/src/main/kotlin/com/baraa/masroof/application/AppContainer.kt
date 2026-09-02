@@ -6,6 +6,7 @@ import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
+import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
 import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
@@ -346,6 +347,12 @@ class AppContainer(
         CommitmentFromTransactionService(
             commitmentRepository = commitmentRepository,
             financialTransactionRepository = financialTransactionRepository,
+        )
+
+    val dashboardCommitmentsWorkflow: DashboardCommitmentsWorkflow =
+        DashboardCommitmentsWorkflow(
+            commitmentFromTransactionService = commitmentFromTransactionService,
+            commitmentRepository = commitmentRepository,
         )
 
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
