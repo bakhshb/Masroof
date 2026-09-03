@@ -520,7 +520,11 @@ class SettingsViewModelTest {
 
         assertTrue(vm.uiState.value.activeCommitments.isEmpty())
         assertEquals(commitment.id, vm.uiState.value.disabledCommitments.single().id)
-        assertFalse(repo.get(commitment.id)!!.active)
+        val stored = repo.get(commitment.id)!!
+        assertFalse(stored.active)
+        assertEquals(1, stored.pauseIntervals.size)
+        assertEquals(Instant.parse("2026-09-01T00:00:00Z"), stored.pauseIntervals.single().pausedAt)
+        assertTrue(vm.uiState.value.disabledCommitments.single().pauseIntervals.isNotEmpty())
     }
 
     @Test

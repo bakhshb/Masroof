@@ -12,6 +12,7 @@ data class Commitment(
     val recurrence: CommitmentRecurrence?,
     val dueDate: LocalDate?,
     val active: Boolean,
+    val pauseIntervals: List<CommitmentPauseInterval> = emptyList(),
     val sourceTransactionId: String,
     val createdAt: Instant,
     val updatedAt: Instant,

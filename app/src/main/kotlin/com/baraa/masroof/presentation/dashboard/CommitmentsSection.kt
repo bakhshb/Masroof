@@ -27,8 +27,6 @@ import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofDonutChart
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MasroofMoneyRow
-import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.common.commitmentDonutPaidFraction
 import com.baraa.masroof.presentation.common.formatCardLast4
@@ -87,27 +85,16 @@ fun CommitmentsSection(
                     )
                 }
 
-                MasroofMoneyRow(
+                DashboardSummaryTotalRow(
                     label = stringResource(R.string.dashboard_commitments_paid),
-                    value = formatLocalizedMoney(overview.paid),
-                    style = MasroofMoneyRowStyle.Inflow,
-                )
-                MasroofHorizontalBar(
-                    progress = paidFraction,
-                    style = MasroofHorizontalBarStyle.Inflow,
+                    amount = overview.paid,
+                    amountColor = extended.inflow,
                 )
 
-                MasroofMoneyRow(
+                DashboardSummaryTotalRow(
                     label = stringResource(R.string.dashboard_commitments_remaining),
-                    value = formatLocalizedMoney(overview.remaining),
-                    style = MasroofMoneyRowStyle.Outflow,
-                )
-                MasroofHorizontalBar(
-                    progress = MasroofBarChart.progress(
-                        overview.remaining.amount,
-                        overview.total.amount,
-                    ),
-                    style = MasroofHorizontalBarStyle.Outflow,
+                    amount = overview.remaining,
+                    amountColor = extended.outflow,
                 )
 
                 Column(
@@ -193,6 +180,7 @@ private fun CommitmentDashboardRowItem(
             MasroofAmountText(
                 amount = formatLocalizedMoney(row.amount),
                 role = MasroofAmountRole.List,
+                color = statusColor,
             )
             Spacer(Modifier.width(MasroofSpacing.listItemGap))
             Text(

@@ -156,6 +156,7 @@ fun SettingsRoute(
             onOpenCommitment = { commitment ->
                 navigateTo(SettingsDestination.CommitmentDetail(commitment.id))
             },
+            onListTabChange = viewModel::setCommitmentsListTab,
         )
 
         is SettingsDestination.CommitmentDetail -> {

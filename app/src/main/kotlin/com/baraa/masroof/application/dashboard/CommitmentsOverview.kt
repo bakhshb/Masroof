@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.application.commitment.CommitmentPauseTransitions
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -276,12 +277,7 @@ object CommitmentsOverviewBuilder {
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
         zoneId: ZoneId,
-    ): Boolean {
-        if (commitment.active) return true
-        val disabledOn = commitment.updatedAt.atZone(zoneId).toLocalDate()
-        val disabledPeriodStart = FinancialPeriodPolicy.periodContaining(disabledOn).startDate
-        return salaryPeriod.startDate.isBefore(disabledPeriodStart)
-    }
+    ): Boolean = CommitmentPauseTransitions.isVisibleInSalaryPeriod(commitment, salaryPeriod, zoneId)
 
     internal fun isOneTimeCommitmentInPeriod(
         commitment: Commitment,

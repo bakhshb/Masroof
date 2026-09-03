@@ -23,6 +23,7 @@ import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
 import com.baraa.masroof.application.onboarding.userOutcome
+import com.baraa.masroof.application.settings.CommitmentHistoryBuilder
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.domain.model.AccountReference
@@ -930,6 +931,10 @@ class SettingsViewModel(
         }
     }
 
+    fun setCommitmentsListTab(tab: CommitmentsListTab) {
+        _uiState.update { it.copy(commitmentsListTab = tab) }
+    }
+
     fun toggleCommitmentActive(commitmentId: String) {
         viewModelScope.launch {
             settingsCommitmentsWorkflow.toggleActive(commitmentId)
@@ -950,17 +955,25 @@ class SettingsViewModel(
             .find { it.id == commitmentId }
 
     private fun applyCommitments(commitments: List<Commitment>) {
-        val items = commitments.map(::toManagedCommitmentUi)
+        val zoneId = java.time.ZoneId.systemDefault()
+        val items = commitments.map { commitment -> toManagedCommitmentUi(commitment, zoneId) }
+        val historyItems = CommitmentHistoryBuilder.historyTabItems(commitments, zoneId)
+            .map { historyItem ->
+                items.first { it.id == historyItem.commitmentId }
+            }
         _uiState.update {
             it.copy(
                 activeCommitments = items.filter { item -> item.active },
-                disabledCommitments = items.filter { item -> !item.active },
+                disabledCommitments = historyItems,
                 commitmentsLoaded = true,
             )
         }
     }
 
-    private fun toManagedCommitmentUi(commitment: Commitment): ManagedCommitmentUi =
+    private fun toManagedCommitmentUi(
+        commitment: Commitment,
+        zoneId: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): ManagedCommitmentUi =
         ManagedCommitmentUi(
             id = commitment.id,
             name = commitment.name,
@@ -970,6 +983,7 @@ class SettingsViewModel(
             dueDate = commitment.dueDate,
             active = commitment.active,
             sourceTransactionId = commitment.sourceTransactionId,
+            pauseIntervals = CommitmentHistoryBuilder.intervalSummaries(commitment, zoneId),
         )
 
     private fun applyRegistries(
@@ -1021,7 +1035,15 @@ class SettingsViewModel(
             }
         val followedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED }
         val followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED }
-        val commitmentItems = commitments?.map(::toManagedCommitmentUi)
+        val commitmentItems = commitments?.map { commitment ->
+            toManagedCommitmentUi(commitment, java.time.ZoneId.systemDefault())
+        }
+        val historyItems = commitments?.let { list ->
+            CommitmentHistoryBuilder.historyTabItems(list, java.time.ZoneId.systemDefault())
+                .mapNotNull { historyItem ->
+                    commitmentItems?.firstOrNull { it.id == historyItem.commitmentId }
+                }
+        }
         _uiState.update {
             it.copy(
                 loading = false,
@@ -1033,7 +1055,7 @@ class SettingsViewModel(
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
                 loans = loanItems,
                 activeCommitments = commitmentItems?.filter { item -> item.active } ?: it.activeCommitments,
-                disabledCommitments = commitmentItems?.filter { item -> !item.active } ?: it.disabledCommitments,
+                disabledCommitments = historyItems ?: it.disabledCommitments,
                 commitmentsLoaded = commitments?.let { true } ?: it.commitmentsLoaded,
                 bankTrees = buildBankTrees(
                     cards = followedCards,

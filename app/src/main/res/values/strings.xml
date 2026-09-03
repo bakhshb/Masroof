@@ -395,9 +395,15 @@
     <string name="transaction_detail_mark_commitment_failed">تعذّر إنشاء الالتزام</string>
     <string name="transaction_detail_mark_commitment_already">هذه العملية مُعيَّنة كالتزام بالفعل</string>
     <string name="settings_commitments_section">الالتزامات</string>
-    <string name="settings_commitments_hub_subtitle">%1$d نشط · %2$d متوقف</string>
+    <string name="settings_commitments_hub_subtitle">%1$d نشط · %2$d في السجل</string>
     <string name="settings_commitments_empty">لا توجد التزامات محفوظة بعد</string>
-    <string name="settings_commitments_disabled_section">متوقفة</string>
+    <string name="settings_commitments_tab_active">نشط</string>
+    <string name="settings_commitments_tab_history">السجل</string>
+    <string name="settings_commitments_active_empty">لا توجد التزامات نشطة</string>
+    <string name="settings_commitments_history_empty">لا توجد التزامات في السجل</string>
+    <string name="settings_commitment_pause_history">سجل الإيقاف</string>
+    <string name="settings_commitment_pause_interval_open">متوقف منذ %1$s</string>
+    <string name="settings_commitment_pause_interval_resumed">%1$s – %2$s</string>
     <string name="settings_commitment_edit_title">تعديل الالتزام</string>
     <string name="settings_commitment_name">الاسم</string>
     <string name="settings_commitment_amount">المبلغ</string>

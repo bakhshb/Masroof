@@ -10,8 +10,14 @@ import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.application.settings.CommitmentPauseIntervalSummary
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import java.time.LocalDate
+
+enum class CommitmentsListTab {
+    ACTIVE,
+    HISTORY,
+}
 
 data class ManagedCardUi(
     val id: String,
@@ -88,6 +94,7 @@ data class ManagedCommitmentUi(
     val dueDate: LocalDate?,
     val active: Boolean,
     val sourceTransactionId: String,
+    val pauseIntervals: List<CommitmentPauseIntervalSummary> = emptyList(),
 )
 
 data class SettingsBankSummaryUi(
@@ -124,6 +131,7 @@ data class SettingsUiState(
     val loans: List<ManagedLoanUi> = emptyList(),
     val activeCommitments: List<ManagedCommitmentUi> = emptyList(),
     val disabledCommitments: List<ManagedCommitmentUi> = emptyList(),
+    val commitmentsListTab: CommitmentsListTab = CommitmentsListTab.ACTIVE,
     val commitmentsLoaded: Boolean = false,
     val savingCommitment: Boolean = false,
     val bankTrees: List<SettingsBankTreeUi> = emptyList(),

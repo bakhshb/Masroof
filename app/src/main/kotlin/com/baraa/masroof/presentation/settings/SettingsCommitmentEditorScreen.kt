@@ -175,6 +175,37 @@ fun SettingsCommitmentEditorScreen(
                 }
             }
 
+            if (commitment.pauseIntervals.isNotEmpty()) {
+                MasroofCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
+                        MasroofSectionHeader(
+                            title = stringResource(R.string.settings_commitment_pause_history),
+                            icon = MasroofIcons.periodHint,
+                        )
+                        commitment.pauseIntervals.forEachIndexed { index, interval ->
+                            val pausedLabel = formatLocalizedTransactionDate(interval.pausedAt)
+                            val resumedLabel = interval.resumedAt?.let { formatLocalizedTransactionDate(it) }
+                            Text(
+                                text = if (resumedLabel != null) {
+                                    stringResource(
+                                        R.string.settings_commitment_pause_interval_resumed,
+                                        pausedLabel,
+                                        resumedLabel,
+                                    )
+                                } else {
+                                    stringResource(R.string.settings_commitment_pause_interval_open, pausedLabel)
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (index < commitment.pauseIntervals.lastIndex) {
+                                Spacer(Modifier.height(MasroofSpacing.inlineGap))
+                            }
+                        }
+                    }
+                }
+            }
+
             IconTextButtonOutlined(
                 onClick = {
                     val amount = parsedAmount ?: return@IconTextButtonOutlined
