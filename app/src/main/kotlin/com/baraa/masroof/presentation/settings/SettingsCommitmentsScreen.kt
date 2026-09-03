@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
+import com.baraa.masroof.application.settings.CommitmentRecordEvent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -26,6 +27,7 @@ fun SettingsCommitmentsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
     onOpenCommitment: (ManagedCommitmentUi) -> Unit,
+    onOpenCommitmentById: (String) -> Unit = {},
     onListTabChange: (CommitmentsListTab) -> Unit = {},
 ) {
     MasroofSecondaryScaffold(
@@ -51,40 +53,88 @@ fun SettingsCommitmentsScreen(
                     label = { Text(stringResource(R.string.settings_commitments_tab_active)) },
                 )
                 FilterChip(
-                    selected = state.commitmentsListTab == CommitmentsListTab.HISTORY,
-                    onClick = { onListTabChange(CommitmentsListTab.HISTORY) },
-                    label = { Text(stringResource(R.string.settings_commitments_tab_history)) },
+                    selected = state.commitmentsListTab == CommitmentsListTab.DISABLED,
+                    onClick = { onListTabChange(CommitmentsListTab.DISABLED) },
+                    label = { Text(stringResource(R.string.settings_commitments_tab_disabled)) },
+                )
+                FilterChip(
+                    selected = state.commitmentsListTab == CommitmentsListTab.RECORD,
+                    onClick = { onListTabChange(CommitmentsListTab.RECORD) },
+                    label = { Text(stringResource(R.string.settings_commitments_tab_record)) },
                 )
             }
 
-            val commitments = when (state.commitmentsListTab) {
-                CommitmentsListTab.ACTIVE -> state.activeCommitments
-                CommitmentsListTab.HISTORY -> state.historyCommitments
-            }
-
-            if (commitments.isEmpty()) {
-                Text(
-                    when (state.commitmentsListTab) {
-                        CommitmentsListTab.ACTIVE -> stringResource(R.string.settings_commitments_active_empty)
-                        CommitmentsListTab.HISTORY -> stringResource(R.string.settings_commitments_history_empty)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = MasroofSpacing.screenHorizontal),
-                )
-                return@Column
-            }
-
-            commitments.forEach { commitment ->
-                SettingsNavRow(
-                    icon = if (commitment.active) MasroofIcons.calendar else MasroofIcons.warning,
-                    title = commitment.name,
-                    subtitle = commitmentSubtitle(commitment),
-                    onClick = { onOpenCommitment(commitment) },
-                )
+            when (state.commitmentsListTab) {
+                CommitmentsListTab.ACTIVE,
+                CommitmentsListTab.DISABLED,
+                -> {
+                    val commitments = when (state.commitmentsListTab) {
+                        CommitmentsListTab.ACTIVE -> state.activeCommitments
+                        CommitmentsListTab.DISABLED -> state.disabledCommitments
+                        CommitmentsListTab.RECORD -> emptyList()
+                    }
+                    if (commitments.isEmpty()) {
+                        Text(
+                            when (state.commitmentsListTab) {
+                                CommitmentsListTab.ACTIVE -> stringResource(R.string.settings_commitments_active_empty)
+                                CommitmentsListTab.DISABLED -> stringResource(R.string.settings_commitments_disabled_empty)
+                                CommitmentsListTab.RECORD -> stringResource(R.string.settings_commitments_record_empty)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = MasroofSpacing.screenHorizontal),
+                        )
+                        return@Column
+                    }
+                    commitments.forEach { commitment ->
+                        SettingsNavRow(
+                            icon = if (commitment.active) MasroofIcons.calendar else MasroofIcons.warning,
+                            title = commitment.name,
+                            subtitle = commitmentSubtitle(commitment),
+                            onClick = { onOpenCommitment(commitment) },
+                        )
+                    }
+                }
+                CommitmentsListTab.RECORD -> {
+                    if (state.commitmentRecordEntries.isEmpty()) {
+                        Text(
+                            stringResource(R.string.settings_commitments_record_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = MasroofSpacing.screenHorizontal),
+                        )
+                        return@Column
+                    }
+                    state.commitmentRecordEntries.forEach { entry ->
+                        SettingsNavRow(
+                            icon = recordIcon(entry.event),
+                            title = entry.commitmentName,
+                            subtitle = recordSubtitle(entry),
+                            onClick = { onOpenCommitmentById(entry.commitmentId) },
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun recordIcon(event: CommitmentRecordEvent) = when (event) {
+    CommitmentRecordEvent.CREATED -> MasroofIcons.calendar
+    CommitmentRecordEvent.PAUSED -> MasroofIcons.warning
+    CommitmentRecordEvent.RESUMED -> MasroofIcons.externalIn
+}
+
+@Composable
+private fun recordSubtitle(entry: CommitmentRecordEntryUi): String {
+    val dateLabel = formatLocalizedTransactionDate(entry.at)
+    val eventLabel = when (entry.event) {
+        CommitmentRecordEvent.CREATED -> stringResource(R.string.settings_commitment_record_created)
+        CommitmentRecordEvent.PAUSED -> stringResource(R.string.settings_commitment_record_paused)
+        CommitmentRecordEvent.RESUMED -> stringResource(R.string.settings_commitment_record_resumed)
+    }
+    return stringResource(R.string.settings_commitment_record_line, eventLabel, dateLabel)
 }
 
 @Composable

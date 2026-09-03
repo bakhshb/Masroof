@@ -250,6 +250,29 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun monthlyCommitment_withoutDueDate_usesOccurrenceAsExpectedDate() {
+        val commitment = commitment(
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = "tx-netflix",
+            recurrence = CommitmentRecurrence.MONTHLY,
+            transactionDate = LocalDate.parse("2026-08-01"),
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(LocalDate.parse("2026-08-01"), overview.rows.single().expectedDate)
+    }
+
+    @Test
     fun monthlyCommitment_appearsInFollowingSalaryPeriod() {
         val commitment = commitment(
             name = "Netflix",

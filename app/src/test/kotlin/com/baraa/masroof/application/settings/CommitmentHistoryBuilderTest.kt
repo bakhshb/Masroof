@@ -21,7 +21,7 @@ class CommitmentHistoryBuilderTest {
         val active = sampleCommitment(id = "active", active = true)
         val paused = sampleCommitment(id = "paused", active = false)
 
-        val items = CommitmentHistoryBuilder.historyTabItems(listOf(active, paused), zone)
+        val items = CommitmentHistoryBuilder.disabledTabItems(listOf(active, paused), zone)
 
         assertEquals(1, items.size)
         assertEquals("paused", items.single().commitmentId)
@@ -64,7 +64,7 @@ class CommitmentHistoryBuilderTest {
             ),
         )
 
-        val items = CommitmentHistoryBuilder.historyTabItems(listOf(older, newer), zone)
+        val items = CommitmentHistoryBuilder.disabledTabItems(listOf(older, newer), zone)
 
         assertEquals("newer", items.first().commitmentId)
         assertEquals("older", items.last().commitmentId)

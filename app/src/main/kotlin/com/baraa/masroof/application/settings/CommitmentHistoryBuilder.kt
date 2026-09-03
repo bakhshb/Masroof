@@ -22,7 +22,7 @@ data class CommitmentPauseIntervalSummary(
 )
 
 object CommitmentHistoryBuilder {
-    fun historyTabItems(
+    fun disabledTabItems(
         commitments: List<Commitment>,
         zoneId: ZoneId,
     ): List<CommitmentHistoryItem> =

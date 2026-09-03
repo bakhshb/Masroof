@@ -32,7 +32,7 @@ data class CommitmentDashboardRow(
     val source: CommitmentDashboardSource,
     val displayName: String,
     val amount: Money,
-    val dueDate: LocalDate?,
+    val expectedDate: LocalDate?,
     val status: CommitmentPaymentStatus,
     val userCommitmentId: String? = null,
     val creditFacilityKey: String? = null,
@@ -171,7 +171,7 @@ object CommitmentsOverviewBuilder {
                 source = CommitmentDashboardSource.USER,
                 displayName = commitment.name,
                 amount = amount,
-                dueDate = commitment.dueDate,
+                expectedDate = commitment.dueDate ?: occurrence,
                 status = if (index < paidOccurrenceCount) {
                     CommitmentPaymentStatus.PAID
                 } else {
@@ -205,7 +205,7 @@ object CommitmentsOverviewBuilder {
                 source = CommitmentDashboardSource.CREDIT_CARD,
                 displayName = facility.primaryLast4,
                 amount = due.amount,
-                dueDate = due.dueDate,
+                expectedDate = due.dueDate,
                 status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,
                 creditFacilityKey = "${facility.bank.id}:${facility.primaryLast4}",
             )
@@ -267,7 +267,7 @@ object CommitmentsOverviewBuilder {
                 source = CommitmentDashboardSource.LOAN,
                 displayName = loan.displayLabel,
                 amount = amount,
-                dueDate = null,
+                expectedDate = null,
                 status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,
                 loanKey = "${loan.bank.id}:${loan.loanType.name}",
             )

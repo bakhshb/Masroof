@@ -24,6 +24,7 @@ import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
 import com.baraa.masroof.application.onboarding.userOutcome
 import com.baraa.masroof.application.settings.CommitmentHistoryBuilder
+import com.baraa.masroof.application.settings.CommitmentRecordBuilder
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.domain.model.AccountReference
@@ -951,20 +952,30 @@ class SettingsViewModel(
     }
 
     fun commitmentById(commitmentId: String): ManagedCommitmentUi? =
-        (_uiState.value.activeCommitments + _uiState.value.historyCommitments)
+        (_uiState.value.activeCommitments + _uiState.value.disabledCommitments)
             .find { it.id == commitmentId }
 
     private fun applyCommitments(commitments: List<Commitment>) {
         val zoneId = java.time.ZoneId.systemDefault()
         val items = commitments.map { commitment -> toManagedCommitmentUi(commitment, zoneId) }
-        val historyItems = CommitmentHistoryBuilder.historyTabItems(commitments, zoneId)
+        val disabledItems = CommitmentHistoryBuilder.disabledTabItems(commitments, zoneId)
             .map { historyItem ->
                 items.first { it.id == historyItem.commitmentId }
+            }
+        val recordEntries = CommitmentRecordBuilder.recordTabItems(commitments)
+            .map { entry ->
+                CommitmentRecordEntryUi(
+                    commitmentId = entry.commitmentId,
+                    commitmentName = entry.commitmentName,
+                    event = entry.event,
+                    at = entry.at.atZone(zoneId).toLocalDate(),
+                )
             }
         _uiState.update {
             it.copy(
                 activeCommitments = items.filter { item -> item.active },
-                historyCommitments = historyItems,
+                disabledCommitments = disabledItems,
+                commitmentRecordEntries = recordEntries,
                 commitmentsLoaded = true,
             )
         }
@@ -1038,10 +1049,21 @@ class SettingsViewModel(
         val commitmentItems = commitments?.map { commitment ->
             toManagedCommitmentUi(commitment, java.time.ZoneId.systemDefault())
         }
-        val historyItems = commitments?.let { list ->
-            CommitmentHistoryBuilder.historyTabItems(list, java.time.ZoneId.systemDefault())
+        val disabledItems = commitments?.let { list ->
+            CommitmentHistoryBuilder.disabledTabItems(list, java.time.ZoneId.systemDefault())
                 .mapNotNull { historyItem ->
                     commitmentItems?.firstOrNull { it.id == historyItem.commitmentId }
+                }
+        }
+        val recordEntries = commitments?.let { list ->
+            CommitmentRecordBuilder.recordTabItems(list)
+                .map { entry ->
+                    CommitmentRecordEntryUi(
+                        commitmentId = entry.commitmentId,
+                        commitmentName = entry.commitmentName,
+                        event = entry.event,
+                        at = entry.at.atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                    )
                 }
         }
         _uiState.update {
@@ -1055,7 +1077,8 @@ class SettingsViewModel(
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
                 loans = loanItems,
                 activeCommitments = commitmentItems?.filter { item -> item.active } ?: it.activeCommitments,
-                historyCommitments = historyItems ?: it.historyCommitments,
+                disabledCommitments = disabledItems ?: it.disabledCommitments,
+                commitmentRecordEntries = recordEntries ?: it.commitmentRecordEntries,
                 commitmentsLoaded = commitments?.let { true } ?: it.commitmentsLoaded,
                 bankTrees = buildBankTrees(
                     cards = followedCards,
