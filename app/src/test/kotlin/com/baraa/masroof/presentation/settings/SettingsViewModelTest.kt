@@ -451,8 +451,8 @@ class SettingsViewModelTest {
 
         assertEquals(1, vm.uiState.value.activeCommitments.size)
         assertEquals(commitment.id, vm.uiState.value.activeCommitments.single().id)
-        assertEquals(1, vm.uiState.value.historyCommitments.size)
-        assertEquals(disabled.id, vm.uiState.value.historyCommitments.single().id)
+        assertEquals(1, vm.uiState.value.disabledCommitments.size)
+        assertEquals(disabled.id, vm.uiState.value.disabledCommitments.single().id)
         assertTrue(vm.uiState.value.commitmentsLoaded)
         assertEquals(commitment.id, vm.commitmentById(commitment.id)?.id)
     }
@@ -519,12 +519,13 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.activeCommitments.isEmpty())
-        assertEquals(commitment.id, vm.uiState.value.historyCommitments.single().id)
+        assertEquals(commitment.id, vm.uiState.value.disabledCommitments.single().id)
         val stored = repo.get(commitment.id)!!
         assertFalse(stored.active)
         assertEquals(1, stored.pauseIntervals.size)
         assertEquals(Instant.parse("2026-09-01T00:00:00Z"), stored.pauseIntervals.single().pausedAt)
-        assertTrue(vm.uiState.value.historyCommitments.single().pauseIntervals.isNotEmpty())
+        assertTrue(vm.uiState.value.disabledCommitments.single().pauseIntervals.isNotEmpty())
+        assertTrue(vm.uiState.value.commitmentRecordEntries.any { it.event == com.baraa.masroof.application.settings.CommitmentRecordEvent.PAUSED })
     }
 
     @Test

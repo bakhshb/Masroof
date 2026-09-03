@@ -3,11 +3,9 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CommitmentDashboardRow
@@ -62,7 +61,7 @@ fun CommitmentsSection(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .height(donutSize),
+                            .padding(end = MasroofSpacing.listItemGap),
                         verticalArrangement = Arrangement.Center,
                     ) {
                         CommitmentSummaryMetric(
@@ -92,10 +91,10 @@ fun CommitmentsSection(
                     amountColor = extended.outflow,
                 )
 
+                DashboardSummaryCardDivider()
+
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = MasroofSpacing.sectionHeaderGap),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
                 ) {
                     overview.rows.forEach { row ->
@@ -149,40 +148,38 @@ private fun CommitmentDashboardRowItem(
         )
         else -> row.displayName
     }
+    val expectedDateLabel = row.expectedDate?.let(dateFormatter::format)
+        ?: stringResource(R.string.dashboard_commitments_no_expected_date)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                displayName,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-            )
-            row.dueDate?.let { dueDate ->
-                Text(
-                    stringResource(R.string.dashboard_commitments_due_date, dateFormatter.format(dueDate)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
-        ) {
-            MasroofAmountText(
-                amount = formatLocalizedMoney(row.amount),
-                role = MasroofAmountRole.List,
-                color = statusColor,
-            )
-            Spacer(Modifier.width(MasroofSpacing.listItemGap))
-            Text(
-                statusLabel,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = statusColor,
-            )
-        }
+        Text(
+            displayName,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            expectedDateLabel,
+            modifier = Modifier.widthIn(min = MasroofSpacing.metricTileHeight / 2),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        MasroofAmountText(
+            amount = formatLocalizedMoney(row.amount),
+            role = MasroofAmountRole.List,
+            color = statusColor,
+        )
+        Text(
+            statusLabel,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = statusColor,
+        )
     }
 }

@@ -156,6 +156,9 @@ fun SettingsRoute(
             onOpenCommitment = { commitment ->
                 navigateTo(SettingsDestination.CommitmentDetail(commitment.id))
             },
+            onOpenCommitmentById = { commitmentId ->
+                navigateTo(SettingsDestination.CommitmentDetail(commitmentId))
+            },
             onListTabChange = viewModel::setCommitmentsListTab,
         )
 
@@ -448,7 +451,7 @@ private fun SettingsHubScreen(
                 subtitle = stringResource(
                     R.string.settings_commitments_hub_subtitle,
                     state.activeCommitments.size,
-                    state.historyCommitments.size,
+                    state.disabledCommitments.size,
                 ),
                 onClick = onOpenCommitments,
             )
