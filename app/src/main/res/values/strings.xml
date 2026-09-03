@@ -64,7 +64,6 @@
     <string name="settings_action_resume_short">متابعة</string>
     <string name="settings_stop_account_confirm_title">إيقاف متابعة الحساب؟</string>
     <string name="settings_stop_account_confirm_body">لن يُعدّ حساب ···%1$s من حساباتك — قد تُصنَّف تحويلاته كتحويلات خارجية.</string>
-    <string name="settings_hub_accounts_subtitle_none">لا توجد حسابات بعد</string>
     <string name="settings_hub_accounts_subtitle">%1$d حساب • %2$d غير مسجّل</string>
     <string name="settings_hub_accounts_subtitle_followed_only">%1$d حساب</string>
     <string name="settings_hub_accounts_subtitle_stopped_only">%1$d حساب متوقف</string>
@@ -129,7 +128,6 @@
     <string name="settings_hub_review_title">مراجعة العمليات</string>
     <string name="settings_hub_review_subtitle_none">لا توجد عمليات معلّقة</string>
     <string name="settings_hub_review_subtitle_count">%1$d عملية تحتاج مراجعة</string>
-    <string name="settings_hub_cards_subtitle_none">لا توجد بطاقات بعد</string>
     <string name="settings_hub_cards_subtitle">%1$d بطاقة • %2$d غير مسجّلة</string>
     <string name="settings_hub_cards_subtitle_followed_only">%1$d بطاقة</string>
     <string name="settings_hub_cards_subtitle_stopped_only">%1$d بطاقة متوقفة</string>
@@ -149,9 +147,6 @@
     <string name="settings_banks_section">البنوك</string>
     <string name="settings_banks_hint">اختر بنكًا لإدارة حساباته وبطاقاته وقروضه.</string>
     <string name="settings_banks_empty">لم يُكتشف أي بنك بعد.</string>
-    <string name="settings_hub_banks_subtitle_none">لا توجد بنوك بعد</string>
-    <string name="settings_hub_banks_subtitle">%1$d بنك • %2$d غير مسجّل</string>
-    <string name="settings_hub_banks_subtitle_banks_only">%1$d بنك</string>
     <string name="settings_bank_accounts_title">الحسابات</string>
     <string name="settings_bank_cards_title">البطاقات</string>
     <string name="settings_bank_loans_title">القروض</string>
@@ -173,7 +168,6 @@
     <string name="settings_loan_type_mortgage">قرض عقاري</string>
     <string name="settings_reparse_title">إعادة تحليل الرسائل المحفوظة</string>
     <string name="settings_update_failed">تعذّر تحديث إعدادات البطاقة</string>
-    <string name="settings_data_section">البيانات والرسائل</string>
     <string name="settings_reparse_stored_hint">يعيد تحليل رسائل البنك المحفوظة على الجهاز. مفيد بعد تحديث التطبيق أو إذا بدا مبلغ أو تصنيف غير صحيح — دون إعادة استيراد من الهاتف.</string>
     <string name="settings_reparse_stored_example">مثال: مشتريات بالدولار تُحوَّل للريال إذا ورد سعر الصرف في الرسالة.</string>
     <string name="settings_import_sms_title">استيراد رسائل البنك من الهاتف</string>
@@ -311,7 +305,6 @@
     <string name="dashboard_accounts_count_label">%1$d حساب</string>
     <string name="dashboard_account_period_in_out">وارد %1$s · منصرف %2$s</string>
     <string name="dashboard_account_linked_mada_label">مدى مربوط: %1$s</string>
-    <string name="dashboard_account_unlinked_mada_label">مدى غير مربوط: %1$s</string>
 <string name="dashboard_account_detail_unavailable">لا تتوفر بيانات الفترة لهذا الحساب</string>
     <string name="dashboard_summary_transactions_title">عمليات الفترة (%1$d)</string>
     <string name="dashboard_summary_transactions_empty">لا توجد عمليات في هذه الفترة</string>
@@ -414,7 +407,6 @@
     <string name="settings_commitment_recurrence_weekly">أسبوعي</string>
     <string name="settings_commitment_recurrence_monthly">شهري</string>
     <string name="settings_commitment_recurrence_yearly">سنوي</string>
-    <string name="settings_commitment_due_date">تاريخ الاستحقاق</string>
     <string name="settings_commitment_due_date_none">بدون تاريخ استحقاق</string>
     <string name="settings_commitment_due_date_clear">مسح تاريخ الاستحقاق</string>
     <string name="settings_commitment_disable">إيقاف</string>
@@ -424,7 +416,6 @@
     <string name="settings_commitment_delete_confirm_body">سيتم حذف الالتزام نهائيًا. لن تتأثر العملية الأصلية.</string>
     <string name="settings_commitment_save">حفظ</string>
     <string name="settings_commitment_disabled_badge">متوقف</string>
-    <string name="dashboard_merchants_title">الإنفاق حسب المتجر</string>
     <string name="dashboard_merchants_summary_title">الإنفاق حسب المتجر</string>
     <string name="dashboard_merchants_view_all">عرض الكل ›</string>
     <string name="dashboard_analysis_title">التحليل</string>
@@ -447,8 +438,6 @@
     <string name="dashboard_debit_card_salary_spending">منصرف منذ %1$s</string>
     <string name="dashboard_debit_card_salary_spending_fallback">منصرف منذ بداية الفترة</string>
     <string name="dashboard_debit_card_linked_account">الحساب المرتبط</string>
-    <string name="dashboard_debit_cards_aggregate_period_spending">مجموع مشتريات مدى في الفترة (من %1$s)</string>
-    <string name="dashboard_debit_cards_aggregate_period_spending_fallback">مجموع مشتريات مدى في الفترة</string>
     <string name="dashboard_credit_card_salary_spending">منصرف فترة الراتب (من %1$s)</string>
     <string name="dashboard_credit_card_salary_spending_fallback">منصرف فترة الراتب</string>
     <string name="dashboard_credit_card_salary_purchases_total">منصرف منذ %1$s</string>
