@@ -63,17 +63,12 @@ fun CommitmentsSection(
                         modifier = Modifier
                             .weight(1f)
                             .height(donutSize),
-                        verticalArrangement = Arrangement.SpaceEvenly,
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         CommitmentSummaryMetric(
                             label = stringResource(R.string.dashboard_commitments_total),
                             value = formatLocalizedMoney(overview.total),
                             valueColor = MaterialTheme.colorScheme.onSurface,
-                        )
-                        CommitmentSummaryMetric(
-                            label = stringResource(R.string.dashboard_commitments_paid),
-                            value = formatLocalizedMoney(overview.paid),
-                            valueColor = extended.inflow,
                         )
                     }
                     MasroofDonutChart(

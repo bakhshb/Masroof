@@ -92,6 +92,20 @@ class CommitmentPauseTransitionsTest {
     }
 
     @Test
+    fun resume_persistsLegacyPauseIntervalFromUpdatedAt() {
+        val pausedAt = Instant.parse("2026-04-01T00:00:00Z")
+        val resumedAt = Instant.parse("2026-09-01T00:00:00Z")
+        val commitment = sampleCommitment(active = false, updatedAt = pausedAt)
+
+        val resumed = CommitmentPauseTransitions.resume(commitment, resumedAt)
+
+        assertTrue(resumed.active)
+        assertEquals(1, resumed.pauseIntervals.size)
+        assertEquals(pausedAt, resumed.pauseIntervals.single().pausedAt)
+        assertEquals(resumedAt, resumed.pauseIntervals.single().resumedAt)
+    }
+
+    @Test
     fun legacyInactiveWithoutIntervals_usesUpdatedAtAsPauseStart() {
         val commitment = sampleCommitment(
             transactionDate = LocalDate.parse("2026-07-01"),

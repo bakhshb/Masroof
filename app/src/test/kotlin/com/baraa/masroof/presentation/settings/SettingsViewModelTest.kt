@@ -508,6 +508,30 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun saveCommitment_preservesLegacyPauseAnchorWhenInactive() = runTest {
+        val pausedAt = Instant.parse("2026-04-01T00:00:00Z")
+        val commitment = sampleCommitment(active = false).copy(updatedAt = pausedAt)
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.saveCommitment(
+            commitment.id,
+            SettingsCommitmentsWorkflow.CommitmentEditorDraft(
+                name = "Updated name",
+                amount = Money.of("99.00", Currency.SAR),
+                transactionDate = LocalDate.parse("2026-08-15"),
+                recurrence = CommitmentRecurrence.YEARLY,
+                dueDate = null,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(pausedAt, repo.get(commitment.id)!!.updatedAt)
+    }
+
+    @Test
     fun toggleCommitmentActive_movesBetweenLists() = runTest {
         val commitment = sampleCommitment(active = true)
         val repo = MutableCommitmentRepository(listOf(commitment))

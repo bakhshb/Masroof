@@ -32,6 +32,7 @@ class SettingsCommitmentsWorkflow(
         val existing = commitmentRepository.get(commitmentId) ?: return
         if (draft.amount.amount.signum() <= 0) return
         val now = clock.now()
+        val preserveLegacyPauseAnchor = !existing.active && existing.pauseIntervals.isEmpty()
         commitmentRepository.update(
             existing.copy(
                 name = draft.name,
@@ -39,7 +40,7 @@ class SettingsCommitmentsWorkflow(
                 transactionDate = draft.transactionDate,
                 recurrence = draft.recurrence,
                 dueDate = draft.dueDate,
-                updatedAt = now,
+                updatedAt = if (preserveLegacyPauseAnchor) existing.updatedAt else now,
             ),
         )
     }

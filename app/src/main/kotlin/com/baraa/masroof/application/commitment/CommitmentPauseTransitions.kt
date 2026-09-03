@@ -20,7 +20,15 @@ object CommitmentPauseTransitions {
     fun resume(commitment: Commitment, now: Instant): Commitment {
         if (commitment.active) return commitment
         val last = commitment.pauseIntervals.lastOrNull()
-            ?: return commitment.copy(active = true, updatedAt = now)
+        if (last == null) {
+            return commitment.copy(
+                active = true,
+                pauseIntervals = listOf(
+                    CommitmentPauseInterval(pausedAt = commitment.updatedAt, resumedAt = now),
+                ),
+                updatedAt = now,
+            )
+        }
         if (last.resumedAt != null) {
             return commitment.copy(active = true, updatedAt = now)
         }
