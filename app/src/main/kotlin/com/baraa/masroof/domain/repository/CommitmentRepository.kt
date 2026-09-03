@@ -12,8 +12,6 @@ interface CommitmentRepository {
 
     suspend fun delete(id: String)
 
-    suspend fun setActive(id: String, active: Boolean)
-
     suspend fun get(id: String): Commitment?
 
     suspend fun getBySourceTransactionId(sourceTransactionId: String): Commitment?

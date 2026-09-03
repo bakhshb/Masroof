@@ -396,7 +396,6 @@
     <string name="transaction_detail_mark_commitment_already">هذه العملية مُعيَّنة كالتزام بالفعل</string>
     <string name="settings_commitments_section">الالتزامات</string>
     <string name="settings_commitments_hub_subtitle">%1$d نشط · %2$d في السجل</string>
-    <string name="settings_commitments_empty">لا توجد التزامات محفوظة بعد</string>
     <string name="settings_commitments_tab_active">نشط</string>
     <string name="settings_commitments_tab_history">السجل</string>
     <string name="settings_commitments_active_empty">لا توجد التزامات نشطة</string>
@@ -421,7 +420,6 @@
     <string name="settings_commitment_delete_confirm_title">حذف الالتزام؟</string>
     <string name="settings_commitment_delete_confirm_body">سيتم حذف الالتزام نهائيًا. لن تتأثر العملية الأصلية.</string>
     <string name="settings_commitment_save">حفظ</string>
-    <string name="settings_commitment_disabled_badge">متوقف</string>
     <string name="dashboard_merchants_summary_title">الإنفاق حسب المتجر</string>
     <string name="dashboard_merchants_view_all">عرض الكل ›</string>
     <string name="dashboard_analysis_title">التحليل</string>

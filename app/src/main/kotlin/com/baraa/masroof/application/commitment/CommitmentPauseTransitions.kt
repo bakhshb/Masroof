@@ -19,16 +19,7 @@ object CommitmentPauseTransitions {
 
     fun resume(commitment: Commitment, now: Instant): Commitment {
         if (commitment.active) return commitment
-        val last = commitment.pauseIntervals.lastOrNull()
-        if (last == null) {
-            return commitment.copy(
-                active = true,
-                pauseIntervals = listOf(
-                    CommitmentPauseInterval(pausedAt = commitment.updatedAt, resumedAt = now),
-                ),
-                updatedAt = now,
-            )
-        }
+        val last = commitment.pauseIntervals.lastOrNull() ?: return commitment
         if (last.resumedAt != null) {
             return commitment.copy(active = true, updatedAt = now)
         }
@@ -44,14 +35,6 @@ object CommitmentPauseTransitions {
     fun toggle(commitment: Commitment, now: Instant): Commitment =
         if (commitment.active) pause(commitment, now) else resume(commitment, now)
 
-    fun effectivePauseIntervals(commitment: Commitment): List<CommitmentPauseInterval> {
-        if (commitment.pauseIntervals.isNotEmpty()) return commitment.pauseIntervals
-        if (!commitment.active) {
-            return listOf(CommitmentPauseInterval(pausedAt = commitment.updatedAt, resumedAt = null))
-        }
-        return emptyList()
-    }
-
     fun isVisibleInSalaryPeriod(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
@@ -60,7 +43,7 @@ object CommitmentPauseTransitions {
         val anchorPeriod = FinancialPeriodPolicy.periodContaining(commitment.transactionDate)
         if (!salaryPeriod.endDateExclusive.isAfter(anchorPeriod.startDate)) return false
 
-        return effectivePauseIntervals(commitment).none { interval ->
+        return commitment.pauseIntervals.none { interval ->
             salaryPeriodOverlapsPause(salaryPeriod, interval, zoneId)
         }
     }

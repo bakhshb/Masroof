@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.settings
 
-import com.baraa.masroof.application.commitment.CommitmentPauseTransitions
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
@@ -38,7 +37,7 @@ object CommitmentHistoryBuilder {
         commitment: Commitment,
         zoneId: ZoneId,
     ): List<CommitmentPauseIntervalSummary> =
-        CommitmentPauseTransitions.effectivePauseIntervals(commitment).map { interval ->
+        commitment.pauseIntervals.map { interval ->
             CommitmentPauseIntervalSummary(
                 pausedAt = interval.pausedAt.atZone(zoneId).toLocalDate(),
                 resumedAt = interval.resumedAt?.atZone(zoneId)?.toLocalDate(),

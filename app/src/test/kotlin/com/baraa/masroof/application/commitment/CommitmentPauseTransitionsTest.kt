@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentPauseInterval
 import com.baraa.masroof.domain.model.CommitmentRecurrence
-import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +43,18 @@ class CommitmentPauseTransitionsTest {
 
         assertTrue(resumed.active)
         assertEquals(resumedAt, resumed.pauseIntervals.single().resumedAt)
+    }
+
+    @Test
+    fun resume_withoutOpenInterval_isNoOp() {
+        val commitment = sampleCommitment(active = false)
+
+        val resumed = CommitmentPauseTransitions.resume(
+            commitment,
+            Instant.parse("2026-09-01T12:00:00Z"),
+        )
+
+        assertEquals(commitment, resumed)
     }
 
     @Test
@@ -92,26 +103,14 @@ class CommitmentPauseTransitionsTest {
     }
 
     @Test
-    fun resume_persistsLegacyPauseIntervalFromUpdatedAt() {
-        val pausedAt = Instant.parse("2026-04-01T00:00:00Z")
-        val resumedAt = Instant.parse("2026-09-01T00:00:00Z")
-        val commitment = sampleCommitment(active = false, updatedAt = pausedAt)
-
-        val resumed = CommitmentPauseTransitions.resume(commitment, resumedAt)
-
-        assertTrue(resumed.active)
-        assertEquals(1, resumed.pauseIntervals.size)
-        assertEquals(pausedAt, resumed.pauseIntervals.single().pausedAt)
-        assertEquals(resumedAt, resumed.pauseIntervals.single().resumedAt)
-    }
-
-    @Test
-    fun legacyInactiveWithoutIntervals_usesUpdatedAtAsPauseStart() {
+    fun pausedCommitment_hiddenDuringOpenPauseInterval() {
+        val pausedAt = Instant.parse("2026-08-15T00:00:00Z")
         val commitment = sampleCommitment(
             transactionDate = LocalDate.parse("2026-07-01"),
             recurrence = CommitmentRecurrence.MONTHLY,
             active = false,
-            updatedAt = Instant.parse("2026-08-15T00:00:00Z"),
+        ).copy(
+            pauseIntervals = listOf(CommitmentPauseInterval(pausedAt = pausedAt, resumedAt = null)),
         )
         val previousPeriod = FinancialPeriodPolicy.previous(
             FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-15")),

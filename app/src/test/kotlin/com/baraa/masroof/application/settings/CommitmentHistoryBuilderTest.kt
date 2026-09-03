@@ -48,10 +48,20 @@ class CommitmentHistoryBuilderTest {
     @Test
     fun historyTabItems_sortedByLatestPauseDescending() {
         val older = sampleCommitment(id = "older", active = false).copy(
-            updatedAt = Instant.parse("2026-03-01T00:00:00Z"),
+            pauseIntervals = listOf(
+                CommitmentPauseInterval(
+                    pausedAt = Instant.parse("2026-03-01T00:00:00Z"),
+                    resumedAt = null,
+                ),
+            ),
         )
         val newer = sampleCommitment(id = "newer", active = false).copy(
-            updatedAt = Instant.parse("2026-09-01T00:00:00Z"),
+            pauseIntervals = listOf(
+                CommitmentPauseInterval(
+                    pausedAt = Instant.parse("2026-09-01T00:00:00Z"),
+                    resumedAt = null,
+                ),
+            ),
         )
 
         val items = CommitmentHistoryBuilder.historyTabItems(listOf(older, newer), zone)
@@ -61,16 +71,12 @@ class CommitmentHistoryBuilderTest {
     }
 
     @Test
-    fun intervalSummaries_backfillsFromUpdatedAtWhenLegacyInactive() {
-        val commitment = sampleCommitment(active = false).copy(
-            updatedAt = Instant.parse("2026-08-15T00:00:00Z"),
-        )
+    fun intervalSummaries_returnsEmptyForCommitmentsWithoutIntervals() {
+        val commitment = sampleCommitment(active = false)
 
         val summaries = CommitmentHistoryBuilder.intervalSummaries(commitment, zone)
 
-        assertEquals(1, summaries.size)
-        assertEquals(LocalDate.parse("2026-08-15"), summaries.single().pausedAt)
-        assertTrue(summaries.single().resumedAt == null)
+        assertTrue(summaries.isEmpty())
     }
 
     private fun sampleCommitment(

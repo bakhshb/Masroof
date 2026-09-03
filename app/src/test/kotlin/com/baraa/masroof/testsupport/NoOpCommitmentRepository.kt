@@ -12,8 +12,6 @@ open class NoOpCommitmentRepository(
 
     override suspend fun delete(id: String) = Unit
 
-    override suspend fun setActive(id: String, active: Boolean) = Unit
-
     override suspend fun get(id: String): Commitment? = commitments.find { it.id == id }
 
     override suspend fun getBySourceTransactionId(sourceTransactionId: String): Commitment? =

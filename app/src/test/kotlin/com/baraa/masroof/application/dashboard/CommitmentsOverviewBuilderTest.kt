@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentPauseInterval
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -287,6 +288,7 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun disabledCommitment_staysVisibleInEarlierPeriodsOnly() {
+        val pausedAt = Instant.parse("2026-08-15T00:00:00Z")
         val commitment = commitment(
             name = "STC",
             amount = Money.of("173.00", Currency.SAR),
@@ -294,7 +296,7 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.MONTHLY,
             active = false,
             transactionDate = LocalDate.parse("2026-07-01"),
-            updatedAt = Instant.parse("2026-08-15T00:00:00Z"),
+            pauseIntervals = listOf(CommitmentPauseInterval(pausedAt = pausedAt, resumedAt = null)),
         )
         val previousPeriod = FinancialPeriodPolicy.previous(period)
 
@@ -500,6 +502,12 @@ class CommitmentsOverviewBuilderTest {
                     amount = Money.of("3000.00", Currency.SAR),
                     sourceTransactionId = "tx-school",
                     active = false,
+                    pauseIntervals = listOf(
+                        CommitmentPauseInterval(
+                            pausedAt = Instant.parse("2026-08-01T00:00:00Z"),
+                            resumedAt = null,
+                        ),
+                    ),
                 ),
             ),
             creditFacilities = CreditFacilitiesOverview(
@@ -780,6 +788,7 @@ class CommitmentsOverviewBuilderTest {
         transactionDate: LocalDate = LocalDate.parse("2026-08-01"),
         id: String = RegistryEntityIdFactory.newCommitmentId(),
         updatedAt: Instant = Instant.parse("2026-08-01T00:00:00Z"),
+        pauseIntervals: List<CommitmentPauseInterval> = emptyList(),
     ): Commitment {
         val now = Instant.parse("2026-08-01T00:00:00Z")
         return Commitment(
@@ -790,6 +799,7 @@ class CommitmentsOverviewBuilderTest {
             recurrence = recurrence,
             dueDate = null,
             active = active,
+            pauseIntervals = pauseIntervals,
             sourceTransactionId = sourceTransactionId,
             createdAt = now,
             updatedAt = updatedAt,

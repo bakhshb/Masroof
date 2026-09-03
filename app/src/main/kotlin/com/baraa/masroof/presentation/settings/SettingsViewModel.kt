@@ -951,7 +951,7 @@ class SettingsViewModel(
     }
 
     fun commitmentById(commitmentId: String): ManagedCommitmentUi? =
-        (_uiState.value.activeCommitments + _uiState.value.disabledCommitments)
+        (_uiState.value.activeCommitments + _uiState.value.historyCommitments)
             .find { it.id == commitmentId }
 
     private fun applyCommitments(commitments: List<Commitment>) {
@@ -964,7 +964,7 @@ class SettingsViewModel(
         _uiState.update {
             it.copy(
                 activeCommitments = items.filter { item -> item.active },
-                disabledCommitments = historyItems,
+                historyCommitments = historyItems,
                 commitmentsLoaded = true,
             )
         }
@@ -1055,7 +1055,7 @@ class SettingsViewModel(
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
                 loans = loanItems,
                 activeCommitments = commitmentItems?.filter { item -> item.active } ?: it.activeCommitments,
-                disabledCommitments = historyItems ?: it.disabledCommitments,
+                historyCommitments = historyItems ?: it.historyCommitments,
                 commitmentsLoaded = commitments?.let { true } ?: it.commitmentsLoaded,
                 bankTrees = buildBankTrees(
                     cards = followedCards,

@@ -18,9 +18,6 @@ interface CommitmentDao {
     @Query("DELETE FROM commitment WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("UPDATE commitment SET active = :active, updatedAtEpochMillis = :updatedAtEpochMillis WHERE id = :id")
-    suspend fun setActive(id: String, active: Boolean, updatedAtEpochMillis: Long)
-
     @Query("SELECT * FROM commitment WHERE id = :id LIMIT 1")
     suspend fun get(id: String): CommitmentEntity?
 

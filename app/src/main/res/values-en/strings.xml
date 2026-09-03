@@ -390,7 +390,6 @@
     <string name="transaction_detail_mark_commitment_already">This transaction is already a commitment</string>
     <string name="settings_commitments_section">Commitments</string>
     <string name="settings_commitments_hub_subtitle">%1$d active · %2$d in history</string>
-    <string name="settings_commitments_empty">No saved commitments yet</string>
     <string name="settings_commitments_tab_active">Active</string>
     <string name="settings_commitments_tab_history">History</string>
     <string name="settings_commitments_active_empty">No active commitments</string>
@@ -415,7 +414,6 @@
     <string name="settings_commitment_delete_confirm_title">Delete commitment?</string>
     <string name="settings_commitment_delete_confirm_body">This permanently removes the commitment. The original transaction is not affected.</string>
     <string name="settings_commitment_save">Save</string>
-    <string name="settings_commitment_disabled_badge">Disabled</string>
     <string name="dashboard_merchants_summary_title">Spending by merchant</string>
     <string name="dashboard_merchants_view_all">View all ›</string>
     <string name="dashboard_analysis_title">Analysis</string>

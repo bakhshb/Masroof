@@ -448,7 +448,7 @@ private fun SettingsHubScreen(
                 subtitle = stringResource(
                     R.string.settings_commitments_hub_subtitle,
                     state.activeCommitments.size,
-                    state.disabledCommitments.size,
+                    state.historyCommitments.size,
                 ),
                 onClick = onOpenCommitments,
             )

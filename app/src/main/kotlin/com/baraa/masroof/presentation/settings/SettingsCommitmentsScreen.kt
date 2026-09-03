@@ -59,7 +59,7 @@ fun SettingsCommitmentsScreen(
 
             val commitments = when (state.commitmentsListTab) {
                 CommitmentsListTab.ACTIVE -> state.activeCommitments
-                CommitmentsListTab.HISTORY -> state.disabledCommitments
+                CommitmentsListTab.HISTORY -> state.historyCommitments
             }
 
             if (commitments.isEmpty()) {

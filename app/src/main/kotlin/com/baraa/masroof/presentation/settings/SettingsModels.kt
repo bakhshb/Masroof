@@ -130,7 +130,7 @@ data class SettingsUiState(
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
     val loans: List<ManagedLoanUi> = emptyList(),
     val activeCommitments: List<ManagedCommitmentUi> = emptyList(),
-    val disabledCommitments: List<ManagedCommitmentUi> = emptyList(),
+    val historyCommitments: List<ManagedCommitmentUi> = emptyList(),
     val commitmentsListTab: CommitmentsListTab = CommitmentsListTab.ACTIVE,
     val commitmentsLoaded: Boolean = false,
     val savingCommitment: Boolean = false,

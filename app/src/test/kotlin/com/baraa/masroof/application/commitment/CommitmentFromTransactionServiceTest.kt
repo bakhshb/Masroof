@@ -137,8 +137,6 @@ class CommitmentFromTransactionServiceTest {
 
         override suspend fun delete(id: String) = throw UnsupportedOperationException()
 
-        override suspend fun setActive(id: String, active: Boolean) = throw UnsupportedOperationException()
-
         override suspend fun get(id: String): Commitment? = bySource.values.find { it.id == id }
 
         override suspend fun getBySourceTransactionId(sourceTransactionId: String): Commitment? =
