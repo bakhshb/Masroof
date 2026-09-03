@@ -8,7 +8,10 @@ import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.AccountType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.CommitmentRecurrence
+import java.time.LocalDate
 
 data class ManagedCardUi(
     val id: String,
@@ -76,6 +79,17 @@ data class ManagedLoanUi(
     val displayName: String? = null,
 )
 
+data class ManagedCommitmentUi(
+    val id: String,
+    val name: String,
+    val amount: com.baraa.masroof.core.money.Money,
+    val transactionDate: LocalDate,
+    val recurrence: CommitmentRecurrence?,
+    val dueDate: LocalDate?,
+    val active: Boolean,
+    val sourceTransactionId: String,
+)
+
 data class SettingsBankSummaryUi(
     val bank: Bank,
     val followedAccountCount: Int,
@@ -108,6 +122,10 @@ data class SettingsUiState(
     val unregisteredAccounts: List<ManagedAccountUi> = emptyList(),
     val stoppedAccounts: List<ManagedAccountUi> = emptyList(),
     val loans: List<ManagedLoanUi> = emptyList(),
+    val activeCommitments: List<ManagedCommitmentUi> = emptyList(),
+    val disabledCommitments: List<ManagedCommitmentUi> = emptyList(),
+    val commitmentsLoaded: Boolean = false,
+    val savingCommitment: Boolean = false,
     val bankTrees: List<SettingsBankTreeUi> = emptyList(),
     val bankSummaries: List<SettingsBankSummaryUi> = emptyList(),
     val appVersion: String = "",

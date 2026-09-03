@@ -21,6 +21,7 @@ import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCommitmentRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -188,6 +189,7 @@ class DashboardServiceTest {
         accountRepo: AccountRegistryRepository = FakeAccountRepo(),
         cardRepo: CardRegistryRepository = FakeCardRepo(),
         loanRepo: LoanRegistryRepository = FakeLoanRepo(),
+        commitmentRepo: com.baraa.masroof.domain.repository.CommitmentRepository = NoOpCommitmentRepository(),
     ): DashboardService =
         DashboardService(
             financialTransactionRepository = ftRepo,
@@ -198,6 +200,7 @@ class DashboardServiceTest {
             accountRegistryRepository = accountRepo,
             cardRegistryRepository = cardRepo,
             loanRegistryRepository = loanRepo,
+            commitmentRepository = commitmentRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }),
             zoneId = zone,
             clock = clock,

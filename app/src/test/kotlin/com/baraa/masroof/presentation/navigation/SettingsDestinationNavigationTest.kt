@@ -12,6 +12,11 @@ class SettingsDestinationNavigationTest {
         assertEquals(SettingsDestination.MyAccounts, decodeSettingsDestination("my_accounts"))
         assertEquals(SettingsDestination.MyCards, decodeSettingsDestination("my_cards"))
         assertEquals(SettingsDestination.MyLoans, decodeSettingsDestination("my_loans"))
+        assertEquals(SettingsDestination.MyCommitments, decodeSettingsDestination("my_commitments"))
+        assertEquals(
+            SettingsDestination.CommitmentDetail("cmt_abc"),
+            decodeSettingsDestination("commitment:cmt_abc"),
+        )
         assertEquals(SettingsDestination.App, decodeSettingsDestination("app"))
         assertEquals(SettingsDestination.DataBackup, decodeSettingsDestination("data_backup"))
         assertEquals(SettingsDestination.DesignCatalog, decodeSettingsDestination("design_catalog"))

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
+import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverview
@@ -801,6 +803,38 @@ class DashboardViewModelTest {
                     ) = null
                 },
                 clock = com.baraa.masroof.sms.time.InstantClock.System,
+            ),
+            dashboardCommitmentsWorkflow = DashboardCommitmentsWorkflow(
+                commitmentFromTransactionService = CommitmentFromTransactionService(
+                    commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
+                    financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
+                        override suspend fun save(
+                            transaction: FinancialTransaction,
+                            rawSmsIds: Collection<String>,
+                        ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
+
+                        override suspend fun getById(id: String) = null
+                        override suspend fun findByRawSmsId(rawSmsId: String) = null
+                        override suspend fun listAll() = emptyList<FinancialTransaction>()
+                        override suspend fun listOccurredBetween(
+                            startInclusive: java.time.Instant,
+                            endExclusive: java.time.Instant,
+                        ) = emptyList<FinancialTransaction>()
+
+                        override suspend fun isRawSmsLinked(rawSmsId: String) = false
+                        override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
+                        override suspend fun update(transaction: FinancialTransaction) = false
+                        override suspend fun updateAppliedExchangeRate(
+                            id: String,
+                            exchangeRate: java.math.BigDecimal,
+                            source: com.baraa.masroof.domain.model.ExchangeRateSource,
+                        ) = false
+                        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
+                        override suspend fun unlinkRawSms(rawSmsId: String) = false
+                        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
+                    },
+                ),
+                commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),

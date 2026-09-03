@@ -50,6 +50,8 @@ internal fun resolvePendingDestination(
         SettingsDestination.MyAccounts,
         SettingsDestination.MyCards,
         SettingsDestination.MyLoans,
+        SettingsDestination.MyCommitments,
+        is SettingsDestination.CommitmentDetail,
         is SettingsDestination.BankAccounts,
         is SettingsDestination.BankCards,
         is SettingsDestination.BankLoans,

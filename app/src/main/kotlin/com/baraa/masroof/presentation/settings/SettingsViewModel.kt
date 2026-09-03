@@ -23,6 +23,7 @@ import com.baraa.masroof.application.update.UpdateManifest
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
 import com.baraa.masroof.application.onboarding.userOutcome
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountType
@@ -31,6 +32,7 @@ import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.OwnershipStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ import kotlinx.coroutines.withContext
 
 class SettingsViewModel(
     private val settingsRegistryWorkflow: SettingsRegistryWorkflow,
+    private val settingsCommitmentsWorkflow: SettingsCommitmentsWorkflow,
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
@@ -93,15 +96,23 @@ class SettingsViewModel(
             restorePendingUpdateState()
             try {
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
+                val commitments = settingsCommitmentsWorkflow.listAll()
                 applyRegistries(
                     cards = snapshot.cards,
                     accounts = snapshot.accounts,
                     loans = snapshot.loans,
+                    commitments = commitments,
                 )
             } catch (ce: CancellationException) {
                 throw ce
             } catch (_: Exception) {
-                _uiState.update { it.copy(loading = false, error = SettingsError.UPDATE_FAILED) }
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        commitmentsLoaded = true,
+                        error = SettingsError.UPDATE_FAILED,
+                    )
+                }
             }
         }
     }
@@ -903,10 +914,69 @@ class SettingsViewModel(
         }
     }
 
+    fun saveCommitment(commitmentId: String, draft: SettingsCommitmentsWorkflow.CommitmentEditorDraft) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(savingCommitment = true) }
+            try {
+                settingsCommitmentsWorkflow.update(commitmentId, draft)
+                applyCommitments(settingsCommitmentsWorkflow.listAll())
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) }
+            } finally {
+                _uiState.update { it.copy(savingCommitment = false) }
+            }
+        }
+    }
+
+    fun toggleCommitmentActive(commitmentId: String) {
+        viewModelScope.launch {
+            settingsCommitmentsWorkflow.toggleActive(commitmentId)
+            applyCommitments(settingsCommitmentsWorkflow.listAll())
+        }
+    }
+
+    fun deleteCommitment(commitmentId: String, onDeleted: () -> Unit = {}) {
+        viewModelScope.launch {
+            settingsCommitmentsWorkflow.delete(commitmentId)
+            applyCommitments(settingsCommitmentsWorkflow.listAll())
+            onDeleted()
+        }
+    }
+
+    fun commitmentById(commitmentId: String): ManagedCommitmentUi? =
+        (_uiState.value.activeCommitments + _uiState.value.disabledCommitments)
+            .find { it.id == commitmentId }
+
+    private fun applyCommitments(commitments: List<Commitment>) {
+        val items = commitments.map(::toManagedCommitmentUi)
+        _uiState.update {
+            it.copy(
+                activeCommitments = items.filter { item -> item.active },
+                disabledCommitments = items.filter { item -> !item.active },
+                commitmentsLoaded = true,
+            )
+        }
+    }
+
+    private fun toManagedCommitmentUi(commitment: Commitment): ManagedCommitmentUi =
+        ManagedCommitmentUi(
+            id = commitment.id,
+            name = commitment.name,
+            amount = commitment.amount,
+            transactionDate = commitment.transactionDate,
+            recurrence = commitment.recurrence,
+            dueDate = commitment.dueDate,
+            active = commitment.active,
+            sourceTransactionId = commitment.sourceTransactionId,
+        )
+
     private fun applyRegistries(
         cards: List<com.baraa.masroof.domain.model.CardRegistryEntry>,
         accounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
         loans: List<com.baraa.masroof.domain.model.LoanRegistryEntry>,
+        commitments: List<Commitment>? = null,
     ) {
         val cardItems = cards
             .filter { it.bank != Bank.UNKNOWN }
@@ -951,6 +1021,7 @@ class SettingsViewModel(
             }
         val followedCards = cardItems.filter { card -> card.ownership == OwnershipStatus.OWNED }
         val followedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.OWNED }
+        val commitmentItems = commitments?.map(::toManagedCommitmentUi)
         _uiState.update {
             it.copy(
                 loading = false,
@@ -961,6 +1032,9 @@ class SettingsViewModel(
                 unregisteredAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.UNKNOWN },
                 stoppedAccounts = accountItems.filter { account -> account.ownership == OwnershipStatus.EXTERNAL },
                 loans = loanItems,
+                activeCommitments = commitmentItems?.filter { item -> item.active } ?: it.activeCommitments,
+                disabledCommitments = commitmentItems?.filter { item -> !item.active } ?: it.disabledCommitments,
+                commitmentsLoaded = commitments?.let { true } ?: it.commitmentsLoaded,
                 bankTrees = buildBankTrees(
                     cards = followedCards,
                     accounts = followedAccounts,

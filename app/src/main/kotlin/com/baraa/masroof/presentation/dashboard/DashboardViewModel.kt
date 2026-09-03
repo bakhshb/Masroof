@@ -7,7 +7,13 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import androidx.lifecycle.viewModelScope
+import com.baraa.masroof.application.commitment.CommitmentCreationResult
+import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
+import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
+import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
+import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
 import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
+import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
@@ -24,9 +30,6 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
-import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
-import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.HistoricalImportUserOutcome
 import com.baraa.masroof.application.onboarding.userOutcome
@@ -51,6 +54,7 @@ class DashboardViewModel(
     private val rescanService: suspend () -> HistoricalImportResult,
     private val reclassificationService: TransactionReclassificationService,
     private val ignoreService: TransactionIgnoreService,
+    private val dashboardCommitmentsWorkflow: DashboardCommitmentsWorkflow,
     private val smsEvidenceLoader: TransactionSmsEvidenceLoader,
     private val permissionStateProvider: () -> Boolean,
     private val appContext: Context,
@@ -284,6 +288,9 @@ class DashboardViewModel(
                 reclassifyError = null,
                 ignoring = false,
                 ignoreError = null,
+                markingCommitment = false,
+                markCommitmentError = null,
+                markCommitmentSuccess = false,
             )
         }
         loadSelectedTransactionSms(transactionId)
@@ -300,6 +307,9 @@ class DashboardViewModel(
                 reclassifyError = null,
                 ignoring = false,
                 ignoreError = null,
+                markingCommitment = false,
+                markCommitmentError = null,
+                markCommitmentSuccess = false,
             )
         }
     }
@@ -348,6 +358,56 @@ class DashboardViewModel(
                         it.copy(
                             reclassifying = false,
                             reclassifyError = result.reason,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun markSelectedTransactionAsCommitment() {
+        val transactionId = _uiState.value.selectedTransactionId ?: return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    markingCommitment = true,
+                    markCommitmentError = null,
+                    markCommitmentSuccess = false,
+                )
+            }
+            val result = try {
+                dashboardCommitmentsWorkflow.createFromTransaction(transactionId)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                CommitmentCreationResult.Rejected("create_failed")
+            }
+            when (result) {
+                CommitmentCreationResult.Success -> {
+                    refreshPreservingSelection()
+                    _uiState.update {
+                        it.copy(
+                            markingCommitment = false,
+                            markCommitmentSuccess = true,
+                            markCommitmentError = null,
+                            committedSourceTransactionIds = it.committedSourceTransactionIds + transactionId,
+                        )
+                    }
+                }
+                CommitmentCreationResult.AlreadyExists -> {
+                    _uiState.update {
+                        it.copy(
+                            markingCommitment = false,
+                            markCommitmentError = "already_exists",
+                            committedSourceTransactionIds = it.committedSourceTransactionIds + transactionId,
+                        )
+                    }
+                }
+                is CommitmentCreationResult.Rejected -> {
+                    _uiState.update {
+                        it.copy(
+                            markingCommitment = false,
+                            markCommitmentError = result.reason,
                         )
                     }
                 }
@@ -422,6 +482,8 @@ class DashboardViewModel(
                         currentAccount = null,
                         spendingSplit = null,
                         creditFacilities = null,
+                        loansOverview = null,
+                        commitmentsOverview = CommitmentsOverview.empty(),
                         merchantSpending = com.baraa.masroof.application.dashboard.MerchantSpendingOverview.empty(),
                         dailySpendingTrend = null,
                         accountsFleet = null,
@@ -444,6 +506,7 @@ class DashboardViewModel(
                     registryAccounts = loadOwnedAccounts(),
                     periodSummaries = overview.ownedAccountPeriodSummaries,
                 )
+                val committedIds = dashboardCommitmentsWorkflow.committedSourceTransactionIds()
                 ensureActive()
                 if (period != activePeriod) {
                     return@launch
@@ -467,6 +530,7 @@ class DashboardViewModel(
                         spendingSplit = overview.spendingSplit,
                         creditFacilities = overview.creditFacilities,
                         loansOverview = overview.loansOverview,
+                        commitmentsOverview = overview.commitmentsOverview,
                         merchantSpending = overview.merchantSpending,
                         dailySpendingTrend = overview.dailySpendingTrend,
                         bankHierarchy = overview.bankHierarchy,
@@ -484,6 +548,7 @@ class DashboardViewModel(
                         unknownCards = unknownCards,
                         ownedCards = ownedCards,
                         ownedAccounts = ownedAccounts,
+                        committedSourceTransactionIds = committedIds,
                     )
                 }
                 preserveSelectionId?.let(::loadSelectedTransactionSms)

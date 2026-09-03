@@ -16,6 +16,7 @@ class SettingsViewModelFactory(
         require(modelClass.isAssignableFrom(SettingsViewModel::class.java))
         return SettingsViewModel(
             settingsRegistryWorkflow = container.settingsRegistryWorkflow,
+            settingsCommitmentsWorkflow = container.settingsCommitmentsWorkflow,
             appLocaleRepository = container.appLocaleRepository,
             themePreferencesRepository = container.themePreferencesRepository,
             databaseBackupService = container.databaseBackupService,

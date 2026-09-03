@@ -15,6 +15,13 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentRecurrence
+import com.baraa.masroof.domain.repository.CommitmentRepository
+import com.baraa.masroof.sms.time.InstantClock
 import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.model.LoanReference
@@ -35,6 +42,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import java.time.Instant
+import java.time.LocalDate
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -430,6 +439,164 @@ class SettingsViewModelTest {
         assertEquals(1, tree.loans.size)
     }
 
+    @Test
+    fun refresh_loadsActiveAndDisabledCommitments() = runTest {
+        val commitment = sampleCommitment(active = true)
+        val disabled = sampleCommitment(id = "cmt_disabled", active = false)
+        val vm = viewModel(
+            commitments = listOf(commitment, disabled),
+        )
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals(1, vm.uiState.value.activeCommitments.size)
+        assertEquals(commitment.id, vm.uiState.value.activeCommitments.single().id)
+        assertEquals(1, vm.uiState.value.disabledCommitments.size)
+        assertEquals(disabled.id, vm.uiState.value.disabledCommitments.single().id)
+        assertTrue(vm.uiState.value.commitmentsLoaded)
+        assertEquals(commitment.id, vm.commitmentById(commitment.id)?.id)
+    }
+
+    @Test
+    fun saveCommitment_updatesStoredCommitment() = runTest {
+        val commitment = sampleCommitment()
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.saveCommitment(
+            commitment.id,
+            SettingsCommitmentsWorkflow.CommitmentEditorDraft(
+                name = "Updated name",
+                amount = Money.of("99.00", Currency.SAR),
+                transactionDate = LocalDate.parse("2026-08-15"),
+                recurrence = CommitmentRecurrence.YEARLY,
+                dueDate = LocalDate.parse("2026-08-20"),
+            ),
+        )
+        advanceUntilIdle()
+
+        val updated = repo.get(commitment.id)!!
+        assertEquals("Updated name", updated.name)
+        assertEquals(Money.of("99.00", Currency.SAR), updated.amount)
+        assertEquals(CommitmentRecurrence.YEARLY, updated.recurrence)
+        assertEquals("Updated name", vm.uiState.value.activeCommitments.single().name)
+    }
+
+    @Test
+    fun saveCommitment_rejectsNonPositiveAmount() = runTest {
+        val commitment = sampleCommitment()
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.saveCommitment(
+            commitment.id,
+            SettingsCommitmentsWorkflow.CommitmentEditorDraft(
+                name = commitment.name,
+                amount = Money.of("0.00", Currency.SAR),
+                transactionDate = commitment.transactionDate,
+                recurrence = commitment.recurrence,
+                dueDate = commitment.dueDate,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(Money.of("71.00", Currency.SAR), repo.get(commitment.id)!!.amount)
+    }
+
+    @Test
+    fun toggleCommitmentActive_movesBetweenLists() = runTest {
+        val commitment = sampleCommitment(active = true)
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.toggleCommitmentActive(commitment.id)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.activeCommitments.isEmpty())
+        assertEquals(commitment.id, vm.uiState.value.disabledCommitments.single().id)
+        assertFalse(repo.get(commitment.id)!!.active)
+    }
+
+    @Test
+    fun deleteCommitment_removesFromUiState() = runTest {
+        val commitment = sampleCommitment()
+        val repo = MutableCommitmentRepository(listOf(commitment))
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.deleteCommitment(commitment.id)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.activeCommitments.isEmpty())
+        assertNull(repo.get(commitment.id))
+    }
+
+    private fun sampleCommitment(
+        id: String = "cmt_1",
+        active: Boolean = true,
+    ): Commitment {
+        val now = Instant.parse("2026-08-01T00:00:00Z")
+        return Commitment(
+            id = id,
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            transactionDate = LocalDate.parse("2026-08-01"),
+            recurrence = CommitmentRecurrence.MONTHLY,
+            dueDate = LocalDate.parse("2026-08-05"),
+            active = active,
+            sourceTransactionId = "tx-$id",
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    private fun commitmentsWorkflow(
+        repo: CommitmentRepository,
+    ): SettingsCommitmentsWorkflow =
+        SettingsCommitmentsWorkflow(
+            commitmentRepository = repo,
+            clock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") },
+        )
+
+    private class MutableCommitmentRepository(
+        initial: List<Commitment> = emptyList(),
+    ) : CommitmentRepository {
+        private val items = initial.associateBy { it.id }.toMutableMap()
+
+        override suspend fun create(commitment: Commitment) {
+            items[commitment.id] = commitment
+        }
+
+        override suspend fun update(commitment: Commitment) {
+            items[commitment.id] = commitment
+        }
+
+        override suspend fun delete(id: String) {
+            items.remove(id)
+        }
+
+        override suspend fun setActive(id: String, active: Boolean) {
+            val existing = items[id] ?: return
+            items[id] = existing.copy(active = active)
+        }
+
+        override suspend fun get(id: String): Commitment? = items[id]
+
+        override suspend fun getBySourceTransactionId(sourceTransactionId: String): Commitment? =
+            items.values.find { it.sourceTransactionId == sourceTransactionId }
+
+        override suspend fun listAll(): List<Commitment> = items.values.sortedBy { it.name }
+
+        override suspend fun listActive(): List<Commitment> = listAll().filter { it.active }
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
@@ -440,6 +607,12 @@ class SettingsViewModelTest {
             SettingsViewModelTestFixtures.appUpdateService(),
         updateCheckCoordinator: com.baraa.masroof.application.update.UpdateCheckCoordinator =
             SettingsViewModelTestFixtures.updateCheckCoordinator(appUpdateService = appUpdateService),
+        commitments: List<Commitment> = emptyList(),
+        commitmentsWorkflow: SettingsCommitmentsWorkflow =
+            SettingsCommitmentsWorkflow(
+                commitmentRepository = MutableCommitmentRepository(commitments),
+                clock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") },
+            ),
     ): SettingsViewModel =
         SettingsViewModel(
             settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(
@@ -447,6 +620,7 @@ class SettingsViewModelTest {
                 accounts = accounts,
                 loans = loans,
             ),
+            settingsCommitmentsWorkflow = commitmentsWorkflow,
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),

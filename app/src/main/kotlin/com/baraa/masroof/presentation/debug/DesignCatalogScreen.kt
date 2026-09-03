@@ -41,7 +41,9 @@ import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofHorizontalBar
 import com.baraa.masroof.presentation.common.MasroofHorizontalBarStyle
 import com.baraa.masroof.presentation.common.MasroofIcons
+import com.baraa.masroof.presentation.common.MasroofDonutChart
 import com.baraa.masroof.presentation.common.MasroofInteractiveLineChart
+import com.baraa.masroof.presentation.common.commitmentDonutPaidFraction
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
 import com.baraa.masroof.presentation.common.MasroofRankedBarRow
@@ -308,6 +310,14 @@ private fun ComponentSection() {
                 selectedPointIndex = selectedPointIndex,
                 onPointSelected = { selectedPointIndex = it },
                 pointLabel = { index -> "Day ${index + 1}: ${previewValues[index]}" },
+            )
+            MasroofDonutChart(
+                paidFraction = commitmentDonutPaidFraction(
+                    java.math.BigDecimal("1000"),
+                    java.math.BigDecimal("650"),
+                ),
+                centerTitle = "Total",
+                centerValue = "1,000.00",
             )
         }
     }

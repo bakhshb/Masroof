@@ -13,6 +13,7 @@ class DashboardLayoutPreferencesTest {
                 entry(DashboardSectionId.HERO),
                 entry(DashboardSectionId.CARDS),
                 entry(DashboardSectionId.LOANS),
+                entry(DashboardSectionId.COMMITMENTS),
                 entry(DashboardSectionId.MERCHANTS),
                 entry(DashboardSectionId.ACCOUNTS),
                 entry(DashboardSectionId.QUICK),
@@ -28,6 +29,7 @@ class DashboardLayoutPreferencesTest {
                 DashboardSectionId.HERO,
                 DashboardSectionId.CARDS,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.COMMITMENTS,
                 DashboardSectionId.MERCHANTS,
                 DashboardSectionId.ACCOUNTS,
                 DashboardSectionId.QUICK,
@@ -54,6 +56,7 @@ class DashboardLayoutPreferencesTest {
             listOf(
                 DashboardSectionId.HERO,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.COMMITMENTS,
                 DashboardSectionId.MERCHANTS,
                 DashboardSectionId.TRANSACTIONS,
                 DashboardSectionId.CARDS,
@@ -85,6 +88,7 @@ class DashboardLayoutPreferencesTest {
                 DashboardSectionId.ACCOUNTS,
                 DashboardSectionId.CARDS,
                 DashboardSectionId.LOANS,
+                DashboardSectionId.COMMITMENTS,
                 DashboardSectionId.MERCHANTS,
                 DashboardSectionId.TRANSACTIONS,
             ),
@@ -95,14 +99,16 @@ class DashboardLayoutPreferencesTest {
     }
 
     @Test
-    fun defaultLayout_includesLoansBetweenCardsAndTransactions() {
+    fun defaultLayout_includesCommitmentsBetweenLoansAndMerchants() {
         val defaults = DashboardLayoutSnapshot.default()
 
         val ids = defaults.sections.map { it.id }
         assertTrue(DashboardSectionId.LOANS in ids)
+        assertTrue(DashboardSectionId.COMMITMENTS in ids)
         assertTrue(DashboardSectionId.MERCHANTS in ids)
         assertTrue(ids.indexOf(DashboardSectionId.LOANS) > ids.indexOf(DashboardSectionId.CARDS))
-        assertTrue(ids.indexOf(DashboardSectionId.MERCHANTS) > ids.indexOf(DashboardSectionId.LOANS))
+        assertTrue(ids.indexOf(DashboardSectionId.COMMITMENTS) > ids.indexOf(DashboardSectionId.LOANS))
+        assertTrue(ids.indexOf(DashboardSectionId.MERCHANTS) > ids.indexOf(DashboardSectionId.COMMITMENTS))
         assertTrue(ids.indexOf(DashboardSectionId.MERCHANTS) < ids.indexOf(DashboardSectionId.TRANSACTIONS))
     }
 

@@ -6,6 +6,7 @@ import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.dao.BankRegistryDao
 import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.dao.CreditFacilityDao
+import com.baraa.masroof.data.room.dao.CommitmentDao
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.LoanRegistryDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
@@ -17,6 +18,7 @@ import com.baraa.masroof.data.room.entity.BankRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.entity.CreditFacilityEntity
 import com.baraa.masroof.data.room.entity.LoanRegistryEntity
+import com.baraa.masroof.data.room.entity.CommitmentEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
@@ -32,6 +34,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_6_7
 import com.baraa.masroof.data.room.migration.MIGRATION_8_9
 import com.baraa.masroof.data.room.migration.MIGRATION_9_10
 import com.baraa.masroof.data.room.migration.MIGRATION_10_11
+import com.baraa.masroof.data.room.migration.MIGRATION_11_12
 import com.baraa.masroof.data.room.migration.MIGRATION_7_8
 
 /**
@@ -41,7 +44,8 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
  * 4→5 exchange rates; 5→6 registry display names and card relationships;
  * 6→7 bank hierarchy (bank_registry, credit_facility, loan_registry, account types);
  * 7→8 opaque registry entity ids; 8→9 loan registry composite key; 9→10 parsed-event dashboard facts;
- * 10→11 bank-neutral parse facts (loan type, debit source account, salary wording).
+ * 10→11 bank-neutral parse facts (loan type, debit source account, salary wording);
+ * 11→12 user commitments.
  * Does not use destructive migration.
  */
 @Database(
@@ -55,10 +59,11 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
         LoanRegistryEntity::class,
         FinancialTransactionEntity::class,
         FinancialTransactionRawSmsLinkEntity::class,
+        CommitmentEntity::class,
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -78,24 +83,32 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun financialTransactionDao(): FinancialTransactionDao
 
+    abstract fun commitmentDao(): CommitmentDao
+
     abstract fun reviewItemDao(): ReviewItemDao
 
     abstract fun userCorrectionDao(): UserCorrectionDao
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 11
+        const val VERSION: Int = 12
 
-        /** Must match app/schemas/.../11.json identityHash — updated after schema export. */
-        const val IDENTITY_HASH: String = "7ab199e3e48084cea08345da07a0daeb"
+        /** Must match app/schemas/.../12.json identityHash — updated after schema export. */
+        const val IDENTITY_HASH: String = "7e4054824f833d3869883fe0565893db"
 
-        /** Previous production schema (v10 parsed-event dashboard facts). */
-        const val PREVIOUS_VERSION: Int = 10
+        /** Previous production schema (v11 bank-neutral parse facts). */
+        const val PREVIOUS_VERSION: Int = 11
+
+        /** Must match app/schemas/.../11.json identityHash. */
+        const val PREVIOUS_IDENTITY_HASH: String = "7ab199e3e48084cea08345da07a0daeb"
+
+        /** Legacy v10 backups (pre bank-neutral parse facts). */
+        const val LEGACY_VERSION_10: Int = 10
 
         /** Must match app/schemas/.../10.json identityHash. */
-        const val PREVIOUS_IDENTITY_HASH: String = "7e3a9698a7d188a855b1e6736a1fd073"
+        const val LEGACY_IDENTITY_HASH_10: String = "7e3a9698a7d188a855b1e6736a1fd073"
 
-        /** Legacy v9 backups (pre bank-neutral parse facts). */
+        /** Legacy v9 backups (pre parsed-event dashboard facts). */
         const val LEGACY_VERSION_9: Int = 9
 
         /** Must match app/schemas/.../9.json identityHash. */
@@ -136,6 +149,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_8_9,
             MIGRATION_9_10,
             MIGRATION_10_11,
+            MIGRATION_11_12,
         )
 
         /** Room versions accepted by [com.baraa.masroof.application.backup.DatabaseBackupService]. */
@@ -145,6 +159,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             LEGACY_VERSION_7 to LEGACY_IDENTITY_HASH_7,
             LEGACY_VERSION_8 to LEGACY_IDENTITY_HASH_8,
             LEGACY_VERSION_9 to LEGACY_IDENTITY_HASH_9,
+            LEGACY_VERSION_10 to LEGACY_IDENTITY_HASH_10,
             PREVIOUS_VERSION to PREVIOUS_IDENTITY_HASH,
         )
     }

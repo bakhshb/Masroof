@@ -19,6 +19,8 @@ object RegistryEntityIdFactory {
 
     fun newLoanId(): String = "lreg_${randomToken()}"
 
+    fun newCommitmentId(): String = "cmt_${randomToken()}"
+
     fun stableAccountId(bankId: String, maskedNumber: String): String =
         stable("areg", bankId, maskedNumber.trim())
 

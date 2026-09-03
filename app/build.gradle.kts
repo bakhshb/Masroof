@@ -17,10 +17,10 @@ if (keystorePropertiesFile.exists()) {
 
 val appVersionName =
     project.findProperty("appVersionName") as? String
-        ?: "0.3.17"
+        ?: "0.3.18"
 val appVersionCode =
     (project.findProperty("appVersionCode") as? String)?.toIntOrNull()
-        ?: 70
+        ?: 71
 val githubOwner = "bakhshb"
 val githubRepo = "Masroof"
 

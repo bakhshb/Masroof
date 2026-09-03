@@ -12,6 +12,8 @@ data class LoanOverview(
     val displayLabel: String,
     val remainingBalance: Money?,
     val remainingBalanceAsOf: Instant?,
+    val latestInstallmentAmount: Money? = null,
+    val latestInstallmentAsOf: Instant? = null,
     val salaryPeriodPayment: SignedMoneyAmount,
     val salaryPeriodLabel: String?,
 )

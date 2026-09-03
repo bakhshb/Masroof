@@ -12,6 +12,7 @@ import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
@@ -84,6 +85,9 @@ class SettingsImportConfirmTest {
                 cards = EmptyCards(),
                 accounts = EmptyAccounts(),
                 loans = NoOpLoanRegistryRepository,
+            ),
+            settingsCommitmentsWorkflow = SettingsCommitmentsWorkflow(
+                commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
             appLocaleRepository = object : AppLocaleRepository {
                 override fun getLanguageTag() = AppLocale.DEFAULT_TAG

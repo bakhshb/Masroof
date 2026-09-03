@@ -1,0 +1,134 @@
+package com.baraa.masroof.application.commitment
+
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.repository.CommitmentRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+
+class CommitmentFromTransactionServiceTest {
+    private val zone = ZoneId.of("Asia/Riyadh")
+    private val clock = Clock.fixed(Instant.parse("2026-08-01T00:00:00Z"), zone)
+
+    @Test
+    fun createFromTransaction_duplicateInsert_returnsAlreadyExists() = runBlocking {
+        val tx = transaction(id = "tx-netflix")
+        val repository = ThrowOnDuplicateCommitmentRepository()
+        val service = CommitmentFromTransactionService(
+            commitmentRepository = repository,
+            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(tx)),
+            zoneId = zone,
+            clock = clock,
+        )
+
+        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
+        assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
+    }
+
+    @Test
+    fun createFromTransaction_refundIsRejected() = runBlocking {
+        val refund = transaction(id = "tx-refund", type = FinancialTransactionType.REFUND)
+        val service = CommitmentFromTransactionService(
+            commitmentRepository = ThrowOnDuplicateCommitmentRepository(),
+            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(refund)),
+            zoneId = zone,
+            clock = clock,
+        )
+
+        assertEquals(
+            CommitmentCreationResult.Rejected("invalid_transaction"),
+            service.createFromTransaction(refund.id),
+        )
+    }
+
+    private fun transaction(
+        id: String,
+        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
+    ): FinancialTransaction =
+        FinancialTransaction(
+            id = id,
+            type = type,
+            amount = Money.of("71.00", Currency.SAR),
+            occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "Netflix",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = emptyList(),
+        )
+
+    private class FakeFinancialTransactionRepository(
+        private val all: List<FinancialTransaction>,
+    ) : FinancialTransactionRepository {
+        override suspend fun save(
+            transaction: FinancialTransaction,
+            rawSmsIds: Collection<String>,
+        ): FinancialTransactionSaveResult = FinancialTransactionSaveResult.Saved
+
+        override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
+
+        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
+
+        override suspend fun listAll(): List<FinancialTransaction> = all
+
+        override suspend fun listOccurredBetween(
+            startInclusive: Instant,
+            endExclusive: Instant,
+        ): List<FinancialTransaction> =
+            all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
+
+        override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
+
+        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
+
+        override suspend fun update(transaction: FinancialTransaction): Boolean = false
+
+        override suspend fun updateAppliedExchangeRate(
+            id: String,
+            exchangeRate: java.math.BigDecimal,
+            source: com.baraa.masroof.domain.model.ExchangeRateSource,
+        ): Boolean = false
+
+        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
+
+        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
+
+        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
+    }
+
+    private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {
+        private val bySource = mutableMapOf<String, Commitment>()
+
+        override suspend fun create(commitment: Commitment) {
+            if (bySource.containsKey(commitment.sourceTransactionId)) {
+                throw IllegalStateException("duplicate sourceTransactionId")
+            }
+            bySource[commitment.sourceTransactionId] = commitment
+        }
+
+        override suspend fun update(commitment: Commitment) = throw UnsupportedOperationException()
+
+        override suspend fun delete(id: String) = throw UnsupportedOperationException()
+
+        override suspend fun setActive(id: String, active: Boolean) = throw UnsupportedOperationException()
+
+        override suspend fun get(id: String): Commitment? = bySource.values.find { it.id == id }
+
+        override suspend fun getBySourceTransactionId(sourceTransactionId: String): Commitment? =
+            bySource[sourceTransactionId]
+
+        override suspend fun listAll(): List<Commitment> = bySource.values.toList()
+
+        override suspend fun listActive(): List<Commitment> = bySource.values.filter { it.active }
+    }
+}

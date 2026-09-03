@@ -9,6 +9,12 @@ sealed interface SettingsDestination {
 
     data object MyLoans : SettingsDestination
 
+    data object MyCommitments : SettingsDestination
+
+    data class CommitmentDetail(
+        val commitmentId: String,
+    ) : SettingsDestination
+
     /** @deprecated Legacy bank list — decoded for saved navigation state only. */
     data object Banks : SettingsDestination
 
@@ -46,6 +52,8 @@ fun SettingsDestination.encode(): String =
         SettingsDestination.MyAccounts -> "my_accounts"
         SettingsDestination.MyCards -> "my_cards"
         SettingsDestination.MyLoans -> "my_loans"
+        SettingsDestination.MyCommitments -> "my_commitments"
+        is SettingsDestination.CommitmentDetail -> "commitment:${commitmentId}"
         SettingsDestination.Banks -> "banks"
         is SettingsDestination.BankHub -> "bank:$bankId"
         is SettingsDestination.BankAccounts -> "bank:$bankId:accounts"
@@ -63,6 +71,12 @@ fun decodeSettingsDestination(encoded: String): SettingsDestination {
     if (encoded == "my_accounts") return SettingsDestination.MyAccounts
     if (encoded == "my_cards") return SettingsDestination.MyCards
     if (encoded == "my_loans") return SettingsDestination.MyLoans
+    if (encoded == "my_commitments") return SettingsDestination.MyCommitments
+    if (encoded.startsWith("commitment:")) {
+        return SettingsDestination.CommitmentDetail(
+            commitmentId = encoded.removePrefix("commitment:"),
+        )
+    }
     if (encoded == "banks") return SettingsDestination.Banks
     if (encoded == "app") return SettingsDestination.App
     if (encoded == "data_backup") return SettingsDestination.DataBackup

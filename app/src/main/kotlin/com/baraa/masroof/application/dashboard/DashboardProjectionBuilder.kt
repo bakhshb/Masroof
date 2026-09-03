@@ -4,6 +4,7 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
@@ -13,6 +14,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
+import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -26,6 +28,7 @@ class DashboardProjectionBuilder(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
     private val loanRegistryRepository: LoanRegistryRepository,
+    private val commitmentRepository: CommitmentRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -39,6 +42,7 @@ class DashboardProjectionBuilder(
         enrichedTransactions: List<FinancialTransaction>,
     ): DashboardProjection {
         val reviewRequiredCount = reviewRepository.listRequired().size
+        val commitments = commitmentRepository.listAll()
         val sarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
@@ -55,6 +59,21 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
         )
         val sarEquivalents = sarResolutions.sarAmounts()
+        val periodTransactionIds = dedupedTransactions.mapTo(mutableSetOf()) { it.id }
+        val commitmentSourceTransactions = commitments.mapNotNull { commitment ->
+            if (commitment.sourceTransactionId in periodTransactionIds) {
+                null
+            } else {
+                financialTransactionRepository.getById(commitment.sourceTransactionId)
+            }
+        }
+        val commitmentSarEquivalents = sarEquivalentResolver.resolve(
+            transactions = commitmentSourceTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = primaryCurrency,
+        ).sarAmounts()
+        val commitmentSarEquivalentAmounts = sarEquivalents + commitmentSarEquivalents
 
         val ownedAccounts = accountRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
@@ -214,6 +233,33 @@ class DashboardProjectionBuilder(
             zoneId = zoneId,
             displayLocale = displayLocale,
         )
+        val creditCardPaymentTransactions = creditFacilityPaymentTransactionsOutsidePeriod(
+            creditFacilities = creditFacilities,
+            salaryPeriod = period,
+            periodTransactionIds = periodTransactionIds,
+            zoneId = zoneId,
+        )
+        val creditCardPaymentSarEquivalents = sarEquivalentResolver.resolve(
+            transactions = creditCardPaymentTransactions,
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            primaryCurrency = primaryCurrency,
+        ).sarAmounts()
+        val commitmentTransactions = buildList {
+            addAll(dedupedTransactions)
+            addAll(commitmentSourceTransactions)
+            addAll(creditCardPaymentTransactions)
+        }.distinctBy { it.id }
+        val commitmentsOverview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = commitments,
+            creditFacilities = creditFacilities,
+            loansOverview = loansOverview,
+            transactions = commitmentTransactions,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = commitmentSarEquivalentAmounts + creditCardPaymentSarEquivalents,
+            zoneId = zoneId,
+        )
         val merchantSpending = MerchantSpendingOverviewBuilder.build(
             transactions = dedupedTransactions,
             primaryCurrency = primaryCurrency,
@@ -246,6 +292,7 @@ class DashboardProjectionBuilder(
             perAccount = perAccount,
             creditFacilities = creditFacilities,
             loansOverview = loansOverview,
+            commitmentsOverview = commitmentsOverview,
             merchantSpending = merchantSpending,
             dailySpendingTrend = dailySpendingTrend,
             bankHierarchy = bankHierarchy,
@@ -263,5 +310,33 @@ class DashboardProjectionBuilder(
             accountRegistry = ownedAccounts,
             cardRegistry = cardRegistry,
         )
+    }
+
+    private suspend fun creditFacilityPaymentTransactionsOutsidePeriod(
+        creditFacilities: CreditFacilitiesOverview,
+        salaryPeriod: FinancialPeriod,
+        periodTransactionIds: Set<String>,
+        zoneId: ZoneId,
+    ): List<FinancialTransaction> {
+        val relevantFacilities = creditFacilities.facilities.filter { facility ->
+            val due = facility.facilityDue ?: return@filter false
+            CommitmentsOverviewBuilder.isStatementDueInPeriod(due, salaryPeriod, zoneId)
+        }
+        if (relevantFacilities.isEmpty()) return emptyList()
+
+        val creditCardPayments = financialTransactionRepository.listByTypes(
+            listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT),
+        )
+        return relevantFacilities.flatMap { facility ->
+            val due = facility.facilityDue ?: return@flatMap emptyList()
+            val cardIds = facility.allCards.mapNotNull { card ->
+                FinancialContainerIdFactory.cardId(card.bank, card.last4)
+            }.toSet()
+            creditCardPayments.filter { transaction ->
+                transaction.id !in periodTransactionIds &&
+                    transaction.destinationContainerId in cardIds &&
+                    !transaction.occurredAt.isBefore(due.updatedAt)
+            }
+        }.distinctBy { it.id }
     }
 }

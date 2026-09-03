@@ -49,6 +49,12 @@ object LoanOverviewBuilder {
             zoneId = zoneId,
             asOfExclusive = salaryPeriodEnd,
         )
+        val installmentByLoanKey = latestInstallmentAmounts(
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            zoneId = zoneId,
+            asOfExclusive = salaryPeriodEnd,
+        )
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
 
         val overviews = ownedLoans.map { loan ->
@@ -70,6 +76,7 @@ object LoanOverviewBuilder {
             }
             val periodPayment = SignedMoneyAmount.of(periodPaymentTotal)
             val remaining = remainingByLoanKey[loanKey]
+            val installment = installmentByLoanKey[loanKey]
             LoanOverview(
                 bank = loan.bank,
                 loanType = loan.loanType,
@@ -77,6 +84,8 @@ object LoanOverviewBuilder {
                     ?: RegistryDisplayLabels.loanLabel(loan),
                 remainingBalance = remaining?.first,
                 remainingBalanceAsOf = remaining?.second,
+                latestInstallmentAmount = installment?.first,
+                latestInstallmentAsOf = installment?.second,
                 salaryPeriodPayment = periodPayment,
                 salaryPeriodLabel = salaryPeriodLabel,
             )
@@ -116,6 +125,35 @@ object LoanOverviewBuilder {
             val existing = latest[key]
             if (existing == null || occurredAt.isAfter(existing.second)) {
                 latest[key] = balance to occurredAt
+            }
+        }
+        return latest
+    }
+
+    private fun latestInstallmentAmounts(
+        parsedRecords: List<ParsedEventRecord>,
+        rawSmsById: Map<String, RawSms>,
+        zoneId: ZoneId,
+        asOfExclusive: Instant,
+    ): Map<String, Pair<Money, Instant>> {
+        val latest = mutableMapOf<String, Pair<Money, Instant>>()
+        parsedRecords.forEach { record ->
+            val event = record.event
+            if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return@forEach
+            val loanType = record.details.loanType ?: return@forEach
+            val amount = event.amount ?: return@forEach
+            val raw = rawSmsById[event.rawSmsId] ?: return@forEach
+            val occurredAt = TransactionTiming.effectiveOccurredAt(
+                event = event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = raw.receivedAt,
+                zoneId = zoneId,
+            )
+            if (!occurredAt.isBefore(asOfExclusive)) return@forEach
+            val key = loanKey(event.bank.id, loanType)
+            val existing = latest[key]
+            if (existing == null || occurredAt.isAfter(existing.second)) {
+                latest[key] = amount to occurredAt
             }
         }
         return latest
