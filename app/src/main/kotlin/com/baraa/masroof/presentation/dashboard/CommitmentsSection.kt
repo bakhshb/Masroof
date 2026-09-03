@@ -3,8 +3,11 @@ package com.baraa.masroof.presentation.dashboard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CommitmentDashboardRow
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
@@ -40,6 +44,10 @@ fun CommitmentsSection(
 ) {
     if (!overview.hasContent) return
 
+    val extended = MasroofThemeExtras.extendedColors
+    val paidFraction = commitmentDonutPaidFraction(overview.total.amount, overview.paid.amount)
+    val donutSize = MasroofSpacing.donutChartSizeLarge
+
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
         MasroofSectionHeader(
             title = stringResource(R.string.dashboard_commitments_title),
@@ -47,49 +55,93 @@ fun CommitmentsSection(
         )
 
         MasroofCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
+            Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    MasroofMoneyRow(
-                        label = stringResource(R.string.dashboard_commitments_total),
-                        value = formatLocalizedMoney(overview.total),
-                        style = MasroofMoneyRowStyle.Neutral,
-                    )
-                    MasroofMoneyRow(
-                        label = stringResource(R.string.dashboard_commitments_paid),
-                        value = formatLocalizedMoney(overview.paid),
-                        style = MasroofMoneyRowStyle.Inflow,
-                    )
-                    MasroofMoneyRow(
-                        label = stringResource(R.string.dashboard_commitments_remaining),
-                        value = formatLocalizedMoney(overview.remaining),
-                        style = MasroofMoneyRowStyle.Outflow,
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(donutSize),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        CommitmentSummaryMetric(
+                            label = stringResource(R.string.dashboard_commitments_total),
+                            value = formatLocalizedMoney(overview.total),
+                            valueColor = MaterialTheme.colorScheme.onSurface,
+                        )
+                        CommitmentSummaryMetric(
+                            label = stringResource(R.string.dashboard_commitments_paid),
+                            value = formatLocalizedMoney(overview.paid),
+                            valueColor = extended.inflow,
+                        )
+                    }
+                    MasroofDonutChart(
+                        paidFraction = paidFraction,
+                        centerTitle = "",
+                        centerValue = "",
+                        showCenterContent = false,
+                        size = donutSize,
                     )
                 }
-                MasroofDonutChart(
-                    paidFraction = commitmentDonutPaidFraction(overview.total.amount, overview.paid.amount),
-                    centerTitle = stringResource(R.string.dashboard_commitments_total),
-                    centerValue = formatLocalizedMoney(overview.total),
-                )
-            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = MasroofSpacing.sectionGap),
-                verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
-            ) {
-                overview.rows.forEach { row ->
-                    CommitmentDashboardRowItem(row = row)
+                MasroofMoneyRow(
+                    label = stringResource(R.string.dashboard_commitments_paid),
+                    value = formatLocalizedMoney(overview.paid),
+                    style = MasroofMoneyRowStyle.Inflow,
+                )
+                MasroofHorizontalBar(
+                    progress = paidFraction,
+                    style = MasroofHorizontalBarStyle.Inflow,
+                )
+
+                MasroofMoneyRow(
+                    label = stringResource(R.string.dashboard_commitments_remaining),
+                    value = formatLocalizedMoney(overview.remaining),
+                    style = MasroofMoneyRowStyle.Outflow,
+                )
+                MasroofHorizontalBar(
+                    progress = MasroofBarChart.progress(
+                        overview.remaining.amount,
+                        overview.total.amount,
+                    ),
+                    style = MasroofHorizontalBarStyle.Outflow,
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = MasroofSpacing.sectionHeaderGap),
+                    verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
+                ) {
+                    overview.rows.forEach { row ->
+                        CommitmentDashboardRowItem(row = row)
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CommitmentSummaryMetric(
+    label: String,
+    value: String,
+    valueColor: Color,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = valueColor,
+        )
     }
 }
 
@@ -134,11 +186,15 @@ private fun CommitmentDashboardRowItem(
                 )
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
             MasroofAmountText(
                 amount = formatLocalizedMoney(row.amount),
                 role = MasroofAmountRole.List,
             )
+            Spacer(Modifier.width(MasroofSpacing.listItemGap))
             Text(
                 statusLabel,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),

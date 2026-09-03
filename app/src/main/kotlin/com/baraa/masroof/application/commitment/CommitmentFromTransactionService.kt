@@ -3,6 +3,7 @@ package com.baraa.masroof.application.commitment
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
@@ -82,6 +83,7 @@ class CommitmentFromTransactionService(
             name = name,
             amount = transaction.amount,
             transactionDate = transactionDate,
+            recurrence = CommitmentRecurrence.MONTHLY,
             sourceTransactionId = transaction.id,
         )
     }

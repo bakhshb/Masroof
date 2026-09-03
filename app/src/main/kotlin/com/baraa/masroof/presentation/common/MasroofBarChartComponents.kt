@@ -23,6 +23,7 @@ import java.math.RoundingMode
 
 enum class MasroofHorizontalBarStyle {
     Default,
+    Inflow,
     Outflow,
 }
 
@@ -45,6 +46,7 @@ fun MasroofHorizontalBar(
     val extended = MasroofThemeExtras.extendedColors
     val fillColor = when (style) {
         MasroofHorizontalBarStyle.Default -> MaterialTheme.colorScheme.primary
+        MasroofHorizontalBarStyle.Inflow -> extended.inflow
         MasroofHorizontalBarStyle.Outflow -> extended.outflow
     }
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -78,6 +80,7 @@ fun MasroofRankedBarRow(
     val extended = MasroofThemeExtras.extendedColors
     val valueColor = when (style) {
         MasroofHorizontalBarStyle.Default -> MaterialTheme.colorScheme.primary
+        MasroofHorizontalBarStyle.Inflow -> extended.inflow
         MasroofHorizontalBarStyle.Outflow -> extended.outflow
     }
 
