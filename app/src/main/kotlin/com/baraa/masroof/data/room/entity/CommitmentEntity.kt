@@ -20,6 +20,7 @@ data class CommitmentEntity(
     val recurrence: String?,
     val dueDateIso: String?,
     val active: Boolean,
+    val pauseIntervalsJson: String = "[]",
     val sourceTransactionId: String,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.application.commitment.CommitmentPauseTransitions
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -74,7 +75,10 @@ object CommitmentsOverviewBuilder {
     ): CommitmentsOverview {
         val consumedPaymentTransactionIds = mutableSetOf<String>()
         val rows = buildList {
-            commitments.filter { it.active }.sortedBy { it.id }.forEach { commitment ->
+            commitments
+                .filter { isCommitmentVisibleInPeriod(it, salaryPeriod, zoneId) }
+                .sortedBy { it.id }
+                .forEach { commitment ->
                 addAll(
                     buildUserRows(
                         commitment = commitment,
@@ -142,18 +146,24 @@ object CommitmentsOverviewBuilder {
             sourceTransactionId = commitment.sourceTransactionId,
             transactions = transactions,
         ) ?: return emptyList()
+        val matchedPayments = matchingPaymentCount(
+            commitment = commitment,
+            salaryPeriod = salaryPeriod,
+            transactions = transactions,
+            primaryCurrency = primaryCurrency,
+            sarEquivalents = sarEquivalents,
+            zoneId = zoneId,
+            consumedPaymentTransactionIds = consumedPaymentTransactionIds,
+        )
         val paidOccurrenceCount = if (commitment.recurrence == null) {
-            occurrences.size
+            when {
+                occurrences.isEmpty() -> 0
+                isDateInPeriod(commitment.transactionDate, salaryPeriod) || matchedPayments > 0 ->
+                    occurrences.size
+                else -> 0
+            }
         } else {
-            matchingPaymentCount(
-                commitment = commitment,
-                salaryPeriod = salaryPeriod,
-                transactions = transactions,
-                primaryCurrency = primaryCurrency,
-                sarEquivalents = sarEquivalents,
-                zoneId = zoneId,
-                consumedPaymentTransactionIds = consumedPaymentTransactionIds,
-            )
+            matchedPayments
         }
         return occurrences.mapIndexed { index, occurrence ->
             CommitmentDashboardRow(
@@ -262,6 +272,12 @@ object CommitmentsOverviewBuilder {
                 loanKey = "${loan.bank.id}:${loan.loanType.name}",
             )
         }
+
+    internal fun isCommitmentVisibleInPeriod(
+        commitment: Commitment,
+        salaryPeriod: FinancialPeriod,
+        zoneId: ZoneId,
+    ): Boolean = CommitmentPauseTransitions.isVisibleInSalaryPeriod(commitment, salaryPeriod, zoneId)
 
     internal fun isOneTimeCommitmentInPeriod(
         commitment: Commitment,

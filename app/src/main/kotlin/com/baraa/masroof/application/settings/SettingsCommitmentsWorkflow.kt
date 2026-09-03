@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.settings
 
+import com.baraa.masroof.application.commitment.CommitmentPauseTransitions
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
@@ -45,7 +46,8 @@ class SettingsCommitmentsWorkflow(
 
     suspend fun toggleActive(commitmentId: String) {
         val existing = commitmentRepository.get(commitmentId) ?: return
-        commitmentRepository.setActive(commitmentId, active = !existing.active)
+        val now = clock.now()
+        commitmentRepository.update(CommitmentPauseTransitions.toggle(existing, now))
     }
 
     suspend fun delete(commitmentId: String) {

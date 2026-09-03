@@ -3,6 +3,7 @@ package com.baraa.masroof.application.commitment
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
@@ -32,6 +33,21 @@ class CommitmentFromTransactionServiceTest {
 
         assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
         assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
+    }
+
+    @Test
+    fun createFromTransaction_defaultsToMonthlyRecurrence() = runBlocking {
+        val tx = transaction(id = "tx-netflix")
+        val repository = ThrowOnDuplicateCommitmentRepository()
+        val service = CommitmentFromTransactionService(
+            commitmentRepository = repository,
+            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(tx)),
+            zoneId = zone,
+            clock = clock,
+        )
+
+        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
+        assertEquals(CommitmentRecurrence.MONTHLY, repository.created.single().recurrence)
     }
 
     @Test
@@ -108,6 +124,7 @@ class CommitmentFromTransactionServiceTest {
 
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {
         private val bySource = mutableMapOf<String, Commitment>()
+        val created: List<Commitment> get() = bySource.values.toList()
 
         override suspend fun create(commitment: Commitment) {
             if (bySource.containsKey(commitment.sourceTransactionId)) {
@@ -119,8 +136,6 @@ class CommitmentFromTransactionServiceTest {
         override suspend fun update(commitment: Commitment) = throw UnsupportedOperationException()
 
         override suspend fun delete(id: String) = throw UnsupportedOperationException()
-
-        override suspend fun setActive(id: String, active: Boolean) = throw UnsupportedOperationException()
 
         override suspend fun get(id: String): Commitment? = bySource.values.find { it.id == id }
 

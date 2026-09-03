@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.domain.model.CommitmentPauseInterval
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -249,6 +250,82 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun monthlyCommitment_appearsInFollowingSalaryPeriod() {
+        val commitment = commitment(
+            name = "Netflix",
+            amount = Money.of("71.00", Currency.SAR),
+            sourceTransactionId = "tx-netflix",
+            recurrence = CommitmentRecurrence.MONTHLY,
+            transactionDate = LocalDate.parse("2026-08-01"),
+        )
+        val nextPeriod = FinancialPeriodPolicy.next(period)
+
+        val inMarkedPeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertEquals(1, inMarkedPeriod.rows.size)
+
+        val inFollowingPeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = nextPeriod,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertEquals(1, inFollowingPeriod.rows.size)
+        assertEquals(CommitmentPaymentStatus.UNPAID, inFollowingPeriod.rows.single().status)
+    }
+
+    @Test
+    fun disabledCommitment_staysVisibleInEarlierPeriodsOnly() {
+        val pausedAt = Instant.parse("2026-08-15T00:00:00Z")
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("173.00", Currency.SAR),
+            sourceTransactionId = "tx-stc",
+            recurrence = CommitmentRecurrence.MONTHLY,
+            active = false,
+            transactionDate = LocalDate.parse("2026-07-01"),
+            pauseIntervals = listOf(CommitmentPauseInterval(pausedAt = pausedAt, resumedAt = null)),
+        )
+        val previousPeriod = FinancialPeriodPolicy.previous(period)
+
+        val inPreviousPeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = previousPeriod,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertEquals(1, inPreviousPeriod.rows.size)
+
+        val inDisabledPeriod = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        assertTrue(inDisabledPeriod.rows.isEmpty())
+    }
+
+    @Test
     fun refundDoesNotCountAsRecurringCommitmentPayment() {
         val refund = transaction(
             id = "refund-stc",
@@ -425,6 +502,12 @@ class CommitmentsOverviewBuilderTest {
                     amount = Money.of("3000.00", Currency.SAR),
                     sourceTransactionId = "tx-school",
                     active = false,
+                    pauseIntervals = listOf(
+                        CommitmentPauseInterval(
+                            pausedAt = Instant.parse("2026-08-01T00:00:00Z"),
+                            resumedAt = null,
+                        ),
+                    ),
                 ),
             ),
             creditFacilities = CreditFacilitiesOverview(
@@ -704,6 +787,8 @@ class CommitmentsOverviewBuilderTest {
         active: Boolean = true,
         transactionDate: LocalDate = LocalDate.parse("2026-08-01"),
         id: String = RegistryEntityIdFactory.newCommitmentId(),
+        updatedAt: Instant = Instant.parse("2026-08-01T00:00:00Z"),
+        pauseIntervals: List<CommitmentPauseInterval> = emptyList(),
     ): Commitment {
         val now = Instant.parse("2026-08-01T00:00:00Z")
         return Commitment(
@@ -714,9 +799,10 @@ class CommitmentsOverviewBuilderTest {
             recurrence = recurrence,
             dueDate = null,
             active = active,
+            pauseIntervals = pauseIntervals,
             sourceTransactionId = sourceTransactionId,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = updatedAt,
         )
     }
 

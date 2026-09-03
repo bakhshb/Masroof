@@ -21,16 +21,6 @@ class RoomCommitmentRepository(
         dao.delete(id)
     }
 
-    override suspend fun setActive(id: String, active: Boolean) {
-        val existing = dao.get(id) ?: return
-        dao.update(
-            existing.copy(
-                active = active,
-                updatedAtEpochMillis = System.currentTimeMillis(),
-            ),
-        )
-    }
-
     override suspend fun get(id: String): Commitment? =
         dao.get(id)?.let(CommitmentMapper::toDomain)
 

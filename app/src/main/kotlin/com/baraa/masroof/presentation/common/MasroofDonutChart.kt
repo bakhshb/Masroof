@@ -26,6 +26,7 @@ fun MasroofDonutChart(
     centerValue: String,
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = MasroofSpacing.donutChartSize,
+    showCenterContent: Boolean = true,
 ) {
     val extended = MasroofThemeExtras.extendedColors
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -70,19 +71,21 @@ fun MasroofDonutChart(
                 )
             }
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                centerTitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                centerValue,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
+        if (showCenterContent) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    centerTitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    centerValue,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
