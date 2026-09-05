@@ -12,6 +12,7 @@ import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.YearMonth
@@ -146,7 +147,7 @@ object CommitmentsOverviewBuilder {
             sourceTransactionId = commitment.sourceTransactionId,
             transactions = transactions,
         ) ?: return emptyList()
-        val matchedPaymentAmounts = collectMatchingPaymentAmounts(
+        val matchedPaymentAmounts = collectMatchingPayments(
             commitment = commitment,
             salaryPeriod = salaryPeriod,
             transactions = transactions,
@@ -154,7 +155,7 @@ object CommitmentsOverviewBuilder {
             sarEquivalents = sarEquivalents,
             zoneId = zoneId,
             consumedPaymentTransactionIds = consumedPaymentTransactionIds,
-        )
+        ).map { it.amount }
         val paidOccurrenceCount = if (commitment.recurrence == null) {
             when {
                 occurrences.isEmpty() -> 0
@@ -358,7 +359,12 @@ object CommitmentsOverviewBuilder {
             anchorDate.isBefore(salaryPeriod.endDateExclusive)
     }
 
-    private fun collectMatchingPaymentAmounts(
+    private data class MatchedCommitmentPayment(
+        val occurredAt: Instant,
+        val amount: Money,
+    )
+
+    private fun collectMatchingPayments(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
         transactions: List<FinancialTransaction>,
@@ -366,10 +372,10 @@ object CommitmentsOverviewBuilder {
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
         consumedPaymentTransactionIds: MutableSet<String>,
-    ): List<Money> {
+    ): List<MatchedCommitmentPayment> {
         val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
-        val matched = mutableListOf<Money>()
+        val matched = mutableListOf<MatchedCommitmentPayment>()
         transactions.forEach { tx ->
             if (tx.occurredAt < periodStart || tx.occurredAt >= periodEnd) return@forEach
             if (tx.id in consumedPaymentTransactionIds) return@forEach
@@ -389,9 +395,9 @@ object CommitmentsOverviewBuilder {
                 sarEquivalents = sarEquivalents,
             ) ?: return@forEach
             consumedPaymentTransactionIds.add(tx.id)
-            matched.add(paymentAmount)
+            matched.add(MatchedCommitmentPayment(occurredAt = tx.occurredAt, amount = paymentAmount))
         }
-        return matched
+        return matched.sortedBy { it.occurredAt }
     }
 
     internal fun matchesCommitmentPayment(

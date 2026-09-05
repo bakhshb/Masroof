@@ -250,6 +250,46 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun weeklyCommitment_assignsPaidAmountsInPaymentChronologicalOrder() {
+        val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val commitment = commitment(
+            name = "Cleaning",
+            amount = Money.of("100.00", Currency.SAR),
+            sourceTransactionId = "tx-cleaning",
+            recurrence = CommitmentRecurrence.WEEKLY,
+            transactionDate = LocalDate.parse("2026-07-28"),
+        )
+        val laterPayment = transaction(
+            id = "payment-cleaning-later",
+            merchant = "Cleaning",
+            amount = "120",
+            at = periodStart.plusSeconds(120),
+        )
+        val earlierPayment = transaction(
+            id = "payment-cleaning-earlier",
+            merchant = "Cleaning",
+            amount = "100",
+            at = periodStart.plusSeconds(60),
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(laterPayment, earlierPayment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        val paidRows = overview.rows.filter { it.status == CommitmentPaymentStatus.PAID }
+        assertEquals(2, paidRows.size)
+        assertEquals(Money.of("100.00", Currency.SAR), paidRows[0].amount)
+        assertEquals(Money.of("120.00", Currency.SAR), paidRows[1].amount)
+    }
+
+    @Test
     fun monthlyCommitment_withoutDueDate_usesOccurrenceAsExpectedDate() {
         val commitment = commitment(
             name = "Netflix",
