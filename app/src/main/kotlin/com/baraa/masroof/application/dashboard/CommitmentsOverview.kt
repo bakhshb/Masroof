@@ -373,7 +373,6 @@ object CommitmentsOverviewBuilder {
                     commitment = commitment,
                     primaryCurrency = primaryCurrency,
                     sarEquivalents = sarEquivalents,
-                    transactions = transactions,
                 )
             ) {
                 return@forEach
@@ -389,7 +388,6 @@ object CommitmentsOverviewBuilder {
         commitment: Commitment,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
-        transactions: List<FinancialTransaction>,
     ): Boolean {
         if (
             transaction.type != FinancialTransactionType.EXPENSE &&
