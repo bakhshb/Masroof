@@ -250,6 +250,46 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun weeklyCommitment_assignsPaidAmountsInPaymentChronologicalOrder() {
+        val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val commitment = commitment(
+            name = "Cleaning",
+            amount = Money.of("100.00", Currency.SAR),
+            sourceTransactionId = "tx-cleaning",
+            recurrence = CommitmentRecurrence.WEEKLY,
+            transactionDate = LocalDate.parse("2026-07-28"),
+        )
+        val laterPayment = transaction(
+            id = "payment-cleaning-later",
+            merchant = "Cleaning",
+            amount = "120",
+            at = periodStart.plusSeconds(120),
+        )
+        val earlierPayment = transaction(
+            id = "payment-cleaning-earlier",
+            merchant = "Cleaning",
+            amount = "100",
+            at = periodStart.plusSeconds(60),
+        )
+
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(laterPayment, earlierPayment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        val paidRows = overview.rows.filter { it.status == CommitmentPaymentStatus.PAID }
+        assertEquals(2, paidRows.size)
+        assertEquals(Money.of("100.00", Currency.SAR), paidRows[0].amount)
+        assertEquals(Money.of("120.00", Currency.SAR), paidRows[1].amount)
+    }
+
+    @Test
     fun monthlyCommitment_withoutDueDate_usesOccurrenceAsExpectedDate() {
         val commitment = commitment(
             name = "Netflix",
@@ -662,7 +702,7 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
-    fun editedCommitmentAmount_usesStoredAmountNotSourceTransaction() {
+    fun paidCommitment_usesActualPaymentAmountNotStoredCommitmentAmount() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val tx = transaction(
             id = "tx-stc",
@@ -691,9 +731,44 @@ class CommitmentsOverviewBuilderTest {
             zoneId = zone,
         )
 
-        assertEquals(Money.of("200.00", Currency.SAR), overview.rows.single().amount)
-        assertEquals(Money.of("200.00", Currency.SAR), overview.total)
-        assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.rows.single().amount)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+    }
+
+    @Test
+    fun recurringCommitment_marksPaidWhenPaymentAmountDiffersFromCommitmentAmount() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val payment = transaction(
+            id = "tx-stc-payment",
+            merchant = "STC",
+            amount = "165",
+            at = start.plusSeconds(120),
+        )
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("200.00", Currency.SAR),
+            sourceTransactionId = "tx-stc-original",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(Money.of("165.00", Currency.SAR), overview.rows.single().amount)
+        assertEquals(Money.of("165.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("165.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
     }
 
     @Test
