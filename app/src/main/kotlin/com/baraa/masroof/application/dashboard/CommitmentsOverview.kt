@@ -139,14 +139,14 @@ object CommitmentsOverviewBuilder {
     ): List<CommitmentDashboardRow> {
         val occurrences = occurrencesInPeriod(commitment, salaryPeriod)
         if (occurrences.isEmpty()) return emptyList()
-        val amount = resolveMoney(
+        val expectedAmount = resolveMoney(
             amount = commitment.amount,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             sourceTransactionId = commitment.sourceTransactionId,
             transactions = transactions,
         ) ?: return emptyList()
-        val matchedPayments = matchingPaymentCount(
+        val matchedPaymentAmounts = collectMatchingPaymentAmounts(
             commitment = commitment,
             salaryPeriod = salaryPeriod,
             transactions = transactions,
@@ -158,21 +158,27 @@ object CommitmentsOverviewBuilder {
         val paidOccurrenceCount = if (commitment.recurrence == null) {
             when {
                 occurrences.isEmpty() -> 0
-                isDateInPeriod(commitment.transactionDate, salaryPeriod) || matchedPayments > 0 ->
+                isDateInPeriod(commitment.transactionDate, salaryPeriod) || matchedPaymentAmounts.isNotEmpty() ->
                     occurrences.size
                 else -> 0
             }
         } else {
-            matchedPayments
+            matchedPaymentAmounts.size
         }
         return occurrences.mapIndexed { index, occurrence ->
+            val isPaid = index < paidOccurrenceCount
+            val rowAmount = if (isPaid && index < matchedPaymentAmounts.size) {
+                matchedPaymentAmounts[index]
+            } else {
+                expectedAmount
+            }
             CommitmentDashboardRow(
                 key = "user:${commitment.id}:$occurrence",
                 source = CommitmentDashboardSource.USER,
                 displayName = commitment.name,
-                amount = amount,
+                amount = rowAmount,
                 expectedDate = commitment.dueDate ?: occurrence,
-                status = if (index < paidOccurrenceCount) {
+                status = if (isPaid) {
                     CommitmentPaymentStatus.PAID
                 } else {
                     CommitmentPaymentStatus.UNPAID
@@ -352,7 +358,7 @@ object CommitmentsOverviewBuilder {
             anchorDate.isBefore(salaryPeriod.endDateExclusive)
     }
 
-    private fun matchingPaymentCount(
+    private fun collectMatchingPaymentAmounts(
         commitment: Commitment,
         salaryPeriod: FinancialPeriod,
         transactions: List<FinancialTransaction>,
@@ -360,10 +366,10 @@ object CommitmentsOverviewBuilder {
         sarEquivalents: Map<String, Money>,
         zoneId: ZoneId,
         consumedPaymentTransactionIds: MutableSet<String>,
-    ): Int {
+    ): List<Money> {
         val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(salaryPeriod.startDate, zoneId)
         val periodEnd = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zoneId)
-        var matched = 0
+        val matched = mutableListOf<Money>()
         transactions.forEach { tx ->
             if (tx.occurredAt < periodStart || tx.occurredAt >= periodEnd) return@forEach
             if (tx.id in consumedPaymentTransactionIds) return@forEach
@@ -377,8 +383,13 @@ object CommitmentsOverviewBuilder {
             ) {
                 return@forEach
             }
+            val paymentAmount = TransactionAmountResolver.effectiveAmount(
+                tx = tx,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents,
+            ) ?: return@forEach
             consumedPaymentTransactionIds.add(tx.id)
-            matched++
+            matched.add(paymentAmount)
         }
         return matched
     }

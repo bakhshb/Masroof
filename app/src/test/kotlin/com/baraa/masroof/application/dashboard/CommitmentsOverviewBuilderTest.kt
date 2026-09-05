@@ -662,7 +662,7 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
-    fun editedCommitmentAmount_usesStoredAmountNotSourceTransaction() {
+    fun paidCommitment_usesActualPaymentAmountNotStoredCommitmentAmount() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val tx = transaction(
             id = "tx-stc",
@@ -691,8 +691,10 @@ class CommitmentsOverviewBuilderTest {
             zoneId = zone,
         )
 
-        assertEquals(Money.of("200.00", Currency.SAR), overview.rows.single().amount)
-        assertEquals(Money.of("200.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.rows.single().amount)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("173.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
     }
 
@@ -722,6 +724,10 @@ class CommitmentsOverviewBuilderTest {
             zoneId = zone,
         )
 
+        assertEquals(Money.of("165.00", Currency.SAR), overview.rows.single().amount)
+        assertEquals(Money.of("165.00", Currency.SAR), overview.total)
+        assertEquals(Money.of("165.00", Currency.SAR), overview.paid)
+        assertEquals(Money.zero(Currency.SAR), overview.remaining)
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
     }
 
