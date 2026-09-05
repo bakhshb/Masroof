@@ -147,7 +147,7 @@ object CommitmentsOverviewBuilder {
             sourceTransactionId = commitment.sourceTransactionId,
             transactions = transactions,
         ) ?: return emptyList()
-        val matchedPaymentAmounts = collectMatchingPayments(
+        val matchedPayments = collectMatchingPayments(
             commitment = commitment,
             salaryPeriod = salaryPeriod,
             transactions = transactions,
@@ -155,30 +155,36 @@ object CommitmentsOverviewBuilder {
             sarEquivalents = sarEquivalents,
             zoneId = zoneId,
             consumedPaymentTransactionIds = consumedPaymentTransactionIds,
-        ).map { it.amount }
+        )
         val paidOccurrenceCount = if (commitment.recurrence == null) {
             when {
                 occurrences.isEmpty() -> 0
-                isDateInPeriod(commitment.transactionDate, salaryPeriod) || matchedPaymentAmounts.isNotEmpty() ->
+                isDateInPeriod(commitment.transactionDate, salaryPeriod) || matchedPayments.isNotEmpty() ->
                     occurrences.size
                 else -> 0
             }
         } else {
-            matchedPaymentAmounts.size
+            matchedPayments.size
         }
         return occurrences.mapIndexed { index, occurrence ->
             val isPaid = index < paidOccurrenceCount
-            val rowAmount = if (isPaid && index < matchedPaymentAmounts.size) {
-                matchedPaymentAmounts[index]
+            val matchedPayment = matchedPayments.getOrNull(index)
+            val rowAmount = if (isPaid && matchedPayment != null) {
+                matchedPayment.amount
             } else {
                 expectedAmount
+            }
+            val rowDate = if (isPaid && matchedPayment != null) {
+                matchedPayment.occurredAt.atZone(zoneId).toLocalDate()
+            } else {
+                commitment.dueDate ?: occurrence
             }
             CommitmentDashboardRow(
                 key = "user:${commitment.id}:$occurrence",
                 source = CommitmentDashboardSource.USER,
                 displayName = commitment.name,
                 amount = rowAmount,
-                expectedDate = commitment.dueDate ?: occurrence,
+                expectedDate = rowDate,
                 status = if (isPaid) {
                     CommitmentPaymentStatus.PAID
                 } else {
