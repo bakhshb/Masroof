@@ -693,7 +693,36 @@ class CommitmentsOverviewBuilderTest {
 
         assertEquals(Money.of("200.00", Currency.SAR), overview.rows.single().amount)
         assertEquals(Money.of("200.00", Currency.SAR), overview.total)
-        assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
+    }
+
+    @Test
+    fun recurringCommitment_marksPaidWhenPaymentAmountDiffersFromCommitmentAmount() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val payment = transaction(
+            id = "tx-stc-payment",
+            merchant = "STC",
+            amount = "165",
+            at = start.plusSeconds(120),
+        )
+        val commitment = commitment(
+            name = "STC",
+            amount = Money.of("200.00", Currency.SAR),
+            sourceTransactionId = "tx-stc-original",
+            recurrence = CommitmentRecurrence.MONTHLY,
+        )
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
     }
 
     @Test

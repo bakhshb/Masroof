@@ -403,14 +403,7 @@ object CommitmentsOverviewBuilder {
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         ) ?: return false
-        val commitmentAmount = resolveMoney(
-            amount = commitment.amount,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            sourceTransactionId = commitment.sourceTransactionId,
-            transactions = transactions,
-        ) ?: return false
-        if (txAmount.amount.compareTo(commitmentAmount.amount) != 0) return false
+        if (txAmount.amount.signum() <= 0) return false
         if (transaction.id == commitment.sourceTransactionId) return true
         val txName = transaction.merchant?.trim()?.lowercase()
             ?: transaction.counterparty?.trim()?.lowercase()
